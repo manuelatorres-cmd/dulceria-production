@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -4029,6 +4029,111 @@ export async function reorderProductionSteps(
     ),
   );
   queryClient.invalidateQueries({ queryKey: ["production-steps"] });
+}
+
+// ---------------------------------------------------------------------------
+// Orders + order items
+// ---------------------------------------------------------------------------
+
+export function useOrders(): Order[] {
+  const { data } = useQuery({
+    queryKey: ["orders"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("orders").select("*"),
+      ) as Order[];
+      return rows.sort((a, b) => a.deadline.localeCompare(b.deadline));
+    },
+  });
+  return data ?? [];
+}
+
+export function useOrder(id: string | undefined): Order | null | undefined {
+  const { data } = useQuery({
+    queryKey: ["orders", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const row = assertOkMaybe(
+        await supabase.from("orders").select("*").eq("id", id!).maybeSingle(),
+      ) as Order | null;
+      return row;
+    },
+  });
+  return data;
+}
+
+export function useOrderItems(orderId: string | undefined): OrderItem[] {
+  const { data } = useQuery({
+    queryKey: ["order-items", orderId],
+    enabled: !!orderId,
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("orderItems").select("*").eq("orderId", orderId!),
+      ) as OrderItem[];
+      return rows.sort((a, b) => a.sortOrder - b.sortOrder);
+    },
+  });
+  return data ?? [];
+}
+
+export function useAllOrderItems(): OrderItem[] {
+  const { data } = useQuery({
+    queryKey: ["order-items", "all"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("orderItems").select("*"),
+      ) as OrderItem[];
+      return rows;
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveOrder(order: Omit<Order, "createdAt" | "updatedAt">): Promise<string> {
+  const now = new Date();
+  if (order.id) {
+    const { error } = await supabase
+      .from("orders")
+      .update({ ...order, updatedAt: now })
+      .eq("id", order.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["orders"] });
+    return order.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("orders")
+    .insert({ ...order, id, createdAt: now, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+  return id;
+}
+
+export async function deleteOrder(id: string): Promise<void> {
+  const { error } = await supabase.from("orders").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+}
+
+export async function saveOrderItem(item: Omit<OrderItem, "id"> & { id?: string }): Promise<string> {
+  if (item.id) {
+    const { error } = await supabase.from("orderItems").update(item).eq("id", item.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["order-items"] });
+    return item.id;
+  }
+  const id = newId();
+  const { error } = await supabase.from("orderItems").insert({ ...item, id });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  return id;
+}
+
+export async function deleteOrderItem(id: string): Promise<void> {
+  const { error } = await supabase.from("orderItems").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
 }
 
 export function useEventCalendar(): EventCalendarEntry[] {

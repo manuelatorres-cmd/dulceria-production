@@ -1114,6 +1114,63 @@ export const EQUIPMENT_KIND_LABELS: Record<EquipmentKind, string> = {
  *  the scheduler (§5) is the only writer. */
 export type EquipmentAvailability = "available" | "in_use" | "archived";
 
+// --- Orders -------------------------------------------------------------
+
+export const ORDER_CHANNELS = ["b2b", "event", "online", "shop"] as const;
+export type OrderChannel = (typeof ORDER_CHANNELS)[number];
+
+export const ORDER_CHANNEL_LABELS: Record<OrderChannel, string> = {
+  b2b: "B2B",
+  event: "Event",
+  online: "Online",
+  shop: "Shop",
+};
+
+export const ORDER_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+export type OrderPriority = (typeof ORDER_PRIORITIES)[number];
+
+export const ORDER_PRIORITY_LABELS: Record<OrderPriority, string> = {
+  low: "Low",
+  normal: "Normal",
+  high: "High",
+  urgent: "Urgent",
+};
+
+export const ORDER_STATUSES = ["pending", "in_production", "done", "cancelled"] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  pending: "Pending",
+  in_production: "In production",
+  done: "Done",
+  cancelled: "Cancelled",
+};
+
+export interface Order {
+  id?: string;
+  channel: OrderChannel;
+  customerName?: string;
+  /** Only set when channel = 'event'. */
+  eventName?: string;
+  /** ISO-timestamp string (timestamptz). Reverse scheduler works
+   *  backwards from this. */
+  deadline: string;
+  priority: OrderPriority;
+  status: OrderStatus;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface OrderItem {
+  id?: string;
+  orderId: string;
+  productId: string;
+  quantity: number;
+  sortOrder: number;
+  notes?: string;
+}
+
 /** One step in the production sequence for a specific product type.
  *  Step names are free-text; reuse across types is via UI autocomplete,
  *  not enforced at the DB level. Duration has two parts so the scheduler
