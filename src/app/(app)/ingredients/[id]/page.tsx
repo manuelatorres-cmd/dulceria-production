@@ -39,7 +39,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
   const [formDirty, setFormDirty] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteCheck, setDeleteCheck] = useState<IngredientDeleteCheck | null>(null);
-  const [activeTab, setActiveTab] = useState<"details" | "composition" | "allergens" | "pricing" | "nutrition" | "shell">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "composition" | "ingredients" | "allergens" | "pricing" | "nutrition" | "shell">("details");
   const market = useMarketRegion();
 
   const [savedOnce, setSavedOnce] = useState(false);
@@ -175,8 +175,8 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
       <div className="flex border-b border-border mb-4 px-4 overflow-x-auto">
         {(
           (editing || ingredient.category === "Chocolate")
-            ? ["details", "shell", "composition", "allergens", "pricing", "nutrition"] as const
-            : ["details", "composition", "allergens", "pricing", "nutrition"] as const
+            ? ["details", "shell", "composition", "ingredients", "allergens", "pricing", "nutrition"] as const
+            : ["details", "composition", "ingredients", "allergens", "pricing", "nutrition"] as const
         ).map((tab) => (
           <button
             key={tab}
@@ -247,6 +247,27 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground py-4">No composition data recorded. <button onClick={() => setEditing(true)} className="text-primary hover:underline">Edit ingredient</button> to add it.</p>
+                )}
+              </div>
+            )}
+
+            {/* Sub-ingredients tab */}
+            {activeTab === "ingredients" && (
+              <div>
+                {ingredient.subIngredients && ingredient.subIngredients.length > 0 ? (
+                  <div className="rounded-lg border border-border bg-card divide-y divide-border">
+                    {ingredient.subIngredients.map((s, i) => (
+                      <div key={i} className="px-3 py-2 text-sm text-foreground">
+                        {s.name}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-4">
+                    No sub-ingredients recorded.{" "}
+                    <button onClick={() => setEditing(true)} className="text-primary hover:underline">Edit ingredient</button>{" "}
+                    to add a breakdown (used for ingredient-list text on fillings, products, and collections).
+                  </p>
                 )}
               </div>
             )}

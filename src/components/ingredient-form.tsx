@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import type { Ingredient, CompositionKey } from "@/types";
+import type { Ingredient, CompositionKey, SubIngredient } from "@/types";
 import { getAllergensByRegion, COMPOSITION_FIELDS, migrateAllergens } from "@/types";
 import { saveIngredient, useMarketRegion, useCurrencySymbol, useIngredientCategoryNames } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ interface IngredientFormProps {
   onSaved: () => void;
   onCancel: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
-  activeSection?: "details" | "composition" | "allergens" | "pricing" | "nutrition" | "shell";
+  activeSection?: "details" | "composition" | "ingredients" | "allergens" | "pricing" | "nutrition" | "shell";
 }
 
 const emptyComp: Record<CompositionKey, string> = {
@@ -56,6 +56,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
   const activeAllergens = getAllergensByRegion(region);
   const [pricingIrrelevant, setPricingIrrelevant] = useState(false);
   const [shellCapable, setShellCapable] = useState(false);
+  const [subIngredients, setSubIngredients] = useState<SubIngredient[]>([]);
 
   // Purchase pricing
   const [purchaseCost, setPurchaseCost] = useState("");
@@ -93,6 +94,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
       setAllergens(migrateAllergens(ingredient.allergens));
       setPricingIrrelevant(ingredient.pricingIrrelevant ?? false);
       setShellCapable(ingredient.shellCapable ?? false);
+      setSubIngredients(ingredient.subIngredients ?? []);
       setPurchaseCost(ingredient.purchaseCost != null ? String(ingredient.purchaseCost) : "");
       setPurchaseDate(ingredient.purchaseDate ?? new Date().toISOString().split("T")[0]);
       setPurchaseQty(ingredient.purchaseQty != null ? String(ingredient.purchaseQty) : "1");
@@ -181,6 +183,11 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
         notes: notes.trim(),
         pricingIrrelevant: pricingIrrelevant || undefined,
         shellCapable: (category === "Chocolate" && shellCapable) || undefined,
+        subIngredients: subIngredients.length > 0
+          ? subIngredients
+              .map((s) => ({ name: s.name.trim(), percentage: s.percentage }))
+              .filter((s) => s.name.length > 0)
+          : undefined,
         purchaseCost: parseFloat(purchaseCost) || undefined,
         purchaseDate: purchaseDate || undefined,
         purchaseQty: parseFloat(purchaseQty) || undefined,
@@ -365,6 +372,95 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
               </div>
             ))}
           </div>
+        </fieldset>
+      )}
+
+      {sec === "ingredients" && (
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium mb-1">Sub-ingredients</legend>
+          <p className="text-xs text-muted-foreground">
+            Optional. Used to compose ingredient-list text at filling / product / collection
+            level. Enter sub-ingredients in descending order of quantity (EU labelling
+            convention); the order you save here is the order they&apos;ll appear on
+            rolled-up ingredient lists.
+          </p>
+
+          {subIngredients.length > 0 && (
+            <div className="space-y-2">
+              {subIngredients.map((s, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <div className="flex flex-col shrink-0">
+                    <button
+                      type="button"
+                      disabled={i === 0}
+                      onClick={() => {
+                        setSubIngredients((prev) => {
+                          const next = [...prev];
+                          [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                          return next;
+                        });
+                        onDirtyChange?.(true);
+                      }}
+                      className="px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground leading-none"
+                      aria-label="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      disabled={i === subIngredients.length - 1}
+                      onClick={() => {
+                        setSubIngredients((prev) => {
+                          const next = [...prev];
+                          [next[i], next[i + 1]] = [next[i + 1], next[i]];
+                          return next;
+                        });
+                        onDirtyChange?.(true);
+                      }}
+                      className="px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground leading-none"
+                      aria-label="Move down"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={s.name}
+                    onChange={(e) => {
+                      setSubIngredients((prev) =>
+                        prev.map((row, j) => (j === i ? { ...row, name: e.target.value } : row)),
+                      );
+                      onDirtyChange?.(true);
+                    }}
+                    placeholder="e.g. Cocoa mass"
+                    className="input flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubIngredients((prev) => prev.filter((_, j) => j !== i));
+                      onDirtyChange?.(true);
+                    }}
+                    className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-muted transition-colors shrink-0"
+                    aria-label="Remove sub-ingredient"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setSubIngredients((prev) => [...prev, { name: "" }]);
+              onDirtyChange?.(true);
+            }}
+            className="text-sm text-primary hover:underline"
+          >
+            + Add sub-ingredient
+          </button>
         </fieldset>
       )}
 

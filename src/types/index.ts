@@ -77,6 +77,23 @@ export interface Ingredient {
   outOfStock?: boolean;       // true = completely out, higher urgency than lowStock
   // Nutrition data (all values per 100g of ingredient)
   nutrition?: import("@/lib/nutrition").NutritionData;
+  /** Optional text-only breakdown of what this compound ingredient is made of.
+   *  Used to generate ingredient-list text at filling / product / collection
+   *  level. Not FK-linked; not used for nutrition rollup (nutrition comes from
+   *  the compound ingredient's own `nutrition` field). Percentages are
+   *  optional and not required to sum to 100 — when present they drive
+   *  sort order on the ingredient-list display. */
+  subIngredients?: SubIngredient[];
+}
+
+/** One entry in an Ingredient's `subIngredients` breakdown — the label that
+ *  will appear on ingredient-list text (e.g. "Cocoa mass"), optionally with a
+ *  percentage for display/sorting. Text-only by design (see migration 0007
+ *  header for rationale). */
+export interface SubIngredient {
+  name: string;
+  /** Optional 0–100. Not required to sum to 100 across siblings. */
+  percentage?: number;
 }
 
 /** Derive cost per gram from purchase fields. Returns null if data is insufficient.
