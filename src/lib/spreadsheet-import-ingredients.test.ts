@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapIngredientRow, validateIngredientRow, INGREDIENT_TEMPLATE_COLUMNS } from "./csv-import-ingredients";
+import { mapIngredientRow, validateIngredientRow, INGREDIENT_TEMPLATE_COLUMNS } from "./spreadsheet-import-ingredients";
 
 // ---------------------------------------------------------------------------
 // mapIngredientRow
@@ -221,5 +221,37 @@ describe("INGREDIENT_TEMPLATE_COLUMNS", () => {
     expect(INGREDIENT_TEMPLATE_COLUMNS[0]).toBe("name");
     expect(INGREDIENT_TEMPLATE_COLUMNS).toContain("manufacturer");
     expect(INGREDIENT_TEMPLATE_COLUMNS).toContain("category");
+  });
+
+  it("includes the subIngredients column", () => {
+    expect(INGREDIENT_TEMPLATE_COLUMNS).toContain("subIngredients");
+  });
+});
+
+describe("mapIngredientRow — subIngredients", () => {
+  it("parses pipe-separated sub-ingredient names", () => {
+    const result = mapIngredientRow({
+      name: "Callebaut 811",
+      subIngredients: "cocoa mass | sugar | cocoa butter | milk powder",
+    });
+    expect(result.subIngredients).toEqual([
+      { name: "cocoa mass" },
+      { name: "sugar" },
+      { name: "cocoa butter" },
+      { name: "milk powder" },
+    ]);
+  });
+
+  it("returns undefined for a blank cell", () => {
+    expect(mapIngredientRow({ name: "Plain" }).subIngredients).toBeUndefined();
+    expect(mapIngredientRow({ name: "Plain", subIngredients: "" }).subIngredients).toBeUndefined();
+  });
+
+  it("ignores empty segments and trims whitespace", () => {
+    const result = mapIngredientRow({
+      name: "Test",
+      subIngredients: " one |  | two  |",
+    });
+    expect(result.subIngredients).toEqual([{ name: "one" }, { name: "two" }]);
   });
 });

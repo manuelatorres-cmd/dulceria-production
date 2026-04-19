@@ -1,16 +1,21 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { exportBackup, importBackup, clearAllData } from "@/lib/backup";
-import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode } from "@/lib/hooks";
-import { getAllergensByRegion, allergenLabel, CURRENCIES, getCurrencySymbol, MARKET_LABEL_RULES, type CurrencyCode, type MarketRegion, type FillMode } from "@/types";
+import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories } from "@/lib/hooks";
+import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, type CurrencyCode, type MarketRegion, type FillMode } from "@/types";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import { loadDemoData, isDemoDataLoaded } from "@/lib/seed-demo";
 import { isCloudConfigured } from "@/lib/supabase";
-import { Download, Upload, AlertTriangle, CheckCircle, ChevronDown, FlaskConical, Video, Printer, Pencil, Trash2, FileSpreadsheet } from "lucide-react";
-import { CSVImport } from "@/components/csv-import";
-import { ingredientImportConfig, getExistingIngredientKeys } from "@/lib/csv-import-ingredients";
+import { Download, AlertTriangle, CheckCircle, FlaskConical, Video, Printer, Pencil, Trash2 } from "lucide-react";
+import { SpreadsheetImport } from "@/components/spreadsheet-import";
+import { ingredientImportConfig, getExistingIngredientKeys } from "@/lib/spreadsheet-import-ingredients";
+import { mouldImportConfig, getExistingMouldKeys } from "@/lib/spreadsheet-import-moulds";
+import { packagingImportConfig, getExistingPackagingKeys } from "@/lib/spreadsheet-import-packaging";
+import { decorationImportConfig, getExistingDecorationKeys } from "@/lib/spreadsheet-import-decorations";
+import { buildFillingImportConfig, buildIngredientLookup as buildIngredientLookupForFilling, getExistingFillingKeys, type FillingImportRow } from "@/lib/spreadsheet-import-fillings";
+import { buildProductImportConfig, buildFillingNameLookup, buildMouldNameLookup, buildIngredientNameLookup, buildProductCategoryLookup, getExistingProductKeys, type ProductImportRow } from "@/lib/spreadsheet-import-products";
 import type { Ingredient } from "@/types";
 
 type ImportState = "idle" | "confirm" | "importing" | "done" | "error";
@@ -757,32 +762,129 @@ function PreferencesTab({
   );
 }
 
-const INGREDIENT_PREVIEW_COLUMNS: { key: string; label: string; accessor: (data: Omit<Ingredient, "id">) => string }[] = [
-  { key: "name", label: "Name", accessor: (d) => d.name },
-  { key: "category", label: "Category", accessor: (d) => d.category ?? "" },
-  { key: "manufacturer", label: "Manufacturer", accessor: (d) => d.manufacturer },
+const INGREDIENT_PREVIEW_COLUMNS = [
+  { key: "name", label: "Name", accessor: (d: Omit<Ingredient, "id">) => d.name },
+  { key: "category", label: "Category", accessor: (d: Omit<Ingredient, "id">) => d.category ?? "" },
+  { key: "manufacturer", label: "Manufacturer", accessor: (d: Omit<Ingredient, "id">) => d.manufacturer },
+];
+
+const MOULD_PREVIEW_COLUMNS = [
+  { key: "name", label: "Name", accessor: (d: { name: string }) => d.name },
+  { key: "cavityWeightG", label: "Cavity g", accessor: (d: { cavityWeightG: number }) => String(d.cavityWeightG) },
+  { key: "numberOfCavities", label: "Cavities", accessor: (d: { numberOfCavities: number }) => String(d.numberOfCavities) },
+];
+
+const PACKAGING_PREVIEW_COLUMNS = [
+  { key: "name", label: "Name", accessor: (d: { name: string }) => d.name },
+  { key: "capacity", label: "Capacity", accessor: (d: { capacity: number }) => String(d.capacity) },
+  { key: "manufacturer", label: "Manufacturer", accessor: (d: { manufacturer?: string }) => d.manufacturer ?? "" },
+];
+
+const DECORATION_PREVIEW_COLUMNS = [
+  { key: "name", label: "Name", accessor: (d: { name: string }) => d.name },
+  { key: "type", label: "Type", accessor: (d: { type: string }) => d.type },
+  { key: "manufacturer", label: "Manufacturer", accessor: (d: { manufacturer?: string }) => d.manufacturer ?? "" },
+];
+
+const FILLING_PREVIEW_COLUMNS = [
+  { key: "name", label: "Name", accessor: (d: FillingImportRow) => d.filling.name },
+  { key: "category", label: "Category", accessor: (d: FillingImportRow) => d.filling.category },
+  { key: "ingredients", label: "Ingredients", accessor: (d: FillingImportRow) => `${d.ingredients.length} items` },
+];
+
+const PRODUCT_PREVIEW_COLUMNS = [
+  { key: "name", label: "Name", accessor: (d: ProductImportRow) => d.product.name },
+  { key: "fillMode", label: "Fill mode", accessor: (d: ProductImportRow) => d.product.fillMode ?? "percentage" },
+  { key: "fillings", label: "Fillings", accessor: (d: ProductImportRow) => `${d.fillings.length} items` },
 ];
 
 function ImportTab() {
+  // Preload lookup data for relational imports (fillings, products).
+  // Hooks are read here so the configs are rebuilt whenever source data changes.
+  const allIngredients = useIngredients(true);
+  const allFillings = useFillings();
+  const allMoulds = useMouldsList(true);
+  const allProductCategories = useProductCategories();
+
+  const fillingImportConfig = useMemo(
+    () => buildFillingImportConfig(buildIngredientLookupForFilling(allIngredients)),
+    [allIngredients],
+  );
+
+  const productImportConfig = useMemo(
+    () => buildProductImportConfig({
+      ingredients: buildIngredientNameLookup(allIngredients),
+      fillings: buildFillingNameLookup(allFillings),
+      moulds: buildMouldNameLookup(allMoulds),
+      productCategories: buildProductCategoryLookup(allProductCategories),
+    }),
+    [allIngredients, allFillings, allMoulds, allProductCategories],
+  );
+
   return (
     <div className="space-y-6">
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-primary">Import Data</h2>
         <p className="text-xs text-muted-foreground">
-          Bulk-import records from a CSV file. Download the template, fill it in using a
-          spreadsheet, then upload it here. Duplicates are detected by name + manufacturer
-          — if both match an existing record, the row is skipped. Import only adds new
-          records; it never updates or replaces existing data.
+          Bulk-import records from an Excel (.xlsx) file. Download the template per entity,
+          fill it in, then upload. Duplicates are detected by name (plus manufacturer for
+          ingredients) — existing rows are skipped, never overwritten. For fillings and
+          products, child rows (ingredient lists / filling references) resolve by name
+          against the records already in your database.
         </p>
       </section>
 
-      {/* Ingredients */}
       <section className="rounded-lg border border-border bg-card p-4">
-        <CSVImport
+        <SpreadsheetImport
           config={ingredientImportConfig}
           getExistingKeys={getExistingIngredientKeys}
           previewColumns={INGREDIENT_PREVIEW_COLUMNS}
-          description="Import ingredients with composition, allergens, nutrition, and pricing data."
+          description="Composition, allergens, nutrition, pricing, sub-ingredient breakdown."
+        />
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-4">
+        <SpreadsheetImport
+          config={mouldImportConfig}
+          getExistingKeys={getExistingMouldKeys}
+          previewColumns={MOULD_PREVIEW_COLUMNS}
+          description="Cavity weight, cavity count, filling weight per cavity, ownership."
+        />
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-4">
+        <SpreadsheetImport
+          config={packagingImportConfig}
+          getExistingKeys={getExistingPackagingKeys}
+          previewColumns={PACKAGING_PREVIEW_COLUMNS}
+          description="Boxes, trays, or other packaging units with their capacity."
+        />
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-4">
+        <SpreadsheetImport
+          config={decorationImportConfig}
+          getExistingKeys={getExistingDecorationKeys}
+          previewColumns={DECORATION_PREVIEW_COLUMNS}
+          description="Cocoa butters, lustre dusts, transfer sheets, and other decoration materials."
+        />
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-4">
+        <SpreadsheetImport
+          config={fillingImportConfig}
+          getExistingKeys={getExistingFillingKeys}
+          previewColumns={FILLING_PREVIEW_COLUMNS}
+          description={`Filling recipes with their ingredient lists. Ingredient names must match existing ingredients — syntax per cell: "Sugar:100g | Cream 35%:200ml".`}
+        />
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-4">
+        <SpreadsheetImport
+          config={productImportConfig}
+          getExistingKeys={getExistingProductKeys}
+          previewColumns={PRODUCT_PREVIEW_COLUMNS}
+          description={`Products with shell chocolate, mould, fillings, and metadata. Names must match existing records. Fillings per cell: "Hazelnut Ganache:50 | Caramel:50".`}
         />
       </section>
     </div>

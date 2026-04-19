@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { toNum, toNumOpt, toStrOpt, toBoolOpt, parseCSVImport } from "./csv-import";
-import type { CSVImportConfig, RowIssue } from "./csv-import";
+import { toNum, toNumOpt, toStrOpt, toBoolOpt, toList, parseRawRows } from "./spreadsheet-import";
+import type { ImportConfig, RowIssue } from "./spreadsheet-import";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,8 +65,20 @@ describe("toBoolOpt", () => {
   });
 });
 
+describe("toList", () => {
+  it("returns [] for empty/undefined", () => {
+    expect(toList(undefined)).toEqual([]);
+    expect(toList("")).toEqual([]);
+  });
+  it("splits on |, trims, drops empties", () => {
+    expect(toList("alpha | beta |  gamma ")).toEqual(["alpha", "beta", "gamma"]);
+    expect(toList("one")).toEqual(["one"]);
+    expect(toList(" | mid | ")).toEqual(["mid"]);
+  });
+});
+
 // ---------------------------------------------------------------------------
-// parseCSVImport
+// parseRawRows — pure mapping/validation layer shared by xlsx + tests
 // ---------------------------------------------------------------------------
 
 interface TestEntity {
@@ -74,10 +86,9 @@ interface TestEntity {
   value: number;
 }
 
-const testConfig: CSVImportConfig<TestEntity> = {
+const testConfig: ImportConfig<TestEntity> = {
   entityName: "widget",
   templateColumns: ["name", "value"],
-  templateUrl: "/test.csv",
   mapRow: (row) => ({
     name: (row.name ?? "").trim(),
     value: toNum(row.value),
@@ -92,10 +103,13 @@ const testConfig: CSVImportConfig<TestEntity> = {
   commitBatch: async (items) => items.length,
 };
 
-describe("parseCSVImport", () => {
+describe("parseRawRows", () => {
   it("parses valid rows with no issues", () => {
-    const csv = "name,value\nAlpha,10\nBeta,20\n";
-    const result = parseCSVImport(csv, testConfig);
+    const result = parseRawRows(
+      [{ name: "Alpha", value: "10" }, { name: "Beta", value: "20" }],
+      ["name", "value"],
+      testConfig,
+    );
 
     expect(result.rows).toHaveLength(2);
     expect(result.rows[0].data).toEqual({ name: "Alpha", value: 10 });
@@ -107,8 +121,11 @@ describe("parseCSVImport", () => {
   });
 
   it("detects missing columns", () => {
-    const csv = "name\nAlpha\n";
-    const result = parseCSVImport(csv, testConfig);
+    const result = parseRawRows(
+      [{ name: "Alpha" }],
+      ["name"],
+      testConfig,
+    );
 
     expect(result.missingColumns).toEqual(["value"]);
     expect(result.rows).toHaveLength(1);
@@ -116,15 +133,21 @@ describe("parseCSVImport", () => {
   });
 
   it("detects unknown columns", () => {
-    const csv = "name,value,extra\nAlpha,10,foo\n";
-    const result = parseCSVImport(csv, testConfig);
+    const result = parseRawRows(
+      [{ name: "Alpha", value: "10", extra: "foo" }],
+      ["name", "value", "extra"],
+      testConfig,
+    );
 
     expect(result.unknownColumns).toEqual(["extra"]);
   });
 
   it("reports validation errors on rows", () => {
-    const csv = "name,value\n,10\nBeta,-5\n";
-    const result = parseCSVImport(csv, testConfig);
+    const result = parseRawRows(
+      [{ name: "", value: "10" }, { name: "Beta", value: "-5" }],
+      ["name", "value"],
+      testConfig,
+    );
 
     expect(result.rows[0].issues).toHaveLength(1);
     expect(result.rows[0].issues[0].severity).toBe("error");
@@ -135,8 +158,11 @@ describe("parseCSVImport", () => {
   });
 
   it("assigns sequential rowIndex starting from 0", () => {
-    const csv = "name,value\nA,1\nB,2\nC,3\n";
-    const result = parseCSVImport(csv, testConfig);
+    const result = parseRawRows(
+      [{ name: "A", value: "1" }, { name: "B", value: "2" }, { name: "C", value: "3" }],
+      ["name", "value"],
+      testConfig,
+    );
     expect(result.rows.map((r) => r.rowIndex)).toEqual([0, 1, 2]);
   });
 });

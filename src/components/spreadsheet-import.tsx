@@ -1,30 +1,25 @@
 "use client";
 
 /**
- * Reusable CSV Import component.
+ * Reusable spreadsheet import component.
  *
  * Renders a self-contained flow:
- *   1. Download template + choose file
+ *   1. Download .xlsx template + choose file
  *   2. Preview parsed rows with per-row validation
  *   3. Confirm and commit
  *
- * Parameterised by a CSVImportConfig<T> — one component, many entity types.
+ * Parameterised by an `ImportConfig<T>` — one component, many entity types.
  */
 
 import { useRef, useState, useCallback } from "react";
 import { Download, Upload, AlertTriangle, CheckCircle, X, FileSpreadsheet } from "lucide-react";
-import { parseCSV } from "@/lib/csv";
-import type { CSVImportConfig, CSVParseResult, CSVImportResult, ParsedRow } from "@/lib/csv-import";
-import { parseCSVImport, commitCSVImport, downloadTemplate } from "@/lib/csv-import";
+import type { ImportConfig, ParseResult, ImportResult, ParsedRow } from "@/lib/spreadsheet-import";
+import { parseImport, commitImport, downloadTemplate } from "@/lib/spreadsheet-import";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+type ImportPhase = "idle" | "parsing" | "preview" | "importing" | "done" | "error";
 
-type ImportPhase = "idle" | "preview" | "importing" | "done" | "error";
-
-interface CSVImportProps<T> {
-  config: CSVImportConfig<T>;
+interface SpreadsheetImportProps<T> {
+  config: ImportConfig<T>;
   /** Load existing dedup keys from the DB. Called once before commit. */
   getExistingKeys: () => Promise<Set<string>>;
   /** Preview columns to show in the table (subset of templateColumns). */
@@ -33,52 +28,37 @@ interface CSVImportProps<T> {
   description?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-export function CSVImport<T>({ config, getExistingKeys, previewColumns, description }: CSVImportProps<T>) {
+export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, description }: SpreadsheetImportProps<T>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<ImportPhase>("idle");
-  const [parseResult, setParseResult] = useState<CSVParseResult<T> | null>(null);
-  const [importResult, setImportResult] = useState<CSVImportResult | null>(null);
+  const [parseResult, setParseResult] = useState<ParseResult<T> | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [fileName, setFileName] = useState("");
+  const [templating, setTemplating] = useState(false);
 
   const handleFileSelected = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
       setFileName(file.name);
       e.target.value = "";
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const text = reader.result as string;
-
-          // Quick sanity: does the file parse at all?
-          const rawRows = parseCSV(text);
-          if (rawRows.length === 0) {
-            setErrorMessage("The file is empty or contains only headers.");
-            setPhase("error");
-            return;
-          }
-
-          const result = parseCSVImport(text, config);
-          setParseResult(result);
-          setPhase("preview");
-          setErrorMessage("");
-        } catch (err) {
-          setErrorMessage(err instanceof Error ? err.message : "Failed to parse CSV.");
+      setPhase("parsing");
+      try {
+        const buffer = await file.arrayBuffer();
+        const result = await parseImport(buffer, config);
+        if (result.rows.length === 0) {
+          setErrorMessage("The file is empty or contains only headers.");
           setPhase("error");
+          return;
         }
-      };
-      reader.onerror = () => {
-        setErrorMessage("Failed to read file.");
+        setParseResult(result);
+        setPhase("preview");
+        setErrorMessage("");
+      } catch (err) {
+        setErrorMessage(err instanceof Error ? err.message : "Failed to parse the spreadsheet.");
         setPhase("error");
-      };
-      reader.readAsText(file);
+      }
     },
     [config],
   );
@@ -88,7 +68,7 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
     setPhase("importing");
     try {
       const existingKeys = await getExistingKeys();
-      const result = await commitCSVImport(parseResult, config, existingKeys);
+      const result = await commitImport(parseResult, config, existingKeys);
       setImportResult(result);
       setPhase("done");
     } catch (err) {
@@ -105,7 +85,15 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
     setFileName("");
   }, []);
 
-  // Counts for the preview summary
+  const handleDownloadTemplate = useCallback(async () => {
+    setTemplating(true);
+    try {
+      await downloadTemplate(config as ImportConfig<unknown>);
+    } finally {
+      setTemplating(false);
+    }
+  }, [config]);
+
   const errorCount = parseResult?.rows.filter((r) => r.issues.some((i) => i.severity === "error")).length ?? 0;
   const warningCount = parseResult?.rows.filter((r) => r.issues.length > 0 && !r.issues.some((i) => i.severity === "error")).length ?? 0;
   const validCount = (parseResult?.rows.length ?? 0) - errorCount;
@@ -117,7 +105,7 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
         <FileSpreadsheet className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">
-            Import {config.entityName}s from CSV
+            Import {config.entityName}s from Excel
           </p>
           {description && (
             <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
@@ -128,29 +116,28 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
       {/* Phase: idle — template download + file picker */}
       {(phase === "idle" || phase === "error") && (
         <div className="space-y-3">
-          {/* Template download */}
           <button
-            onClick={() => downloadTemplate(config as CSVImportConfig<unknown>)}
-            className="flex items-center gap-2 text-sm text-primary hover:underline"
+            onClick={handleDownloadTemplate}
+            disabled={templating}
+            className="flex items-center gap-2 text-sm text-primary hover:underline disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
-            Download CSV template
+            {templating ? "Generating…" : "Download .xlsx template"}
           </button>
 
-          {/* File picker */}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="w-full rounded-full border border-border py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             <span className="flex items-center justify-center gap-2">
               <Upload className="w-4 h-4" />
-              Choose CSV file…
+              Choose .xlsx file…
             </span>
           </button>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
             onChange={handleFileSelected}
           />
@@ -164,10 +151,14 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
         </div>
       )}
 
+      {/* Phase: parsing */}
+      {phase === "parsing" && (
+        <div className="py-3 text-center text-sm text-muted-foreground">Reading spreadsheet…</div>
+      )}
+
       {/* Phase: preview — table + confirm */}
       {phase === "preview" && parseResult && (
         <div className="space-y-4">
-          {/* File info + column warnings */}
           <div className="rounded-md border border-border bg-card px-3 py-2 space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">{fileName}</p>
@@ -200,7 +191,6 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
             )}
           </div>
 
-          {/* Preview table */}
           <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full text-xs">
               <thead>
@@ -226,7 +216,6 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
             </table>
           </div>
 
-          {/* Action bar */}
           <div className="flex gap-2">
             {validCount > 0 ? (
               <button
@@ -250,12 +239,10 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
         </div>
       )}
 
-      {/* Phase: importing */}
       {phase === "importing" && (
         <div className="py-3 text-center text-sm text-muted-foreground">Importing…</div>
       )}
 
-      {/* Phase: done */}
       {phase === "done" && importResult && (
         <div className="space-y-3">
           <div className="flex items-start gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2">
@@ -281,7 +268,6 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
         </div>
       )}
 
-      {/* Phase: error (during import) */}
       {phase === "error" && parseResult && (
         <div className="space-y-3">
           <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2">
@@ -299,10 +285,6 @@ export function CSVImport<T>({ config, getExistingKeys, previewColumns, descript
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Preview row
-// ---------------------------------------------------------------------------
 
 function PreviewRow<T>({
   row,

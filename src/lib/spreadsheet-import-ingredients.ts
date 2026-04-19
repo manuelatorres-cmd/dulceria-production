@@ -1,17 +1,18 @@
 /**
- * Ingredient-specific CSV import config.
+ * Ingredient-specific spreadsheet import config.
  *
- * Maps CSV columns → Ingredient objects, validates composition + required fields,
- * and commits via bulkAdd (no price-history triggers — these are fresh imports).
+ * Maps spreadsheet columns → Ingredient objects, validates composition +
+ * required fields, and commits via a bulk insert (no price-history triggers —
+ * these are fresh imports).
  */
 
 import { supabase, newId } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import type { Ingredient } from "@/types";
+import type { Ingredient, SubIngredient } from "@/types";
 import { INGREDIENT_CATEGORIES } from "@/types";
 import type { NutrientKey, NutritionData } from "@/lib/nutrition";
-import type { CSVImportConfig, RowIssue } from "@/lib/csv-import";
-import { toNum, toNumOpt, toStrOpt, toBoolOpt } from "@/lib/csv-import";
+import type { ImportConfig, RowIssue } from "@/lib/spreadsheet-import";
+import { toNum, toNumOpt, toStrOpt, toBoolOpt, toList } from "@/lib/spreadsheet-import";
 
 // ---------------------------------------------------------------------------
 // Constants (shared with seed.ts — canonical source)
@@ -34,7 +35,7 @@ const NUTRITION_COLUMNS: NutrientKey[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Template columns — must match public/seed/ingredients.csv header
+// Template columns
 // ---------------------------------------------------------------------------
 
 export const INGREDIENT_TEMPLATE_COLUMNS = [
@@ -48,6 +49,8 @@ export const INGREDIENT_TEMPLATE_COLUMNS = [
   "cacaoFat", "sugar", "milkFat", "water", "solids", "otherFats", "alcohol",
   // Flags
   "shellCapable", "pricingIrrelevant",
+  // Sub-ingredients — pipe-separated names, e.g. "cocoa mass | sugar | milk powder"
+  "subIngredients",
   // Allergens (22 boolean columns)
   ...ALLERGEN_COLUMNS.map((id) => `allergen_${id}`),
   // Nutrition (17 numeric columns)
@@ -93,8 +96,17 @@ export function mapIngredientRow(row: Record<string, string>): Omit<Ingredient, 
     allergens: ALLERGEN_COLUMNS.filter((id) => toBoolOpt(row[`allergen_${id}`]) === true),
     shellCapable: toBoolOpt(row.shellCapable),
     pricingIrrelevant: toBoolOpt(row.pricingIrrelevant),
+    subIngredients: parseSubIngredients(row.subIngredients),
     nutrition: parseNutritionColumns(row),
   };
+}
+
+/** Parse a pipe-separated sub-ingredient cell into a `SubIngredient[]`.
+ *  Only names are captured — percentages aren't exposed in the UI. */
+function parseSubIngredients(val: string | undefined): SubIngredient[] | undefined {
+  const names = toList(val);
+  if (names.length === 0) return undefined;
+  return names.map((name) => ({ name }));
 }
 
 // ---------------------------------------------------------------------------
@@ -154,10 +166,9 @@ export function validateIngredientRow(data: Omit<Ingredient, "id">): RowIssue[] 
 // Config
 // ---------------------------------------------------------------------------
 
-export const ingredientImportConfig: CSVImportConfig<Omit<Ingredient, "id">> = {
+export const ingredientImportConfig: ImportConfig<Omit<Ingredient, "id">> = {
   entityName: "ingredient",
   templateColumns: INGREDIENT_TEMPLATE_COLUMNS,
-  templateUrl: "/seed/ingredients.csv",
   mapRow: mapIngredientRow,
   validateRow: (data, _rowIndex) => validateIngredientRow(data),
   dedupKey: (data) => `${data.name.toLowerCase().trim()}::${(data.manufacturer || "").toLowerCase().trim()}`,
