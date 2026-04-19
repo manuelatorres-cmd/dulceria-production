@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -3797,9 +3797,6 @@ export async function saveCapacityConfig(partial: Partial<CapacityConfig>): Prom
     .from("capacityConfig")
     .upsert({
       id: CAPACITY_CONFIG_ID,
-      peopleCount: partial.peopleCount ?? null,
-      hoursPerPersonPerDay: partial.hoursPerPersonPerDay ?? null,
-      workingDays: partial.workingDays ?? null,
       warnThresholdPercent: partial.warnThresholdPercent ?? null,
       criticalThresholdPercent: partial.criticalThresholdPercent ?? null,
       capacityBufferPercent: partial.capacityBufferPercent ?? null,
@@ -3808,6 +3805,108 @@ export async function saveCapacityConfig(partial: Partial<CapacityConfig>): Prom
     }, { onConflict: "id" });
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["capacity-config"] });
+}
+
+// ---------------------------------------------------------------------------
+// People + unavailability
+// ---------------------------------------------------------------------------
+
+export function usePeople(includeArchived = false): Person[] {
+  const { data } = useQuery({
+    queryKey: ["people", { includeArchived }],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("people").select("*"),
+      ) as Person[];
+      return rows
+        .filter((p) => (includeArchived ? true : !p.archived))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+  return data ?? [];
+}
+
+export async function savePerson(person: Omit<Person, "createdAt" | "updatedAt">): Promise<string> {
+  const now = new Date();
+  if (person.id) {
+    const { error } = await supabase
+      .from("people")
+      .update({ ...person, updatedAt: now })
+      .eq("id", person.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["people"] });
+    return person.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("people")
+    .insert({ ...person, id, createdAt: now, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["people"] });
+  return id;
+}
+
+export async function deletePerson(id: string): Promise<void> {
+  const { error } = await supabase.from("people").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["people"] });
+  queryClient.invalidateQueries({ queryKey: ["person-unavailability"] });
+}
+
+export async function archivePerson(id: string, archived = true): Promise<void> {
+  const { error } = await supabase
+    .from("people")
+    .update({ archived, updatedAt: new Date() })
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["people"] });
+}
+
+/** All unavailability rows across all people, sorted by startDate asc.
+ *  The UI filters by personId for per-person views; the scheduler uses
+ *  the full set to deduct hours per day. */
+export function usePersonUnavailability(): PersonUnavailability[] {
+  const { data } = useQuery({
+    queryKey: ["person-unavailability"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("personUnavailability").select("*"),
+      ) as PersonUnavailability[];
+      return rows.sort((a, b) => a.startDate.localeCompare(b.startDate));
+    },
+  });
+  return data ?? [];
+}
+
+export async function savePersonUnavailability(
+  entry: Omit<PersonUnavailability, "createdAt">,
+): Promise<string> {
+  const now = new Date();
+  if (entry.id) {
+    const { error } = await supabase
+      .from("personUnavailability")
+      .update(entry)
+      .eq("id", entry.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["person-unavailability"] });
+    return entry.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("personUnavailability")
+    .insert({ ...entry, id, createdAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["person-unavailability"] });
+  return id;
+}
+
+export async function deletePersonUnavailability(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("personUnavailability")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["person-unavailability"] });
 }
 
 export function useEventCalendar(): EventCalendarEntry[] {

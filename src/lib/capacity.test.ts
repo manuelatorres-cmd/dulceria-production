@@ -1,129 +1,176 @@
 import { describe, it, expect } from "vitest";
 import {
   capacityConfigStatus,
+  availableHoursOnDate,
   effectiveDailyCapacityMinutes,
-  isWorkingDay,
   weekdayFromDate,
   sortWeekdays,
+  collectRoles,
 } from "./capacity";
-import type { CapacityConfig } from "@/types";
+import type { CapacityConfig, Person, PersonUnavailability, EventCalendarEntry } from "@/types";
+
+const fullConfig: CapacityConfig = {
+  capacityBufferPercent: 15,
+  fillingBufferPercent: 10,
+  warnThresholdPercent: 80,
+  criticalThresholdPercent: 95,
+};
+
+const alice: Person = {
+  id: "p-alice",
+  name: "Alice",
+  roles: ["chocolatier", "owner"],
+  defaultHoursPerDay: 6,
+  workingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+};
+
+const bob: Person = {
+  id: "p-bob",
+  name: "Bob",
+  roles: ["chocolatier"],
+  defaultHoursPerDay: 4,
+  workingDays: ["tuesday", "thursday"],
+};
 
 describe("capacityConfigStatus", () => {
-  it("flags every field when config is null", () => {
-    const status = capacityConfigStatus(null);
+  it("flags percent fields + people when nothing is filled", () => {
+    const status = capacityConfigStatus(null, []);
     expect(status.isComplete).toBe(false);
-    expect(status.missing.length).toBeGreaterThan(0);
-    expect(status.missing).toContain("People count");
-    expect(status.missing).toContain("Working days");
+    expect(status.missing).toContain("Capacity buffer %");
+    expect(status.missing).toContain("Filling buffer %");
+    expect(status.missing).toContain("Warn threshold %");
+    expect(status.missing).toContain("Critical threshold %");
+    expect(status.missing).toContain("At least one person");
   });
 
-  it("flags individual missing fields", () => {
-    const partial: CapacityConfig = {
-      peopleCount: 2,
-      hoursPerPersonPerDay: 6,
-      workingDays: ["monday", "tuesday"],
-      capacityBufferPercent: 10,
-      // filling + thresholds missing
-    };
-    const status = capacityConfigStatus(partial);
+  it("flags the empty-people case when config is complete but no people exist", () => {
+    const status = capacityConfigStatus(fullConfig, []);
     expect(status.isComplete).toBe(false);
-    expect(status.missing).toEqual([
-      "Filling buffer %",
-      "Warn threshold %",
-      "Critical threshold %",
+    expect(status.missing).toEqual(["At least one person"]);
+  });
+
+  it("flags unconfigured people (no hours or no working days)", () => {
+    const status = capacityConfigStatus(fullConfig, [
+      { name: "Partial", defaultHoursPerDay: 0, workingDays: ["monday"] },
+      { name: "Partial", defaultHoursPerDay: 5, workingDays: [] },
     ]);
-  });
-
-  it("passes when every field is set within range", () => {
-    const full: CapacityConfig = {
-      peopleCount: 2,
-      hoursPerPersonPerDay: 6,
-      workingDays: ["monday", "tuesday", "wednesday"],
-      capacityBufferPercent: 15,
-      fillingBufferPercent: 10,
-      warnThresholdPercent: 80,
-      criticalThresholdPercent: 95,
-    };
-    expect(capacityConfigStatus(full).isComplete).toBe(true);
-    expect(capacityConfigStatus(full).missing).toEqual([]);
-  });
-
-  it("rejects out-of-range percents and non-positive counts", () => {
-    const bad: CapacityConfig = {
-      peopleCount: 0,                   // not > 0
-      hoursPerPersonPerDay: 25,         // > 24 — but typing-wise any > 0 number passes this helper;
-                                        // the Supabase CHECK catches that. Helper only checks > 0.
-      workingDays: [],                  // empty array treated as missing
-      capacityBufferPercent: 150,       // out of range
-      fillingBufferPercent: -5,         // negative
-      warnThresholdPercent: 80,
-      criticalThresholdPercent: 95,
-    };
-    const status = capacityConfigStatus(bad);
     expect(status.isComplete).toBe(false);
-    expect(status.missing).toContain("People count");
-    expect(status.missing).toContain("Working days");
+    expect(status.missing).toEqual(["At least one person with hours and working days"]);
+  });
+
+  it("skips archived people for completeness", () => {
+    const status = capacityConfigStatus(fullConfig, [
+      { ...alice, archived: true },
+    ]);
+    expect(status.isComplete).toBe(false);
+    expect(status.missing).toContain("At least one person");
+  });
+
+  it("passes when config is complete and at least one person has hours + days", () => {
+    const status = capacityConfigStatus(fullConfig, [alice]);
+    expect(status.isComplete).toBe(true);
+    expect(status.missing).toEqual([]);
+  });
+
+  it("rejects out-of-range percent values", () => {
+    const bad: CapacityConfig = {
+      capacityBufferPercent: 150,
+      fillingBufferPercent: -5,
+      warnThresholdPercent: 80,
+      criticalThresholdPercent: 95,
+    };
+    const status = capacityConfigStatus(bad, [alice]);
     expect(status.missing).toContain("Capacity buffer %");
     expect(status.missing).toContain("Filling buffer %");
   });
 });
 
-describe("effectiveDailyCapacityMinutes", () => {
-  it("returns 0 when required inputs are missing", () => {
-    expect(effectiveDailyCapacityMinutes(null)).toBe(0);
-    expect(effectiveDailyCapacityMinutes({})).toBe(0);
-    expect(effectiveDailyCapacityMinutes({ peopleCount: 2 })).toBe(0);
+describe("availableHoursOnDate", () => {
+  it("sums hours across people working on that weekday", () => {
+    // 2026-04-21 is a Tuesday — both Alice (6h) and Bob (4h) work it.
+    const date = new Date("2026-04-21T12:00:00");
+    expect(availableHoursOnDate(date, [alice, bob])).toBe(10);
   });
 
-  it("applies the buffer to the raw people-hours budget", () => {
-    // 2 people × 8h = 960 min. Buffer 20% → 768 min.
-    expect(effectiveDailyCapacityMinutes({
-      peopleCount: 2,
-      hoursPerPersonPerDay: 8,
-      capacityBufferPercent: 20,
-    })).toBe(768);
+  it("only counts people whose workingDays include the day", () => {
+    // 2026-04-20 is a Monday — only Alice (6h) works it.
+    const date = new Date("2026-04-20T12:00:00");
+    expect(availableHoursOnDate(date, [alice, bob])).toBe(6);
+  });
+
+  it("excludes archived people", () => {
+    const date = new Date("2026-04-21T12:00:00");
+    expect(availableHoursOnDate(date, [{ ...alice, archived: true }, bob])).toBe(4);
+  });
+
+  it("excludes a person on an unavailability range", () => {
+    const date = new Date("2026-04-21T12:00:00");
+    const unavail: PersonUnavailability[] = [
+      { personId: "p-alice", startDate: "2026-04-20", endDate: "2026-04-25" },
+    ];
+    expect(availableHoursOnDate(date, [alice, bob], unavail)).toBe(4);
+  });
+
+  it("returns 0 on a workshop-wide blocked day regardless of people", () => {
+    const date = new Date("2026-04-21T12:00:00");
+    const blocked: EventCalendarEntry[] = [
+      { name: "Equipment service", kind: "blocked", startDate: "2026-04-21", endDate: "2026-04-21" },
+    ];
+    expect(availableHoursOnDate(date, [alice, bob], [], blocked)).toBe(0);
+  });
+
+  it("ignores people with zero or missing hours", () => {
+    const date = new Date("2026-04-21T12:00:00");
+    const untrained: Person = { id: "p-x", name: "Trainee", workingDays: ["tuesday"] };
+    expect(availableHoursOnDate(date, [untrained])).toBe(0);
+  });
+});
+
+describe("effectiveDailyCapacityMinutes", () => {
+  it("applies the capacity buffer to the summed hours × 60", () => {
+    // Tuesday: Alice + Bob = 10h → 600 min. Buffer 15% → 510 min.
+    const date = new Date("2026-04-21T12:00:00");
+    expect(effectiveDailyCapacityMinutes(date, fullConfig, [alice, bob])).toBe(510);
+  });
+
+  it("returns 0 when no-one is available (blocked day)", () => {
+    const date = new Date("2026-04-21T12:00:00");
+    const blocked: EventCalendarEntry[] = [
+      { name: "Holiday", kind: "blocked", startDate: "2026-04-21", endDate: "2026-04-21" },
+    ];
+    expect(effectiveDailyCapacityMinutes(date, fullConfig, [alice, bob], [], blocked)).toBe(0);
   });
 
   it("treats a missing buffer as 0% (full capacity)", () => {
-    // 1 × 6 = 360 min.
-    expect(effectiveDailyCapacityMinutes({
-      peopleCount: 1,
-      hoursPerPersonPerDay: 6,
-    })).toBe(360);
-  });
-
-  it("clamps absurd buffer values to the 0–100 range", () => {
-    expect(effectiveDailyCapacityMinutes({
-      peopleCount: 1,
-      hoursPerPersonPerDay: 10,
-      capacityBufferPercent: 200,
-    })).toBe(0);
+    // Alice alone on Monday: 6h → 360 min.
+    const date = new Date("2026-04-20T12:00:00");
+    expect(effectiveDailyCapacityMinutes(date, {} as CapacityConfig, [alice])).toBe(360);
   });
 });
 
-describe("weekdayFromDate + isWorkingDay", () => {
-  it("maps JavaScript days to the lowercase Weekday string", () => {
+describe("weekdayFromDate + sortWeekdays", () => {
+  it("maps JavaScript days to lowercase Weekday strings", () => {
     expect(weekdayFromDate(new Date("2026-04-20T12:00:00"))).toBe("monday");
     expect(weekdayFromDate(new Date("2026-04-19T12:00:00"))).toBe("sunday");
   });
-
-  it("isWorkingDay honours the configured working-days set", () => {
-    const config: CapacityConfig = {
-      workingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
-    };
-    expect(isWorkingDay(config, new Date("2026-04-20T12:00:00"))).toBe(true);  // mon
-    expect(isWorkingDay(config, new Date("2026-04-18T12:00:00"))).toBe(false); // sat
-  });
-
-  it("returns false when workingDays is empty or missing", () => {
-    expect(isWorkingDay({ workingDays: [] }, new Date("2026-04-20T12:00:00"))).toBe(false);
-    expect(isWorkingDay(null, new Date("2026-04-20T12:00:00"))).toBe(false);
-  });
-});
-
-describe("sortWeekdays", () => {
-  it("sorts to Monday-first canonical order", () => {
+  it("sorts to canonical Monday-first order", () => {
     expect(sortWeekdays(["friday", "monday", "wednesday"])).toEqual(["monday", "wednesday", "friday"]);
-    expect(sortWeekdays(["sunday", "saturday"])).toEqual(["saturday", "sunday"]);
   });
 });
+
+describe("collectRoles", () => {
+  it("returns the sorted, deduplicated union of roles across all people", () => {
+    expect(collectRoles([alice, bob])).toEqual(["chocolatier", "owner"]);
+  });
+  it("trims whitespace and drops empties", () => {
+    const dirty: Person[] = [
+      { name: "X", roles: ["  baker  ", ""] },
+      { name: "Y", roles: ["baker", "assistant "] },
+    ];
+    expect(collectRoles(dirty)).toEqual(["assistant", "baker"]);
+  });
+  it("tolerates missing roles field", () => {
+    expect(collectRoles([{ name: "No roles" }])).toEqual([]);
+  });
+});
+

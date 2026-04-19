@@ -1031,31 +1031,70 @@ export const WEEKDAYS = [
 export type Weekday = (typeof WEEKDAYS)[number];
 
 /**
- * Singleton config row: how much production work fits in a day.
+ * Singleton config row: workshop-wide buffers + dashboard thresholds.
+ *
+ * People are now per-person (see `Person`) — the scheduler sums each
+ * person's own default hours × working days minus their unavailability.
+ * The fields here stay workshop-wide because they apply regardless of
+ * which person is on duty.
  *
  * All fields are nullable because the schema ships empty — the Settings →
  * Capacity & People form gates completeness. The scheduler refuses to run
- * until `capacityConfigStatus(config).isComplete` is true.
+ * until `capacityConfigStatus(config, people).isComplete` is true.
  */
 export interface CapacityConfig {
   id?: string;
-  /** How many people are available for production on a working day. */
-  peopleCount?: number;
-  /** Hours each person is available per working day (≤ 24). */
-  hoursPerPersonPerDay?: number;
-  /** Working days of the week. Values are lowercase Weekday strings. */
-  workingDays?: Weekday[];
   /** Percent utilisation at which the dashboard shows a warning (0–100). */
   warnThresholdPercent?: number;
   /** Percent utilisation at which the dashboard shows a critical alert (0–100). */
   criticalThresholdPercent?: number;
-  /** General capacity safety margin (0–100). Effective per-day budget is
-   *  (1 - capacityBufferPercent/100) × peopleCount × hoursPerPersonPerDay. */
+  /** General capacity safety margin (0–100). Applied to the aggregated
+   *  per-day people-hours budget so alerts fire before 100% utilisation. */
   capacityBufferPercent?: number;
   /** Filling-specific overproduction buffer (0–100). Filling batches
    *  scale up by this factor to cover yield loss during production. */
   fillingBufferPercent?: number;
   updatedAt?: Date;
+}
+
+/**
+ * A production worker. The reverse scheduler sums available hours per
+ * day across every non-archived person, after filtering for:
+ *   - day ∈ person.workingDays
+ *   - no personUnavailability row covering the date
+ *   - no workshop-wide `eventCalendar(kind='blocked')` row covering it
+ *
+ * `roles` is free-text multi-select — the UI shows every role already
+ * used across the team as an autocomplete pick but any string is allowed.
+ */
+export interface Person {
+  id?: string;
+  name: string;
+  /** Free-text role labels, e.g. ["chocolatier", "owner"]. */
+  roles?: string[];
+  /** Typical availability per working day (hours, ≤ 24). */
+  defaultHoursPerDay?: number;
+  /** Days this person works, independent of the workshop. */
+  workingDays?: Weekday[];
+  /** Soft-delete — archived people are excluded from scheduling
+   *  but preserved on historical productionSchedule assignments. */
+  archived?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** A person-specific unavailability window (vacation, doctor's appointment,
+ *  sick day). Workshop-wide closures live on `EventCalendarEntry` with
+ *  kind='blocked' so they apply to everyone at once. */
+export interface PersonUnavailability {
+  id?: string;
+  personId: string;
+  /** Inclusive start date, ISO-date string. */
+  startDate: string;
+  /** Inclusive end date, ISO-date string. Must be ≥ startDate. */
+  endDate: string;
+  notes?: string;
+  createdAt?: Date;
 }
 
 export type EventCalendarKind = "event" | "peak" | "blocked" | "holiday";

@@ -3,13 +3,13 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { exportBackup, importBackup, clearAllData } from "@/lib/backup";
-import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry } from "@/lib/hooks";
-import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry } from "@/types";
-import { capacityConfigStatus, sortWeekdays } from "@/lib/capacity";
+import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry, usePeople, savePerson, deletePerson, archivePerson, usePersonUnavailability, savePersonUnavailability, deletePersonUnavailability } from "@/lib/hooks";
+import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability } from "@/types";
+import { capacityConfigStatus, sortWeekdays, collectRoles } from "@/lib/capacity";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import { loadDemoData, isDemoDataLoaded } from "@/lib/seed-demo";
 import { isCloudConfigured } from "@/lib/supabase";
-import { Download, AlertTriangle, CheckCircle, FlaskConical, Video, Printer, Pencil, Trash2, Plus, X, Clock } from "lucide-react";
+import { Download, AlertTriangle, CheckCircle, FlaskConical, Video, Printer, Pencil, Trash2, Plus, X, Clock, Archive, ArchiveRestore, ChevronDown, ChevronRight } from "lucide-react";
 import { SpreadsheetImport } from "@/components/spreadsheet-import";
 import { ingredientImportConfig, getExistingIngredientKeys } from "@/lib/spreadsheet-import-ingredients";
 import { mouldImportConfig, getExistingMouldKeys } from "@/lib/spreadsheet-import-moulds";
@@ -513,11 +513,10 @@ const WEEKDAY_LABELS: Record<Weekday, string> = {
 
 function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) {
   const config = useCapacityConfig();
+  const people = usePeople(true); // include archived — per-row filtering in UI
+  const unavailability = usePersonUnavailability();
   const blocked = useBlockedDays();
 
-  const [peopleCount, setPeopleCount] = useState<string>("");
-  const [hoursPerDay, setHoursPerDay] = useState<string>("");
-  const [workingDays, setWorkingDays] = useState<Set<Weekday>>(new Set());
   const [capacityBuffer, setCapacityBuffer] = useState<string>("");
   const [fillingBuffer, setFillingBuffer] = useState<string>("");
   const [warnThreshold, setWarnThreshold] = useState<string>("");
@@ -528,9 +527,6 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
   // Sync form state when the config first loads
   const configKey = config ? JSON.stringify(config) : "null";
   if (configKey !== syncedAt) {
-    setPeopleCount(config?.peopleCount != null ? String(config.peopleCount) : "");
-    setHoursPerDay(config?.hoursPerPersonPerDay != null ? String(config.hoursPerPersonPerDay) : "");
-    setWorkingDays(new Set<Weekday>(config?.workingDays ?? []));
     setCapacityBuffer(config?.capacityBufferPercent != null ? String(config.capacityBufferPercent) : "");
     setFillingBuffer(config?.fillingBufferPercent != null ? String(config.fillingBufferPercent) : "");
     setWarnThreshold(config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "");
@@ -540,9 +536,6 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
   }
 
   const isDirty = syncedAt !== null && (
-    peopleCount !== (config?.peopleCount != null ? String(config.peopleCount) : "") ||
-    hoursPerDay !== (config?.hoursPerPersonPerDay != null ? String(config.hoursPerPersonPerDay) : "") ||
-    JSON.stringify(sortWeekdays([...workingDays])) !== JSON.stringify(sortWeekdays(config?.workingDays ?? [])) ||
     capacityBuffer !== (config?.capacityBufferPercent != null ? String(config.capacityBufferPercent) : "") ||
     fillingBuffer !== (config?.fillingBufferPercent != null ? String(config.fillingBufferPercent) : "") ||
     warnThreshold !== (config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "") ||
@@ -551,22 +544,10 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
 
   useEffect(() => { onDirtyChange(isDirty); }, [isDirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function toggleWorkingDay(day: Weekday) {
-    setWorkingDays((prev) => {
-      const next = new Set(prev);
-      if (next.has(day)) next.delete(day);
-      else next.add(day);
-      return next;
-    });
-  }
-
   async function handleSave() {
     setSaving(true);
     try {
       await saveCapacityConfig({
-        peopleCount: parsePositiveInt(peopleCount),
-        hoursPerPersonPerDay: parsePositiveNum(hoursPerDay),
-        workingDays: sortWeekdays([...workingDays]),
         capacityBufferPercent: parsePercent(capacityBuffer),
         fillingBufferPercent: parsePercent(fillingBuffer),
         warnThresholdPercent: parsePercent(warnThreshold),
@@ -577,18 +558,14 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
     }
   }
 
-  // Preview the "live" config that the status helper + dashboard will see
-  // once saved, so the completeness banner reflects current inputs.
   const previewConfig: CapacityConfig = {
-    peopleCount: parsePositiveInt(peopleCount),
-    hoursPerPersonPerDay: parsePositiveNum(hoursPerDay),
-    workingDays: sortWeekdays([...workingDays]),
     capacityBufferPercent: parsePercent(capacityBuffer),
     fillingBufferPercent: parsePercent(fillingBuffer),
     warnThresholdPercent: parsePercent(warnThreshold),
     criticalThresholdPercent: parsePercent(criticalThreshold),
   };
-  const status = capacityConfigStatus(previewConfig);
+  const status = capacityConfigStatus(previewConfig, people);
+  const knownRoles = collectRoles(people);
 
   return (
     <div className="space-y-6">
@@ -596,9 +573,10 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
         <h2 className="text-sm font-semibold text-primary">Capacity &amp; People</h2>
         <p className="text-xs text-muted-foreground">
           How much production capacity you have on a working day. The reverse scheduler
-          uses these values to fit orders into the calendar and the dashboard uses them
-          to warn when a day is overbooked. Partial saves are allowed — the scheduler
-          refuses to run until every field is set.
+          sums each person's available hours per day (after unavailability + workshop
+          blocked days) and uses the thresholds below to flag overbooked days on the
+          dashboard. Partial saves are allowed — the scheduler refuses to run until
+          every field is set.
         </p>
         {!status.isComplete && (
           <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
@@ -616,79 +594,12 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
         )}
       </section>
 
-      {/* People + hours */}
-      <section className="space-y-3">
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">People on a working day</label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={peopleCount}
-                onChange={(e) => setPeopleCount(e.target.value)}
-                placeholder="e.g. 2"
-                className="input"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                How many people are available for production. Not counting shop hours, admin, etc.
-              </p>
-            </div>
-            <div>
-              <label className="label">Hours per person per day</label>
-              <input
-                type="number"
-                min="0.5"
-                step="0.5"
-                max="24"
-                value={hoursPerDay}
-                onChange={(e) => setHoursPerDay(e.target.value)}
-                placeholder="e.g. 6"
-                className="input"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Active production hours — not the calendar shift length.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Working days */}
-      <section className="space-y-3">
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <div>
-            <label className="label">Working days</label>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {WEEKDAYS.map((day) => {
-                const active = workingDays.has(day);
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => toggleWorkingDay(day)}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                      active
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card text-muted-foreground border-border hover:bg-muted"
-                    }`}
-                  >
-                    {WEEKDAY_LABELS[day]}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Days the scheduler is allowed to place work on. Specific off-days (vacation,
-              equipment service) go in the Blocked days section below.
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* People */}
+      <PeopleSection people={people} unavailability={unavailability} knownRoles={knownRoles} />
 
       {/* Buffers */}
       <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-primary">Buffers</h2>
         <div className="rounded-lg border border-border bg-card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -704,8 +615,8 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
                 className="input"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Safety margin applied to the daily budget. 15% means the scheduler aims to
-                fill only 85% of the raw people-hours so there's room for the unexpected.
+                Safety margin applied to the summed people-hours budget. 15% means the
+                scheduler aims to fill only 85% so there's room for the unexpected.
               </p>
             </div>
             <div>
@@ -731,6 +642,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
 
       {/* Thresholds */}
       <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-primary">Dashboard thresholds</h2>
         <div className="rounded-lg border border-border bg-card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -769,14 +681,14 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
         </div>
       </section>
 
-      {/* Save button */}
+      {/* Save button for capacity-config scalars */}
       <div className="flex items-center gap-2">
         <button
           onClick={handleSave}
           disabled={saving || !isDirty}
           className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Saving…" : "Save buffers & thresholds"}
         </button>
         {isDirty && (
           <span className="text-xs text-muted-foreground">Unsaved changes</span>
@@ -786,6 +698,494 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
       {/* Blocked days */}
       <BlockedDaysSection blocked={blocked} />
     </div>
+  );
+}
+
+// ─── People section ───────────────────────────────────────────────────────
+
+function PeopleSection({ people, unavailability, knownRoles }: {
+  people: Person[];
+  unavailability: PersonUnavailability[];
+  knownRoles: string[];
+}) {
+  const [adding, setAdding] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Sort: active first (by name), then archived
+  const sorted = [...people].sort((a, b) => {
+    if (!!a.archived !== !!b.archived) return a.archived ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-primary">People</h2>
+          <p className="text-xs text-muted-foreground">
+            Add each person who works in production. The scheduler sums their available
+            hours per day after their working-day and unavailability settings.
+          </p>
+        </div>
+        {!adding && (
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add person
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <PersonEditor
+          knownRoles={knownRoles}
+          onSaved={() => setAdding(false)}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+
+      {sorted.length === 0 && !adding ? (
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+          No people added yet.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {sorted.map((p) => {
+            const personUnavail = unavailability.filter((u) => u.personId === p.id);
+            return (
+              <PersonCard
+                key={p.id}
+                person={p}
+                unavailability={personUnavail}
+                knownRoles={knownRoles}
+                expanded={expandedId === p.id}
+                onToggle={() => setExpandedId(expandedId === p.id ? null : p.id!)}
+              />
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: {
+  person: Person;
+  unavailability: PersonUnavailability[];
+  knownRoles: string[];
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const [pendingRemove, setPendingRemove] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function handleArchive(archived: boolean) {
+    if (!person.id) return;
+    setBusy(true);
+    try { await archivePerson(person.id, archived); }
+    finally { setBusy(false); }
+  }
+
+  async function handleDelete() {
+    if (!person.id) return;
+    setBusy(true);
+    try { await deletePerson(person.id); }
+    finally { setBusy(false); setPendingRemove(false); }
+  }
+
+  const workingDaysLabel = (person.workingDays ?? []).length > 0
+    ? sortWeekdays(person.workingDays!).map((d) => WEEKDAY_LABELS[d]).join(", ")
+    : "—";
+
+  return (
+    <li className={`rounded-lg border bg-card overflow-hidden ${person.archived ? "border-border opacity-70" : "border-border"}`}>
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          aria-expanded={expanded}
+        >
+          {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">
+              {person.name}
+              {person.archived && <span className="ml-2 text-xs text-muted-foreground">(archived)</span>}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {(person.roles ?? []).join(", ") || "no roles"}
+              {person.defaultHoursPerDay != null && ` · ${person.defaultHoursPerDay}h/day`}
+              {` · ${workingDaysLabel}`}
+              {unavailability.length > 0 && ` · ${unavailability.length} unavailable period${unavailability.length > 1 ? "s" : ""}`}
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-border px-3 py-3 space-y-3">
+          <PersonEditor
+            person={person}
+            knownRoles={knownRoles}
+            onSaved={() => { /* stays expanded so you can continue editing */ }}
+          />
+
+          <PersonUnavailabilityEditor personId={person.id!} unavailability={unavailability} />
+
+          <div className="border-t border-border pt-3 flex items-center gap-4">
+            {!person.archived ? (
+              <button
+                onClick={() => handleArchive(true)}
+                disabled={busy}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                <Archive className="w-3.5 h-3.5" /> Archive
+              </button>
+            ) : (
+              <button
+                onClick={() => handleArchive(false)}
+                disabled={busy}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                <ArchiveRestore className="w-3.5 h-3.5" /> Unarchive
+              </button>
+            )}
+            {pendingRemove ? (
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground">Delete permanently?</span>
+                <button onClick={handleDelete} disabled={busy} className="text-red-600 font-medium hover:underline disabled:opacity-50">
+                  {busy ? "…" : "Yes"}
+                </button>
+                <button onClick={() => setPendingRemove(false)} className="text-muted-foreground hover:underline">
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setPendingRemove(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
+  person?: Person;
+  knownRoles: string[];
+  onSaved: () => void;
+  onCancel?: () => void;
+}) {
+  const isNew = !person?.id;
+  const [name, setName] = useState(person?.name ?? "");
+  const [roles, setRoles] = useState<string[]>(person?.roles ?? []);
+  const [roleDraft, setRoleDraft] = useState("");
+  const [defaultHours, setDefaultHours] = useState(person?.defaultHoursPerDay != null ? String(person.defaultHoursPerDay) : "");
+  const [workingDays, setWorkingDays] = useState<Set<Weekday>>(new Set(person?.workingDays ?? []));
+  const [saving, setSaving] = useState(false);
+
+  function addRole(value: string) {
+    const v = value.trim();
+    if (!v) return;
+    if (roles.some((r) => r.toLowerCase() === v.toLowerCase())) {
+      setRoleDraft("");
+      return;
+    }
+    setRoles([...roles, v]);
+    setRoleDraft("");
+  }
+
+  function removeRole(role: string) {
+    setRoles(roles.filter((r) => r !== role));
+  }
+
+  function toggleWorkingDay(day: Weekday) {
+    setWorkingDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+  }
+
+  async function handleSave() {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      await savePerson({
+        id: person?.id,
+        name: name.trim(),
+        roles: roles.length > 0 ? roles : undefined,
+        defaultHoursPerDay: parsePositiveNum(defaultHours),
+        workingDays: workingDays.size > 0 ? sortWeekdays([...workingDays]) : undefined,
+        archived: person?.archived,
+      });
+      if (isNew) {
+        setName("");
+        setRoles([]);
+        setDefaultHours("");
+        setWorkingDays(new Set());
+      }
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const availableRoleSuggestions = knownRoles.filter(
+    (r) => !roles.some((existing) => existing.toLowerCase() === r.toLowerCase()),
+  );
+
+  return (
+    <div className={`rounded-lg ${isNew ? "border border-border bg-card p-4" : ""} space-y-3`}>
+      <div>
+        <label className="label">Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Manuela"
+          autoFocus={isNew}
+          className="input"
+        />
+      </div>
+
+      <div>
+        <label className="label">Roles</label>
+        {roles.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {roles.map((r) => (
+              <span key={r} className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">
+                {r}
+                <button
+                  onClick={() => removeRole(r)}
+                  className="hover:text-destructive"
+                  aria-label={`Remove role ${r}`}
+                  type="button"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            list="known-roles"
+            value={roleDraft}
+            onChange={(e) => setRoleDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRole(roleDraft); } }}
+            placeholder="e.g. chocolatier"
+            className="input flex-1"
+          />
+          <datalist id="known-roles">
+            {availableRoleSuggestions.map((r) => <option key={r} value={r} />)}
+          </datalist>
+          <button
+            type="button"
+            onClick={() => addRole(roleDraft)}
+            disabled={!roleDraft.trim()}
+            className="rounded-full border border-border px-3 py-1.5 text-sm disabled:opacity-50"
+          >
+            Add role
+          </button>
+        </div>
+        {knownRoles.length > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Existing roles on your team: {knownRoles.join(", ")}.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className="label">Default hours per day</label>
+        <input
+          type="number"
+          min="0.5"
+          step="0.5"
+          max="24"
+          value={defaultHours}
+          onChange={(e) => setDefaultHours(e.target.value)}
+          placeholder="e.g. 6"
+          className="input w-32"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Active production hours on a typical working day.
+        </p>
+      </div>
+
+      <div>
+        <label className="label">Working days</label>
+        <div className="flex flex-wrap gap-2 mt-1">
+          {WEEKDAYS.map((day) => {
+            const active = workingDays.has(day);
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => toggleWorkingDay(day)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                }`}
+              >
+                {WEEKDAY_LABELS[day]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={handleSave}
+          disabled={saving || !name.trim()}
+          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {saving ? "Saving…" : isNew ? "Add person" : "Save changes"}
+        </button>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="rounded-full border border-border px-4 py-2 text-sm"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PersonUnavailabilityEditor({ personId, unavailability }: {
+  personId: string;
+  unavailability: PersonUnavailability[];
+}) {
+  const [adding, setAdding] = useState(false);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const canSave = !!startDate && !!endDate && endDate >= startDate && !saving;
+
+  async function handleAdd() {
+    setSaving(true);
+    try {
+      await savePersonUnavailability({ personId, startDate, endDate, notes: notes.trim() || undefined });
+      setAdding(false);
+      setStartDate("");
+      setEndDate("");
+      setNotes("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-muted-foreground">Unavailable dates</p>
+        {!adding && (
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <Plus className="w-3 h-3" /> Add
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="label">Start</label>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input" />
+            </div>
+            <div>
+              <label className="label">End (inclusive)</label>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate || undefined} className="input" />
+            </div>
+          </div>
+          <div>
+            <label className="label">Notes (optional)</label>
+            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Summer holiday" className="input" />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleAdd}
+              disabled={!canSave}
+              className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50"
+            >
+              {saving ? "Adding…" : "Add"}
+            </button>
+            <button
+              onClick={() => { setAdding(false); setStartDate(""); setEndDate(""); setNotes(""); }}
+              className="rounded-full border border-border px-3 py-1 text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {unavailability.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No unavailable dates.</p>
+      ) : (
+        <ul className="space-y-1">
+          {unavailability.map((u) => <UnavailabilityRow key={u.id} entry={u} />)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function UnavailabilityRow({ entry }: { entry: PersonUnavailability }) {
+  const [pendingRemove, setPendingRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  async function handleDelete() {
+    if (!entry.id) return;
+    setRemoving(true);
+    try { await deletePersonUnavailability(entry.id); }
+    finally { setRemoving(false); setPendingRemove(false); }
+  }
+
+  return (
+    <li className="flex items-center gap-2 text-xs px-2 py-1 rounded border border-border bg-card">
+      <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
+      <span className="flex-1 min-w-0 truncate">
+        {formatIsoDate(entry.startDate)}
+        {entry.startDate !== entry.endDate && ` — ${formatIsoDate(entry.endDate)}`}
+        {entry.notes && <span className="text-muted-foreground"> · {entry.notes}</span>}
+      </span>
+      {pendingRemove ? (
+        <span className="flex items-center gap-1.5 shrink-0">
+          <button onClick={handleDelete} disabled={removing} className="text-red-600 font-medium hover:underline disabled:opacity-50">
+            {removing ? "…" : "Remove"}
+          </button>
+          <button onClick={() => setPendingRemove(false)} className="text-muted-foreground hover:underline">
+            Cancel
+          </button>
+        </span>
+      ) : (
+        <button
+          onClick={() => setPendingRemove(true)}
+          className="text-muted-foreground/50 hover:text-destructive shrink-0"
+          aria-label="Remove unavailability"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </li>
   );
 }
 
@@ -955,11 +1355,6 @@ function formatIsoDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-function parsePositiveInt(s: string): number | undefined {
-  const n = parseInt(s, 10);
-  if (isNaN(n) || n <= 0) return undefined;
-  return n;
-}
 function parsePositiveNum(s: string): number | undefined {
   const n = parseFloat(s);
   if (isNaN(n) || n <= 0) return undefined;
