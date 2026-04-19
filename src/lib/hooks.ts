@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -3963,6 +3963,72 @@ export async function archiveEquipment(id: string, archived = true): Promise<voi
     .eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["equipment"] });
+}
+
+// ---------------------------------------------------------------------------
+// Production steps
+// ---------------------------------------------------------------------------
+
+export function useProductionSteps(): ProductionStep[] {
+  const { data } = useQuery({
+    queryKey: ["production-steps"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("productionSteps").select("*"),
+      ) as ProductionStep[];
+      return rows.sort(
+        (a, b) => a.productType.localeCompare(b.productType) || a.sortOrder - b.sortOrder,
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveProductionStep(
+  step: Omit<ProductionStep, "createdAt" | "updatedAt">,
+): Promise<string> {
+  const now = new Date();
+  if (step.id) {
+    const { error } = await supabase
+      .from("productionSteps")
+      .update({ ...step, updatedAt: now })
+      .eq("id", step.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["production-steps"] });
+    return step.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("productionSteps")
+    .insert({ ...step, id, createdAt: now, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["production-steps"] });
+  return id;
+}
+
+export async function deleteProductionStep(id: string): Promise<void> {
+  const { error } = await supabase.from("productionSteps").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["production-steps"] });
+}
+
+/** Reorder every step in the given product type. Writes new sortOrder
+ *  values in one batched update. */
+export async function reorderProductionSteps(
+  productType: string,
+  orderedIds: string[],
+): Promise<void> {
+  const now = new Date();
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from("productionSteps")
+        .update({ sortOrder: index, updatedAt: now })
+        .eq("id", id)
+        .eq("productType", productType),
+    ),
+  );
+  queryClient.invalidateQueries({ queryKey: ["production-steps"] });
 }
 
 export function useEventCalendar(): EventCalendarEntry[] {

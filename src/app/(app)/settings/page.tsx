@@ -3,8 +3,8 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { exportBackup, importBackup, clearAllData } from "@/lib/backup";
-import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry, usePeople, savePerson, deletePerson, archivePerson, usePersonUnavailability, savePersonUnavailability, deletePersonUnavailability, useEquipment, saveEquipment, deleteEquipment, archiveEquipment } from "@/lib/hooks";
-import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, EQUIPMENT_KINDS, EQUIPMENT_KIND_LABELS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability, type Equipment, type EquipmentKind } from "@/types";
+import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry, usePeople, savePerson, deletePerson, archivePerson, usePersonUnavailability, savePersonUnavailability, deletePersonUnavailability, useEquipment, saveEquipment, deleteEquipment, archiveEquipment, useProductionSteps, saveProductionStep, deleteProductionStep, reorderProductionSteps } from "@/lib/hooks";
+import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, EQUIPMENT_KINDS, EQUIPMENT_KIND_LABELS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability, type Equipment, type EquipmentKind, type ProductionStep } from "@/types";
 import { capacityConfigStatus, sortWeekdays, collectRoles } from "@/lib/capacity";
 import { equipmentAvailability, equipmentReadiness, EQUIPMENT_AVAILABILITY_LABEL } from "@/lib/equipment";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
@@ -21,7 +21,7 @@ import { buildProductImportConfig, buildFillingNameLookup, buildMouldNameLookup,
 import type { Ingredient } from "@/types";
 
 type ImportState = "idle" | "confirm" | "importing" | "done" | "error";
-type Tab = "backup" | "import" | "capacity" | "equipment" | "market" | "printing" | "demo";
+type Tab = "backup" | "import" | "capacity" | "equipment" | "steps" | "market" | "printing" | "demo";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("backup");
@@ -118,6 +118,12 @@ export default function SettingsPage() {
           Equipment
         </button>
         <button
+          onClick={() => switchTab("steps")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "steps" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+        >
+          Production Steps
+        </button>
+        <button
           onClick={() => switchTab("market")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "market" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
         >
@@ -156,6 +162,8 @@ export default function SettingsPage() {
           <CapacityTab onDirtyChange={setMarketDirty} />
         ) : activeTab === "equipment" ? (
           <EquipmentTab />
+        ) : activeTab === "steps" ? (
+          <ProductionStepsTab />
         ) : activeTab === "market" ? (
           <PreferencesTab marketRegion={marketRegion} onRegionChange={setMarketRegion} currency={currency} onCurrencyChange={setCurrency} facilityMayContain={facilityMayContain} onMayContainChange={setFacilityMayContain} defaultFillMode={defaultFillMode} onFillModeChange={setDefaultFillMode} onDirtyChange={setMarketDirty} />
         ) : activeTab === "printing" ? (
@@ -1540,6 +1548,338 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
           className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : isNew ? "Add equipment" : "Save changes"}
+        </button>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="rounded-full border border-border px-4 py-2 text-sm"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Production Steps (§3 of the production planning stack)
+// ---------------------------------------------------------------------------
+
+function ProductionStepsTab() {
+  const categories = useProductCategories();
+  const steps = useProductionSteps();
+  const [selectedType, setSelectedType] = useState<string>("");
+  const [adding, setAdding] = useState(false);
+
+  // Sync selection when categories load — default to the first active category
+  useEffect(() => {
+    if (!selectedType && categories.length > 0) {
+      const active = categories.filter((c) => !c.archived);
+      if (active.length > 0) setSelectedType(active[0].name);
+    }
+  }, [categories, selectedType]);
+
+  // Steps for the selected product type, ordered
+  const stepsForType = useMemo(
+    () => steps.filter((s) => s.productType === selectedType).sort((a, b) => a.sortOrder - b.sortOrder),
+    [steps, selectedType],
+  );
+
+  // All unique step names across every type, for the autocomplete datalist
+  const knownStepNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of steps) set.add(s.name);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [steps]);
+
+  return (
+    <div className="space-y-6">
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-primary">Production Steps</h2>
+        <p className="text-xs text-muted-foreground">
+          Define the production sequence per product type. Each step has a name,
+          active time (hands-on work — counts toward the daily capacity budget)
+          and waiting time (drying, resting — doesn't). Reuse step names across
+          types by picking from the dropdown.
+        </p>
+      </section>
+
+      {categories.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+          No product categories yet. Add one under Products → Categories first.
+        </p>
+      ) : (
+        <>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <label className="label">Product type</label>
+            <select
+              value={selectedType}
+              onChange={(e) => { setSelectedType(e.target.value); setAdding(false); }}
+              className="input"
+            >
+              {categories.filter((c) => !c.archived).map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedType && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {stepsForType.length} step{stepsForType.length !== 1 ? "s" : ""} for <strong>{selectedType}</strong>
+                </p>
+                {!adding && (
+                  <button
+                    onClick={() => setAdding(true)}
+                    className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add step
+                  </button>
+                )}
+              </div>
+
+              {adding && (
+                <ProductionStepEditor
+                  productType={selectedType}
+                  knownStepNames={knownStepNames}
+                  nextSortOrder={stepsForType.length}
+                  onSaved={() => setAdding(false)}
+                  onCancel={() => setAdding(false)}
+                />
+              )}
+
+              {stepsForType.length === 0 && !adding ? (
+                <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+                  No steps yet for {selectedType}. Click Add step to start.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {stepsForType.map((step, i) => (
+                    <ProductionStepRow
+                      key={step.id}
+                      step={step}
+                      knownStepNames={knownStepNames}
+                      index={i}
+                      total={stepsForType.length}
+                      onMoveUp={async () => {
+                        const next = [...stepsForType];
+                        [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                        await reorderProductionSteps(selectedType, next.map((s) => s.id!));
+                      }}
+                      onMoveDown={async () => {
+                        const next = [...stepsForType];
+                        [next[i], next[i + 1]] = [next[i + 1], next[i]];
+                        await reorderProductionSteps(selectedType, next.map((s) => s.id!));
+                      }}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ProductionStepRow({ step, knownStepNames, index, total, onMoveUp, onMoveDown }: {
+  step: ProductionStep;
+  knownStepNames: string[];
+  index: number;
+  total: number;
+  onMoveUp: () => Promise<void>;
+  onMoveDown: () => Promise<void>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function handleDelete() {
+    if (!step.id) return;
+    setBusy(true);
+    try { await deleteProductionStep(step.id); }
+    finally { setBusy(false); setPendingRemove(false); }
+  }
+
+  return (
+    <li className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <div className="flex flex-col shrink-0">
+          <button
+            disabled={index === 0}
+            onClick={onMoveUp}
+            aria-label="Move up"
+            className="px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground leading-none"
+          >
+            ↑
+          </button>
+          <button
+            disabled={index === total - 1}
+            onClick={onMoveDown}
+            aria-label="Move down"
+            className="px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground leading-none"
+          >
+            ↓
+          </button>
+        </div>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          aria-expanded={expanded}
+        >
+          {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">
+              <span className="text-muted-foreground mr-1.5">{index + 1}.</span>
+              {step.name}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Active {step.activeMinutes} min · Waiting {step.waitingMinutes} min
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-border px-3 py-3 space-y-3">
+          <ProductionStepEditor
+            step={step}
+            productType={step.productType}
+            knownStepNames={knownStepNames}
+            onSaved={() => { /* stays expanded */ }}
+          />
+          <div className="border-t border-border pt-3">
+            {pendingRemove ? (
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground">Delete this step?</span>
+                <button onClick={handleDelete} disabled={busy} className="text-red-600 font-medium hover:underline disabled:opacity-50">
+                  {busy ? "…" : "Yes"}
+                </button>
+                <button onClick={() => setPendingRemove(false)} className="text-muted-foreground hover:underline">
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setPendingRemove(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete step
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder, onSaved, onCancel }: {
+  step?: ProductionStep;
+  productType: string;
+  knownStepNames: string[];
+  nextSortOrder?: number;
+  onSaved: () => void;
+  onCancel?: () => void;
+}) {
+  const isNew = !step?.id;
+  const [name, setName] = useState(step?.name ?? "");
+  const [activeMinutes, setActiveMinutes] = useState(step?.activeMinutes != null ? String(step.activeMinutes) : "");
+  const [waitingMinutes, setWaitingMinutes] = useState(step?.waitingMinutes != null ? String(step.waitingMinutes) : "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!name.trim()) return;
+    const active = parseFloat(activeMinutes);
+    const waiting = parseFloat(waitingMinutes);
+    if (isNaN(active) || active < 0 || isNaN(waiting) || waiting < 0) return;
+    setSaving(true);
+    try {
+      await saveProductionStep({
+        id: step?.id,
+        productType,
+        name: name.trim(),
+        activeMinutes: active,
+        waitingMinutes: waiting,
+        sortOrder: step?.sortOrder ?? nextSortOrder ?? 0,
+      });
+      if (isNew) {
+        setName("");
+        setActiveMinutes("");
+        setWaitingMinutes("");
+      }
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className={`space-y-3 ${isNew ? "rounded-lg border border-border bg-card p-4" : ""}`}>
+      <div>
+        <label className="label">Step name</label>
+        <input
+          type="text"
+          list="known-step-names"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. tempering, shell, fill"
+          autoFocus={isNew}
+          className="input"
+        />
+        <datalist id="known-step-names">
+          {knownStepNames.map((n) => <option key={n} value={n} />)}
+        </datalist>
+        {knownStepNames.length > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Previously used: {knownStepNames.join(", ")}
+          </p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Active time (min / mould)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.5"
+            value={activeMinutes}
+            onChange={(e) => setActiveMinutes(e.target.value)}
+            placeholder="e.g. 5"
+            className="input"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Hands-on time per mould. Counts toward daily capacity.
+          </p>
+        </div>
+        <div>
+          <label className="label">Waiting time (min)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.5"
+            value={waitingMinutes}
+            onChange={(e) => setWaitingMinutes(e.target.value)}
+            placeholder="e.g. 20"
+            className="input"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Drying / resting. Affects timeline but not capacity.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={handleSave}
+          disabled={saving || !name.trim() || activeMinutes === "" || waitingMinutes === ""}
+          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {saving ? "Saving…" : isNew ? "Add step" : "Save changes"}
         </button>
         {onCancel && (
           <button

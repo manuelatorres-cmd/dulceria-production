@@ -1114,6 +1114,22 @@ export const EQUIPMENT_KIND_LABELS: Record<EquipmentKind, string> = {
  *  the scheduler (§5) is the only writer. */
 export type EquipmentAvailability = "available" | "in_use" | "archived";
 
+/** One step in the production sequence for a specific product type.
+ *  Step names are free-text; reuse across types is via UI autocomplete,
+ *  not enforced at the DB level. Duration has two parts so the scheduler
+ *  can distinguish hands-on work (activeMinutes, counts against the
+ *  people-hours budget) from drying/resting (waitingMinutes, doesn't). */
+export interface ProductionStep {
+  id?: string;
+  productType: string;
+  name: string;
+  activeMinutes: number;
+  waitingMinutes: number;
+  sortOrder: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 /**
  * A piece of production equipment. Availability is not stored directly —
  * it's derived from whatever the scheduler has assigned to `currentPlanId`
