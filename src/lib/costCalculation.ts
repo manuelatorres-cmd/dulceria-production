@@ -163,6 +163,96 @@ export function calculateProductCost(input: CostCalculationInput): CostCalculati
   return { costPerProduct, breakdown, warnings };
 }
 
+// ── Filling cost (batch recipe, no mould/shell) ────────────────────────────
+
+export interface FillingCostEntry {
+  ingredientId: string;
+  label: string;
+  grams: number;
+  /** Cost per gram of this ingredient, or null if it has no pricing data. */
+  costPerGram: number | null;
+  /** grams × costPerGram, or 0 when costPerGram is null. */
+  subtotal: number;
+}
+
+export interface FillingCostResult {
+  entries: FillingCostEntry[];
+  /** Sum of each ingredient's gram weight. Excludes non-mass units. */
+  totalGrams: number;
+  /** Sum of each ingredient's subtotal. Ingredients with no pricing
+   *  contribute 0 and drive the `missingPricing` warning. */
+  totalCost: number;
+  /** totalCost scaled to 100g of the batch. Null when totalGrams = 0. */
+  costPer100g: number | null;
+  /** Count of ingredients with mass units but no pricing data (excluding
+   *  those marked `pricingIrrelevant`). */
+  missingPricing: number;
+  /** Count of ingredients with non-mass units (each, pcs, etc). */
+  nonMassUnits: number;
+}
+
+/**
+ * Calculate the cost of a filling as recorded (the batch as the user
+ * typed it — not scaled to any mould). Returns cost per 100g of the
+ * batch, the total batch cost, and a per-ingredient breakdown sorted
+ * by subtotal descending.
+ */
+export function calculateFillingCost(
+  fillingIngredients: FillingIngredient[],
+  ingredientMap: Map<string, Ingredient>,
+): FillingCostResult {
+  const entries: FillingCostEntry[] = [];
+  let totalGrams = 0;
+  let totalCost = 0;
+  let missingPricing = 0;
+  let nonMassUnits = 0;
+
+  for (const li of fillingIngredients) {
+    const ing = ingredientMap.get(li.ingredientId);
+    if (!ing) continue;
+
+    const grams = toGramsForCost(li.amount, li.unit);
+    if (grams == null) {
+      nonMassUnits += 1;
+      continue;
+    }
+
+    const cpg = deriveIngredientCostPerGram(ing);
+    const subtotal = cpg != null ? grams * cpg : 0;
+    if (cpg == null && !(ing.pricingIrrelevant ?? false)) missingPricing += 1;
+
+    totalGrams += grams;
+    totalCost += subtotal;
+
+    entries.push({
+      ingredientId: li.ingredientId,
+      label: ing.name,
+      grams,
+      costPerGram: cpg,
+      subtotal,
+    });
+  }
+
+  entries.sort((a, b) => b.subtotal - a.subtotal);
+
+  return {
+    entries,
+    totalGrams,
+    totalCost,
+    costPer100g: totalGrams > 0 ? (totalCost / totalGrams) * 100 : null,
+    missingPricing,
+    nonMassUnits,
+  };
+}
+
+/** kg/L → grams at 1000:1; ml → g at 1:1 (close enough for costing).
+ *  Non-mass units (pcs, each) return null — the caller surfaces a warning. */
+function toGramsForCost(amount: number, unit: string): number | null {
+  if (unit === "g" || unit === "ml") return amount;
+  if (unit === "kg" || unit === "L") return amount * 1000;
+  return null;
+}
+
 export function serializeBreakdown(breakdown: BreakdownEntry[]): string {
   return JSON.stringify(breakdown);
 }

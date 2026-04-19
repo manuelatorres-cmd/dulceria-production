@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useFilling, useFillingIngredients, useIngredients, saveFilling, deleteFilling, deleteFillingWithCleanup, archiveFillingWithCleanup, unarchiveFilling, updateFillingAllergens, useFillingUsage, reorderFillingIngredients, useFillingVersionHistory, forkFillingVersion, getFillingForkImpact, getFillingDeleteImpact, hasProductBeenProduced, hasFillingBeenProduced, getFillingArchiveImpact, useProductsList, saveProduct, addFillingToProduct, duplicateFilling, useAllFillingStatuses, useMarketRegion } from "@/lib/hooks";
 import { calculateFillingNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
 import { buildFillingIngredientList } from "@/lib/ingredientList";
+import { calculateFillingCost, formatCost } from "@/lib/costCalculation";
+import { useCurrencySymbol } from "@/lib/hooks";
 import type { FillingArchiveImpact, FillingDeleteImpact } from "@/lib/hooks";
 import { SortableFillingIngredientRow } from "@/components/sortable-filling-ingredient-row";
 import { AddFillingIngredient } from "@/components/add-filling-ingredient";
@@ -36,7 +38,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
   const existingStatuses = useAllFillingStatuses();
   const statusSuggestions = [...new Set([...DEFAULT_FILLING_STATUSES, ...existingStatuses])].sort();
 
-  const [activeTab, setActiveTab] = useState<"ingredients" | "nutrition" | "history">("ingredients");
+  const [activeTab, setActiveTab] = useState<"ingredients" | "nutrition" | "cost" | "history">("ingredients");
   const [editing, setEditing] = useState(isNew);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [unlocked, setUnlocked] = useState(isForked);
@@ -383,8 +385,8 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
         <div className="flex border-b border-border mb-2 px-4">
           {(
             hasVersionHistory
-              ? (["ingredients", "nutrition", "history"] as const)
-              : (["ingredients", "nutrition"] as const)
+              ? (["ingredients", "nutrition", "cost", "history"] as const)
+              : (["ingredients", "nutrition", "cost"] as const)
           ).map((tab) => (
             <button
               key={tab}
@@ -395,7 +397,10 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab === "ingredients" ? "Ingredients" : tab === "nutrition" ? "Nutrition" : "Versions"}
+              {tab === "ingredients" ? "Ingredients"
+                : tab === "nutrition" ? "Nutrition"
+                : tab === "cost" ? "Cost"
+                : "Versions"}
             </button>
           ))}
         </div>
@@ -404,6 +409,11 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
       {/* Tab body */}
       {(!editing && activeTab === "history") ? (
         <FillingVersionHistoryTab versions={versionHistory} currentId={fillingId} />
+      ) : (!editing && activeTab === "cost") ? (
+        <FillingCostTab
+          fillingIngredients={fillingIngredients}
+          ingredientMap={ingredientMap}
+        />
       ) : (!editing && activeTab === "nutrition") ? (
         <FillingNutritionTab
           fillingIngredients={fillingIngredients}
@@ -1076,6 +1086,114 @@ function FillingNutritionTab({
           <p className="text-sm text-muted-foreground">No ingredients yet.</p>
         )}
       </div>
+    </div>
+  );
+}
+
+function FillingCostTab({
+  fillingIngredients,
+  ingredientMap,
+}: {
+  fillingIngredients: import("@/types").FillingIngredient[];
+  ingredientMap: Map<string, Ingredient>;
+}) {
+  const sym = useCurrencySymbol();
+  const cost = calculateFillingCost(fillingIngredients, ingredientMap);
+
+  if (fillingIngredients.length === 0) {
+    return (
+      <div className="px-4 pb-6">
+        <p className="text-sm text-muted-foreground py-8 text-center">
+          Add ingredients to this filling to see a cost breakdown.
+        </p>
+      </div>
+    );
+  }
+
+  const { entries, totalGrams, totalCost, costPer100g, missingPricing, nonMassUnits } = cost;
+  const noPriceable = entries.length === 0;
+
+  return (
+    <div className="px-4 pb-6 space-y-4">
+      {/* Headline figures */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="text-xs text-muted-foreground">Cost per 100g</p>
+          <p className="text-2xl font-bold text-primary">
+            {costPer100g != null ? formatCost(costPer100g, sym) : "—"}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="text-xs text-muted-foreground">Total batch cost</p>
+          <p className="text-2xl font-bold text-primary">{formatCost(totalCost, sym)}</p>
+          {totalGrams > 0 && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Batch weight: {totalGrams % 1 === 0 ? totalGrams : totalGrams.toFixed(1)}g
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Warnings */}
+      {missingPricing > 0 && (
+        <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+          <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
+          <p className="text-xs text-status-warn">
+            {missingPricing} ingredient{missingPricing > 1 ? "s have" : " has"} no pricing data —
+            cost may be understated.
+          </p>
+        </div>
+      )}
+      {nonMassUnits > 0 && (
+        <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+          <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
+          <p className="text-xs text-status-warn">
+            {nonMassUnits} ingredient{nonMassUnits > 1 ? "s use" : " uses"} a non-mass unit and
+            {nonMassUnits > 1 ? " are" : " is"} excluded from the cost.
+          </p>
+        </div>
+      )}
+
+      {/* Breakdown */}
+      {!noPriceable && (
+        <div>
+          <h2 className="text-sm font-medium text-muted-foreground mb-2">Breakdown</h2>
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
+              <span className="flex-1">Ingredient</span>
+              <span className="w-20 text-right">Grams</span>
+              <span className="w-24 text-right">Cost/g</span>
+              <span className="w-24 text-right">Subtotal</span>
+              <span className="w-14 text-right">%</span>
+            </div>
+            {entries.map((e) => {
+              const pct = totalCost > 0 ? (e.subtotal / totalCost) * 100 : 0;
+              return (
+                <div
+                  key={e.ingredientId}
+                  className="flex items-baseline px-3 py-1.5 text-sm border-b border-border last:border-b-0"
+                >
+                  <span className="flex-1 truncate">{e.label}</span>
+                  <span className="w-20 text-right tabular-nums">
+                    {e.grams % 1 === 0 ? e.grams : e.grams.toFixed(1)}
+                  </span>
+                  <span className={`w-24 text-right tabular-nums ${e.costPerGram == null ? "text-muted-foreground/50" : ""}`}>
+                    {e.costPerGram != null
+                      ? `${sym}${e.costPerGram < 0.01 ? e.costPerGram.toFixed(4) : e.costPerGram.toFixed(3)}`
+                      : "—"}
+                  </span>
+                  <span className={`w-24 text-right tabular-nums ${e.costPerGram == null ? "text-muted-foreground/50" : ""}`}>
+                    {e.costPerGram != null ? formatCost(e.subtotal, sym) : "—"}
+                  </span>
+                  <span className="w-14 text-right tabular-nums text-muted-foreground text-xs">
+                    {e.costPerGram != null ? `${pct.toFixed(1)}%` : ""}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

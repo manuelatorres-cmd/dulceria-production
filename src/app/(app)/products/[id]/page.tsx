@@ -1404,7 +1404,7 @@ function ProductCostTab({
   sym = "€",
 }: {
   productId: string;
-  product: { defaultMouldId?: string; coating?: string; name: string };
+  product: { defaultMouldId?: string; shellIngredientId?: string; name: string };
   productFillings: import("@/types").ProductFilling[];
   allMoulds: import("@/types").Mould[];
   sym?: string;
@@ -1425,9 +1425,11 @@ function ProductCostTab({
 
   const mould = allMoulds.find((m) => m.id === product.defaultMouldId);
   const hasMould = !!mould;
-  const hasCoating = !!product.coating;
 
   const ingredientsMap = new Map(allIngredients.map((i) => [i.id!, i]));
+  const shellIngredient = product.shellIngredientId ? ingredientsMap.get(product.shellIngredientId) : undefined;
+  const hasShell = !!shellIngredient;
+  const shellPriced = hasShell && costPerGram(shellIngredient) !== null;
   const fillingsMap = new Map(allFillings.map((l) => [l.id!, l]));
 
   // Ingredients used in this product that have no pricing (and aren't marked irrelevant)
@@ -1639,7 +1641,7 @@ function ProductCostTab({
           )}
           <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
             {mould && <span>Mould: {mould.name} ({mould.cavityWeightG}g)</span>}
-            {product.coating && <span className="capitalize">Coating: {product.coating}</span>}
+            {shellIngredient && <span>Shell: {shellIngredient.name}</span>}
           </div>
         </div>
         <button
@@ -1661,12 +1663,21 @@ function ProductCostTab({
           </p>
         </div>
       )}
-      {hasMould && !hasCoating && (
+      {hasMould && !hasShell && (
         <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
           <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
           <p className="text-xs text-status-warn">
-            Shell and cap costs require a coating type. Set one above, then map it to a chocolate
-            ingredient in <strong>Settings → Coating Chocolates</strong>.
+            No shell chocolate set — shell and cap costs are excluded. Pick one on the
+            <strong> Shell</strong> tab.
+          </p>
+        </div>
+      )}
+      {hasMould && hasShell && !shellPriced && (
+        <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+          <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
+          <p className="text-xs text-status-warn">
+            Shell chocolate <strong>{shellIngredient!.name}</strong> has no pricing data —
+            shell and cap costs are excluded until its pricing is set.
           </p>
         </div>
       )}

@@ -7,9 +7,15 @@
  *
  * Convention (EU FIC 1169/2011 and equivalents):
  *   - Ingredients listed in descending order of weight.
- *   - Compound ingredients may declare their sub-ingredients in parentheses.
- *   - Allergens emphasised (bolded) where present. We carry allergen IDs on
- *     each entry; the UI decides the emphasis style.
+ *   - Compound ingredients (those with a `subIngredients` breakdown) are
+ *     flattened: only the sub-ingredient names appear on the final list,
+ *     not the parent's commercial name. Rationale: legal labels declare
+ *     what's actually in the product, not the SKU you bought.
+ *   - Ingredients without a breakdown appear under their own name.
+ *   - Duplicate names are merged — if "sugar" appears in two compound
+ *     ingredients, it appears once with the combined weight.
+ *   - Allergens emphasised (bolded) where any contributing parent carries
+ *     the allergen. The UI decides the emphasis style.
  */
 
 import type { FillingIngredient, Ingredient, Mould, ProductFilling } from "@/types";
@@ -21,49 +27,36 @@ import {
 
 /** One item on a rolled-up ingredient list. */
 export interface IngredientListEntry {
-  /** Display label. For compound ingredients whose parent has sub-ingredients,
-   *  this is "Parent name (sub1, sub2, sub3)" in the order the user saved. */
+  /** Display label: a sub-ingredient name, or — for ingredients without
+   *  a breakdown — the ingredient's own name. */
   label: string;
-  /** Total grams contributed by this ingredient (pre-sort key). */
+  /** Total grams contributed by parent ingredients mapping to this label.
+   *  When a parent flattens into multiple subs, each sub inherits the
+   *  parent's full weight (there's no per-sub percentage in the model). */
   grams: number;
-  /** Allergen IDs from the parent ingredient. The UI bolds the label when
-   *  this array is non-empty. Allergens aren't tagged at the sub-ingredient
-   *  level (per product rule, 2026-04-19). */
+  /** Allergen IDs unioned across every parent ingredient that contributes
+   *  to this label. The UI bolds the label when this is non-empty. */
   allergens: string[];
-}
-
-/** Format one filling ingredient's parent as a label, folding in any
- *  sub-ingredients as "(sub1, sub2, …)". */
-function labelFor(ing: Ingredient): string {
-  const subs = ing.subIngredients ?? [];
-  if (subs.length === 0) return ing.name;
-  const subNames = subs.map((s) => s.name).filter((n) => n && n.trim().length > 0);
-  if (subNames.length === 0) return ing.name;
-  return `${ing.name} (${subNames.join(", ")})`;
 }
 
 /**
  * Roll up a filling's ingredient list, sorted by grams descending.
  *
- * No merging across rows: if the same ingredient is listed twice on a
- * filling (rare but allowed), each occurrence appears separately. The
- * caller can merge upstream if it matters.
+ * Each filling ingredient is flattened into its sub-ingredient names
+ * (or its own name if it has no breakdown). Duplicate names merge across
+ * rows — the customer-facing label shows each declared ingredient once.
  */
 export function buildFillingIngredientList(
   fillingIngredients: FillingIngredient[],
   ingredientMap: Map<string, Ingredient>,
 ): IngredientListEntry[] {
-  const entries: IngredientListEntry[] = [];
+  const contributions: Contribution[] = [];
   for (const li of fillingIngredients) {
     const ing = ingredientMap.get(li.ingredientId);
     if (!ing) continue;
-    entries.push({
-      label: labelFor(ing),
-      grams: li.amount,
-      allergens: ing.allergens ?? [],
-    });
+    contributions.push({ ing, grams: li.amount });
   }
-  return entries.sort((a, b) => b.grams - a.grams);
+  return flattenAndDedup(contributions);
 }
 
 /** Input for `buildProductIngredientList`. Mirrors the weight-math inputs
@@ -84,42 +77,37 @@ export interface ProductIngredientListInput {
 /**
  * Roll up a product's ingredient list across shell + all fillings.
  *
- * Merges duplicates across fillings by ingredient id (customer-facing
- * labels merge — "Butter" from two fillings should appear once with
- * combined weight), and sorts descending by grams.
- *
- * Returns [] when no mould is set, since all weight math keys off the
- * mould cavity. Filling weights use the same logic as
- * `calculateProductNutrition`.
+ * Each parent ingredient is flattened into its sub-ingredient names (or
+ * its own name), and duplicate names merge so the same ingredient shows
+ * once with the combined weight. Returns [] when no mould is set, since
+ * all weight math keys off the mould cavity.
  */
 export function buildProductIngredientList(input: ProductIngredientListInput): IngredientListEntry[] {
-  const byId = new Map<string, { ing: Ingredient; grams: number }>();
-  accumulateProduct(byId, input);
-  return finishEntries(byId);
+  const contributions: Contribution[] = [];
+  accumulateProduct(contributions, input);
+  return flattenAndDedup(contributions);
 }
 
 /**
  * Roll up a collection's ingredient list across every product in the
  * collection. Each product contributes its own shell + filling weights;
- * duplicates across products merge by ingredient id so the final label
- * shows each ingredient once with the combined grams.
- *
- * Sort order is descending by total grams. Products without a mould are
- * skipped (same guard as the per-product helper).
+ * sub-ingredients are flattened and duplicates merge across every product.
  */
 export function buildCollectionIngredientList(
   perProduct: ProductIngredientListInput[],
 ): IngredientListEntry[] {
-  const byId = new Map<string, { ing: Ingredient; grams: number }>();
-  for (const input of perProduct) accumulateProduct(byId, input);
-  return finishEntries(byId);
+  const contributions: Contribution[] = [];
+  for (const input of perProduct) accumulateProduct(contributions, input);
+  return flattenAndDedup(contributions);
 }
 
-/** Fold one product's shell + filling ingredient weights into the shared map. */
-function accumulateProduct(
-  byId: Map<string, { ing: Ingredient; grams: number }>,
-  input: ProductIngredientListInput,
-): void {
+// ─── Internals ──────────────────────────────────────────────────────────────
+
+/** One parent ingredient's contribution to the rolled-up list. */
+type Contribution = { ing: Ingredient; grams: number };
+
+/** Compute shell + filling ingredient contributions from one product. */
+function accumulateProduct(out: Contribution[], input: ProductIngredientListInput): void {
   const {
     mould, productFillings, fillingIngredientsMap, ingredientMap,
     shellIngredient,
@@ -129,15 +117,8 @@ function accumulateProduct(
 
   if (!mould) return;
 
-  const bump = (ing: Ingredient, grams: number) => {
-    if (!ing.id || grams <= 0) return;
-    const cur = byId.get(ing.id);
-    if (cur) cur.grams += grams;
-    else byId.set(ing.id, { ing, grams });
-  };
-
   if (shellIngredient && shellPercentage > 0) {
-    bump(shellIngredient, calculateShellWeightG(mould, shellPercentage));
+    out.push({ ing: shellIngredient, grams: calculateShellWeightG(mould, shellPercentage) });
   }
 
   for (const rl of productFillings) {
@@ -152,21 +133,58 @@ function accumulateProduct(
       const ing = ingredientMap.get(li.ingredientId);
       if (!ing) continue;
       const fraction = li.amount / fillingTotalProductG;
-      bump(ing, fillingWeightG * fraction);
+      out.push({ ing, grams: fillingWeightG * fraction });
     }
   }
 }
 
-function finishEntries(
-  byId: Map<string, { ing: Ingredient; grams: number }>,
-): IngredientListEntry[] {
-  const entries: IngredientListEntry[] = [];
-  for (const { ing, grams } of byId.values()) {
-    entries.push({
-      label: labelFor(ing),
-      grams,
-      allergens: ing.allergens ?? [],
-    });
+/**
+ * Flatten sub-ingredients, dedup by case-insensitive name, union allergens,
+ * sum grams. Each parent ingredient either expands into its sub-ingredient
+ * names (when the breakdown is present) or stays under its own name.
+ *
+ * When a parent flattens into N subs, each sub inherits the parent's full
+ * weight — there are no per-sub percentages in the data model. If two
+ * parents declare the same sub, their weights add.
+ */
+function flattenAndDedup(contributions: Contribution[]): IngredientListEntry[] {
+  const byKey = new Map<string, { label: string; grams: number; allergens: Set<string> }>();
+
+  for (const { ing, grams } of contributions) {
+    if (grams <= 0) continue;
+
+    const names = deriveDisplayNames(ing);
+    const parentAllergens = ing.allergens ?? [];
+
+    for (const name of names) {
+      const key = name.toLowerCase();
+      const cur = byKey.get(key);
+      if (cur) {
+        cur.grams += grams;
+        for (const a of parentAllergens) cur.allergens.add(a);
+      } else {
+        byKey.set(key, {
+          label: name,
+          grams,
+          allergens: new Set(parentAllergens),
+        });
+      }
+    }
   }
-  return entries.sort((a, b) => b.grams - a.grams);
+
+  return [...byKey.values()]
+    .map((v) => ({ label: v.label, grams: v.grams, allergens: [...v.allergens] }))
+    .sort((a, b) => b.grams - a.grams);
+}
+
+/** Return the list of names this ingredient should appear under on the
+ *  rolled-up list — its sub-ingredient names if a breakdown exists, or
+ *  otherwise its own name. Empty/whitespace entries are dropped. */
+function deriveDisplayNames(ing: Ingredient): string[] {
+  const subs = (ing.subIngredients ?? [])
+    .map((s) => s.name?.trim() ?? "")
+    .filter((n) => n.length > 0);
+  if (subs.length > 0) return subs;
+  const parent = ing.name?.trim() ?? "";
+  return parent.length > 0 ? [parent] : [];
 }
