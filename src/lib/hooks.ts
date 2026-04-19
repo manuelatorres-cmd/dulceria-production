@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -3765,4 +3765,94 @@ export async function deductFillingStock(
 
   queryClient.invalidateQueries({ queryKey: ["filling-stock"] });
   return totalDeducted;
+}
+
+// ---------------------------------------------------------------------------
+// Capacity & People (singleton) + Event calendar
+// ---------------------------------------------------------------------------
+
+/**
+ * capacityConfig is a singleton by convention (migration 0002). The app
+ * always reads/writes the same UUID so we don't need a "first row" query.
+ */
+export const CAPACITY_CONFIG_ID = "00000000-0000-0000-0000-000000000001";
+
+export function useCapacityConfig(): CapacityConfig | null {
+  const { data } = useQuery({
+    queryKey: ["capacity-config"],
+    queryFn: async () => {
+      const row = assertOkMaybe(
+        await supabase.from("capacityConfig").select("*").eq("id", CAPACITY_CONFIG_ID).maybeSingle(),
+      ) as CapacityConfig | null;
+      return row;
+    },
+  });
+  return data ?? null;
+}
+
+/** Upsert the singleton capacityConfig row. Missing fields stay null — the
+ *  Settings form lets you save partial rows so progress isn't lost. */
+export async function saveCapacityConfig(partial: Partial<CapacityConfig>): Promise<void> {
+  const { error } = await supabase
+    .from("capacityConfig")
+    .upsert({
+      id: CAPACITY_CONFIG_ID,
+      peopleCount: partial.peopleCount ?? null,
+      hoursPerPersonPerDay: partial.hoursPerPersonPerDay ?? null,
+      workingDays: partial.workingDays ?? null,
+      warnThresholdPercent: partial.warnThresholdPercent ?? null,
+      criticalThresholdPercent: partial.criticalThresholdPercent ?? null,
+      capacityBufferPercent: partial.capacityBufferPercent ?? null,
+      fillingBufferPercent: partial.fillingBufferPercent ?? null,
+      updatedAt: new Date(),
+    }, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["capacity-config"] });
+}
+
+export function useEventCalendar(): EventCalendarEntry[] {
+  const { data } = useQuery({
+    queryKey: ["event-calendar"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("eventCalendar").select("*"),
+      ) as EventCalendarEntry[];
+      return rows.sort((a, b) => a.startDate.localeCompare(b.startDate));
+    },
+  });
+  return data ?? [];
+}
+
+/** Blocked-day entries only (kind='blocked'), sorted by start date asc. */
+export function useBlockedDays(): EventCalendarEntry[] {
+  const all = useEventCalendar();
+  return all.filter((e) => e.kind === "blocked");
+}
+
+export async function saveEventCalendarEntry(
+  entry: Omit<EventCalendarEntry, "createdAt" | "updatedAt">,
+): Promise<string> {
+  const now = new Date();
+  if (entry.id) {
+    const { error } = await supabase
+      .from("eventCalendar")
+      .update({ ...entry, updatedAt: now })
+      .eq("id", entry.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["event-calendar"] });
+    return entry.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("eventCalendar")
+    .insert({ ...entry, id, createdAt: now, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["event-calendar"] });
+  return id;
+}
+
+export async function deleteEventCalendarEntry(id: string): Promise<void> {
+  const { error } = await supabase.from("eventCalendar").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["event-calendar"] });
 }

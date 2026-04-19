@@ -3,12 +3,13 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { exportBackup, importBackup, clearAllData } from "@/lib/backup";
-import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories } from "@/lib/hooks";
-import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, type CurrencyCode, type MarketRegion, type FillMode } from "@/types";
+import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry } from "@/lib/hooks";
+import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry } from "@/types";
+import { capacityConfigStatus, sortWeekdays } from "@/lib/capacity";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import { loadDemoData, isDemoDataLoaded } from "@/lib/seed-demo";
 import { isCloudConfigured } from "@/lib/supabase";
-import { Download, AlertTriangle, CheckCircle, FlaskConical, Video, Printer, Pencil, Trash2 } from "lucide-react";
+import { Download, AlertTriangle, CheckCircle, FlaskConical, Video, Printer, Pencil, Trash2, Plus, X, Clock } from "lucide-react";
 import { SpreadsheetImport } from "@/components/spreadsheet-import";
 import { ingredientImportConfig, getExistingIngredientKeys } from "@/lib/spreadsheet-import-ingredients";
 import { mouldImportConfig, getExistingMouldKeys } from "@/lib/spreadsheet-import-moulds";
@@ -19,7 +20,7 @@ import { buildProductImportConfig, buildFillingNameLookup, buildMouldNameLookup,
 import type { Ingredient } from "@/types";
 
 type ImportState = "idle" | "confirm" | "importing" | "done" | "error";
-type Tab = "backup" | "import" | "market" | "printing" | "demo";
+type Tab = "backup" | "import" | "capacity" | "market" | "printing" | "demo";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("backup");
@@ -104,6 +105,12 @@ export default function SettingsPage() {
           Import
         </button>
         <button
+          onClick={() => switchTab("capacity")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "capacity" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+        >
+          Capacity &amp; People
+        </button>
+        <button
           onClick={() => switchTab("market")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "market" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
         >
@@ -138,6 +145,8 @@ export default function SettingsPage() {
           />
         ) : activeTab === "import" ? (
           <ImportTab />
+        ) : activeTab === "capacity" ? (
+          <CapacityTab onDirtyChange={setMarketDirty} />
         ) : activeTab === "market" ? (
           <PreferencesTab marketRegion={marketRegion} onRegionChange={setMarketRegion} currency={currency} onCurrencyChange={setCurrency} facilityMayContain={facilityMayContain} onMayContainChange={setFacilityMayContain} defaultFillMode={defaultFillMode} onFillModeChange={setDefaultFillMode} onDirtyChange={setMarketDirty} />
         ) : activeTab === "printing" ? (
@@ -491,6 +500,475 @@ function ClearAllDataSection() {
       </div>
     </section>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Capacity & People (§1 of the production planning stack)
+// ---------------------------------------------------------------------------
+
+const WEEKDAY_LABELS: Record<Weekday, string> = {
+  monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu",
+  friday: "Fri", saturday: "Sat", sunday: "Sun",
+};
+
+function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) {
+  const config = useCapacityConfig();
+  const blocked = useBlockedDays();
+
+  const [peopleCount, setPeopleCount] = useState<string>("");
+  const [hoursPerDay, setHoursPerDay] = useState<string>("");
+  const [workingDays, setWorkingDays] = useState<Set<Weekday>>(new Set());
+  const [capacityBuffer, setCapacityBuffer] = useState<string>("");
+  const [fillingBuffer, setFillingBuffer] = useState<string>("");
+  const [warnThreshold, setWarnThreshold] = useState<string>("");
+  const [criticalThreshold, setCriticalThreshold] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [syncedAt, setSyncedAt] = useState<string | null>(null);
+
+  // Sync form state when the config first loads
+  const configKey = config ? JSON.stringify(config) : "null";
+  if (configKey !== syncedAt) {
+    setPeopleCount(config?.peopleCount != null ? String(config.peopleCount) : "");
+    setHoursPerDay(config?.hoursPerPersonPerDay != null ? String(config.hoursPerPersonPerDay) : "");
+    setWorkingDays(new Set<Weekday>(config?.workingDays ?? []));
+    setCapacityBuffer(config?.capacityBufferPercent != null ? String(config.capacityBufferPercent) : "");
+    setFillingBuffer(config?.fillingBufferPercent != null ? String(config.fillingBufferPercent) : "");
+    setWarnThreshold(config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "");
+    setCriticalThreshold(config?.criticalThresholdPercent != null ? String(config.criticalThresholdPercent) : "");
+    setSyncedAt(configKey);
+    onDirtyChange(false);
+  }
+
+  const isDirty = syncedAt !== null && (
+    peopleCount !== (config?.peopleCount != null ? String(config.peopleCount) : "") ||
+    hoursPerDay !== (config?.hoursPerPersonPerDay != null ? String(config.hoursPerPersonPerDay) : "") ||
+    JSON.stringify(sortWeekdays([...workingDays])) !== JSON.stringify(sortWeekdays(config?.workingDays ?? [])) ||
+    capacityBuffer !== (config?.capacityBufferPercent != null ? String(config.capacityBufferPercent) : "") ||
+    fillingBuffer !== (config?.fillingBufferPercent != null ? String(config.fillingBufferPercent) : "") ||
+    warnThreshold !== (config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "") ||
+    criticalThreshold !== (config?.criticalThresholdPercent != null ? String(config.criticalThresholdPercent) : "")
+  );
+
+  useEffect(() => { onDirtyChange(isDirty); }, [isDirty]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleWorkingDay(day: Weekday) {
+    setWorkingDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await saveCapacityConfig({
+        peopleCount: parsePositiveInt(peopleCount),
+        hoursPerPersonPerDay: parsePositiveNum(hoursPerDay),
+        workingDays: sortWeekdays([...workingDays]),
+        capacityBufferPercent: parsePercent(capacityBuffer),
+        fillingBufferPercent: parsePercent(fillingBuffer),
+        warnThresholdPercent: parsePercent(warnThreshold),
+        criticalThresholdPercent: parsePercent(criticalThreshold),
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Preview the "live" config that the status helper + dashboard will see
+  // once saved, so the completeness banner reflects current inputs.
+  const previewConfig: CapacityConfig = {
+    peopleCount: parsePositiveInt(peopleCount),
+    hoursPerPersonPerDay: parsePositiveNum(hoursPerDay),
+    workingDays: sortWeekdays([...workingDays]),
+    capacityBufferPercent: parsePercent(capacityBuffer),
+    fillingBufferPercent: parsePercent(fillingBuffer),
+    warnThresholdPercent: parsePercent(warnThreshold),
+    criticalThresholdPercent: parsePercent(criticalThreshold),
+  };
+  const status = capacityConfigStatus(previewConfig);
+
+  return (
+    <div className="space-y-6">
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-primary">Capacity &amp; People</h2>
+        <p className="text-xs text-muted-foreground">
+          How much production capacity you have on a working day. The reverse scheduler
+          uses these values to fit orders into the calendar and the dashboard uses them
+          to warn when a day is overbooked. Partial saves are allowed — the scheduler
+          refuses to run until every field is set.
+        </p>
+        {!status.isComplete && (
+          <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+            <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
+            <p className="text-xs text-status-warn">
+              Missing: {status.missing.join(", ")}
+            </p>
+          </div>
+        )}
+        {status.isComplete && (
+          <div className="flex items-start gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2">
+            <CheckCircle className="w-4 h-4 text-status-ok shrink-0 mt-0.5" />
+            <p className="text-xs text-status-ok">All fields set — the scheduler can run.</p>
+          </div>
+        )}
+      </section>
+
+      {/* People + hours */}
+      <section className="space-y-3">
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">People on a working day</label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={peopleCount}
+                onChange={(e) => setPeopleCount(e.target.value)}
+                placeholder="e.g. 2"
+                className="input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                How many people are available for production. Not counting shop hours, admin, etc.
+              </p>
+            </div>
+            <div>
+              <label className="label">Hours per person per day</label>
+              <input
+                type="number"
+                min="0.5"
+                step="0.5"
+                max="24"
+                value={hoursPerDay}
+                onChange={(e) => setHoursPerDay(e.target.value)}
+                placeholder="e.g. 6"
+                className="input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Active production hours — not the calendar shift length.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Working days */}
+      <section className="space-y-3">
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div>
+            <label className="label">Working days</label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {WEEKDAYS.map((day) => {
+                const active = workingDays.has(day);
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleWorkingDay(day)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {WEEKDAY_LABELS[day]}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Days the scheduler is allowed to place work on. Specific off-days (vacation,
+              equipment service) go in the Blocked days section below.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Buffers */}
+      <section className="space-y-3">
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Capacity buffer (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={capacityBuffer}
+                onChange={(e) => setCapacityBuffer(e.target.value)}
+                placeholder="e.g. 15"
+                className="input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Safety margin applied to the daily budget. 15% means the scheduler aims to
+                fill only 85% of the raw people-hours so there's room for the unexpected.
+              </p>
+            </div>
+            <div>
+              <label className="label">Filling buffer (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={fillingBuffer}
+                onChange={(e) => setFillingBuffer(e.target.value)}
+                placeholder="e.g. 10"
+                className="input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Extra filling to produce per batch to cover yield loss. 10% means making
+                a 220g batch when 200g is needed.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Thresholds */}
+      <section className="space-y-3">
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Warn threshold (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={warnThreshold}
+                onChange={(e) => setWarnThreshold(e.target.value)}
+                placeholder="e.g. 80"
+                className="input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Dashboard shows a warning when a day's utilisation passes this %.
+              </p>
+            </div>
+            <div>
+              <label className="label">Critical threshold (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={criticalThreshold}
+                onChange={(e) => setCriticalThreshold(e.target.value)}
+                placeholder="e.g. 95"
+                className="input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Dashboard shows a critical alert at this % — the day is effectively full.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Save button */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleSave}
+          disabled={saving || !isDirty}
+          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        {isDirty && (
+          <span className="text-xs text-muted-foreground">Unsaved changes</span>
+        )}
+      </div>
+
+      {/* Blocked days */}
+      <BlockedDaysSection blocked={blocked} />
+    </div>
+  );
+}
+
+function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const canSave = name.trim().length > 0 && !!startDate && !!endDate && endDate >= startDate && !saving;
+
+  async function handleAdd() {
+    setSaving(true);
+    try {
+      await saveEventCalendarEntry({
+        name: name.trim(),
+        kind: "blocked",
+        startDate,
+        endDate,
+      });
+      setAdding(false);
+      setName("");
+      setStartDate("");
+      setEndDate("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-primary">Blocked days</h2>
+          <p className="text-xs text-muted-foreground">
+            Off-days the scheduler skips — vacation, equipment service, public holidays.
+          </p>
+        </div>
+        {!adding && (
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add blocked period
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div>
+            <label className="label">Reason</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Summer holiday"
+              autoFocus
+              className="input"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Start</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">End (inclusive)</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                min={startDate || undefined}
+                className="input"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleAdd}
+              disabled={!canSave}
+              className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+            >
+              {saving ? "Adding…" : "Add"}
+            </button>
+            <button
+              onClick={() => { setAdding(false); setName(""); setStartDate(""); setEndDate(""); }}
+              className="rounded-full border border-border px-4 py-2 text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {blocked.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-2 text-center border border-dashed border-border rounded-lg">
+          No blocked periods.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {blocked.map((entry) => (
+            <BlockedDayRow key={entry.id} entry={entry} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function BlockedDayRow({ entry }: { entry: EventCalendarEntry }) {
+  const [pendingRemove, setPendingRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  async function handleDelete() {
+    if (!entry.id) return;
+    setRemoving(true);
+    try {
+      await deleteEventCalendarEntry(entry.id);
+    } finally {
+      setRemoving(false);
+      setPendingRemove(false);
+    }
+  }
+
+  return (
+    <li className="rounded-lg border border-border bg-card flex items-center gap-3 px-3 py-2.5">
+      <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{entry.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {formatIsoDate(entry.startDate)}
+          {entry.startDate !== entry.endDate && ` — ${formatIsoDate(entry.endDate)}`}
+        </p>
+      </div>
+      {pendingRemove ? (
+        <span className="flex items-center gap-1.5 text-xs shrink-0">
+          <span className="text-muted-foreground">Remove?</span>
+          <button onClick={handleDelete} disabled={removing} className="text-red-600 font-medium hover:underline disabled:opacity-50">
+            {removing ? "…" : "Yes"}
+          </button>
+          <button onClick={() => setPendingRemove(false)} className="text-muted-foreground hover:underline">
+            Cancel
+          </button>
+        </span>
+      ) : (
+        <button
+          onClick={() => setPendingRemove(true)}
+          className="text-muted-foreground/50 hover:text-destructive shrink-0"
+          aria-label="Remove blocked period"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
+    </li>
+  );
+}
+
+function formatIsoDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function parsePositiveInt(s: string): number | undefined {
+  const n = parseInt(s, 10);
+  if (isNaN(n) || n <= 0) return undefined;
+  return n;
+}
+function parsePositiveNum(s: string): number | undefined {
+  const n = parseFloat(s);
+  if (isNaN(n) || n <= 0) return undefined;
+  return n;
+}
+function parsePercent(s: string): number | undefined {
+  const n = parseFloat(s);
+  if (isNaN(n) || n < 0 || n > 100) return undefined;
+  return n;
 }
 
 function PreferencesTab({

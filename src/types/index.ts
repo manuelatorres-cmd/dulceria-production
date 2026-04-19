@@ -1022,3 +1022,63 @@ export interface CollectionPricingSnapshot {
   /** Human-readable description, e.g. "Sell price updated to €15.95" */
   triggerDetail: string;
 }
+
+// --- Production planning: capacity + calendar ---------------------------
+
+export const WEEKDAYS = [
+  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+] as const;
+export type Weekday = (typeof WEEKDAYS)[number];
+
+/**
+ * Singleton config row: how much production work fits in a day.
+ *
+ * All fields are nullable because the schema ships empty — the Settings →
+ * Capacity & People form gates completeness. The scheduler refuses to run
+ * until `capacityConfigStatus(config).isComplete` is true.
+ */
+export interface CapacityConfig {
+  id?: string;
+  /** How many people are available for production on a working day. */
+  peopleCount?: number;
+  /** Hours each person is available per working day (≤ 24). */
+  hoursPerPersonPerDay?: number;
+  /** Working days of the week. Values are lowercase Weekday strings. */
+  workingDays?: Weekday[];
+  /** Percent utilisation at which the dashboard shows a warning (0–100). */
+  warnThresholdPercent?: number;
+  /** Percent utilisation at which the dashboard shows a critical alert (0–100). */
+  criticalThresholdPercent?: number;
+  /** General capacity safety margin (0–100). Effective per-day budget is
+   *  (1 - capacityBufferPercent/100) × peopleCount × hoursPerPersonPerDay. */
+  capacityBufferPercent?: number;
+  /** Filling-specific overproduction buffer (0–100). Filling batches
+   *  scale up by this factor to cover yield loss during production. */
+  fillingBufferPercent?: number;
+  updatedAt?: Date;
+}
+
+export type EventCalendarKind = "event" | "peak" | "blocked" | "holiday";
+
+/**
+ * Date-range entries that affect scheduling or the dashboard — events,
+ * predicted demand peaks, blocked days (vacation, equipment service),
+ * holidays. `kind='blocked'` days are excluded from the scheduler's
+ * working-day set even when they fall on a configured working weekday.
+ */
+export interface EventCalendarEntry {
+  id?: string;
+  name: string;
+  kind: EventCalendarKind;
+  /** Inclusive start date, ISO-date string ("YYYY-MM-DD"). */
+  startDate: string;
+  /** Inclusive end date, ISO-date string. Must be ≥ startDate. */
+  endDate: string;
+  /** Optional link back to an order (e.g. an event's delivery slot). */
+  relatedOrderId?: string;
+  /** Optional CSS colour (hex or named) for the dashboard calendar dot. */
+  color?: string;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
