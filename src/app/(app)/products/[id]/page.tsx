@@ -8,6 +8,7 @@ import { colorToCSS } from "@/lib/colors";
 import { deserializeBreakdown, enrichBreakdownLabels, formatCost, costDelta, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
 import { DENSITY_G_PER_ML } from "@/lib/production";
 import { getNutrientsByMarket, getNutritionPanelTitle, scaleToServing, formatNutrientValue, percentDailyValue, calculateProductNutrition } from "@/lib/nutrition";
+import { buildProductIngredientList } from "@/lib/ingredientList";
 import { calculateShellWeightG, calculateCapWeightG } from "@/lib/costCalculation";
 import type { MarketRegion } from "@/types";
 import { ArrowLeft, Camera, Plus, X, Search, Trash2, Pencil, ChevronRight, StickyNote, RefreshCw, AlertTriangle, Undo2, Copy, Archive, ArchiveRestore, GripVertical, Snowflake } from "lucide-react";
@@ -2723,6 +2724,18 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
     [mould, productFillings, fillingIngredientsMap, ingredientMap, shellIngredient, effectiveShellPercentage],
   );
 
+  const ingredientList = useMemo(
+    () => buildProductIngredientList({
+      mould: mould ?? null,
+      productFillings,
+      fillingIngredientsMap,
+      ingredientMap,
+      shellIngredient: shellIngredient ?? null,
+      shellPercentage: effectiveShellPercentage,
+    }),
+    [mould, productFillings, fillingIngredientsMap, ingredientMap, shellIngredient, effectiveShellPercentage],
+  );
+
   const { per100g, perProduct, productWeightG, ingredientsWithData, ingredientsTotal, warnings } = result;
   const nutrients = getNutrientsByMarket(market);
   const panelTitle = getNutritionPanelTitle(market);
@@ -2757,17 +2770,6 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
     );
   }
 
-  if (!hasData) {
-    return (
-      <div className="px-4 pb-6">
-        <p className="text-sm text-muted-foreground py-8 text-center">
-          None of the ingredients in this product have nutrition data.
-          Add nutrition values to your ingredients to see aggregated data here.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="px-4 pb-6">
       <h2 className="text-sm font-medium text-muted-foreground mb-1">{panelTitle}</h2>
@@ -2779,7 +2781,7 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
         </div>
       ))}
 
-      {ingredientsWithData < ingredientsTotal && (
+      {hasData && ingredientsWithData < ingredientsTotal && (
         <div className="flex items-start gap-2 text-xs text-amber-700 mb-1">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
@@ -2789,15 +2791,17 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground mb-3 mt-2">
-        Product weight: {productWeightG.toFixed(1)}g
-        {" "}(shell + cap: {mould ? (calculateShellWeightG(mould) + calculateCapWeightG(mould)).toFixed(1) : "?"}g
-        {shellIngredient ? ` of ${shellIngredient.name}` : ""}
-        {", "}fill: {mould ? (productWeightG - calculateShellWeightG(mould) - calculateCapWeightG(mould)).toFixed(1) : "?"}g)
-        {showPerServing && " · FDA serving: 30g"}
-      </p>
+      {hasData ? (
+        <>
+          <p className="text-xs text-muted-foreground mb-3 mt-2">
+            Product weight: {productWeightG.toFixed(1)}g
+            {" "}(shell + cap: {mould ? (calculateShellWeightG(mould) + calculateCapWeightG(mould)).toFixed(1) : "?"}g
+            {shellIngredient ? ` of ${shellIngredient.name}` : ""}
+            {", "}fill: {mould ? (productWeightG - calculateShellWeightG(mould) - calculateCapWeightG(mould)).toFixed(1) : "?"}g)
+            {showPerServing && " · FDA serving: 30g"}
+          </p>
 
-      {/* Nutrition table */}
+          {/* Nutrition table */}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         {/* Header row */}
         <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
@@ -2852,6 +2856,34 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
             </div>
           );
         })}
+      </div>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground py-4">
+          None of the ingredients in this product have nutrition data.
+          Add nutrition values to your ingredients to see aggregated data here.
+        </p>
+      )}
+
+      {/* Ingredient list — customer-facing label text */}
+      <div className="mt-6">
+        <h2 className="text-sm font-medium text-muted-foreground mb-1">Ingredients list</h2>
+        <p className="text-xs text-muted-foreground mb-2">
+          Listed in descending order of weight. Allergen-bearing ingredients are shown in bold.
+        </p>
+        {ingredientList.length > 0 ? (
+          <p className="text-sm leading-relaxed">
+            {ingredientList.map((entry, i) => (
+              <span key={i}>
+                {i > 0 ? ", " : ""}
+                {entry.allergens.length > 0 ? <strong>{entry.label}</strong> : entry.label}
+              </span>
+            ))}
+            .
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">No ingredients yet.</p>
+        )}
       </div>
     </div>
   );
