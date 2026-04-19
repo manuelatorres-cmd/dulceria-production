@@ -282,6 +282,74 @@ export function aggregateNutrition(entries: IngredientNutritionEntry[]): {
 }
 
 // ---------------------------------------------------------------------------
+// Filling-level nutrition: aggregate a filling's ingredients directly
+// ---------------------------------------------------------------------------
+
+export interface FillingNutritionResult {
+  /** Nutrition per 100g of the filling mixture */
+  per100g: NutritionData;
+  /** Total weight of all the filling's ingredients in grams (sum of amounts) */
+  totalWeightG: number;
+  /** How many of the filling's ingredients have nutrition data */
+  ingredientsWithData: number;
+  /** Total ingredients on the filling */
+  ingredientsTotal: number;
+  warnings: string[];
+}
+
+/**
+ * Calculate nutrition for a single filling from its ingredient list.
+ *
+ * Ingredients contribute proportionally to their amount in grams. Entries
+ * with non-gram units (e.g. counts) are skipped with a warning — filling
+ * ingredients almost always sit in g/kg/ml/L and the weighted aggregation
+ * requires a consistent mass basis.
+ */
+export function calculateFillingNutrition(
+  fillingIngredients: FillingIngredient[],
+  ingredientMap: Map<string, Ingredient>,
+): FillingNutritionResult {
+  const warnings: string[] = [];
+  const entries: IngredientNutritionEntry[] = [];
+  let ingredientsTotal = 0;
+  let ingredientsWithData = 0;
+
+  for (const li of fillingIngredients) {
+    const ing = ingredientMap.get(li.ingredientId);
+    if (!ing) continue;
+    ingredientsTotal += 1;
+
+    const amountG = toGramsForNutrition(li.amount, li.unit);
+    if (amountG == null) {
+      warnings.push(`"${ing.name}" uses unit "${li.unit}" — skipped (nutrition needs a mass/volume amount).`);
+      continue;
+    }
+
+    if (!ing.nutrition || !hasNutritionData(ing.nutrition)) {
+      warnings.push(`"${ing.name}" has no nutrition data.`);
+      continue;
+    }
+
+    ingredientsWithData += 1;
+    entries.push({
+      amountG,
+      nutrition: fillDerivedNutrition(ing.nutrition),
+    });
+  }
+
+  const { per100g, totalWeightG } = aggregateNutrition(entries);
+  return { per100g, totalWeightG, ingredientsWithData, ingredientsTotal, warnings };
+}
+
+/** Convert a filling-ingredient amount to grams for nutrition weighting.
+ *  Treats ml as g (1:1) — close enough for per-100g nutrition rollup. */
+function toGramsForNutrition(amount: number, unit: string): number | null {
+  if (unit === "g" || unit === "ml") return amount;
+  if (unit === "kg" || unit === "L") return amount * 1000;
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Product-level nutrition: shell + cap + fill fillings (mirrors costCalculation)
 // ---------------------------------------------------------------------------
 

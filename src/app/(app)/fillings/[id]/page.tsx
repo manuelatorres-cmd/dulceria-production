@@ -2,7 +2,9 @@
 
 import { useState, useCallback, useEffect, use } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useFilling, useFillingIngredients, useIngredients, saveFilling, deleteFilling, deleteFillingWithCleanup, archiveFillingWithCleanup, unarchiveFilling, updateFillingAllergens, useFillingUsage, reorderFillingIngredients, useFillingVersionHistory, forkFillingVersion, getFillingForkImpact, getFillingDeleteImpact, hasProductBeenProduced, hasFillingBeenProduced, getFillingArchiveImpact, useProductsList, saveProduct, addFillingToProduct, duplicateFilling, useAllFillingStatuses } from "@/lib/hooks";
+import { useFilling, useFillingIngredients, useIngredients, saveFilling, deleteFilling, deleteFillingWithCleanup, archiveFillingWithCleanup, unarchiveFilling, updateFillingAllergens, useFillingUsage, reorderFillingIngredients, useFillingVersionHistory, forkFillingVersion, getFillingForkImpact, getFillingDeleteImpact, hasProductBeenProduced, hasFillingBeenProduced, getFillingArchiveImpact, useProductsList, saveProduct, addFillingToProduct, duplicateFilling, useAllFillingStatuses, useMarketRegion } from "@/lib/hooks";
+import { calculateFillingNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
+import { buildFillingIngredientList } from "@/lib/ingredientList";
 import type { FillingArchiveImpact, FillingDeleteImpact } from "@/lib/hooks";
 import { SortableFillingIngredientRow } from "@/components/sortable-filling-ingredient-row";
 import { AddFillingIngredient } from "@/components/add-filling-ingredient";
@@ -10,7 +12,7 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSe
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { CategoryPicker } from "@/components/category-picker";
-import { ArrowLeft, Pencil, Trash2, Lock, LockOpen, GitBranch, Plus, Search, Copy, ArchiveRestore, Archive } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Lock, LockOpen, GitBranch, Plus, Search, Copy, ArchiveRestore, Archive, AlertTriangle } from "lucide-react";
 import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { StepListEditor, StepList } from "@/components/step-list-editor";
@@ -34,7 +36,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
   const existingStatuses = useAllFillingStatuses();
   const statusSuggestions = [...new Set([...DEFAULT_FILLING_STATUSES, ...existingStatuses])].sort();
 
-  const [activeTab, setActiveTab] = useState<"ingredients" | "history">("ingredients");
+  const [activeTab, setActiveTab] = useState<"ingredients" | "nutrition" | "history">("ingredients");
   const [editing, setEditing] = useState(isNew);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [unlocked, setUnlocked] = useState(isForked);
@@ -377,9 +379,13 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Tab strip — only shown when not editing */}
-      {!editing && hasVersionHistory && (
+      {!editing && (
         <div className="flex border-b border-border mb-2 px-4">
-          {(["ingredients", "history"] as const).map((tab) => (
+          {(
+            hasVersionHistory
+              ? (["ingredients", "nutrition", "history"] as const)
+              : (["ingredients", "nutrition"] as const)
+          ).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -389,15 +395,20 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab === "ingredients" ? "Ingredients" : "Versions"}
+              {tab === "ingredients" ? "Ingredients" : tab === "nutrition" ? "Nutrition" : "Versions"}
             </button>
           ))}
         </div>
       )}
 
-      {/* Ingredients tab */}
+      {/* Tab body */}
       {(!editing && activeTab === "history") ? (
         <FillingVersionHistoryTab versions={versionHistory} currentId={fillingId} />
+      ) : (!editing && activeTab === "nutrition") ? (
+        <FillingNutritionTab
+          fillingIngredients={fillingIngredients}
+          ingredientMap={ingredientMap}
+        />
       ) : (
         <div className="px-4 pb-6">
           <div className="flex items-baseline justify-between mb-2">
@@ -952,6 +963,119 @@ function FillingProductSection({ fillingId, products }: { fillingId: string; pro
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function FillingNutritionTab({
+  fillingIngredients,
+  ingredientMap,
+}: {
+  fillingIngredients: import("@/types").FillingIngredient[];
+  ingredientMap: Map<string, Ingredient>;
+}) {
+  const market = useMarketRegion();
+  const nutrition = calculateFillingNutrition(fillingIngredients, ingredientMap);
+  const ingredientList = buildFillingIngredientList(fillingIngredients, ingredientMap);
+
+  const nutrients = getNutrientsByMarket(market);
+  const panelTitle = getNutritionPanelTitle(market);
+  const { per100g, totalWeightG, ingredientsWithData, ingredientsTotal, warnings } = nutrition;
+  const hasData = Object.keys(per100g).length > 0;
+
+  if (ingredientsTotal === 0) {
+    return (
+      <div className="px-4 pb-6">
+        <p className="text-sm text-muted-foreground py-8 text-center">
+          Add ingredients to this filling to see nutrition data.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 pb-6 space-y-6">
+      {/* Nutrition panel */}
+      <div>
+        <h2 className="text-sm font-medium text-muted-foreground mb-1">{panelTitle}</h2>
+
+        {warnings.map((w, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs text-amber-700 mb-1">
+            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <span>{w}</span>
+          </div>
+        ))}
+
+        {hasData && ingredientsWithData < ingredientsTotal && (
+          <div className="flex items-start gap-2 text-xs text-amber-700 mb-1">
+            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <span>
+              Nutrition data for {ingredientsWithData} of {ingredientsTotal} ingredients.
+              Values are partial — add data to remaining ingredients for complete figures.
+            </span>
+          </div>
+        )}
+
+        {hasData ? (
+          <>
+            <p className="text-xs text-muted-foreground mb-3 mt-2">
+              Filling weight: {totalWeightG.toFixed(1)}g
+            </p>
+
+            <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
+                <span className="flex-1">Nutrient</span>
+                <span className="w-24 text-right">Per 100g</span>
+              </div>
+
+              {nutrients.map((n) => {
+                const val100 = per100g[n.key];
+                return (
+                  <div
+                    key={n.key}
+                    className={`flex items-baseline px-3 py-1.5 text-sm border-b border-border last:border-b-0 ${
+                      n.indent === 0 ? "font-medium" : "font-normal"
+                    }`}
+                  >
+                    <span className={`flex-1 ${n.indent === 1 ? "ml-4 text-muted-foreground" : n.indent === 2 ? "ml-8 text-muted-foreground" : ""}`}>
+                      {n.label}
+                    </span>
+                    <span className={`w-24 text-right ${val100 == null ? "text-muted-foreground/50" : ""}`}>
+                      {formatNutrientValue(val100, n.unit)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground py-4">
+            None of this filling&rsquo;s ingredients have nutrition data yet.
+            Add nutrition values to your ingredients to see aggregated data here.
+          </p>
+        )}
+      </div>
+
+      {/* Ingredient list */}
+      <div>
+        <h2 className="text-sm font-medium text-muted-foreground mb-1">Ingredients list</h2>
+        <p className="text-xs text-muted-foreground mb-2">
+          Listed in descending order of weight. Allergen-bearing ingredients are shown in bold.
+        </p>
+        {ingredientList.length > 0 ? (
+          <p className="text-sm leading-relaxed">
+            {ingredientList.map((entry, i) => (
+              <span key={i}>
+                {i > 0 ? ", " : ""}
+                {entry.allergens.length > 0 ? <strong>{entry.label}</strong> : entry.label}
+              </span>
+            ))}
+            .
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">No ingredients yet.</p>
+        )}
+      </div>
     </div>
   );
 }
