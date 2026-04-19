@@ -466,6 +466,52 @@ export function calculateProductNutrition(input: ProductNutritionInput): Product
   };
 }
 
+// ---------------------------------------------------------------------------
+// Collection-level nutrition: weighted aggregation across products
+// ---------------------------------------------------------------------------
+
+export interface CollectionNutritionResult {
+  /** Nutrition per 100g of the collection's combined product weight */
+  per100g: NutritionData;
+  /** Sum of product weights across every product contributing data */
+  totalWeightG: number;
+  /** How many products contributed nutrition data */
+  productsWithData: number;
+  /** Total products in the collection */
+  productsTotal: number;
+}
+
+/**
+ * Aggregate nutrition across a collection's products, weighted by each
+ * product's weight. Products with no nutrition data (empty per100g) or
+ * zero weight are excluded from the roll-up.
+ *
+ * Takes the per-product results from `calculateProductNutrition` so the
+ * weight math stays in one place — callers compute per-product nutrition
+ * once (useful for the UI anyway) and feed the results in.
+ */
+export function calculateCollectionNutrition(
+  perProduct: ProductNutritionResult[],
+): CollectionNutritionResult {
+  const entries: IngredientNutritionEntry[] = [];
+  let productsWithData = 0;
+
+  for (const r of perProduct) {
+    if (r.productWeightG <= 0) continue;
+    if (Object.keys(r.per100g).length === 0) continue;
+    productsWithData += 1;
+    entries.push({ amountG: r.productWeightG, nutrition: r.per100g });
+  }
+
+  const { per100g, totalWeightG } = aggregateNutrition(entries);
+  return {
+    per100g,
+    totalWeightG,
+    productsWithData,
+    productsTotal: perProduct.length,
+  };
+}
+
 /**
  * Scale a per-100g nutrition data object to a given serving size in grams.
  */

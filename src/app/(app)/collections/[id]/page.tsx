@@ -19,10 +19,19 @@ import {
   useAllPackagingOrders,
   useCurrencySymbol,
   useProductCategoryMap,
+  useIngredients,
+  useMouldsList,
+  useProductFillingsForProducts,
+  useFillingIngredientsForFillings,
+  useMarketRegion,
 } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
+import { deriveShellPercentageFromGrams } from "@/lib/costCalculation";
+import { DENSITY_G_PER_ML } from "@/lib/production";
+import { calculateProductNutrition, calculateCollectionNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
+import { buildCollectionIngredientList, type ProductIngredientListInput } from "@/lib/ingredientList";
 import { ArrowLeft, Plus, Search, X, Trash2, Pencil, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
@@ -691,6 +700,13 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
         </section>
 
         {/* ═══════════════════════════════════════════════════════════════
+            Nutrition & Ingredients
+           ═══════════════════════════════════════════════════════════════ */}
+        {productIds.length > 0 && (
+          <CollectionNutritionSection productIds={productIds} />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
             Pricing & Margins
            ═══════════════════════════════════════════════════════════════ */}
         <section>
@@ -1159,5 +1175,180 @@ function BoxCard({
         )}
       </div>
     </div>
+  );
+}
+
+/* ─── Nutrition & Ingredients (collection-level rollup) ─── */
+
+function CollectionNutritionSection({ productIds }: { productIds: string[] }) {
+  const allProducts = useProductsList(true);
+  const allIngredients = useIngredients(true);
+  const allMoulds = useMouldsList(true);
+  const productFillingsMap = useProductFillingsForProducts(productIds);
+
+  const fillingIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const pid of productIds) {
+      for (const pf of productFillingsMap.get(pid) ?? []) set.add(pf.fillingId);
+    }
+    return [...set];
+  }, [productIds, productFillingsMap]);
+  const fillingIngredientsMap = useFillingIngredientsForFillings(fillingIds);
+
+  const market = useMarketRegion();
+
+  const ingredientMap = useMemo(
+    () => new Map(allIngredients.map((i) => [i.id!, i])),
+    [allIngredients],
+  );
+  const productMap = useMemo(
+    () => new Map(allProducts.map((r) => [r.id!, r])),
+    [allProducts],
+  );
+  const mouldMap = useMemo(
+    () => new Map(allMoulds.map((m) => [m.id!, m])),
+    [allMoulds],
+  );
+
+  // Per-product rollup specs — one entry per product in the collection.
+  // Products missing a mould are skipped (same guard as the product helper).
+  const perProductInputs: ProductIngredientListInput[] = useMemo(() => {
+    const inputs: ProductIngredientListInput[] = [];
+    for (const pid of productIds) {
+      const product = productMap.get(pid);
+      if (!product) continue;
+      const mould = product.defaultMouldId ? mouldMap.get(product.defaultMouldId) : null;
+      if (!mould) continue;
+      const productFillings = productFillingsMap.get(pid) ?? [];
+      const shellIngredient = product.shellIngredientId ? ingredientMap.get(product.shellIngredientId) ?? null : null;
+
+      let shellPercentage = product.shellPercentage ?? 37;
+      if (product.fillMode === "grams") {
+        const totalFillGrams = productFillings.reduce((s, pf) => s + (pf.fillGrams ?? 0), 0);
+        shellPercentage = deriveShellPercentageFromGrams(mould.cavityWeightG, totalFillGrams, DENSITY_G_PER_ML);
+      }
+
+      inputs.push({
+        mould,
+        productFillings,
+        fillingIngredientsMap,
+        ingredientMap,
+        shellIngredient,
+        shellPercentage,
+        fillMode: product.fillMode,
+      });
+    }
+    return inputs;
+  }, [productIds, productMap, mouldMap, ingredientMap, productFillingsMap, fillingIngredientsMap]);
+
+  const perProductNutrition = useMemo(
+    () => perProductInputs.map((input) => calculateProductNutrition({
+      mould: input.mould ?? null,
+      productFillings: input.productFillings,
+      fillingIngredientsMap: input.fillingIngredientsMap,
+      ingredientMap: input.ingredientMap,
+      shellIngredient: input.shellIngredient ?? null,
+      shellPercentage: input.shellPercentage,
+    })),
+    [perProductInputs],
+  );
+
+  const collectionNutrition = useMemo(
+    () => calculateCollectionNutrition(perProductNutrition),
+    [perProductNutrition],
+  );
+
+  const ingredientList = useMemo(
+    () => buildCollectionIngredientList(perProductInputs),
+    [perProductInputs],
+  );
+
+  const nutrients = getNutrientsByMarket(market);
+  const panelTitle = getNutritionPanelTitle(market);
+  const { per100g, totalWeightG, productsWithData, productsTotal } = collectionNutrition;
+  const hasData = Object.keys(per100g).length > 0;
+  const productsWithoutMould = productIds.length - perProductInputs.length;
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-primary mb-3">Nutrition &amp; Ingredients</h2>
+
+      {productsWithoutMould > 0 && (
+        <div className="flex items-start gap-2 text-xs text-amber-700 mb-2">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            {productsWithoutMould} product(s) have no default mould and are excluded from this rollup.
+          </span>
+        </div>
+      )}
+
+      {hasData && productsWithData < productsTotal && (
+        <div className="flex items-start gap-2 text-xs text-amber-700 mb-2">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            Nutrition data for {productsWithData} of {productsTotal} products. Values are
+            partial — add ingredient nutrition to complete the rollup.
+          </span>
+        </div>
+      )}
+
+      {/* Nutrition panel */}
+      {hasData ? (
+        <>
+          <p className="text-xs text-muted-foreground mb-2">
+            {panelTitle} · weighted average across products ({totalWeightG.toFixed(0)}g total)
+          </p>
+          <div className="rounded-lg border border-border bg-card overflow-hidden mb-4">
+            <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
+              <span className="flex-1">Nutrient</span>
+              <span className="w-24 text-right">Per 100g</span>
+            </div>
+            {nutrients.map((n) => {
+              const val = per100g[n.key];
+              return (
+                <div
+                  key={n.key}
+                  className={`flex items-baseline px-3 py-1.5 text-sm border-b border-border last:border-b-0 ${
+                    n.indent === 0 ? "font-medium" : "font-normal"
+                  }`}
+                >
+                  <span className={`flex-1 ${n.indent === 1 ? "ml-4 text-muted-foreground" : n.indent === 2 ? "ml-8 text-muted-foreground" : ""}`}>
+                    {n.label}
+                  </span>
+                  <span className={`w-24 text-right ${val == null ? "text-muted-foreground/50" : ""}`}>
+                    {formatNutrientValue(val, n.unit)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground py-3 mb-4">
+          No products in this collection have nutrition data yet.
+        </p>
+      )}
+
+      {/* Ingredient list */}
+      <div>
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Ingredients list</h3>
+        <p className="text-xs text-muted-foreground mb-2">
+          Listed in descending order of weight. Allergen-bearing ingredients are shown in bold.
+        </p>
+        {ingredientList.length > 0 ? (
+          <p className="text-sm leading-relaxed">
+            {ingredientList.map((entry, i) => (
+              <span key={i}>
+                {i > 0 ? ", " : ""}
+                {entry.allergens.length > 0 ? <strong>{entry.label}</strong> : entry.label}
+              </span>
+            ))}
+            .
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">No ingredients yet.</p>
+        )}
+      </div>
+    </section>
   );
 }

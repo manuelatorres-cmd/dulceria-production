@@ -93,6 +93,33 @@ export interface ProductIngredientListInput {
  * `calculateProductNutrition`.
  */
 export function buildProductIngredientList(input: ProductIngredientListInput): IngredientListEntry[] {
+  const byId = new Map<string, { ing: Ingredient; grams: number }>();
+  accumulateProduct(byId, input);
+  return finishEntries(byId);
+}
+
+/**
+ * Roll up a collection's ingredient list across every product in the
+ * collection. Each product contributes its own shell + filling weights;
+ * duplicates across products merge by ingredient id so the final label
+ * shows each ingredient once with the combined grams.
+ *
+ * Sort order is descending by total grams. Products without a mould are
+ * skipped (same guard as the per-product helper).
+ */
+export function buildCollectionIngredientList(
+  perProduct: ProductIngredientListInput[],
+): IngredientListEntry[] {
+  const byId = new Map<string, { ing: Ingredient; grams: number }>();
+  for (const input of perProduct) accumulateProduct(byId, input);
+  return finishEntries(byId);
+}
+
+/** Fold one product's shell + filling ingredient weights into the shared map. */
+function accumulateProduct(
+  byId: Map<string, { ing: Ingredient; grams: number }>,
+  input: ProductIngredientListInput,
+): void {
   const {
     mould, productFillings, fillingIngredientsMap, ingredientMap,
     shellIngredient,
@@ -100,10 +127,7 @@ export function buildProductIngredientList(input: ProductIngredientListInput): I
     fillMode = "percentage",
   } = input;
 
-  if (!mould) return [];
-
-  // Merge by ingredient id across shell + all fillings
-  const byId = new Map<string, { ing: Ingredient; grams: number }>();
+  if (!mould) return;
 
   const bump = (ing: Ingredient, grams: number) => {
     if (!ing.id || grams <= 0) return;
@@ -112,12 +136,10 @@ export function buildProductIngredientList(input: ProductIngredientListInput): I
     else byId.set(ing.id, { ing, grams });
   };
 
-  // Shell (shell + cap, combined)
   if (shellIngredient && shellPercentage > 0) {
     bump(shellIngredient, calculateShellWeightG(mould, shellPercentage));
   }
 
-  // Fillings — same weight model as `calculateProductNutrition`
   for (const rl of productFillings) {
     const lis = fillingIngredientsMap.get(rl.fillingId) ?? [];
     const fillingWeightG = fillMode === "grams" && rl.fillGrams != null
@@ -133,7 +155,11 @@ export function buildProductIngredientList(input: ProductIngredientListInput): I
       bump(ing, fillingWeightG * fraction);
     }
   }
+}
 
+function finishEntries(
+  byId: Map<string, { ing: Ingredient; grams: number }>,
+): IngredientListEntry[] {
   const entries: IngredientListEntry[] = [];
   for (const { ing, grams } of byId.values()) {
     entries.push({
