@@ -5,6 +5,7 @@ import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { GlobalErrorHandler } from "@/components/global-error-handler";
+import { QueryProvider } from "@/components/query-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -12,8 +13,7 @@ const inter = Inter({
   display: "swap",
 });
 
-const isCloudConfigured = Boolean(process.env.NEXT_PUBLIC_DEXIE_CLOUD_URL);
-const appTitle = isCloudConfigured ? "Choc-collab" : "Choc-collab — local only";
+const appTitle = "Choc-collab";
 
 export const metadata: Metadata = {
   title: appTitle,
@@ -48,14 +48,16 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-background text-foreground font-sans antialiased">
-        <ErrorBoundary>
-          {/* Suspense boundary is required for static export: any client component
-              using `useSearchParams()` otherwise triggers a CSR bailout and the
-              build fails. Fallback is null — the real render happens client-side. */}
-          <Suspense fallback={null}>{children}</Suspense>
-        </ErrorBoundary>
-        <GlobalErrorHandler />
-        <ServiceWorkerRegister />
+        <QueryProvider>
+          <ErrorBoundary>
+            {/* Suspense boundary is required for static export: any client component
+                using `useSearchParams()` otherwise triggers a CSR bailout and the
+                build fails. Fallback is null — the real render happens client-side. */}
+            <Suspense fallback={null}>{children}</Suspense>
+          </ErrorBoundary>
+          <GlobalErrorHandler />
+          <ServiceWorkerRegister />
+        </QueryProvider>
       </body>
     </html>
   );

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import type { Ingredient, CompositionKey } from "@/types";
 import { getAllergensByRegion, COMPOSITION_FIELDS, migrateAllergens } from "@/types";
-import { saveIngredient, useMarketRegion, useCurrencySymbol, useCoatings, useCurrentCoatingMappings, saveCoatingChocolateMapping, addCoating, updateCoatingTemperingFlag, useIngredientCategoryNames } from "@/lib/hooks";
+import { saveIngredient, useMarketRegion, useCurrencySymbol, useIngredientCategoryNames } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { ALL_NUTRIENT_FIELDS, getNutrientsByMarket, fillDerivedNutrition, type NutrientKey, type NutritionData } from "@/lib/nutrition";
 
@@ -56,10 +56,6 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
   const activeAllergens = getAllergensByRegion(region);
   const [pricingIrrelevant, setPricingIrrelevant] = useState(false);
   const [shellCapable, setShellCapable] = useState(false);
-  const [coatingType, setCoatingType] = useState("");
-  const [seedTempering, setSeedTempering] = useState(false);
-  const coatings = useCoatings();
-  const currentMappings = useCurrentCoatingMappings();
 
   // Purchase pricing
   const [purchaseCost, setPurchaseCost] = useState("");
@@ -97,12 +93,6 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
       setAllergens(migrateAllergens(ingredient.allergens));
       setPricingIrrelevant(ingredient.pricingIrrelevant ?? false);
       setShellCapable(ingredient.shellCapable ?? false);
-      // Resolve current coating mapping for this ingredient
-      const mappedEntry = Array.from(currentMappings.entries()).find(
-        ([, m]) => m.ingredientId === ingredient.id
-      );
-      setCoatingType(mappedEntry?.[0] ?? "");
-      setSeedTempering(mappedEntry?.[1]?.seedTempering ?? false);
       setPurchaseCost(ingredient.purchaseCost != null ? String(ingredient.purchaseCost) : "");
       setPurchaseDate(ingredient.purchaseDate ?? new Date().toISOString().split("T")[0]);
       setPurchaseQty(ingredient.purchaseQty != null ? String(ingredient.purchaseQty) : "1");
@@ -206,17 +196,6 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
         allergens,
         nutrition: filledNutrition,
       });
-
-      // Save coating type mapping when shell-capable chocolate
-      if (category === "Chocolate" && shellCapable && coatingType.trim() && ingredient?.id) {
-        const value = coatingType.trim().toLowerCase();
-        if (!coatings.includes(value)) {
-          await addCoating(value);
-        }
-        await saveCoatingChocolateMapping(value, ingredient.id);
-        // Update seed tempering flag on the mapping
-        await updateCoatingTemperingFlag(value, seedTempering);
-      }
 
       onSaved();
     } finally {
@@ -358,37 +337,6 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
             Can be used as shell chocolate
             <span className="text-xs text-muted-foreground">(couverture)</span>
           </label>
-
-          {shellCapable && (
-            <>
-              <div>
-                <label className="label">Coating type</label>
-                <input
-                  type="text"
-                  list="coating-type-options"
-                  value={coatingType}
-                  onChange={(e) => { setCoatingType(e.target.value); onDirtyChange?.(true); }}
-                  className="input"
-                  placeholder="e.g. dark, milk, white"
-                />
-                <datalist id="coating-type-options">
-                  {coatings.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
-              </div>
-
-              <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={seedTempering}
-                  onChange={(e) => { setSeedTempering(e.target.checked); onDirtyChange?.(true); }}
-                  className="w-4 h-4 rounded border-border accent-primary"
-                />
-                <span className="text-sm">Hand tempering — seeding method</span>
-              </label>
-            </>
-          )}
         </fieldset>
       )}
 

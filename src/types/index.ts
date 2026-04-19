@@ -480,16 +480,6 @@ export interface IngredientPriceHistory {
   note?: string;
 }
 
-/** Time-series record of which chocolate ingredient maps to a coating name */
-export interface CoatingChocolateMapping {
-  id?: string;
-  coatingName: string;      // e.g. "dark", "milk"
-  ingredientId: string;     // must be category = "Chocolate"
-  effectiveFrom: Date;
-  note?: string;
-  seedTempering?: boolean;  // true = hand temper using seeding method; drives chocolate amount calc in production
-}
-
 /** Point-in-time cost per product (1 cavity) snapshot */
 export interface ProductCostSnapshot {
   id?: string;

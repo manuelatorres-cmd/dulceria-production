@@ -3,7 +3,7 @@
 import { useState, useEffect, use, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
-import { useIngredient, useIngredients, useIngredientUsage, saveIngredient, deleteIngredient, archiveIngredient, unarchiveIngredient, checkIngredientBeforeDelete, useIngredientPriceHistory, deleteIngredientPriceHistoryEntry, setIngredientLowStock, setIngredientOutOfStock, markIngredientOrdered, useCurrencySymbol, useCurrentCoatingMappings } from "@/lib/hooks";
+import { useIngredient, useIngredients, useIngredientUsage, saveIngredient, deleteIngredient, archiveIngredient, unarchiveIngredient, checkIngredientBeforeDelete, useIngredientPriceHistory, deleteIngredientPriceHistoryEntry, setIngredientLowStock, setIngredientOutOfStock, markIngredientOrdered, useCurrencySymbol } from "@/lib/hooks";
 import type { IngredientDeleteCheck } from "@/lib/hooks";
 import { IngredientForm } from "@/components/ingredient-form";
 import { COMPOSITION_FIELDS, allergenLabel, type Ingredient } from "@/types";
@@ -32,7 +32,6 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
   const ingredientBrands = [...new Set(allIngredients.map((i) => i.brand).filter(Boolean))] as string[];
   const ingredientVendors = [...new Set(allIngredients.map((i) => i.vendor).filter(Boolean))] as string[];
   const sources = [...new Set(allIngredients.map((i) => i.source).filter(Boolean))];
-  const currentMappings = useCurrentCoatingMappings();
   const [priceHistoryExpanded, setPriceHistoryExpanded] = useState(false);
   const [pendingRemovePriceEntry, setPendingRemovePriceEntry] = useState<string | null>(null);
 
@@ -169,10 +168,13 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
         )}
       </div>
 
-      {/* Tab strip — always visible */}
+      {/* Tab strip — always visible. The Shell tab shows whenever the saved
+          ingredient is category=Chocolate OR the user is actively editing
+          (so they can reach the shellCapable checkbox on a new/edited row
+          before the category is committed). */}
       <div className="flex border-b border-border mb-4 px-4 overflow-x-auto">
         {(
-          ingredient.category === "Chocolate"
+          (editing || ingredient.category === "Chocolate")
             ? ["details", "shell", "composition", "allergens", "pricing", "nutrition"] as const
             : ["details", "composition", "allergens", "pricing", "nutrition"] as const
         ).map((tab) => (
@@ -384,8 +386,6 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
             {activeTab === "shell" && (
               <ShellTabReadView
                 ingredient={ingredient}
-                ingredientId={ingredientId}
-                currentMappings={currentMappings}
                 onEdit={() => setEditing(true)}
               />
             )}
@@ -428,21 +428,11 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
 
 function ShellTabReadView({
   ingredient,
-  ingredientId,
-  currentMappings,
   onEdit,
 }: {
   ingredient: Ingredient;
-  ingredientId: string;
-  currentMappings: Map<string, import("@/types").CoatingChocolateMapping>;
   onEdit: () => void;
 }) {
-  const currentCoatingName = Array.from(currentMappings.entries()).find(
-    ([, m]) => m.ingredientId === ingredientId
-  )?.[0] ?? null;
-
-  const currentMapping = currentCoatingName ? currentMappings.get(currentCoatingName) : null;
-
   if (!ingredient.shellCapable) {
     return (
       <div>
@@ -460,23 +450,6 @@ function ShellTabReadView({
         <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-3 py-1 text-xs font-medium">
           Shell chocolate (couverture)
         </span>
-      </div>
-
-      <div className="rounded-lg border border-border bg-card divide-y divide-border">
-        <div className="flex justify-between px-3 py-2 text-sm">
-          <span className="text-muted-foreground">Coating type</span>
-          {currentCoatingName ? (
-            <span className="font-medium capitalize">{currentCoatingName}</span>
-          ) : (
-            <span className="text-muted-foreground">— not set —</span>
-          )}
-        </div>
-        {currentMapping && (
-          <div className="flex justify-between px-3 py-2 text-sm">
-            <span className="text-muted-foreground">Hand tempering (seeding)</span>
-            <span>{currentMapping.seedTempering ? "Yes" : "No"}</span>
-          </div>
-        )}
       </div>
     </div>
   );

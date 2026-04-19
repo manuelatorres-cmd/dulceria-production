@@ -20,13 +20,14 @@ import {
   useCurrencySymbol,
   useProductCategoryMap,
 } from "@/lib/hooks";
-import { db } from "@/lib/db";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { assertOk } from "@/lib/supabase-query";
 import { ArrowLeft, Plus, Search, X, Trash2, Pencil, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import Link from "next/link";
-import type { ProductCostSnapshot, Packaging, PackagingOrder, CollectionPricingSnapshot } from "@/types";
+import type { ProductCostSnapshot, Packaging, PackagingOrder, CollectionPricingSnapshot, Ingredient } from "@/types";
 import { costPerGram } from "@/types";
 import {
   latestPackagingUnitCost,
@@ -77,20 +78,24 @@ const MARGIN_COLORS: Record<MarginHealth, { bar: string; text: string; bg: strin
 };
 
 /** Bulk-fetch the latest cost snapshot per product (single query, stable hook count) */
-function useProductCosts(productIds: string[]): Map<string, ProductCostSnapshot> {
-  const key = productIds.join(",");
-  const snapshots = useLiveQuery(async () => {
-    const all = await db.productCostSnapshots.toArray();
-    const latest = new Map<string, ProductCostSnapshot>();
-    for (const snap of all) {
-      const existing = latest.get(snap.productId);
-      if (!existing || new Date(snap.recordedAt).getTime() > new Date(existing.recordedAt).getTime()) {
-        latest.set(snap.productId, snap);
+function useProductCosts(_productIds: string[]): Map<string, ProductCostSnapshot> {
+  const { data } = useQuery({
+    queryKey: ["product-cost-snapshots", "latest-per-product"],
+    queryFn: async () => {
+      const all = assertOk(
+        await supabase.from("productCostSnapshots").select("*"),
+      ) as ProductCostSnapshot[];
+      const latest = new Map<string, ProductCostSnapshot>();
+      for (const snap of all) {
+        const existing = latest.get(snap.productId);
+        if (!existing || new Date(snap.recordedAt).getTime() > new Date(existing.recordedAt).getTime()) {
+          latest.set(snap.productId, snap);
+        }
       }
-    }
-    return latest;
-  }, [key]);
-  return snapshots ?? new Map();
+      return latest;
+    },
+  });
+  return data ?? new Map();
 }
 
 export default function CollectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -126,17 +131,26 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   // Check if any ingredients used in this collection's products have missing pricing
   const productIdsKey = productIds.join(",");
-  const hasMissingIngredientPricing = useLiveQuery(async () => {
-    if (productIds.length === 0) return false;
-    const rls = await db.productFillings.where("productId").anyOf(productIds).toArray();
-    if (rls.length === 0) return false;
-    const fillingIds = [...new Set(rls.map((rl) => rl.fillingId))];
-    const lis = await db.fillingIngredients.where("fillingId").anyOf(fillingIds).toArray();
-    if (lis.length === 0) return false;
-    const ingredientIds = [...new Set(lis.map((li) => li.ingredientId))];
-    const ingredients = (await db.ingredients.bulkGet(ingredientIds)).filter((x): x is NonNullable<typeof x> => x != null);
-    return ingredients.some((ing) => costPerGram(ing) === null);
-  }, [productIdsKey]);
+  const { data: hasMissingIngredientPricing } = useQuery({
+    queryKey: ["collection-missing-ingredient-pricing", productIdsKey],
+    enabled: productIds.length > 0,
+    queryFn: async () => {
+      const rls = assertOk(
+        await supabase.from("productFillings").select("fillingId").in("productId", productIds),
+      ) as { fillingId: string }[];
+      if (rls.length === 0) return false;
+      const fillingIds = [...new Set(rls.map((rl) => rl.fillingId))];
+      const lis = assertOk(
+        await supabase.from("fillingIngredients").select("ingredientId").in("fillingId", fillingIds),
+      ) as { ingredientId: string }[];
+      if (lis.length === 0) return false;
+      const ingredientIds = [...new Set(lis.map((li) => li.ingredientId))];
+      const ingredients = assertOk(
+        await supabase.from("ingredients").select("*").in("id", ingredientIds),
+      ) as Ingredient[];
+      return ingredients.some((ing) => costPerGram(ing) === null);
+    },
+  });
 
   // Edit mode
   const [editing, setEditing] = useState(isNew);

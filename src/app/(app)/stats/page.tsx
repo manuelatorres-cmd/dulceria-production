@@ -8,8 +8,7 @@ import {
   useProductsList,
   useCollections,
 } from "@/lib/hooks";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/lib/db";
+import { useAllCollectionProducts } from "@/lib/hooks";
 import { PageHeader } from "@/components/page-header";
 import type { CollectionProduct } from "@/types";
 
@@ -185,8 +184,7 @@ export default function StatsPage() {
   const moulds = useMouldsList(true);
   const products = useProductsList();
   const collections = useCollections();
-  const allCollectionProducts: CollectionProduct[] =
-    useLiveQuery(() => db.collectionProducts.toArray()) ?? [];
+  const allCollectionProducts: CollectionProduct[] = useAllCollectionProducts();
 
   const [timePreset, setTimePreset] = useState<TimePreset>("12m");
   const [customStart, setCustomStart] = useState<string>("");

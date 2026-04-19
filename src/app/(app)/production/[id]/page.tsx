@@ -5,7 +5,7 @@ import {
   useProductionPlan, usePlanProducts, usePlanStepStatuses,
   useProductsList, useProductFillingsForProducts, useFillings, useFillingIngredientsForFillings,
   useMouldsList, useIngredients, saveProductionPlan, savePlanProduct, toggleStep,
-  useDecorationMaterials, setDecorationMaterialLowStock, useCurrentCoatingMappings,
+  useDecorationMaterials, setDecorationMaterialLowStock,
   saveFillingStock, deductFillingStock, useShelfStableCategoryNames,
 } from "@/lib/hooks";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
@@ -113,7 +113,9 @@ function PlanContent({
   const allMoulds = useMouldsList(true);
   const allIngredients = useIngredients();
   const allMaterials = useDecorationMaterials();
-  const currentCoatingMappings = useCurrentCoatingMappings();
+  // Coating → chocolate mapping system removed (migration 0006). Seed-tempering
+  // data used to come from that mapping; with no way to configure it, we treat
+  // all coatings as non-seed-tempering now.
   const materialsMap = useMemo(() => new Map(allMaterials.map((m) => [m.id!, m])), [allMaterials]);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
@@ -813,8 +815,7 @@ function PlanContent({
                     {coatingOrder.map((coating) => {
                       const coatingSteps = byCoating.get(coating)!;
                       const coatingMoulds = coatingSteps.reduce((s, st) => s + (st.mouldCount ?? 0), 0);
-                      const mapping = currentCoatingMappings.get(coating);
-                      const seedTempering = activePhase === "shell" && (mapping?.seedTempering ?? false);
+                      const seedTempering = false;
                       let temperingPanel: React.ReactNode = null;
                       if (seedTempering) {
                         // Sum total cavity weight (g) for all planProducts with this coating using manufacturer's cavityWeightG

@@ -5,8 +5,6 @@ import {
   calculateFillingWeightPerCavityG,
   calculateProductCost,
   deriveShellPercentageFromGrams,
-  resolveCurrentCoatingCostPerGram,
-  resolveCoatingCostAtDate,
   serializeBreakdown,
   deserializeBreakdown,
   buildIngredientCostMap,
@@ -17,7 +15,7 @@ import {
   CAP_FACTOR,
 } from "./costCalculation";
 import { FILL_FACTOR, DENSITY_G_PER_ML } from "./production";
-import type { Mould, ProductFilling, FillingIngredient, Filling, CoatingChocolateMapping, Ingredient, BreakdownEntry } from "@/types";
+import type { Mould, ProductFilling, FillingIngredient, Filling, Ingredient, BreakdownEntry } from "@/types";
 
 const mockMould: Mould = {
   id: "1",
@@ -180,66 +178,6 @@ describe("calculateProductCost", () => {
     const e2 = fillingEntries.find((e) => e.ingredientId === "101");
     expect(e1!.grams / totalFillingWeight).toBeCloseTo(0.6, 2);
     expect(e2!.grams / totalFillingWeight).toBeCloseTo(0.4, 2);
-  });
-});
-
-// --- resolveCoatingCostAtDate ---
-
-describe("resolveCoatingCostAtDate", () => {
-  const now = new Date("2026-03-23T12:00:00Z");
-  const past1 = new Date("2026-01-01T00:00:00Z");
-  const past2 = new Date("2026-02-15T00:00:00Z");
-  const future = new Date("2026-06-01T00:00:00Z");
-
-  const mappings: CoatingChocolateMapping[] = [
-    { id: "1", coatingName: "dark", ingredientId: "200", effectiveFrom: past1 },
-    { id: "2", coatingName: "dark", ingredientId: "201", effectiveFrom: past2 },
-    { id: "3", coatingName: "dark", ingredientId: "202", effectiveFrom: future },
-    { id: "4", coatingName: "milk", ingredientId: "205", effectiveFrom: past1 },
-  ];
-  const costMap = new Map<string, number | null>([["200", 0.015], ["201", 0.020], ["202", 0.025], ["205", 0.018]]);
-
-  it("returns the most recent mapping on or before the query date", () => {
-    const result = resolveCoatingCostAtDate("dark", mappings, costMap, now);
-    expect(result.ingredientId).toBe("201"); // past2 is more recent than past1, but before now
-    expect(result.costPerGram).toBeCloseTo(0.020);
-  });
-
-  it("ignores future-dated mappings", () => {
-    // future mapping should not be picked for now
-    const result = resolveCoatingCostAtDate("dark", mappings, costMap, now);
-    expect(result.ingredientId).not.toBe("202");
-  });
-
-  it("returns null for unknown coating", () => {
-    const result = resolveCoatingCostAtDate("white", mappings, costMap, now);
-    expect(result.costPerGram).toBeNull();
-    expect(result.ingredientId).toBeNull();
-  });
-
-  it("returns null when coatingName is undefined", () => {
-    const result = resolveCoatingCostAtDate(undefined, mappings, costMap, now);
-    expect(result.costPerGram).toBeNull();
-  });
-
-  it("can resolve an earlier date (historical lookup)", () => {
-    // At past1, only the first entry should be active
-    const earlyDate = new Date("2026-01-10T00:00:00Z");
-    const result = resolveCoatingCostAtDate("dark", mappings, costMap, earlyDate);
-    expect(result.ingredientId).toBe("200");
-  });
-});
-
-describe("resolveCurrentCoatingCostPerGram", () => {
-  it("picks the most recent mapping as of today", () => {
-    const past = new Date("2025-01-01T00:00:00Z");
-    const mappings: CoatingChocolateMapping[] = [
-      { id: "1", coatingName: "dark", ingredientId: "300", effectiveFrom: past },
-    ];
-    const costMap = new Map<string, number | null>([["300", 0.022]]);
-    const result = resolveCurrentCoatingCostPerGram("dark", mappings, costMap);
-    expect(result.ingredientId).toBe("300");
-    expect(result.costPerGram).toBeCloseTo(0.022);
   });
 });
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { assertOk } from "@/lib/supabase-query";
 import Link from "next/link";
-import { db } from "@/lib/db";
 import { useProductsList, useMouldsList, useIngredients, useCurrencySymbol, useProductCategoryMap } from "@/lib/hooks";
 import { deserializeBreakdown } from "@/lib/costCalculation";
 import { getProductFillingCategories, rankSimilarProducts } from "@/lib/productSimilarity";
@@ -207,9 +208,18 @@ export default function ProductCostPage() {
   const ingredients = useIngredients();
   const sym = useCurrencySymbol();
   const productCategoryMap = useProductCategoryMap();
-  const allFillings = useLiveQuery(() => db.fillings.toArray()) ?? [];
-  const allProductFillings = useLiveQuery(() => db.productFillings.toArray()) ?? [];
-  const allSnapshots = useLiveQuery(() => db.productCostSnapshots.toArray()) ?? [];
+  const { data: allFillings = [] } = useQuery({
+    queryKey: ["fillings", "all-including-superseded"],
+    queryFn: async () => assertOk(await supabase.from("fillings").select("*")) as Filling[],
+  });
+  const { data: allProductFillings = [] } = useQuery({
+    queryKey: ["product-fillings", "all"],
+    queryFn: async () => assertOk(await supabase.from("productFillings").select("*")) as ProductFilling[],
+  });
+  const { data: allSnapshots = [] } = useQuery({
+    queryKey: ["product-cost-snapshots", "all"],
+    queryFn: async () => assertOk(await supabase.from("productCostSnapshots").select("*")) as ProductCostSnapshot[],
+  });
 
   const [focusId, setFocusId] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<string[]>([]);

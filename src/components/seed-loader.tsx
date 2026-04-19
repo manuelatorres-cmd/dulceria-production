@@ -1,20 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
-import { seedIfNeeded } from "@/lib/seed";
-import { ensureDefaultProductCategories, ensureDefaultDecorationCategories, ensureDefaultShellDesigns, ensureDefaultFillingCategories, ensureDefaultIngredientCategories } from "@/lib/hooks";
-
+/**
+ * Historically bootstrapped a fresh browser with ChocCollab's default product /
+ * filling / ingredient / decoration / shell-design categories. Intentionally
+ * empty now: under the "no seed data" rule (2026-04-19) the app ships empty.
+ * Users populate their own categories via Settings → Import backup, or by
+ * creating them on the relevant category pages.
+ *
+ * Kept as a rendered component (not deleted) so `layout.tsx` stays unchanged;
+ * may be repurposed later for other first-run concerns (e.g. routing the
+ * user to Settings if capacityConfig is missing).
+ */
 export function SeedLoader() {
-  useEffect(() => {
-    // Idempotent — only inserts the defaults if the table is empty. Runs on every
-    // app load so fresh users (who skip the v4 upgrade hook) still get the seeded values.
-    ensureDefaultProductCategories().catch((e) => console.error("ensureDefaultProductCategories failed:", e));
-    ensureDefaultDecorationCategories().catch((e) => console.error("ensureDefaultDecorationCategories failed:", e));
-    ensureDefaultShellDesigns().catch((e) => console.error("ensureDefaultShellDesigns failed:", e));
-    ensureDefaultFillingCategories().catch((e) => console.error("ensureDefaultFillingCategories failed:", e));
-    ensureDefaultIngredientCategories().catch((e) => console.error("ensureDefaultIngredientCategories failed:", e));
-    seedIfNeeded();
-  }, []);
-
   return null;
 }

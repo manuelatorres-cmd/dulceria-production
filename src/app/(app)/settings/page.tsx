@@ -7,7 +7,7 @@ import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMay
 import { getAllergensByRegion, allergenLabel, CURRENCIES, getCurrencySymbol, MARKET_LABEL_RULES, type CurrencyCode, type MarketRegion, type FillMode } from "@/types";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import { loadDemoData, isDemoDataLoaded } from "@/lib/seed-demo";
-import { isCloudConfigured } from "@/lib/db";
+import { isCloudConfigured } from "@/lib/supabase";
 import { Download, Upload, AlertTriangle, CheckCircle, ChevronDown, FlaskConical, Video, Printer, Pencil, Trash2, FileSpreadsheet } from "lucide-react";
 import { CSVImport } from "@/components/csv-import";
 import { ingredientImportConfig, getExistingIngredientKeys } from "@/lib/csv-import-ingredients";
@@ -210,76 +210,11 @@ function BackupTab({
           </button>
         </div>
 
-        {/* Import */}
-        <div className="rounded-lg border border-border bg-card p-4 space-y-2">
-          <div className="flex items-start gap-3">
-            <Upload className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">Restore from backup</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Replaces <strong>all</strong> current data with the contents of a backup file.
-                This cannot be undone.
-              </p>
-            </div>
-          </div>
-
-          {importState === "idle" || importState === "error" ? (
-            <>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full rounded-full border border-border py-2 text-sm font-medium hover:bg-muted transition-colors"
-              >
-                Choose backup file…
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,application/json"
-                className="hidden"
-                onChange={onFileSelected}
-              />
-              {importState === "error" && (
-                <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2">
-                  <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive">{errorMessage}</p>
-                </div>
-              )}
-            </>
-          ) : importState === "confirm" ? (
-            <div className="space-y-2">
-              <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
-                <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
-                <p className="text-xs text-status-warn">
-                  This will <strong>replace all your data</strong> with the contents of{" "}
-                  <span className="font-medium">{selectedFile?.name}</span>. Are you sure?
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={onConfirmImport}
-                  className="flex-1 rounded-full bg-destructive text-destructive-foreground py-2 text-sm font-medium"
-                >
-                  Yes, replace all data
-                </button>
-                <button
-                  onClick={onCancelImport}
-                  className="rounded-full border border-border px-4 py-2 text-sm"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : importState === "importing" ? (
-            <div className="py-2 text-center text-sm text-muted-foreground">Importing…</div>
-          ) : importState === "done" ? (
-            <div className="flex items-center gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2">
-              <CheckCircle className="w-4 h-4 text-status-ok shrink-0" />
-              <p className="text-xs text-status-ok">
-                Restore complete. Reload the page to see your data.
-              </p>
-            </div>
-          ) : null}
-        </div>
+        {/* Import UI removed 2026-04-19: the bulk-restore flow was unreliable
+            in practice and the user opted to enter data manually on first run.
+            Export still works. The `importBackup()` function stays in
+            src/lib/backup.ts (dead code for now) so we can revive the UI later
+            without re-deriving all the legacy field migrators. */}
       </section>
 
       {/* About */}
@@ -289,7 +224,7 @@ function BackupTab({
           <p className="text-sm font-medium">Choc-collab{isCloudConfigured ? "" : " — local only"}</p>
           {isCloudConfigured ? (
             <>
-              <p className="text-xs text-muted-foreground">Chocolatier toolkit, synced via Dexie Cloud.</p>
+              <p className="text-xs text-muted-foreground">Chocolatier toolkit, synced via Supabase.</p>
               <p className="text-xs text-muted-foreground">Your data is securely synced across all your devices.</p>
             </>
           ) : (

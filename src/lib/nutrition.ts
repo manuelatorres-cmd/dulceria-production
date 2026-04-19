@@ -10,7 +10,7 @@
  * computed by weighted aggregation across all fillings and their ingredients.
  */
 
-import type { MarketRegion, Mould, ProductFilling, FillingIngredient, Filling, Ingredient, CoatingChocolateMapping } from "@/types";
+import type { MarketRegion, Mould, ProductFilling, FillingIngredient, Filling, Ingredient } from "@/types";
 import { calculateShellWeightG, calculateFillingWeightPerCavityG, DEFAULT_SHELL_PERCENTAGE } from "@/lib/costCalculation";
 
 // ---------------------------------------------------------------------------
@@ -396,24 +396,6 @@ export function calculateProductNutrition(input: ProductNutritionInput): Product
     ingredientsTotal: allIngredientIds.size,
     warnings,
   };
-}
-
-/**
- * Resolve the current coating chocolate ingredient for a product's coating name.
- * @deprecated Use Product.shellIngredientId directly instead.
- */
-export function resolveCoatingIngredient(
-  coatingName: string | undefined,
-  mappings: CoatingChocolateMapping[],
-  ingredientMap: Map<string, Ingredient>,
-): Ingredient | null {
-  if (!coatingName) return null;
-  const now = Date.now();
-  const relevant = mappings
-    .filter(m => m.coatingName === coatingName && new Date(m.effectiveFrom).getTime() <= now)
-    .sort((a, b) => new Date(b.effectiveFrom).getTime() - new Date(a.effectiveFrom).getTime());
-  if (relevant.length === 0) return null;
-  return ingredientMap.get(relevant[0].ingredientId) ?? null;
 }
 
 /**

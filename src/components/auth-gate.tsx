@@ -1,36 +1,91 @@
 "use client";
 
-import { useObservable } from "dexie-react-hooks";
-import { db, isCloudConfigured } from "@/lib/db";
+import { useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
+/**
+ * Sign-in gate. Blocks the app until the shared Supabase user is signed in;
+ * once signed in, renders children. No sign-up flow — the shared account is
+ * pre-created in the Supabase dashboard (see migration 0003's footer).
+ *
+ * Session state is persisted by the Supabase client in localStorage and
+ * auto-refreshed in the background, so a refresh or tab reopen keeps the user
+ * signed in. Sign-out lives in the side nav.
+ */
 export function AuthGate({ children }: { children: React.ReactNode }) {
-  const currentUser = useObservable(db.cloud.currentUser);
+  // undefined = still hydrating from localStorage; null = confirmed signed out
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!isCloudConfigured) return <>{children}</>;
-  if (currentUser === undefined) return null;
-  if (currentUser.isLoggedIn) return <>{children}</>;
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  if (session === undefined) return null;
+  if (session) return <>{children}</>;
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    setSubmitting(false);
+    if (signInError) {
+      setError(signInError.message);
+    }
+    // On success, onAuthStateChange fires and the gate re-renders children.
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <div className="max-w-sm w-full space-y-6 text-center">
-        <div className="space-y-2">
+      <form onSubmit={onSubmit} className="max-w-sm w-full space-y-6">
+        <div className="space-y-2 text-center">
           <h1 className="text-3xl text-primary" style={{ fontFamily: "var(--font-display)" }}>
             Choc-collab
           </h1>
           <p className="text-sm text-muted-foreground">
-            Sign in to sync your chocolate-making data across devices.
+            Sign in to continue.
           </p>
         </div>
+        <div className="space-y-3">
+          <input
+            type="email"
+            autoComplete="email"
+            required
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg border border-border bg-card px-4 py-2 text-sm"
+          />
+          <input
+            type="password"
+            autoComplete="current-password"
+            required
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-lg border border-border bg-card px-4 py-2 text-sm"
+          />
+        </div>
+        {error && (
+          <p className="text-xs text-destructive">{error}</p>
+        )}
         <button
-          onClick={() => db.cloud.login()}
-          className="w-full rounded-full bg-primary text-primary-foreground py-3 text-sm font-medium hover:bg-primary/90 transition-colors"
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-full bg-primary text-primary-foreground py-3 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          Sign in to continue
+          {submitting ? "Signing in…" : "Sign in"}
         </button>
-        <p className="text-xs text-muted-foreground">
-          We&apos;ll email you a one-time code — no password needed.
-        </p>
-      </div>
+      </form>
     </div>
   );
 }

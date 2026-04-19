@@ -5,7 +5,8 @@
  * and commits via bulkAdd (no price-history triggers — these are fresh imports).
  */
 
-import { db } from "@/lib/db";
+import { supabase, newId } from "@/lib/supabase";
+import { assertOk } from "@/lib/supabase-query";
 import type { Ingredient } from "@/types";
 import { INGREDIENT_CATEGORIES } from "@/types";
 import type { NutrientKey, NutritionData } from "@/lib/nutrition";
@@ -161,7 +162,10 @@ export const ingredientImportConfig: CSVImportConfig<Omit<Ingredient, "id">> = {
   validateRow: (data, _rowIndex) => validateIngredientRow(data),
   dedupKey: (data) => `${data.name.toLowerCase().trim()}::${(data.manufacturer || "").toLowerCase().trim()}`,
   commitBatch: async (items) => {
-    await db.ingredients.bulkAdd(items);
+    if (items.length === 0) return 0;
+    const withIds = items.map((item) => ({ ...item, id: newId() }));
+    const { error } = await supabase.from("ingredients").insert(withIds);
+    if (error) throw error;
     return items.length;
   },
 };
@@ -171,6 +175,9 @@ export const ingredientImportConfig: CSVImportConfig<Omit<Ingredient, "id">> = {
 // ---------------------------------------------------------------------------
 
 export async function getExistingIngredientKeys(): Promise<Set<string>> {
-  const all = await db.ingredients.toArray();
+  const all = assertOk(await supabase.from("ingredients").select("name, manufacturer")) as {
+    name: string;
+    manufacturer: string | null;
+  }[];
   return new Set(all.map((i) => `${i.name.toLowerCase().trim()}::${(i.manufacturer || "").toLowerCase().trim()}`));
 }

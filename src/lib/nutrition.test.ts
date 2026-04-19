@@ -15,11 +15,10 @@ import {
   getNutrientsByMarket,
   getNutritionPanelTitle,
   calculateProductNutrition,
-  resolveCoatingIngredient,
   type NutritionData,
   type IngredientNutritionEntry,
 } from "./nutrition";
-import type { Mould, Ingredient, ProductFilling, FillingIngredient, CoatingChocolateMapping } from "@/types";
+import type { Mould, Ingredient, ProductFilling, FillingIngredient } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Energy conversion
@@ -534,38 +533,3 @@ describe("calculateProductNutrition", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// resolveCoatingIngredient
-// ---------------------------------------------------------------------------
-
-describe("resolveCoatingIngredient", () => {
-  const chocA = makeIngredient("chocA", "Old Choc", { fat: 30 });
-  const chocB = makeIngredient("chocB", "New Choc", { fat: 35 });
-  const ingredientMap = new Map([["chocA", chocA], ["chocB", chocB]]);
-
-  it("returns null when no coating name", () => {
-    expect(resolveCoatingIngredient(undefined, [], ingredientMap)).toBeNull();
-  });
-
-  it("returns null when no mappings match", () => {
-    expect(resolveCoatingIngredient("dark", [], ingredientMap)).toBeNull();
-  });
-
-  it("returns the most recent mapping", () => {
-    const mappings: CoatingChocolateMapping[] = [
-      { id: "m1", coatingName: "dark", ingredientId: "chocA", effectiveFrom: new Date("2025-01-01") },
-      { id: "m2", coatingName: "dark", ingredientId: "chocB", effectiveFrom: new Date("2026-01-01") },
-    ];
-    const result = resolveCoatingIngredient("dark", mappings, ingredientMap);
-    expect(result?.id).toBe("chocB");
-  });
-
-  it("ignores future mappings", () => {
-    const mappings: CoatingChocolateMapping[] = [
-      { id: "m1", coatingName: "dark", ingredientId: "chocA", effectiveFrom: new Date("2025-01-01") },
-      { id: "m2", coatingName: "dark", ingredientId: "chocB", effectiveFrom: new Date("2099-01-01") },
-    ];
-    const result = resolveCoatingIngredient("dark", mappings, ingredientMap);
-    expect(result?.id).toBe("chocA");
-  });
-});

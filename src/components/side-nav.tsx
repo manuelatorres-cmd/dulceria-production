@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useObservable } from "dexie-react-hooks";
 import { useEffect, useState } from "react";
-import { db, isCloudConfigured } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { usePendingShoppingCount } from "@/lib/hooks";
 
 type NavItem = {
@@ -261,63 +260,26 @@ function CloudOffIcon({ className }: { className?: string }) {
 }
 
 function SyncStatusLink({ labelClass }: { labelClass: string }) {
-  const currentUser = useObservable(db.cloud.currentUser);
-  const isLoggedIn = currentUser?.isLoggedIn ?? false;
+  const [email, setEmail] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setEmail(session?.user?.email ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
-  if (!isCloudConfigured) {
-    return (
-      <div
-        title="Running locally — data stays in this browser."
-        className="flex items-center gap-3 px-2 py-2.5 rounded-lg text-muted-foreground"
-      >
-        <CloudOffIcon className="w-5 h-5 shrink-0" />
-        <span className={`${labelClass} text-sm truncate`}>Local only</span>
-      </div>
-    );
-  }
-
-  const [confirming, setConfirming] = useState(false);
-
-  if (!isLoggedIn) return null;
-
-  if (confirming) {
-    return (
-      <div className="px-2 py-2 rounded-lg bg-muted text-sm space-y-2">
-        <p className="text-foreground">Sign out of {currentUser?.email}?</p>
-        <p className="text-xs text-muted-foreground">
-          Any unsynced changes will stay on this device until you sign in again.
-        </p>
-        <div className="flex items-center gap-3 text-xs">
-          <button
-            type="button"
-            onClick={() => { setConfirming(false); db.cloud.logout(); }}
-            className="text-red-600 font-medium hover:underline"
-          >
-            Yes, sign out
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirming(false)}
-            className="text-muted-foreground hover:underline"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!email) return null;
 
   return (
     <button
       type="button"
-      onClick={() => setConfirming(true)}
-      title={`Signed in as ${currentUser?.email} — click to sign out`}
+      onClick={() => supabase.auth.signOut()}
+      title={`Signed in as ${email} — click to sign out`}
       className="flex items-center gap-3 px-2 py-2.5 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted w-full text-left"
     >
       <LogOutIcon className="w-5 h-5 shrink-0" />
-      <span className={`${labelClass} text-sm truncate`}>
-        {currentUser?.email ?? "Sign out"}
-      </span>
+      <span className={`${labelClass} text-sm truncate`}>{email}</span>
     </button>
   );
 }

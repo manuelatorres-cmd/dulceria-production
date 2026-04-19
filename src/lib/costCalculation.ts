@@ -1,4 +1,4 @@
-import type { Mould, ProductFilling, FillingIngredient, Filling, CoatingChocolateMapping, BreakdownEntry } from "@/types";
+import type { Mould, ProductFilling, FillingIngredient, Filling, BreakdownEntry } from "@/types";
 import { costPerGram as deriveIngredientCostPerGram } from "@/types";
 import type { Ingredient } from "@/types";
 import { DENSITY_G_PER_ML } from "@/lib/production";
@@ -161,38 +161,6 @@ export function calculateProductCost(input: CostCalculationInput): CostCalculati
 
   const costPerProduct = breakdown.reduce((s, e) => s + e.subtotal, 0);
   return { costPerProduct, breakdown, warnings };
-}
-
-// ── Legacy coating resolution (kept for old snapshot display) ────────────────
-
-/**
- * Resolve the current coating chocolate cost-per-gram for a given coating name.
- * Returns the most recent mapping where effectiveFrom <= now.
- * @deprecated Use direct shellIngredientId lookup instead for new code.
- */
-export function resolveCoatingCostAtDate(
-  coatingName: string | undefined,
-  mappings: CoatingChocolateMapping[],
-  ingredientCostMap: Map<string, number | null>,
-  at: Date,
-): { costPerGram: number | null; ingredientId: string | null } {
-  if (!coatingName) return { costPerGram: null, ingredientId: null };
-  const relevant = mappings
-    .filter((m) => m.coatingName === coatingName && new Date(m.effectiveFrom).getTime() <= at.getTime())
-    .sort((a, b) => new Date(b.effectiveFrom).getTime() - new Date(a.effectiveFrom).getTime());
-  if (relevant.length === 0) return { costPerGram: null, ingredientId: null };
-  const mapping = relevant[0];
-  const cpg = ingredientCostMap.get(mapping.ingredientId) ?? null;
-  return { costPerGram: cpg, ingredientId: mapping.ingredientId };
-}
-
-/** @deprecated Use direct shellIngredientId lookup instead. */
-export function resolveCurrentCoatingCostPerGram(
-  coatingName: string | undefined,
-  mappings: CoatingChocolateMapping[],
-  ingredientCostMap: Map<string, number | null>,
-): { costPerGram: number | null; ingredientId: string | null } {
-  return resolveCoatingCostAtDate(coatingName, mappings, ingredientCostMap, new Date());
 }
 
 export function serializeBreakdown(breakdown: BreakdownEntry[]): string {

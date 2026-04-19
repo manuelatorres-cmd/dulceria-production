@@ -4,12 +4,14 @@ import { useMemo } from "react";
 import {
   useCollections,
   useAllCollectionPackagings,
+  useAllCollectionProducts,
   usePackagingList,
   useAllPackagingOrders,
   useCurrencySymbol,
 } from "@/lib/hooks";
-import { db } from "@/lib/db";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { assertOk } from "@/lib/supabase-query";
 import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import type { Collection, CollectionPackaging, Packaging, PackagingOrder, ProductCostSnapshot, CollectionProduct } from "@/types";
@@ -78,8 +80,11 @@ export default function PricingPage() {
   const sym = useCurrencySymbol();
 
   // Load all collectionProducts and productCostSnapshots in bulk
-  const allCollectionProducts = useLiveQuery(() => db.collectionProducts.toArray()) ?? [];
-  const allSnapshots = useLiveQuery(() => db.productCostSnapshots.toArray()) ?? [];
+  const allCollectionProducts = useAllCollectionProducts();
+  const { data: allSnapshots = [] } = useQuery({
+    queryKey: ["product-cost-snapshots", "all"],
+    queryFn: async () => assertOk(await supabase.from("productCostSnapshots").select("*")) as ProductCostSnapshot[],
+  });
 
   // Build lookup maps
   const packagingMap = useMemo(() => {

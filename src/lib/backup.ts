@@ -1,4 +1,5 @@
-import { db } from "@/lib/db";
+import { supabase, newId } from "@/lib/supabase";
+import { assertOk } from "@/lib/supabase-query";
 
 const BACKUP_VERSION = 1;
 
@@ -19,7 +20,6 @@ export interface BackupData {
   userPreferences?: unknown[];
   productFillingHistory?: unknown[];
   ingredientPriceHistory?: unknown[];
-  coatingChocolateMappings?: unknown[];
   productCostSnapshots?: unknown[];
   packaging?: unknown[];
   packagingOrders?: unknown[];
@@ -50,105 +50,84 @@ export interface BackupData {
   layerStock?: unknown[];
 }
 
+// All Supabase tables included in the backup payload, in export order.
+// Insert order (import) is the reverse of the delete order inside importBackup.
+const EXPORT_TABLES = [
+  "ingredients",
+  "products",
+  "productCategories",
+  "fillings",
+  "productFillings",
+  "fillingIngredients",
+  "moulds",
+  "productionPlans",
+  "planProducts",
+  "planStepStatus",
+  "userPreferences",
+  "productFillingHistory",
+  "ingredientPriceHistory",
+  "productCostSnapshots",
+  "packaging",
+  "packagingOrders",
+  "decorationMaterials",
+  "decorationCategories",
+  "shellDesigns",
+  "experiments",
+  "experimentIngredients",
+  "shoppingItems",
+  "collections",
+  "collectionProducts",
+  "collectionPackagings",
+  "collectionPricingSnapshots",
+  "fillingStock",
+  "fillingCategories",
+  "ingredientCategories",
+] as const;
+
 export async function exportBackup(): Promise<void> {
-  const [
-    ingredients,
-    products,
-    productCategories,
-    fillings,
-    productFillings,
-    fillingIngredients,
-    moulds,
-    productionPlans,
-    planProducts,
-    planStepStatus,
-    userPreferences,
-    productFillingHistory,
-    ingredientPriceHistory,
-    coatingChocolateMappings,
-    productCostSnapshots,
-    packaging,
-    packagingOrders,
-    decorationMaterials,
-    decorationCategories,
-    shellDesigns,
-    experiments,
-    experimentIngredients,
-    shoppingItems,
-    collections,
-    collectionProducts,
-    collectionPackagings,
-    collectionPricingSnapshots,
-    fillingStock,
-    fillingCategories,
-    ingredientCategories,
-  ] = await Promise.all([
-    db.ingredients.toArray(),
-    db.products.toArray(),
-    db.productCategories.toArray(),
-    db.fillings.toArray(),
-    db.productFillings.toArray(),
-    db.fillingIngredients.toArray(),
-    db.moulds.toArray(),
-    db.productionPlans.toArray(),
-    db.planProducts.toArray(),
-    db.planStepStatus.toArray(),
-    db.userPreferences.toArray(),
-    db.productFillingHistory.toArray(),
-    db.ingredientPriceHistory.toArray(),
-    db.coatingChocolateMappings.toArray(),
-    db.productCostSnapshots.toArray(),
-    db.packaging.toArray(),
-    db.packagingOrders.toArray(),
-    db.decorationMaterials.toArray(),
-    db.decorationCategories.toArray(),
-    db.shellDesigns.toArray(),
-    db.experiments.toArray(),
-    db.experimentIngredients.toArray(),
-    db.shoppingItems.toArray(),
-    db.collections.toArray(),
-    db.collectionProducts.toArray(),
-    db.collectionPackagings.toArray(),
-    db.collectionPricingSnapshots.toArray(),
-    db.fillingStock.toArray(),
-    db.fillingCategories.toArray(),
-    db.ingredientCategories.toArray(),
-  ]);
+  const results = await Promise.all(
+    EXPORT_TABLES.map((name) =>
+      supabase.from(name).select("*").then((r) => assertOk(r) as unknown[]),
+    ),
+  );
+  const rowsByName: Record<string, unknown[]> = {};
+  EXPORT_TABLES.forEach((name, i) => {
+    rowsByName[name] = results[i];
+  });
 
   const backup: BackupData = {
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    ingredients,
-    products,
-    productCategories,
-    fillings,
-    productFillings,
-    fillingIngredients,
-    moulds,
-    productionPlans,
-    planProducts,
-    planStepStatus,
-    settings: [], // Legacy — v4 migrated to userPreferences. Kept for backward compat.
-    userPreferences,
-    productFillingHistory,
-    ingredientPriceHistory,
-    coatingChocolateMappings,
-    productCostSnapshots,
-    packaging,
-    packagingOrders,
-    decorationMaterials,
-    decorationCategories,
-    shellDesigns,
-    experiments,
-    experimentIngredients,
-    shoppingItems,
-    collections,
-    collectionProducts,
-    collectionPackagings,
-    collectionPricingSnapshots,
-    fillingStock,
-    fillingCategories,
-    ingredientCategories,
+    ingredients: rowsByName.ingredients,
+    products: rowsByName.products,
+    productCategories: rowsByName.productCategories,
+    fillings: rowsByName.fillings,
+    productFillings: rowsByName.productFillings,
+    fillingIngredients: rowsByName.fillingIngredients,
+    moulds: rowsByName.moulds,
+    productionPlans: rowsByName.productionPlans,
+    planProducts: rowsByName.planProducts,
+    planStepStatus: rowsByName.planStepStatus,
+    settings: [],
+    userPreferences: rowsByName.userPreferences,
+    productFillingHistory: rowsByName.productFillingHistory,
+    ingredientPriceHistory: rowsByName.ingredientPriceHistory,
+    productCostSnapshots: rowsByName.productCostSnapshots,
+    packaging: rowsByName.packaging,
+    packagingOrders: rowsByName.packagingOrders,
+    decorationMaterials: rowsByName.decorationMaterials,
+    decorationCategories: rowsByName.decorationCategories,
+    shellDesigns: rowsByName.shellDesigns,
+    experiments: rowsByName.experiments,
+    experimentIngredients: rowsByName.experimentIngredients,
+    shoppingItems: rowsByName.shoppingItems,
+    collections: rowsByName.collections,
+    collectionProducts: rowsByName.collectionProducts,
+    collectionPackagings: rowsByName.collectionPackagings,
+    collectionPricingSnapshots: rowsByName.collectionPricingSnapshots,
+    fillingStock: rowsByName.fillingStock,
+    fillingCategories: rowsByName.fillingCategories,
+    ingredientCategories: rowsByName.ingredientCategories,
   };
 
   const json = JSON.stringify(backup, (_key, value) => value ?? undefined);
@@ -163,36 +142,64 @@ export async function exportBackup(): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+// Insert order: parents (lookup/leaf tables) first, middle tables, then
+// child tables with FKs into other tables. Each row's FK targets exist by
+// the time its upsert runs. Mirrors the delete order (reversed) inside the
+// `clear_all_data()` RPC in migration 0004.
+const INSERT_ORDER = [
+  // Phase 3 — leaf / lookup tables (no outbound FKs into migratable tables)
+  "shoppingItems",
+  "userPreferences",
+  "moulds",
+  "ingredients",
+  "productCategories",
+  "ingredientCategories",
+  "fillingCategories",
+  "decorationCategories",
+  // Phase 2 — middle tables
+  "shellDesigns",
+  "decorationMaterials",
+  "packaging",
+  "collections",
+  "products",
+  "fillings",
+  "experiments",
+  // Phase 1 — child tables (FKs into the tables above)
+  "packagingOrders",
+  "productionPlans",
+  "fillingStock",
+  "planProducts",
+  "planStepStatus",
+  "experimentIngredients",
+  "productFillings",
+  "fillingIngredients",
+  "productFillingHistory",
+  "ingredientPriceHistory",
+  "productCostSnapshots",
+  "collectionProducts",
+  "collectionPackagings",
+  "collectionPricingSnapshots",
+] as const;
+
+/** Map of table name -> the imported rows for that table. */
+type ImportPayload = Partial<Record<(typeof INSERT_ORDER)[number], Record<string, unknown>[]>>;
+
+async function bulkUpsert(table: string, rows: Record<string, unknown>[]): Promise<void> {
+  if (rows.length === 0) return;
+  // Chunk so large backups don't exceed Supabase's per-request payload size.
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const slice = rows.slice(i, i + CHUNK);
+    const { error } = await supabase.from(table).upsert(slice, { onConflict: "id" });
+    if (error) throw error;
+  }
+}
+
 export async function clearAllData(): Promise<void> {
-  await db.transaction(
-    "rw",
-    [
-      db.ingredients, db.products, db.productCategories, db.fillings, db.productFillings, db.fillingIngredients,
-      db.moulds, db.productionPlans, db.planProducts, db.planStepStatus, db.settings, db.userPreferences,
-      db.productFillingHistory, db.ingredientPriceHistory, db.coatingChocolateMappings,
-      db.productCostSnapshots, db.packaging, db.packagingOrders, db.decorationMaterials,
-      db.decorationCategories, db.shellDesigns,
-      db.experiments, db.experimentIngredients, db.shoppingItems,
-      db.collections, db.collectionProducts, db.collectionPackagings, db.collectionPricingSnapshots, db.fillingStock,
-      db.fillingCategories, db.ingredientCategories,
-    ],
-    async () => {
-      await Promise.all([
-        db.ingredients.clear(), db.products.clear(), db.productCategories.clear(), db.fillings.clear(),
-        db.productFillings.clear(), db.fillingIngredients.clear(), db.moulds.clear(),
-        db.productionPlans.clear(), db.planProducts.clear(), db.planStepStatus.clear(),
-        db.settings.clear(), db.userPreferences.clear(), db.productFillingHistory.clear(), db.ingredientPriceHistory.clear(),
-        db.coatingChocolateMappings.clear(), db.productCostSnapshots.clear(),
-        db.packaging.clear(), db.packagingOrders.clear(), db.decorationMaterials.clear(),
-        db.decorationCategories.clear(), db.shellDesigns.clear(),
-        db.experiments.clear(), db.experimentIngredients.clear(), db.shoppingItems.clear(),
-        db.collections.clear(), db.collectionProducts.clear(),
-        db.collectionPackagings.clear(), db.collectionPricingSnapshots.clear(),
-        db.fillingStock.clear(), db.fillingCategories.clear(), db.ingredientCategories.clear(),
-      ]);
-    },
-  );
-  // Prevent seed data from reloading on next visit
+  // Atomic server-side wipe (migration 0004). One round-trip, all-or-nothing.
+  const { error } = await supabase.rpc("clear_all_data");
+  if (error) throw error;
+  // Prevent the client-side "first run" path from re-seeding on next visit.
   localStorage.setItem("chocolatier-seeded", "true");
 }
 
@@ -281,9 +288,17 @@ function migrateExperiment(r: AnyRec): AnyRec {
   return out;
 }
 
-function applyAll<T>(rows: unknown[] | undefined, fn: (r: AnyRec) => AnyRec): T[] {
+function applyAll(rows: unknown[] | undefined, fn: (r: AnyRec) => AnyRec): AnyRec[] {
   if (!rows) return [];
-  return rows.map(r => fn((r ?? {}) as AnyRec)) as T[];
+  return rows.map(r => fn((r ?? {}) as AnyRec));
+}
+
+/** Strip keys we don't want to forward to Supabase (e.g. residual legacy fields
+ *  that aren't in the new schema). Keeps unknown keys by default — the app's schema
+ *  tolerates extra columns being named in the TS types but not sent. */
+function passThrough(rows: unknown[] | undefined): AnyRec[] {
+  if (!rows) return [];
+  return rows.map(r => (r ?? {}) as AnyRec);
 }
 
 export async function importBackup(file: File): Promise<void> {
@@ -312,7 +327,6 @@ export async function importBackup(file: File): Promise<void> {
   const rawLegacySettings          = data.settings                ?? [];
   const rawProductFillingHistory   = data.productFillingHistory   ?? data.recipeLayerHistory     ?? [];
   const rawIngredientPriceHistory  = data.ingredientPriceHistory  ?? [];
-  const rawCoatingChocolateMaps    = data.coatingChocolateMappings ?? [];
   const rawProductCostSnapshots    = data.productCostSnapshots    ?? data.recipeCostSnapshots    ?? [];
   const rawPackaging               = data.packaging               ?? [];
   const rawPackagingOrders         = data.packagingOrders         ?? [];
@@ -331,121 +345,59 @@ export async function importBackup(file: File): Promise<void> {
   const rawIngredientCategories    = data.ingredientCategories    ?? [];
 
   // Apply field-level migrations for backups written pre-rename.
-  const ingredients              = rawIngredients as never[];
-  const productCategories        = rawProductCategories as never[];
-  const products                 = applyAll<never>(rawProducts, migrateProduct);
-  const fillings                 = rawFillings as never[];
-  const productFillings          = applyAll<never>(rawProductFillings, migrateProductFilling);
-  const fillingIngredients       = applyAll<never>(rawFillingIngredients, migrateFillingIngredient);
-  const moulds                   = rawMoulds as never[];
-  const productionPlans          = applyAll<never>(rawProductionPlans, migrateProductionPlan);
-  const planProducts             = applyAll<never>(rawPlanProducts, migratePlanProduct);
-  const planStepStatus           = rawPlanStepStatus as never[];
-  const userPreferences          = rawUserPreferences as never[];
-  const productFillingHistory    = applyAll<never>(rawProductFillingHistory, migrateProductFillingHistory);
-  const ingredientPriceHistory   = rawIngredientPriceHistory as never[];
-  const coatingChocolateMappings = rawCoatingChocolateMaps as never[];
-  const productCostSnapshots     = applyAll<never>(rawProductCostSnapshots, migrateProductCostSnapshot);
-  const packaging                = rawPackaging as never[];
-  const packagingOrders          = rawPackagingOrders as never[];
-  const decorationMaterials      = rawDecorationMaterials as never[];
-  const decorationCategories     = rawDecorationCategories as never[];
-  const shellDesigns             = rawShellDesigns as never[];
-  const experiments              = applyAll<never>(rawExperiments, migrateExperiment);
-  const experimentIngredients    = rawExperimentIngredients as never[];
-  const shoppingItems            = rawShoppingItems as never[];
-  const collections              = rawCollections as never[];
-  const collectionProducts       = applyAll<never>(rawCollectionProducts, migrateCollectionProduct);
-  const collectionPackagings     = rawCollectionPackagings as never[];
-  const collectionPricingSnapshots = applyAll<never>(rawCollectionPricingSnaps, migrateCollectionPricingSnapshot);
-  const fillingStock             = applyAll<never>(rawFillingStock, migrateFillingStock);
-  const fillingCategories        = rawFillingCategories as never[];
-  const ingredientCategories     = rawIngredientCategories as never[];
+  const payload: ImportPayload = {
+    ingredients:                passThrough(rawIngredients),
+    productCategories:          passThrough(rawProductCategories),
+    products:                   applyAll(rawProducts, migrateProduct),
+    fillings:                   passThrough(rawFillings),
+    productFillings:            applyAll(rawProductFillings, migrateProductFilling),
+    fillingIngredients:         applyAll(rawFillingIngredients, migrateFillingIngredient),
+    moulds:                     passThrough(rawMoulds),
+    productionPlans:            applyAll(rawProductionPlans, migrateProductionPlan),
+    planProducts:               applyAll(rawPlanProducts, migratePlanProduct),
+    planStepStatus:             passThrough(rawPlanStepStatus),
+    userPreferences:            passThrough(rawUserPreferences),
+    productFillingHistory:      applyAll(rawProductFillingHistory, migrateProductFillingHistory),
+    ingredientPriceHistory:     passThrough(rawIngredientPriceHistory),
+    productCostSnapshots:       applyAll(rawProductCostSnapshots, migrateProductCostSnapshot),
+    packaging:                  passThrough(rawPackaging),
+    packagingOrders:            passThrough(rawPackagingOrders),
+    decorationMaterials:        passThrough(rawDecorationMaterials),
+    decorationCategories:       passThrough(rawDecorationCategories),
+    shellDesigns:               passThrough(rawShellDesigns),
+    experiments:                applyAll(rawExperiments, migrateExperiment),
+    experimentIngredients:      passThrough(rawExperimentIngredients),
+    shoppingItems:              passThrough(rawShoppingItems),
+    collections:                passThrough(rawCollections),
+    collectionProducts:         applyAll(rawCollectionProducts, migrateCollectionProduct),
+    collectionPackagings:       passThrough(rawCollectionPackagings),
+    collectionPricingSnapshots: applyAll(rawCollectionPricingSnaps, migrateCollectionPricingSnapshot),
+    fillingStock:               applyAll(rawFillingStock, migrateFillingStock),
+    fillingCategories:          passThrough(rawFillingCategories),
+    ingredientCategories:       passThrough(rawIngredientCategories),
+  };
 
-  await db.transaction(
-    "rw",
-    [
-      db.ingredients, db.products, db.productCategories, db.fillings, db.productFillings, db.fillingIngredients,
-      db.moulds, db.productionPlans, db.planProducts, db.planStepStatus, db.settings, db.userPreferences,
-      db.productFillingHistory, db.ingredientPriceHistory, db.coatingChocolateMappings,
-      db.productCostSnapshots, db.packaging, db.packagingOrders, db.decorationMaterials,
-      db.decorationCategories, db.shellDesigns,
-      db.experiments, db.experimentIngredients, db.shoppingItems,
-      db.collections, db.collectionProducts, db.collectionPackagings, db.collectionPricingSnapshots, db.fillingStock,
-      db.fillingCategories, db.ingredientCategories,
-    ],
-    async () => {
-      await Promise.all([
-        db.ingredients.clear(), db.products.clear(), db.productCategories.clear(), db.fillings.clear(),
-        db.productFillings.clear(), db.fillingIngredients.clear(), db.moulds.clear(),
-        db.productionPlans.clear(), db.planProducts.clear(), db.planStepStatus.clear(),
-        db.settings.clear(), db.userPreferences.clear(), db.productFillingHistory.clear(), db.ingredientPriceHistory.clear(),
-        db.coatingChocolateMappings.clear(), db.productCostSnapshots.clear(),
-        db.packaging.clear(), db.packagingOrders.clear(), db.decorationMaterials.clear(),
-        db.decorationCategories.clear(), db.shellDesigns.clear(),
-        db.experiments.clear(), db.experimentIngredients.clear(), db.shoppingItems.clear(),
-        db.collections.clear(), db.collectionProducts.clear(),
-        db.collectionPackagings.clear(), db.collectionPricingSnapshots.clear(),
-        db.fillingStock.clear(), db.fillingCategories.clear(), db.ingredientCategories.clear(),
-      ]);
-      await Promise.all([
-        ingredients.length              && db.ingredients.bulkAdd(ingredients),
-        products.length                 && db.products.bulkAdd(products),
-        productCategories.length        && db.productCategories.bulkAdd(productCategories),
-        fillings.length                 && db.fillings.bulkAdd(fillings),
-        productFillings.length          && db.productFillings.bulkAdd(productFillings),
-        fillingIngredients.length       && db.fillingIngredients.bulkAdd(fillingIngredients),
-        moulds.length                   && db.moulds.bulkAdd(moulds),
-        productionPlans.length          && db.productionPlans.bulkAdd(productionPlans),
-        planProducts.length             && db.planProducts.bulkAdd(planProducts),
-        planStepStatus.length           && db.planStepStatus.bulkAdd(planStepStatus),
-        userPreferences.length          && db.userPreferences.bulkAdd(userPreferences),
-        productFillingHistory.length    && db.productFillingHistory.bulkAdd(productFillingHistory),
-        ingredientPriceHistory.length   && db.ingredientPriceHistory.bulkAdd(ingredientPriceHistory),
-        coatingChocolateMappings.length && db.coatingChocolateMappings.bulkAdd(coatingChocolateMappings),
-        productCostSnapshots.length     && db.productCostSnapshots.bulkAdd(productCostSnapshots),
-        packaging.length                && db.packaging.bulkAdd(packaging),
-        packagingOrders.length          && db.packagingOrders.bulkAdd(packagingOrders),
-        decorationMaterials.length      && db.decorationMaterials.bulkAdd(decorationMaterials),
-        decorationCategories.length     && db.decorationCategories.bulkAdd(decorationCategories),
-        shellDesigns.length             && db.shellDesigns.bulkAdd(shellDesigns),
-        experiments.length              && db.experiments.bulkAdd(experiments),
-        experimentIngredients.length    && db.experimentIngredients.bulkAdd(experimentIngredients),
-        shoppingItems.length            && db.shoppingItems.bulkAdd(shoppingItems),
-        collections.length              && db.collections.bulkAdd(collections),
-        collectionProducts.length       && db.collectionProducts.bulkAdd(collectionProducts),
-        collectionPackagings.length     && db.collectionPackagings.bulkAdd(collectionPackagings),
-        collectionPricingSnapshots.length && db.collectionPricingSnapshots.bulkAdd(collectionPricingSnapshots),
-        fillingStock.length             && db.fillingStock.bulkAdd(fillingStock),
-        fillingCategories.length        && db.fillingCategories.bulkAdd(fillingCategories),
-        ingredientCategories.length     && db.ingredientCategories.bulkAdd(ingredientCategories),
-      ]);
-    },
-  );
+  // 1. Atomic server-side wipe. Single round-trip, all-or-nothing.
+  const { error: clearErr } = await supabase.rpc("clear_all_data");
+  if (clearErr) throw clearErr;
 
-  // Pre-v2 backups (and pre-rename backups) lack the productCategories table and
-  // store category names as the legacy `productType` string on each Product. Run
-  // the same logic the v2 upgrade hook applies, but post-import: ensure the two
-  // defaults exist, create extras for any unknown legacy types, and link every
-  // product to a category. This is a no-op when the backup already includes
-  // categories and `productCategoryId` on each product.
+  // 2. Upsert each table in dependency order. Upsert (rather than insert)
+  //    makes a partial failure re-runnable: rerunning picks up where it left
+  //    off and overwrites anything already there with backup values.
+  for (const table of INSERT_ORDER) {
+    const rows = payload[table];
+    if (!rows) continue;
+    await bulkUpsert(table, rows);
+  }
+
+  // 3. Post-import reconciliation for pre-v2 / pre-v4 / pre-v5 / pre-v6 backups
+  //    that predate some of the lookup tables.
   await reconcileProductCategoriesAfterImport();
-
-  // Pre-v4 backups lack the decorationCategories and shellDesigns tables.
-  // Ensure the defaults exist so the UI always has categories and designs to show.
   const { ensureDefaultDecorationCategories, ensureDefaultShellDesigns, ensureDefaultFillingCategories, ensureDefaultIngredientCategories } = await import("@/lib/hooks");
   await ensureDefaultDecorationCategories();
   await ensureDefaultShellDesigns();
-  // Pre-v5 backups also lack the fillingCategories table — seed defaults so the
-  // production wizard can resolve shelf-stable status by name.
   await ensureDefaultFillingCategories();
-  // Pre-v6 backups lack the ingredientCategories table — seed defaults so the
-  // ingredient form and list page have categories to show.
   await ensureDefaultIngredientCategories();
-
-  // Pre-v4 backups store preferences in the key-value `settings` table rather
-  // than the new `userPreferences` table. Migrate them if userPreferences is
-  // empty but legacy settings exist.
   await reconcileUserPreferencesAfterImport(rawLegacySettings);
 }
 
@@ -453,60 +405,75 @@ export async function importBackup(file: File): Promise<void> {
  * Idempotent post-import reconciliation. Ensures the productCategories table
  * has at least the default seeded categories, then walks every product and
  * back-fills `productCategoryId` from the legacy `productType` string for any
- * product that doesn't already have one set. Safe to call after any import.
+ * product that doesn't already have one set.
  */
 async function reconcileProductCategoriesAfterImport(): Promise<void> {
-  const existing = await db.productCategories.toArray();
+  const existing = assertOk(await supabase.from("productCategories").select("*")) as {
+    id: string;
+    name: string;
+    shellPercentMin: number;
+    shellPercentMax: number;
+    defaultShellPercent: number;
+  }[];
   const byLower = new Map(existing.map((c) => [c.name.toLowerCase(), c]));
 
-  // Ensure both default categories exist (preserving any user-edited ranges).
   const now = new Date();
   const { DEFAULT_PRODUCT_CATEGORIES } = await import("@/types");
   for (const seed of DEFAULT_PRODUCT_CATEGORIES) {
     if (byLower.has(seed.name.toLowerCase())) continue;
-    const id = await db.productCategories.add({
+    const id = newId();
+    const { error } = await supabase.from("productCategories").insert({
+      id,
       name: seed.name,
       shellPercentMin: seed.shellPercentMin,
       shellPercentMax: seed.shellPercentMax,
       defaultShellPercent: seed.defaultShellPercent,
       createdAt: now,
       updatedAt: now,
-    } as never) as string;
-    byLower.set(seed.name.toLowerCase(), { ...seed, id, createdAt: now, updatedAt: now } as never);
+    });
+    if (error) throw error;
+    byLower.set(seed.name.toLowerCase(), { ...seed, id });
   }
 
-  // Walk products needing back-fill (no productCategoryId set).
-  const products = await db.products.toArray();
+  const products = assertOk(await supabase.from("products").select("id, productCategoryId, productType")) as {
+    id: string;
+    productCategoryId: string | null;
+    productType: string | null;
+  }[];
   const needsLink = products.filter((p) => !p.productCategoryId);
   if (needsLink.length === 0) return;
 
-  // For each unique legacy productType string not already a category, create one.
+  // Create one category per unique legacy `productType` string not already covered.
   const legacyTypes = new Set<string>();
   for (const p of needsLink) {
-    const t = ((p as unknown as { productType?: string }).productType ?? "").toString().trim();
+    const t = (p.productType ?? "").toString().trim();
     if (t && !byLower.has(t.toLowerCase())) legacyTypes.add(t);
   }
   for (const name of legacyTypes) {
-    const id = await db.productCategories.add({
+    const id = newId();
+    const { error } = await supabase.from("productCategories").insert({
+      id,
       name,
       shellPercentMin: 0,
       shellPercentMax: 100,
       defaultShellPercent: 30,
       createdAt: now,
       updatedAt: now,
-    } as never) as string;
-    byLower.set(name.toLowerCase(), { id, name, shellPercentMin: 0, shellPercentMax: 100, defaultShellPercent: 30, createdAt: now, updatedAt: now } as never);
+    });
+    if (error) throw error;
+    byLower.set(name.toLowerCase(), { id, name, shellPercentMin: 0, shellPercentMax: 100, defaultShellPercent: 30 });
   }
 
-  // Link each product. Default to "moulded".
   const mouldedId = byLower.get("moulded")?.id;
   for (const p of needsLink) {
-    if (!p.id) continue;
-    const t = ((p as unknown as { productType?: string }).productType ?? "").toString().trim().toLowerCase();
+    const t = (p.productType ?? "").toString().trim().toLowerCase();
     const categoryId = (t && byLower.get(t)?.id) || mouldedId;
-    if (categoryId) {
-      await db.products.update(p.id, { productCategoryId: categoryId });
-    }
+    if (!categoryId) continue;
+    const { error } = await supabase
+      .from("products")
+      .update({ productCategoryId: categoryId })
+      .eq("id", p.id);
+    if (error) throw error;
   }
 }
 
@@ -516,23 +483,23 @@ async function reconcileProductCategoriesAfterImport(): Promise<void> {
  * No-op if userPreferences already has data (i.e. the backup was v4+).
  */
 async function reconcileUserPreferencesAfterImport(rawLegacySettings: unknown[]): Promise<void> {
-  const existing = await db.userPreferences.toArray();
-  if (existing.length > 0) return; // already migrated or backup included userPreferences
+  const existing = assertOk(await supabase.from("userPreferences").select("id")) as { id: string }[];
+  if (existing.length > 0) return;
 
   if (!rawLegacySettings || rawLegacySettings.length === 0) {
-    // No settings at all — create defaults
-    await db.userPreferences.add({
+    const { error } = await supabase.from("userPreferences").insert({
+      id: newId(),
       marketRegion: "EU",
       currency: "EUR",
       defaultFillMode: "percentage",
       facilityMayContain: [],
       coatings: ["dark", "milk", "white", "vegan white", "vegan milk", "caramel"],
       updatedAt: new Date(),
-    } as never);
+    });
+    if (error) throw error;
     return;
   }
 
-  // Parse legacy key-value pairs
   const byKey = new Map<string, string>();
   for (const row of rawLegacySettings) {
     const r = row as { key?: string; value?: string };
@@ -545,12 +512,14 @@ async function reconcileUserPreferencesAfterImport(rawLegacySettings: unknown[])
     try { return JSON.parse(raw) as T; } catch { return fallback; }
   }
 
-  await db.userPreferences.add({
+  const { error } = await supabase.from("userPreferences").insert({
+    id: newId(),
     marketRegion: parse("marketRegion", "EU"),
     currency: parse("currency", "EUR"),
     defaultFillMode: parse("defaultFillMode", "percentage"),
     facilityMayContain: parse<string[]>("facilityMayContain", []),
     coatings: parse<string[]>("coatings", ["dark", "milk", "white", "vegan white", "vegan milk", "caramel"]),
     updatedAt: new Date(),
-  } as never);
+  });
+  if (error) throw error;
 }
