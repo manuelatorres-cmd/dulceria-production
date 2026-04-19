@@ -1097,6 +1097,54 @@ export interface PersonUnavailability {
   createdAt?: Date;
 }
 
+// --- Equipment ---------------------------------------------------------
+
+export const EQUIPMENT_KINDS = ["tempering", "melting_pot", "coating_belt", "other"] as const;
+export type EquipmentKind = (typeof EQUIPMENT_KINDS)[number];
+
+export const EQUIPMENT_KIND_LABELS: Record<EquipmentKind, string> = {
+  tempering: "Tempering machine",
+  melting_pot: "Melting pot",
+  coating_belt: "Coating belt",
+  other: "Other",
+};
+
+/** Derived availability status shown on the Equipment list. The stored
+ *  columns `currentPlanId`/`currentScheduleId`/`occupiedSince` drive it;
+ *  the scheduler (§5) is the only writer. */
+export type EquipmentAvailability = "available" | "in_use" | "archived";
+
+/**
+ * A piece of production equipment. Availability is not stored directly —
+ * it's derived from whatever the scheduler has assigned to `currentPlanId`
+ * / `currentScheduleId`. Users edit name / kind / quantity / kgPerHour
+ * and metadata; the scheduler owns the occupancy columns.
+ */
+export interface Equipment {
+  id?: string;
+  name: string;
+  kind: EquipmentKind;
+  /** How many identical copies exist. The scheduler uses this for
+   *  parallelism (two units = two tasks at once). */
+  quantity?: number;
+  /** Throughput per unit in kg/hour. */
+  kgPerHour?: number;
+  /** Per-cycle load capacity (kg). Legacy from migration 0002 — not
+   *  exposed in the Settings form today but kept on the row. */
+  capacityKg?: number;
+  manufacturer?: string;
+  model?: string;
+  notes?: string;
+  /** Scheduler-managed — do not edit from the form. */
+  currentPlanId?: string;
+  currentScheduleId?: string;
+  occupiedSince?: Date;
+  expectedFreeAt?: Date;
+  archived?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export type EventCalendarKind = "event" | "peak" | "blocked" | "holiday";
 
 /**

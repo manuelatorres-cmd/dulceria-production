@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -3907,6 +3907,62 @@ export async function deletePersonUnavailability(id: string): Promise<void> {
     .eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["person-unavailability"] });
+}
+
+// ---------------------------------------------------------------------------
+// Equipment
+// ---------------------------------------------------------------------------
+
+export function useEquipment(includeArchived = false): Equipment[] {
+  const { data } = useQuery({
+    queryKey: ["equipment", { includeArchived }],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("equipment").select("*"),
+      ) as Equipment[];
+      return rows
+        .filter((e) => (includeArchived ? true : !e.archived))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveEquipment(
+  equipment: Omit<Equipment, "createdAt" | "updatedAt">,
+): Promise<string> {
+  const now = new Date();
+  if (equipment.id) {
+    const { error } = await supabase
+      .from("equipment")
+      .update({ ...equipment, updatedAt: now })
+      .eq("id", equipment.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["equipment"] });
+    return equipment.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("equipment")
+    .insert({ ...equipment, id, createdAt: now, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["equipment"] });
+  return id;
+}
+
+export async function deleteEquipment(id: string): Promise<void> {
+  const { error } = await supabase.from("equipment").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["equipment"] });
+}
+
+export async function archiveEquipment(id: string, archived = true): Promise<void> {
+  const { error } = await supabase
+    .from("equipment")
+    .update({ archived, updatedAt: new Date() })
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["equipment"] });
 }
 
 export function useEventCalendar(): EventCalendarEntry[] {

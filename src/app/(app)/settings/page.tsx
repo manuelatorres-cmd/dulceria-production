@@ -3,9 +3,10 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { exportBackup, importBackup, clearAllData } from "@/lib/backup";
-import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry, usePeople, savePerson, deletePerson, archivePerson, usePersonUnavailability, savePersonUnavailability, deletePersonUnavailability } from "@/lib/hooks";
-import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability } from "@/types";
+import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry, usePeople, savePerson, deletePerson, archivePerson, usePersonUnavailability, savePersonUnavailability, deletePersonUnavailability, useEquipment, saveEquipment, deleteEquipment, archiveEquipment } from "@/lib/hooks";
+import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, EQUIPMENT_KINDS, EQUIPMENT_KIND_LABELS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability, type Equipment, type EquipmentKind } from "@/types";
 import { capacityConfigStatus, sortWeekdays, collectRoles } from "@/lib/capacity";
+import { equipmentAvailability, equipmentReadiness, EQUIPMENT_AVAILABILITY_LABEL } from "@/lib/equipment";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import { loadDemoData, isDemoDataLoaded } from "@/lib/seed-demo";
 import { isCloudConfigured } from "@/lib/supabase";
@@ -20,7 +21,7 @@ import { buildProductImportConfig, buildFillingNameLookup, buildMouldNameLookup,
 import type { Ingredient } from "@/types";
 
 type ImportState = "idle" | "confirm" | "importing" | "done" | "error";
-type Tab = "backup" | "import" | "capacity" | "market" | "printing" | "demo";
+type Tab = "backup" | "import" | "capacity" | "equipment" | "market" | "printing" | "demo";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("backup");
@@ -111,6 +112,12 @@ export default function SettingsPage() {
           Capacity &amp; People
         </button>
         <button
+          onClick={() => switchTab("equipment")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "equipment" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+        >
+          Equipment
+        </button>
+        <button
           onClick={() => switchTab("market")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "market" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
         >
@@ -147,6 +154,8 @@ export default function SettingsPage() {
           <ImportTab />
         ) : activeTab === "capacity" ? (
           <CapacityTab onDirtyChange={setMarketDirty} />
+        ) : activeTab === "equipment" ? (
+          <EquipmentTab />
         ) : activeTab === "market" ? (
           <PreferencesTab marketRegion={marketRegion} onRegionChange={setMarketRegion} currency={currency} onCurrencyChange={setCurrency} facilityMayContain={facilityMayContain} onMayContainChange={setFacilityMayContain} defaultFillMode={defaultFillMode} onFillModeChange={setDefaultFillMode} onDirtyChange={setMarketDirty} />
         ) : activeTab === "printing" ? (
@@ -1189,6 +1198,362 @@ function UnavailabilityRow({ entry }: { entry: PersonUnavailability }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Equipment (§2 of the production planning stack)
+// ---------------------------------------------------------------------------
+
+function EquipmentTab() {
+  const equipment = useEquipment(true); // include archived; filter per row
+  const [adding, setAdding] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const readiness = equipmentReadiness(equipment);
+
+  // Active first (by name), then archived
+  const sorted = [...equipment].sort((a, b) => {
+    if (!!a.archived !== !!b.archived) return a.archived ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="space-y-6">
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-primary">Equipment</h2>
+        <p className="text-xs text-muted-foreground">
+          Tempering machines, melting pots, coating belts, and anything else the
+          scheduler needs to place tasks on. Throughput (kg/hour) and quantity
+          let it estimate duration and run parallel tasks on multiple units.
+          Availability below is derived from active production — not set here.
+        </p>
+        {equipment.filter((e) => !e.archived).length === 0 ? (
+          <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+            <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
+            <p className="text-xs text-status-warn">
+              Add at least one piece of equipment so the scheduler has something to assign work to.
+            </p>
+          </div>
+        ) : readiness.isComplete ? (
+          <div className="flex items-start gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2">
+            <CheckCircle className="w-4 h-4 text-status-ok shrink-0 mt-0.5" />
+            <p className="text-xs text-status-ok">
+              All equipment has quantity + throughput set — the scheduler can use it.
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+            <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
+            <p className="text-xs text-status-warn">
+              {readiness.incompleteCount} equipment item{readiness.incompleteCount > 1 ? "s" : ""} missing quantity or kg/hour.
+            </p>
+          </div>
+        )}
+      </section>
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          {equipment.filter((e) => !e.archived).length} active
+          {equipment.filter((e) => e.archived).length > 0 && ` · ${equipment.filter((e) => e.archived).length} archived`}
+        </p>
+        {!adding && (
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add equipment
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <EquipmentEditor
+          onSaved={() => setAdding(false)}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+
+      {sorted.length === 0 && !adding ? (
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+          No equipment added yet.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {sorted.map((eq) => (
+            <EquipmentCard
+              key={eq.id}
+              equipment={eq}
+              expanded={expandedId === eq.id}
+              onToggle={() => setExpandedId(expandedId === eq.id ? null : eq.id!)}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function EquipmentCard({ equipment: eq, expanded, onToggle }: {
+  equipment: Equipment;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const [pendingRemove, setPendingRemove] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function handleArchive(archived: boolean) {
+    if (!eq.id) return;
+    setBusy(true);
+    try { await archiveEquipment(eq.id, archived); }
+    finally { setBusy(false); }
+  }
+
+  async function handleDelete() {
+    if (!eq.id) return;
+    setBusy(true);
+    try { await deleteEquipment(eq.id); }
+    finally { setBusy(false); setPendingRemove(false); }
+  }
+
+  const avail = equipmentAvailability(eq);
+  const availColor =
+    avail === "available" ? "text-status-ok bg-status-ok-bg border-status-ok-edge" :
+    avail === "in_use" ? "text-status-warn bg-status-warn-bg border-status-warn-edge" :
+    "text-muted-foreground bg-muted border-border";
+
+  return (
+    <li className={`rounded-lg border bg-card overflow-hidden ${eq.archived ? "opacity-70 border-border" : "border-border"}`}>
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          aria-expanded={expanded}
+        >
+          {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{eq.name}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {EQUIPMENT_KIND_LABELS[eq.kind]}
+              {eq.quantity != null && ` · ×${eq.quantity}`}
+              {eq.kgPerHour != null && ` · ${eq.kgPerHour} kg/h`}
+              {eq.manufacturer && ` · ${eq.manufacturer}`}
+            </p>
+          </div>
+        </button>
+        <span className={`shrink-0 rounded-full border text-[10px] font-medium px-2 py-0.5 ${availColor}`}>
+          {EQUIPMENT_AVAILABILITY_LABEL[avail]}
+        </span>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-border px-3 py-3 space-y-3">
+          <EquipmentEditor equipment={eq} onSaved={() => { /* stays expanded */ }} />
+
+          <div className="border-t border-border pt-3 flex items-center gap-4">
+            {!eq.archived ? (
+              <button
+                onClick={() => handleArchive(true)}
+                disabled={busy}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                <Archive className="w-3.5 h-3.5" /> Archive
+              </button>
+            ) : (
+              <button
+                onClick={() => handleArchive(false)}
+                disabled={busy}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              >
+                <ArchiveRestore className="w-3.5 h-3.5" /> Unarchive
+              </button>
+            )}
+            {pendingRemove ? (
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground">Delete permanently?</span>
+                <button onClick={handleDelete} disabled={busy} className="text-red-600 font-medium hover:underline disabled:opacity-50">
+                  {busy ? "…" : "Yes"}
+                </button>
+                <button onClick={() => setPendingRemove(false)} className="text-muted-foreground hover:underline">
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setPendingRemove(true)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function EquipmentEditor({ equipment, onSaved, onCancel }: {
+  equipment?: Equipment;
+  onSaved: () => void;
+  onCancel?: () => void;
+}) {
+  const isNew = !equipment?.id;
+  const [name, setName] = useState(equipment?.name ?? "");
+  const [kind, setKind] = useState<EquipmentKind>(equipment?.kind ?? "tempering");
+  const [quantity, setQuantity] = useState(equipment?.quantity != null ? String(equipment.quantity) : "");
+  const [kgPerHour, setKgPerHour] = useState(equipment?.kgPerHour != null ? String(equipment.kgPerHour) : "");
+  const [manufacturer, setManufacturer] = useState(equipment?.manufacturer ?? "");
+  const [model, setModel] = useState(equipment?.model ?? "");
+  const [notes, setNotes] = useState(equipment?.notes ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      await saveEquipment({
+        id: equipment?.id,
+        name: name.trim(),
+        kind,
+        quantity: parsePositiveInt(quantity),
+        kgPerHour: parsePositiveNum(kgPerHour),
+        capacityKg: equipment?.capacityKg,
+        manufacturer: manufacturer.trim() || undefined,
+        model: model.trim() || undefined,
+        notes: notes.trim() || undefined,
+        archived: equipment?.archived,
+        currentPlanId: equipment?.currentPlanId,
+        currentScheduleId: equipment?.currentScheduleId,
+        occupiedSince: equipment?.occupiedSince,
+        expectedFreeAt: equipment?.expectedFreeAt,
+      });
+      if (isNew) {
+        setName("");
+        setKind("tempering");
+        setQuantity("");
+        setKgPerHour("");
+        setManufacturer("");
+        setModel("");
+        setNotes("");
+      }
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className={`space-y-3 ${isNew ? "rounded-lg border border-border bg-card p-4" : ""}`}>
+      <div>
+        <label className="label">Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Chocovision Delta"
+          autoFocus={isNew}
+          className="input"
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="label">Type</label>
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as EquipmentKind)}
+            className="input"
+          >
+            {EQUIPMENT_KINDS.map((k) => (
+              <option key={k} value={k}>{EQUIPMENT_KIND_LABELS[k]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">Quantity</label>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            placeholder="e.g. 2"
+            className="input"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            How many identical units.
+          </p>
+        </div>
+        <div>
+          <label className="label">Throughput (kg/hour)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={kgPerHour}
+            onChange={(e) => setKgPerHour(e.target.value)}
+            placeholder="e.g. 5"
+            className="input"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Per unit.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Manufacturer (optional)</label>
+          <input
+            type="text"
+            value={manufacturer}
+            onChange={(e) => setManufacturer(e.target.value)}
+            placeholder="e.g. Selmi"
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="label">Model (optional)</label>
+          <input
+            type="text"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="e.g. Top EX"
+            className="input"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="label">Notes (optional)</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          placeholder="Anything the scheduler should ignore but you want to remember"
+          className="input resize-none"
+        />
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={handleSave}
+          disabled={saving || !name.trim()}
+          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {saving ? "Saving…" : isNew ? "Add equipment" : "Save changes"}
+        </button>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="rounded-full border border-border px-4 py-2 text-sm"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -1357,6 +1722,11 @@ function formatIsoDate(iso: string): string {
 
 function parsePositiveNum(s: string): number | undefined {
   const n = parseFloat(s);
+  if (isNaN(n) || n <= 0) return undefined;
+  return n;
+}
+function parsePositiveInt(s: string): number | undefined {
+  const n = parseInt(s, 10);
   if (isNaN(n) || n <= 0) return undefined;
   return n;
 }
