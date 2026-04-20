@@ -52,6 +52,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
   const [comp, setComp] = useState<Record<CompositionKey, string>>({ ...emptyComp });
   const [allergens, setAllergens] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const region = useMarketRegion();
   const activeAllergens = getAllergensByRegion(region);
   const [pricingIrrelevant, setPricingIrrelevant] = useState(false);
@@ -157,6 +158,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
     if (!name.trim()) return;
     if (!compEmpty && !compValid) return;
     setSaving(true);
+    setSaveError("");
     try {
       // Build nutrition data from local string state
       const nutritionData: NutritionData = {};
@@ -181,13 +183,11 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
         category: category || undefined,
         cost: 0, // legacy field kept for compatibility
         notes: notes.trim(),
-        pricingIrrelevant: pricingIrrelevant || undefined,
-        // Always persist the actual boolean — the UI already gates the
-        // checkbox's visibility to the Chocolate category via the "shell"
-        // tab, so there's no second-guessing needed here. Previously we
-        // collapsed `false` to `undefined`, which meant unchecking the
-        // box never reached the DB (Supabase strips undefined fields
-        // from update payloads).
+        // Both booleans persist as real booleans. Previously we collapsed
+        // `false` to `undefined`, which on update caused Supabase to
+        // serialise null into the payload — and both columns are NOT NULL
+        // in the schema, so the DB rejected every edit.
+        pricingIrrelevant,
         shellCapable,
         subIngredients: subIngredients.length > 0
           ? subIngredients
@@ -211,6 +211,15 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
       });
 
       onSaved();
+    } catch (err) {
+      // Surface the real reason so a failed save isn't silent. Supabase
+      // throws PostgrestError as a plain object, not an Error instance,
+      // so read the shape defensively.
+      const raw: { message?: string; code?: string; details?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      const code = raw.code ? ` (code ${raw.code})` : "";
+      setSaveError(`${raw.message || raw.details || "Save failed"}${code}`);
+      console.error("saveIngredient failed:", err);
     } finally {
       setSaving(false);
     }
@@ -664,6 +673,9 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
           Cancel
         </button>
       </div>
+      {saveError && (
+        <p className="text-xs text-status-alert pt-1">{saveError}</p>
+      )}
     </form>
   );
 }

@@ -40,6 +40,20 @@ export async function saveIngredient(ingredient: Omit<Ingredient, "id"> & { id?:
   let savedId: string;
   let priceChanged = false;
 
+  // Drop any `undefined` values before the payload reaches Supabase.
+  // The JS client serialises `undefined` as `null` on the wire, which
+  // trips NOT-NULL columns (pricingIrrelevant, shellCapable, etc.)
+  // whenever a form sends an explicit undefined. Form mappers like
+  // `brand: brand.trim() || undefined` are common — rather than fix
+  // each one, strip here centrally.
+  const stripUndef = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
+    const out: Partial<T> = {};
+    for (const key in obj) {
+      if (obj[key] !== undefined) out[key] = obj[key];
+    }
+    return out;
+  };
+
   if (ingredient.id) {
     const existing = assertOkMaybe(
       await supabase.from("ingredients").select("*").eq("id", ingredient.id).maybeSingle(),
@@ -53,7 +67,7 @@ export async function saveIngredient(ingredient: Omit<Ingredient, "id"> & { id?:
     }
     const { error } = await supabase
       .from("ingredients")
-      .update({ ...ingredient, updatedAt: new Date() })
+      .update(stripUndef({ ...ingredient, updatedAt: new Date() }))
       .eq("id", ingredient.id);
     if (error) throw error;
     savedId = ingredient.id;
@@ -61,7 +75,7 @@ export async function saveIngredient(ingredient: Omit<Ingredient, "id"> & { id?:
     savedId = newId();
     const { error } = await supabase
       .from("ingredients")
-      .insert({ ...ingredient, id: savedId, updatedAt: new Date() });
+      .insert(stripUndef({ ...ingredient, id: savedId, updatedAt: new Date() }));
     if (error) throw error;
     priceChanged = deriveIngredientCostPerGram(ingredient as Ingredient) !== null;
   }
