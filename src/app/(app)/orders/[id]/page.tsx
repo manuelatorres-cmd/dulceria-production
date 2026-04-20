@@ -11,6 +11,7 @@ import {
   useProductActiveMinutesMap, useProductionSchedule, useCapacityConfig,
   usePeople, usePersonUnavailability, useBlockedDays,
   useProductLocationTotals,
+  useReplenishmentOrderFor,
 } from "@/lib/hooks";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
@@ -28,6 +29,7 @@ import {
   type DeliveryType,
   type Packaging, type OrderPackagingLine,
   type ProductCostSnapshot, type PackagingOrder,
+  type OrderItem,
 } from "@/types";
 import { ArrowLeft, Plus, Trash2, X, Pencil, AlertTriangle, Calendar, Package } from "lucide-react";
 
@@ -40,6 +42,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const items = useOrderItems(orderId);
   const products = useProductsList(true);
   const packaging = usePackagingList(true);
+  const replenishmentOrder = useReplenishmentOrderFor(orderId);
+  const parentOrder = useOrder(order?.sourceOrderId);
   const packagingLines = useOrderPackagingLines(orderId);
   const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
   const packagingMap = useMemo(() => new Map(packaging.map((p) => [p.id!, p])), [packaging]);
@@ -239,6 +243,35 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </button>
           )}
         </div>
+
+        {/* Replenishment / borrow linkage banners */}
+        {parentOrder && (
+          <Link
+            href={`/orders/${encodeURIComponent(parentOrder.id!)}`}
+            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm hover:bg-primary/10"
+          >
+            <Package className="w-4 h-4 text-primary" />
+            <span className="flex-1">
+              <span className="font-medium">Shop Replenishment</span> for order
+              {" "}<span className="text-primary font-medium">{parentOrder.customerName || parentOrder.id?.slice(0, 8)}</span>
+            </span>
+            <span className="text-xs text-muted-foreground">View parent →</span>
+          </Link>
+        )}
+        {replenishmentOrder && (
+          <Link
+            href={`/orders/${encodeURIComponent(replenishmentOrder.id!)}`}
+            className="flex items-center gap-2 rounded-lg border border-status-ok/30 bg-status-ok/5 px-3 py-2 text-sm hover:bg-status-ok/10"
+          >
+            <Package className="w-4 h-4 text-status-ok" />
+            <span className="flex-1">
+              Linked replenishment order (deadline{" "}
+              {new Date(replenishmentOrder.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })})
+              {" · "}{replenishmentOrder.status}
+            </span>
+            <span className="text-xs text-muted-foreground">View →</span>
+          </Link>
+        )}
 
         {/* Status selector */}
         <div className="flex items-center gap-2">
@@ -734,13 +767,14 @@ function AddOrderLine({ orderId, nextSortOrder, products, onCancel }: {
 }
 
 function OrderLineRow({ item, productName }: {
-  item: { id?: string; orderId: string; productId: string; quantity: number; sortOrder: number; notes?: string };
+  item: OrderItem;
   productName: string;
 }) {
   const [pendingRemove, setPendingRemove] = useState(false);
   const [editingQty, setEditingQty] = useState(false);
   const [qtyInput, setQtyInput] = useState(String(item.quantity));
   const [saveError, setSaveError] = useState("");
+  const [switchingMode, setSwitchingMode] = useState(false);
 
   async function handleDelete() {
     if (!item.id) return;
@@ -767,6 +801,7 @@ function OrderLineRow({ item, productName }: {
         quantity: n,
         sortOrder: item.sortOrder,
         notes: item.notes,
+        fulfilmentMode: item.fulfilmentMode,
       });
       setEditingQty(false);
     } catch (err) {
@@ -778,12 +813,69 @@ function OrderLineRow({ item, productName }: {
     }
   }
 
+  async function toggleFulfilmentMode() {
+    if (!item.id) return;
+    const next = item.fulfilmentMode === "borrow" ? "produce" : "borrow";
+    setSwitchingMode(true);
+    setSaveError("");
+    try {
+      // Saving an existing line with a different fulfilmentMode does not
+      // re-run the auto-decision. To move an existing line into 'borrow'
+      // we need to also allocate — simplest path: delete + re-add so
+      // saveOrderItem's new-line flow handles the allocation.
+      if (next === "borrow") {
+        await deleteOrderItem(item.id);
+        await saveOrderItem({
+          orderId: item.orderId,
+          productId: item.productId,
+          quantity: item.quantity,
+          sortOrder: item.sortOrder,
+          notes: item.notes,
+          fulfilmentMode: "borrow",
+        });
+      } else {
+        // Going borrow → produce: delete (releases the allocation) + re-add as produce.
+        await deleteOrderItem(item.id);
+        await saveOrderItem({
+          orderId: item.orderId,
+          productId: item.productId,
+          quantity: item.quantity,
+          sortOrder: item.sortOrder,
+          notes: item.notes,
+          fulfilmentMode: "produce",
+        });
+      }
+    } catch (err) {
+      const raw: { message?: string; code?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      setSaveError(raw.message || "Mode switch failed");
+    } finally {
+      setSwitchingMode(false);
+    }
+  }
+
+  const isBorrow = item.fulfilmentMode === "borrow";
+
   return (
-    <li className="rounded-lg border border-border bg-card px-3 py-2.5">
+    <li className={`rounded-lg border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{productName}</p>
+          <p className="text-sm font-medium truncate">
+            {productName}
+            {isBorrow && (
+              <span className="ml-2 text-[10px] uppercase tracking-wide text-primary bg-primary/15 rounded px-1.5 py-0.5 align-middle">
+                From Store
+              </span>
+            )}
+          </p>
           {item.notes && <p className="text-xs text-muted-foreground truncate">{item.notes}</p>}
+          <button
+            onClick={toggleFulfilmentMode}
+            disabled={switchingMode}
+            className="text-[11px] text-muted-foreground hover:text-foreground hover:underline mt-0.5 disabled:opacity-50"
+          >
+            {switchingMode ? "Switching…" : isBorrow ? "Produce fresh instead" : "Fulfil from Store stock"}
+          </button>
         </div>
         {editingQty ? (
           <input

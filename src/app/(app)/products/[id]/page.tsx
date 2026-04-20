@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductFillingHistory, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, setPlanProductStockStatus, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList } from "@/lib/hooks";
+import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductFillingHistory, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, setPlanProductStockStatus, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList, useProductLeadTimeSuggestions } from "@/lib/hooks";
 import { SHELL_TECHNIQUES, DECORATION_MATERIAL_TYPE_LABELS, DECORATION_APPLY_AT_OPTIONS, normalizeApplyAt, type ShellDesignStep, type ShellDesignApplyAt, type ProductCostSnapshot, type BreakdownEntry, type ProductFilling, costPerGram, type DecorationMaterial, allergenLabel, type FillMode } from "@/types";
 import { colorToCSS } from "@/lib/colors";
 import { deserializeBreakdown, enrichBreakdownLabels, formatCost, costDelta, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -43,6 +43,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }, [allProducts]);
   const coatings = useCoatings();
   const sym = useCurrencySymbol();
+  const leadTimeSuggestions = useProductLeadTimeSuggestions();
+  const suggestedLeadTime = productId ? leadTimeSuggestions.get(productId) : undefined;
 
   const searchParams = useSearchParams();
   const isNew = searchParams.get("new") === "1";
@@ -78,6 +80,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [notes, setNotes] = useState("");
   const [localShelfLife, setLocalShelfLife] = useState("");
   const [localLowStockThreshold, setLocalLowStockThreshold] = useState("");
+  const [localLeadTimeDays, setLocalLeadTimeDays] = useState("");
   const [localMouldId, setLocalMouldId] = useState("");
   const [batchQtyInput, setBatchQtyInput] = useState("");
   const [localShellDesign, setLocalShellDesign] = useState<ShellDesignStep[]>([]);
@@ -113,6 +116,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       setNotes(product.notes || "");
       setLocalShelfLife(product.shelfLifeWeeks || "");
       setLocalLowStockThreshold(product.lowStockThreshold != null ? String(product.lowStockThreshold) : "");
+      setLocalLeadTimeDays(product.leadTimeDays != null ? String(product.leadTimeDays) : "");
       setLocalMouldId(product.defaultMouldId || "");
       setBatchQtyInput(String(product.defaultBatchQty ?? 1));
       setLocalShellDesign(product.shellDesign ?? []);
@@ -140,6 +144,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     notes !== (product.notes || "") ||
     localShelfLife !== (product.shelfLifeWeeks || "") ||
     localLowStockThreshold !== (product.lowStockThreshold != null ? String(product.lowStockThreshold) : "") ||
+    localLeadTimeDays !== (product.leadTimeDays != null ? String(product.leadTimeDays) : "") ||
     localMouldId !== (product.defaultMouldId || "") ||
     batchQtyInput !== String(product.defaultBatchQty ?? 1) ||
     JSON.stringify([...localTags].sort()) !== JSON.stringify([...(product.tags ?? [])].sort()) ||
@@ -303,6 +308,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         const v = parseInt(localLowStockThreshold.trim(), 10);
         return isNaN(v) || v < 0 ? undefined : v;
       })(),
+      leadTimeDays: (() => {
+        const v = parseInt(localLeadTimeDays.trim(), 10);
+        return isNaN(v) || v < 0 ? undefined : v;
+      })(),
       defaultMouldId: localMouldId || undefined,
       defaultBatchQty: batchQty,
       shellDesign: localShellDesign,
@@ -324,6 +333,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     setNotes(product.notes || "");
     setLocalShelfLife(product.shelfLifeWeeks || "");
     setLocalLowStockThreshold(product.lowStockThreshold != null ? String(product.lowStockThreshold) : "");
+    setLocalLeadTimeDays(product.leadTimeDays != null ? String(product.leadTimeDays) : "");
     setLocalMouldId(product.defaultMouldId || "");
     setBatchQtyInput(String(product.defaultBatchQty ?? 1));
     setLocalShellDesign(product.shellDesign ?? []);
@@ -759,6 +769,32 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             />
             <p className="text-xs text-muted-foreground mt-1">
               Pieces below which this product is flagged low in the production wizard.
+            </p>
+          </div>
+          <div>
+            <label className="label">Production lead time (days)</label>
+            <input
+              type="number"
+              min={0}
+              value={localLeadTimeDays}
+              onChange={(e) => setLocalLeadTimeDays(e.target.value)}
+              placeholder="e.g. 2"
+              className="input w-32"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Days to make one replacement batch. Used by the Shop borrow logic
+              — borrow is only offered if the next shop opening is at least
+              this many days away.
+              {suggestedLeadTime != null && (
+                <>
+                  {" "}Suggested: <button
+                    type="button"
+                    onClick={() => setLocalLeadTimeDays(String(suggestedLeadTime))}
+                    className="text-primary font-medium hover:underline"
+                  >{suggestedLeadTime} day{suggestedLeadTime === 1 ? "" : "s"}</button>
+                  {" "}— derived from production steps ÷ team capacity.
+                </>
+              )}
             </p>
           </div>
         </div>

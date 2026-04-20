@@ -7,6 +7,7 @@ import {
   useShopOpeningHours, useShopClosures, saveShopOpeningHours,
   saveShopClosure, deleteShopClosure,
   useProductsList, useProductLocationTotals, useStockLocationMinimums,
+  saveStockLocationMinimum,
 } from "@/lib/hooks";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
@@ -222,15 +223,76 @@ function ShopStockRow({ row }: {
     over: "bg-primary",
   }[status];
 
+  const [editing, setEditing] = useState(false);
+  const [minInput, setMinInput] = useState(String(row.min));
+  const [maxInput, setMaxInput] = useState(row.max != null ? String(row.max) : "");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  async function saveMinMax() {
+    if (!row.product.id) return;
+    const minN = parseInt(minInput, 10);
+    const maxN = maxInput.trim() === "" ? undefined : parseInt(maxInput, 10);
+    if (!Number.isFinite(minN) || minN < 0) { setSaveError("Min must be ≥ 0"); return; }
+    if (maxN != null && (!Number.isFinite(maxN) || maxN < minN)) { setSaveError("Max must be ≥ Min"); return; }
+    setSaving(true);
+    setSaveError("");
+    try {
+      await saveStockLocationMinimum({
+        productId: row.product.id,
+        location: "store",
+        minimumUnits: minN,
+        maximumUnits: maxN,
+      });
+      setEditing(false);
+    } catch (err) {
+      const raw: { message?: string; code?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      setSaveError(raw.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <li className="rounded-lg border border-border bg-card p-3">
       <div className="flex items-center gap-3">
         <div className={`w-3 h-3 rounded-full shrink-0 ${dotColor}`} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{row.product.name}</p>
-          <p className="text-[11px] text-muted-foreground">
-            Min {row.min}{row.max != null ? ` · Max ${row.max}` : ""}
-          </p>
+          {editing ? (
+            <div className="flex items-center gap-2 mt-1">
+              <label className="text-[11px] text-muted-foreground">Min</label>
+              <input
+                type="number" min={0} value={minInput}
+                onChange={(e) => setMinInput(e.target.value)}
+                className="input !py-0.5 !text-xs !w-16"
+              />
+              <label className="text-[11px] text-muted-foreground">Max</label>
+              <input
+                type="number" min={0} value={maxInput}
+                onChange={(e) => setMaxInput(e.target.value)}
+                placeholder="—"
+                className="input !py-0.5 !text-xs !w-16"
+              />
+              <button onClick={saveMinMax} disabled={saving}
+                className="text-xs text-primary font-medium hover:underline disabled:opacity-50">
+                {saving ? "…" : "Save"}
+              </button>
+              <button onClick={() => setEditing(false)}
+                className="text-xs text-muted-foreground hover:underline">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setMinInput(String(row.min)); setMaxInput(row.max != null ? String(row.max) : ""); setEditing(true); }}
+              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline text-left"
+            >
+              Min {row.min}{row.max != null ? ` · Max ${row.max}` : " · Max —"} ✎
+            </button>
+          )}
+          {saveError && <p className="text-[11px] text-status-alert mt-1">{saveError}</p>}
         </div>
         <div className="text-right">
           <p className="text-base font-semibold tabular-nums">{row.store}</p>

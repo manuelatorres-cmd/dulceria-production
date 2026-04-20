@@ -1846,6 +1846,11 @@ function ProductionStepRow({ step, knownStepNames, index, total, onMoveUp, onMov
             <p className="text-sm font-medium truncate">
               <span className="text-muted-foreground mr-1.5">{index + 1}.</span>
               {step.name}
+              {step.isFinishingStep && (
+                <span className="ml-2 text-[10px] uppercase tracking-wide text-primary bg-primary/10 rounded px-1.5 py-0.5 align-middle">
+                  Finishing
+                </span>
+              )}
             </p>
             <p className="text-xs text-muted-foreground">
               Active {step.activeMinutes} min · Waiting {step.waitingMinutes} min
@@ -1900,6 +1905,7 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
   const [name, setName] = useState(step?.name ?? "");
   const [activeMinutes, setActiveMinutes] = useState(step?.activeMinutes != null ? String(step.activeMinutes) : "");
   const [waitingMinutes, setWaitingMinutes] = useState(step?.waitingMinutes != null ? String(step.waitingMinutes) : "");
+  const [isFinishingStep, setIsFinishingStep] = useState(!!step?.isFinishingStep);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -1918,11 +1924,13 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
         activeMinutes: active,
         waitingMinutes: waiting,
         sortOrder: step?.sortOrder ?? nextSortOrder ?? 0,
+        isFinishingStep,
       });
       if (isNew) {
         setName("");
         setActiveMinutes("");
         setWaitingMinutes("");
+        setIsFinishingStep(false);
       }
       onSaved();
     } catch (err) {
@@ -2004,6 +2012,23 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
           </p>
         </div>
       </div>
+
+      <label className="flex items-start gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={isFinishingStep}
+          onChange={(e) => setIsFinishingStep(e.target.checked)}
+          className="w-4 h-4 mt-0.5"
+        />
+        <span>
+          <span className="font-medium">Finishing step</span>
+          <span className="block text-xs text-muted-foreground">
+            Post-storage tasks (polish, pack, wrap). Only these run when a line
+            is fulfilled by borrowing from Store stock — the full production
+            cycle runs on the replenishment order instead.
+          </span>
+        </span>
+      </label>
 
       <div className="flex gap-2 pt-1">
         <button

@@ -4112,6 +4112,27 @@ export function useOrder(id: string | undefined): Order | null | undefined {
   return data;
 }
 
+/** The linked shop-replenishment order (child) for a given parent order,
+ *  if any. Returns undefined while loading, null when none exists. */
+export function useReplenishmentOrderFor(parentOrderId: string | undefined): Order | null | undefined {
+  const { data } = useQuery({
+    queryKey: ["replenishment-order-for", parentOrderId],
+    enabled: !!parentOrderId,
+    queryFn: async () => {
+      const row = assertOkMaybe(
+        await supabase
+          .from("orders")
+          .select("*")
+          .eq("sourceOrderId", parentOrderId!)
+          .eq("channel", "shop")
+          .maybeSingle(),
+      ) as Order | null;
+      return row;
+    },
+  });
+  return data;
+}
+
 export function useOrderItems(orderId: string | undefined): OrderItem[] {
   const { data } = useQuery({
     queryKey: ["order-items", orderId],
@@ -6491,5 +6512,39 @@ export function useProductStoreAvailable(): Map<string, number> {
     }
     return out;
   }, [totals]);
+}
+
+/** productId → suggested lead time in days, derived from production
+ *  steps + daily people-hours. Rounded up so a 6-hour batch still
+ *  shows as 1 day. Used as the hint below the product lead-time input
+ *  when the user hasn't set an explicit value. */
+export function useProductLeadTimeSuggestions(): Map<string, number> {
+  const products = useProductsList(true);
+  const categories = useProductCategories(true);
+  const steps = useProductionSteps();
+  const people = usePeople(false);
+  return useMemo(() => {
+    const categoryById = new Map(categories.map((c) => [c.id!, c.name] as const));
+    const batchMinutesByType = new Map<string, number>();
+    for (const s of steps) {
+      const prev = batchMinutesByType.get(s.productType) ?? 0;
+      batchMinutesByType.set(s.productType, prev + (s.activeMinutes ?? 0) + (s.waitingMinutes ?? 0));
+    }
+    const dailyCapacityMinutes = people
+      .filter((p) => !p.archived)
+      .reduce((s, p) => s + ((p.defaultHoursPerDay ?? 0) * 60), 0);
+
+    const out = new Map<string, number>();
+    for (const p of products) {
+      const categoryName = p.productCategoryId ? categoryById.get(p.productCategoryId) : undefined;
+      const totalBatchMinutes = categoryName ? (batchMinutesByType.get(categoryName) ?? 0) : 0;
+      if (dailyCapacityMinutes <= 0 || totalBatchMinutes <= 0) {
+        out.set(p.id!, 1);
+        continue;
+      }
+      out.set(p.id!, Math.max(1, Math.ceil(totalBatchMinutes / dailyCapacityMinutes)));
+    }
+    return out;
+  }, [products, categories, steps, people]);
 }
 
