@@ -199,6 +199,12 @@ export interface Product {
   defaultBatchQty?: number; // default: 1
   shellDesign?: ShellDesignStep[]; // ordered decoration steps for moulded products
   vegan?: boolean; // user-set flag; shown as a leaf icon on printed batch labels
+  /** Production lead time in whole days. Editable per product; when unset
+   *  the UI shows a suggested value derived from productionSteps × capacity.
+   *  Used by the borrow-from-Store decision: borrow is only allowed if
+   *  the next shop opening day is at least this many days away, so the
+   *  replenishment batch can be produced in time. */
+  leadTimeDays?: number;
   archived?: boolean; // soft-delete: hidden from lists, preserved for production history
   createdAt: Date;
   updatedAt: Date;
@@ -1423,6 +1429,11 @@ export interface Order {
   /** External reference for imported orders (e.g. Shopify's order
    *  name "#1001"). Used to dedup re-imports. */
   sourceRef?: string;
+  /** Order that triggered the creation of this one. Only set on
+   *  auto-generated "Shop Replenishment" orders — points at the
+   *  customer order whose borrow decision created the replenishment.
+   *  null for normal customer orders. */
+  sourceOrderId?: string;
   /** Invoiced amount — what the customer actually paid. Editable,
    *  separate from any calculated retail / quote total. */
   pricePaid?: number;
@@ -1449,6 +1460,9 @@ export interface OrderPackagingLine {
   updatedAt?: Date;
 }
 
+export const FULFILMENT_MODES = ["produce", "borrow"] as const;
+export type FulfilmentMode = (typeof FULFILMENT_MODES)[number];
+
 export interface OrderItem {
   id?: string;
   orderId: string;
@@ -1459,6 +1473,11 @@ export interface OrderItem {
   unitPrice?: number;
   sortOrder: number;
   notes?: string;
+  /** How this line is fulfilled. 'produce' = full production cycle runs.
+   *  'borrow' = pieces come from Store stock (already made); Store stock
+   *  moves to Allocated at save time, and only finishing-steps are
+   *  scheduled. Defaults to 'produce'. */
+  fulfilmentMode?: FulfilmentMode;
 }
 
 /** One row on the production schedule — the scheduler's output. One per
@@ -1500,6 +1519,11 @@ export interface ProductionStep {
   activeMinutes: number;
   waitingMinutes: number;
   sortOrder: number;
+  /** Post-storage finishing task (polish, pack, label, wrap). When an
+   *  order line is fulfilled by borrowing from Store stock, only the
+   *  steps with isFinishingStep=true are scheduled — the full production
+   *  cycle runs on the replenishment order instead. */
+  isFinishingStep?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -1681,7 +1705,37 @@ export interface StockLocationMinimum {
   productId: string;
   location: StockLocation;
   minimumUnits: number;
+  /** Optional "restock to this level" target. When null, the replenishment
+   *  engine falls back to minimumUnits as the top-up target. */
+  maximumUnits?: number;
   reorderPoint?: number;
   notes?: string;
   updatedAt: Date;
+}
+
+// --- Shop opening hours + closures ---
+
+/** Weekly shop schedule. One row per day-of-week (0 = Sunday … 6 = Saturday,
+ *  matching JS Date.getDay()). isOpen = false means closed that weekday;
+ *  isOpen = true requires openAt + closeAt as 'HH:MM' strings. */
+export interface ShopOpeningHours {
+  id?: string;
+  dayOfWeek: number;
+  isOpen: boolean;
+  openAt?: string;
+  closeAt?: string;
+  updatedAt?: Date;
+}
+
+/** One-off closure (holiday, vacation, illness). Overrides the weekly
+ *  schedule — the shop is treated as closed on every date in
+ *  [startDate, endDate]. Single-day closures repeat the date. */
+export interface ShopClosure {
+  id?: string;
+  /** ISO date 'YYYY-MM-DD'. */
+  startDate: string;
+  /** ISO date 'YYYY-MM-DD'. */
+  endDate: string;
+  reason?: string;
+  createdAt?: Date;
 }

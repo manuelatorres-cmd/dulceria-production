@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -6023,5 +6023,109 @@ export function useProductActiveMinutesMap(): Map<string, number> {
     }
     return out;
   }, [products, moulds, categories, steps]);
+}
+
+// =====================================================================
+// Shop opening hours + closures
+// =====================================================================
+
+/** Seven rows, one per day-of-week. Migration 0033 seeds all seven, so
+ *  this always returns a full week (even if every day is isOpen=false). */
+export function useShopOpeningHours(): ShopOpeningHours[] {
+  const { data } = useQuery({
+    queryKey: ["shop-opening-hours"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("shopOpeningHours").select("*").order("dayOfWeek", { ascending: true }),
+      ) as ShopOpeningHours[];
+      return rows;
+    },
+  });
+  return data ?? [];
+}
+
+/** Upsert a single day's schedule. Matches on dayOfWeek so the UI can
+ *  flip isOpen + times without juggling row ids. */
+export async function saveShopOpeningHours(
+  row: Omit<ShopOpeningHours, "id" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const now = new Date();
+  if (row.id) {
+    const { error } = await supabase
+      .from("shopOpeningHours")
+      .update({ ...row, updatedAt: now })
+      .eq("id", row.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["shop-opening-hours"] });
+    return row.id;
+  }
+  // Fallback for a brand-new row (if the seed didn't run for some reason).
+  const id = newId();
+  const { error } = await supabase
+    .from("shopOpeningHours")
+    .insert({ ...row, id, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["shop-opening-hours"] });
+  return id;
+}
+
+export function useShopClosures(): ShopClosure[] {
+  const { data } = useQuery({
+    queryKey: ["shop-closures"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("shopClosures").select("*").order("startDate", { ascending: true }),
+      ) as ShopClosure[];
+      return rows;
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveShopClosure(
+  row: Omit<ShopClosure, "id" | "createdAt"> & { id?: string },
+): Promise<string> {
+  if (row.id) {
+    const { error } = await supabase
+      .from("shopClosures")
+      .update(row)
+      .eq("id", row.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["shop-closures"] });
+    return row.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("shopClosures")
+    .insert({ ...row, id, createdAt: new Date() });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["shop-closures"] });
+  return id;
+}
+
+export async function deleteShopClosure(id: string): Promise<void> {
+  const { error } = await supabase.from("shopClosures").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["shop-closures"] });
+}
+
+// =====================================================================
+// Per-product Store availability (un-allocated)
+// =====================================================================
+
+/** productId → pieces in Store that are *not* already allocated to an
+ *  order. Used by the borrow decision. "Allocated" rows carry an
+ *  orderId and are parked at location='allocated', so Store stock is
+ *  always un-allocated by definition — but we still subtract any
+ *  pending-borrow reservations the caller layers on top. */
+export function useProductStoreAvailable(): Map<string, number> {
+  const totals = useProductLocationTotals();
+  return useMemo(() => {
+    const out = new Map<string, number>();
+    for (const [productId, byLoc] of totals) {
+      out.set(productId, byLoc.store ?? 0);
+    }
+    return out;
+  }, [totals]);
 }
 
