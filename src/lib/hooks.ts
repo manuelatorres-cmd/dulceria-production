@@ -4159,6 +4159,12 @@ export async function saveOrder(order: Omit<Order, "createdAt" | "updatedAt">): 
       .eq("id", order.id);
     if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ["orders"] });
+    // When the order moves to cancelled, drop every allocation and its
+    // linked replenishment order. Done status keeps the allocation intact —
+    // those pieces have already left the Store on fulfilment.
+    if (order.status === "cancelled") {
+      await revertBorrowsForOrder(order.id);
+    }
     return order.id;
   }
   const id = newId();
@@ -4171,6 +4177,11 @@ export async function saveOrder(order: Omit<Order, "createdAt" | "updatedAt">): 
 }
 
 export async function deleteOrder(id: string): Promise<void> {
+  // Release any allocated-from-store stock and drop the linked
+  // replenishment order before the parent row goes. Without this, the
+  // borrowed pieces would stay locked in the allocated location with
+  // a dangling orderId.
+  await revertBorrowsForOrder(id);
   const { error } = await supabase.from("orders").delete().eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -4182,19 +4193,372 @@ export async function saveOrderItem(item: Omit<OrderItem, "id"> & { id?: string 
     const { error } = await supabase.from("orderItems").update(item).eq("id", item.id);
     if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ["order-items"] });
+    await onOrderItemChanged(item.orderId);
     return item.id;
   }
   const id = newId();
-  const { error } = await supabase.from("orderItems").insert({ ...item, id });
+  // Decide fulfilment for brand-new lines on B2B / online orders. Once a
+  // line exists and has a mode, the user has full control — we don't
+  // auto-flip it on subsequent edits.
+  const mode = item.fulfilmentMode ?? await decideAutoBorrowForNewLine(item);
+  const { error } = await supabase
+    .from("orderItems")
+    .insert({ ...item, id, fulfilmentMode: mode });
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  if (mode === "borrow") {
+    await allocateLineFromStore({ orderId: item.orderId, productId: item.productId, quantity: item.quantity });
+  }
+  await onOrderItemChanged(item.orderId);
   return id;
 }
 
 export async function deleteOrderItem(id: string): Promise<void> {
+  // Read the row first so we can release its allocation, if any.
+  const existing = assertOkMaybe(
+    await supabase.from("orderItems").select("*").eq("id", id).maybeSingle(),
+  ) as OrderItem | null;
   const { error } = await supabase.from("orderItems").delete().eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  if (existing?.fulfilmentMode === "borrow") {
+    await deallocateLineToStore({
+      orderId: existing.orderId,
+      productId: existing.productId,
+    });
+    await onOrderItemChanged(existing.orderId);
+  } else if (existing) {
+    await onOrderItemChanged(existing.orderId);
+  }
+}
+
+// =====================================================================
+// Borrow-from-Store engine
+// =====================================================================
+//
+// Public surface:
+//   - allocateLineFromStore / deallocateLineToStore  (low-level)
+//   - revertBorrowsForOrder                          (cancel / delete path)
+//   - syncReplenishmentOrder                         (keeps the child order
+//                                                     in sync with current
+//                                                     borrowed lines)
+//   - decideAutoBorrowForNewLine                     (used by saveOrderItem)
+//
+// The engine never silently re-evaluates an existing line's mode: once
+// a line is 'produce' or 'borrow', only the user (or revert) can change
+// it. This keeps saves predictable and stops the scheduler from
+// thrashing when the same order is edited repeatedly.
+
+async function decideAutoBorrowForNewLine(
+  item: Pick<OrderItem, "orderId" | "productId" | "quantity">,
+): Promise<"produce" | "borrow"> {
+  // Only auto-borrow for B2B / online parent orders. Replenishment
+  // orders (channel='shop' + sourceOrderId set) are skipped — we don't
+  // borrow against ourselves.
+  const order = assertOkMaybe(
+    await supabase.from("orders").select("*").eq("id", item.orderId).maybeSingle(),
+  ) as Order | null;
+  if (!order) return "produce";
+  if (order.channel !== "b2b" && order.channel !== "online") return "produce";
+
+  const [hours, closures, product, storeTotals] = await Promise.all([
+    supabase.from("shopOpeningHours").select("*"),
+    supabase.from("shopClosures").select("*"),
+    supabase.from("products").select("id, leadTimeDays").eq("id", item.productId).maybeSingle(),
+    computeStoreAvailableFor(item.productId),
+  ]);
+  const hoursRows = (hours.data ?? []) as ShopOpeningHours[];
+  const closureRows = (closures.data ?? []) as ShopClosure[];
+  const leadTimeDays = (product.data as { leadTimeDays?: number } | null)?.leadTimeDays ?? 1;
+
+  const { decideBorrowStrategy } = await import("@/lib/borrowDecision");
+  const decision = decideBorrowStrategy({
+    quantityRequested: item.quantity,
+    storeAvailable: storeTotals,
+    leadTimeDays,
+    now: new Date(),
+    hours: hoursRows,
+    closures: closureRows,
+  });
+  return decision.mode;
+}
+
+/** Un-allocated store pieces available *right now* for this product —
+ *  sum of all store stockLocations rows, minus any already-allocated
+ *  slots earmarked to other orders for the same product. */
+async function computeStoreAvailableFor(productId: string): Promise<number> {
+  const batches = assertOk(
+    await supabase.from("planProducts").select("id").eq("productId", productId),
+  ) as Array<{ id: string }>;
+  if (batches.length === 0) return 0;
+  const ids = batches.map((b) => b.id);
+  const rows = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("location, quantity, planProductId")
+      .in("planProductId", ids)
+      .eq("location", "store"),
+  ) as Array<{ quantity: number }>;
+  return rows.reduce((s, r) => s + (r.quantity ?? 0), 0);
+}
+
+async function allocateLineFromStore(args: {
+  orderId: string; productId: string; quantity: number;
+}): Promise<void> {
+  const moved = await moveProductStockFifo({
+    productId: args.productId,
+    fromLocation: "store",
+    toLocation: "allocated",
+    quantity: args.quantity,
+    orderId: args.orderId,
+    reason: "allocate",
+  });
+  const total = moved.reduce((s, m) => s + m.quantity, 0);
+  if (total < args.quantity) {
+    // Not enough — revert the partial move so we don't leave the order
+    // half-borrowed. Flip the line back to produce so the UI reflects
+    // reality instead of pretending the borrow worked.
+    for (const m of moved) {
+      await transferBatchStock({
+        planProductId: m.planProductId,
+        productId: args.productId,
+        fromLocation: "allocated",
+        toLocation: "store",
+        quantity: m.quantity,
+        orderId: args.orderId,
+        reason: "allocate",
+      });
+    }
+    await supabase
+      .from("orderItems")
+      .update({ fulfilmentMode: "produce" })
+      .eq("orderId", args.orderId)
+      .eq("productId", args.productId);
+    queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  }
+}
+
+async function deallocateLineToStore(args: {
+  orderId: string; productId: string;
+}): Promise<void> {
+  // Find all allocated rows for this order + product, move back to store.
+  const batches = assertOk(
+    await supabase.from("planProducts").select("id").eq("productId", args.productId),
+  ) as Array<{ id: string }>;
+  if (batches.length === 0) return;
+  const allocated = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("*")
+      .eq("orderId", args.orderId)
+      .eq("location", "allocated")
+      .in("planProductId", batches.map((b) => b.id)),
+  ) as StockLocationRow[];
+  for (const row of allocated) {
+    await transferBatchStock({
+      planProductId: row.planProductId,
+      productId: args.productId,
+      fromLocation: "allocated",
+      toLocation: "store",
+      quantity: row.quantity,
+      orderId: args.orderId,
+      reason: "allocate",
+    });
+  }
+}
+
+/** Hook called after any orderItem change. Keeps the linked Shop
+ *  Replenishment order (channel='shop' + sourceOrderId=parent) in sync
+ *  with the current set of borrowed lines. No-op for parent orders
+ *  that have no borrowed items. */
+async function onOrderItemChanged(orderId: string): Promise<void> {
+  const order = assertOkMaybe(
+    await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
+  ) as Order | null;
+  if (!order) return;
+  // A replenishment order is itself a 'shop' order with sourceOrderId set —
+  // we never recursively generate children for children.
+  if (order.channel === "shop" && order.sourceOrderId) return;
+  await syncReplenishmentOrder(orderId);
+}
+
+export async function syncReplenishmentOrder(parentOrderId: string): Promise<void> {
+  const parent = assertOkMaybe(
+    await supabase.from("orders").select("*").eq("id", parentOrderId).maybeSingle(),
+  ) as Order | null;
+  if (!parent) return;
+
+  const parentItems = assertOk(
+    await supabase.from("orderItems").select("*").eq("orderId", parentOrderId),
+  ) as OrderItem[];
+  const borrowedItems = parentItems.filter((i) => i.fulfilmentMode === "borrow");
+
+  const existing = assertOkMaybe(
+    await supabase
+      .from("orders")
+      .select("*")
+      .eq("sourceOrderId", parentOrderId)
+      .eq("channel", "shop")
+      .maybeSingle(),
+  ) as Order | null;
+
+  // Nothing to replenish — drop the child if it exists.
+  if (borrowedItems.length === 0) {
+    if (existing?.id) {
+      await deleteOrder(existing.id);
+    }
+    return;
+  }
+
+  // Target deadline = next shop opening from now. If the parent's own
+  // deadline is sooner we still aim for shop opening — the purpose of
+  // the replenishment is to refill the store before it reopens.
+  const [hoursRes, closuresRes] = await Promise.all([
+    supabase.from("shopOpeningHours").select("*"),
+    supabase.from("shopClosures").select("*"),
+  ]);
+  const hours = (hoursRes.data ?? []) as ShopOpeningHours[];
+  const closures = (closuresRes.data ?? []) as ShopClosure[];
+  const { nextShopOpeningDay } = await import("@/lib/shopHours");
+  const deadline = nextShopOpeningDay(hours, closures, new Date()) ?? new Date(parent.deadline);
+  // Shop opens that morning — aim to finish production the evening
+  // before. Set the deadline to 08:00 of the opening day.
+  deadline.setHours(8, 0, 0, 0);
+
+  let childId = existing?.id;
+  if (!childId) {
+    childId = newId();
+    const { error } = await supabase.from("orders").insert({
+      id: childId,
+      channel: "shop",
+      customerName: "Shop Replenishment",
+      deadline: deadline.toISOString(),
+      priority: parent.priority,
+      status: "pending",
+      notes: `Auto-created to restock Store after borrowing for order ${parentOrderId.slice(0, 8)}.`,
+      sourceOrderId: parentOrderId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    if (error) throw error;
+  } else {
+    // Keep deadline + priority fresh in case the parent changed.
+    await supabase
+      .from("orders")
+      .update({ deadline: deadline.toISOString(), priority: parent.priority, updatedAt: new Date() })
+      .eq("id", childId);
+  }
+
+  // Rebuild child orderItems to match the current borrowed set. Replace
+  // strategy — simpler and correct for small N — delete all child items,
+  // insert fresh ones with the computed replenishment quantity.
+  await supabase.from("orderItems").delete().eq("orderId", childId);
+
+  // Load minimums once for all borrowed products.
+  const productIds = borrowedItems.map((i) => i.productId);
+  const [minsRes, totals] = await Promise.all([
+    supabase
+      .from("stockLocationMinimums")
+      .select("*")
+      .in("productId", productIds)
+      .eq("location", "store"),
+    Promise.all(productIds.map((pid) => computeStoreAvailableFor(pid))),
+  ]);
+  const minsByProduct = new Map<string, StockLocationMinimum>();
+  for (const m of (minsRes.data ?? []) as StockLocationMinimum[]) {
+    minsByProduct.set(m.productId, m);
+  }
+  const storeByProduct = new Map<string, number>();
+  productIds.forEach((pid, idx) => storeByProduct.set(pid, totals[idx]));
+
+  const { computeReplenishmentQuantity } = await import("@/lib/borrowDecision");
+
+  let sortOrder = 0;
+  const inserts = borrowedItems.map((bi) => {
+    const mins = minsByProduct.get(bi.productId);
+    const qty = computeReplenishmentQuantity({
+      borrowedQuantity: bi.quantity,
+      currentStore: storeByProduct.get(bi.productId) ?? 0,
+      minimumUnits: mins?.minimumUnits ?? bi.quantity,
+      maximumUnits: mins?.maximumUnits,
+    });
+    return {
+      id: newId(),
+      orderId: childId,
+      productId: bi.productId,
+      quantity: qty,
+      sortOrder: sortOrder++,
+      fulfilmentMode: "produce" as const,
+      notes: `Replenish Store after borrowing ${bi.quantity} pc for order ${parentOrderId.slice(0, 8)}.`,
+    };
+  });
+  if (inserts.length > 0) {
+    const { error } = await supabase.from("orderItems").insert(inserts);
+    if (error) throw error;
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+}
+
+/** Cancel-path: release every Allocated piece this order holds and drop
+ *  its linked replenishment order. Called from deleteOrder and from the
+ *  status flip to 'cancelled'. Idempotent. */
+export async function revertBorrowsForOrder(orderId: string): Promise<void> {
+  // 1. Flip any borrowed orderItems back to produce first — so UI shows
+  //    the correct state even if the transfer step fails.
+  await supabase
+    .from("orderItems")
+    .update({ fulfilmentMode: "produce" })
+    .eq("orderId", orderId)
+    .eq("fulfilmentMode", "borrow");
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+
+  // 2. Move every 'allocated' row tagged with this orderId back to store.
+  const allocated = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("*")
+      .eq("orderId", orderId)
+      .eq("location", "allocated"),
+  ) as StockLocationRow[];
+  for (const row of allocated) {
+    // Need the productId for the movement log. Look up the batch.
+    const batch = assertOkMaybe(
+      await supabase
+        .from("planProducts")
+        .select("productId")
+        .eq("id", row.planProductId)
+        .maybeSingle(),
+    ) as { productId?: string } | null;
+    await transferBatchStock({
+      planProductId: row.planProductId,
+      productId: batch?.productId ?? "",
+      fromLocation: "allocated",
+      toLocation: "store",
+      quantity: row.quantity,
+      orderId,
+      reason: "allocate",
+      notes: "Reverted on order cancel/delete.",
+    });
+  }
+
+  // 3. Drop the linked replenishment order outright — its reason to
+  //    exist (the parent's demand) is gone.
+  const child = assertOkMaybe(
+    await supabase
+      .from("orders")
+      .select("id")
+      .eq("sourceOrderId", orderId)
+      .eq("channel", "shop")
+      .maybeSingle(),
+  ) as { id?: string } | null;
+  if (child?.id) {
+    await supabase.from("orderItems").delete().eq("orderId", child.id);
+    await supabase.from("orders").delete().eq("id", child.id);
+    queryClient.invalidateQueries({ queryKey: ["orders"] });
+    queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  }
 }
 
 // ---------------------------------------------------------------------------
