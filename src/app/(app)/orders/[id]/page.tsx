@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useMemo } from "react";
+import { use, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -338,7 +338,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   );
 }
 
-function AddOrderLine({ orderId, nextSortOrder, products, onSaved, onCancel }: {
+function AddOrderLine({ orderId, nextSortOrder, products, onCancel }: {
   orderId: string;
   nextSortOrder: number;
   products: { id?: string; name: string }[];
@@ -349,21 +349,42 @@ function AddOrderLine({ orderId, nextSortOrder, products, onSaved, onCancel }: {
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [addedCount, setAddedCount] = useState(0);
+  const productSelectRef = useRef<HTMLSelectElement>(null);
 
   const qty = parseInt(quantity, 10);
   const canSave = !!productId && !isNaN(qty) && qty > 0 && !saving;
 
   async function handleAdd() {
+    if (!canSave) return;
     setSaving(true);
+    setSaveError("");
     try {
       await saveOrderItem({
         orderId,
         productId,
+        // sortOrder bumps by 1 per add so multiple adds stay in the
+        // order the user entered them.
         quantity: qty,
-        sortOrder: nextSortOrder,
+        sortOrder: nextSortOrder + addedCount,
         notes: notes.trim() || undefined,
       });
-      onSaved();
+      // Reset the fields and keep the form open so the user can add
+      // the next line without re-clicking "Add product". Focus the
+      // product select so they can start typing the next product
+      // immediately.
+      setProductId("");
+      setQuantity("1");
+      setNotes("");
+      setAddedCount((n) => n + 1);
+      productSelectRef.current?.focus();
+    } catch (err) {
+      const raw: { message?: string; code?: string; details?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      const code = raw.code ? ` (code ${raw.code})` : "";
+      setSaveError(`${raw.message || raw.details || "Save failed"}${code}`);
+      console.error("saveOrderItem failed:", err);
     } finally {
       setSaving(false);
     }
@@ -373,7 +394,13 @@ function AddOrderLine({ orderId, nextSortOrder, products, onSaved, onCancel }: {
     <div className="rounded-lg border border-border bg-card p-3 space-y-2 mb-2">
       <div className="grid grid-cols-3 gap-2">
         <div className="col-span-2">
-          <select value={productId} onChange={(e) => setProductId(e.target.value)} className="input">
+          <select
+            ref={productSelectRef}
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
+            className="input"
+            autoFocus
+          >
             <option value="">— select product —</option>
             {products.filter((p) => p.id).map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
@@ -387,6 +414,15 @@ function AddOrderLine({ orderId, nextSortOrder, products, onSaved, onCancel }: {
             step="1"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter on the quantity field saves + advances. The user
+              // asked for this explicitly — "jump to next line" without
+              // having to click Add product again.
+              if (e.key === "Enter" && canSave) {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
             placeholder="Qty"
             className="input"
           />
@@ -396,17 +432,31 @@ function AddOrderLine({ orderId, nextSortOrder, products, onSaved, onCancel }: {
         type="text"
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && canSave) {
+            e.preventDefault();
+            handleAdd();
+          }
+        }}
         placeholder="Line notes (optional)"
         className="input"
       />
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <button onClick={handleAdd} disabled={!canSave} className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
           {saving ? "Adding…" : "Add"}
         </button>
         <button onClick={onCancel} className="rounded-full border border-border px-3 py-1 text-xs">
-          Cancel
+          Done
         </button>
+        {addedCount > 0 && (
+          <span className="text-[11px] text-muted-foreground">
+            {addedCount} line{addedCount === 1 ? "" : "s"} added
+          </span>
+        )}
       </div>
+      {saveError && (
+        <p className="text-xs text-status-alert">{saveError}</p>
+      )}
     </div>
   );
 }
