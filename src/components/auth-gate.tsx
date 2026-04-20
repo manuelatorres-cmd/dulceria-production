@@ -49,7 +49,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       <form onSubmit={onSubmit} className="max-w-sm w-full space-y-6">
         <div className="space-y-2 text-center">
           <h1 className="text-3xl text-primary" style={{ fontFamily: "var(--font-display)" }}>
-            Choc-collab
+            Dulceria
           </h1>
           <p className="text-sm text-muted-foreground">
             Sign in to continue.

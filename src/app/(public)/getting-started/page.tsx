@@ -124,12 +124,12 @@ const SECTIONS: Section[] = [
       <>
         <p className="sub">A one-minute orientation so you know what you&apos;re looking at.</p>
         <p>
-          I built Choc-collab because my own recipes lived everywhere — spreadsheets, notebooks, PDFs, a Google doc,
+          I built Dulceria because my own recipes lived everywhere — spreadsheets, notebooks, PDFs, a Google doc,
           the occasional cocoa butter splattered paper. Rescaling a ganache for a different mould was a guessing
           game. I never really knew what each bonbon cost me to make.
         </p>
         <p>
-          Choc-collab is an app that sits on your iPad, phone, or laptop
+          Dulceria is an app that sits on your iPad, phone, or laptop
           and keeps your entire workshop in one place: ingredients, fillings, products, production
           plans, stock, collections, and a little bit of business intelligence. Your data lives in your
           browser — no account, no server, no lock-in. If you want to sync across devices later, you
@@ -151,7 +151,7 @@ const SECTIONS: Section[] = [
     render: () => (
       <>
         <p className="sub">
-          Choc-collab can be used in two ways. Both give you the same features;
+          Dulceria can be used in two ways. Both give you the same features;
           the difference is who runs the server — and whether your data can sync
           across devices.
         </p>
@@ -178,7 +178,7 @@ const SECTIONS: Section[] = [
         <h3>Hosted (with Dexie Cloud sync)</h3>
         <p>
           If you opened the app at a public URL (e.g. a{" "}
-          <code>choc-collab</code> domain someone else is running) and were asked
+          <code>dulceria</code> domain someone else is running) and were asked
           for an email to sign in, you&apos;re on a hosted version. Data still
           lives primarily in your browser, but it&apos;s also synced to a personal
           Dexie Cloud database so it&apos;s available on every device you sign in
@@ -217,7 +217,7 @@ const SECTIONS: Section[] = [
     render: () => (
       <>
         <p className="sub">
-          Choc-collab is a Progressive Web App. Installing it gives you a real app icon, a full-screen
+          Dulceria is a Progressive Web App. Installing it gives you a real app icon, a full-screen
           view without the browser chrome, and offline support.
         </p>
         <h3>On an iPad or iPhone</h3>
@@ -241,7 +241,7 @@ const SECTIONS: Section[] = [
         <h3>On a Mac, Windows, or Linux desktop</h3>
         <p>
           In Chrome, Edge, or Brave, look for the little install icon at the right end of the address
-          bar, or use the browser menu&apos;s <strong>Install Choc-collab</strong>. Safari on macOS
+          bar, or use the browser menu&apos;s <strong>Install Dulceria</strong>. Safari on macOS
           14+ supports &ldquo;Add to Dock&rdquo; from the File menu.
         </p>
         <Callout kind="note" title="Why bother installing?">
@@ -704,7 +704,7 @@ const SECTIONS: Section[] = [
           If you want your workshop on both an iPad <em>and</em> a laptop, you can connect a
           personal Dexie Cloud database (their free tier covers a single chocolatier comfortably).
           It&apos;s not a one-click setting inside the app — sync is baked in at deploy time, so
-          you&apos;ll host your own copy of Choc-collab on Vercel with a Dexie Cloud URL plugged in.
+          you&apos;ll host your own copy of Dulceria on Vercel with a Dexie Cloud URL plugged in.
           Non-technical-friendly, takes about twenty minutes the first time.
         </p>
         <p>
@@ -728,7 +728,7 @@ const SECTIONS: Section[] = [
         <p className="sub">
           This section is for anyone who wants their data to sync across devices — iPad, laptop,
           phone — without a shared server run by me. You&apos;ll end up with your own copy of
-          Choc-collab, hosted on Vercel&apos;s free tier, syncing to your own Dexie Cloud database.
+          Dulceria, hosted on Vercel&apos;s free tier, syncing to your own Dexie Cloud database.
           Nothing here requires writing code. If you can copy-paste and click buttons, you can do
           this.
         </p>
@@ -829,7 +829,7 @@ const SECTIONS: Section[] = [
         </div>
 
         <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--color-border)" }}>
-          <h3 style={{ marginTop: 0 }}>Part C · Fork the Choc-collab repo on GitHub</h3>
+          <h3 style={{ marginTop: 0 }}>Part C · Fork the Dulceria repo on GitHub</h3>
           <p className="sub" style={{ marginBottom: 10 }}>
             <em>Goal: get your own copy of the project so Vercel has something to deploy.</em>
           </p>
@@ -840,8 +840,8 @@ const SECTIONS: Section[] = [
           <ol>
             <li>
               Go to{" "}
-              <a href="https://github.com/choc-collab/app" target="_blank" rel="noreferrer">
-                github.com/choc-collab/app
+              <a href="https://github.com/manuelatorres-cmd/dulceria-production" target="_blank" rel="noreferrer">
+                github.com/manuelatorres-cmd/dulceria-production
               </a>
               .
             </li>
@@ -926,7 +926,7 @@ const SECTIONS: Section[] = [
             <em>Goal: when I ship a fix, your deploy updates itself. No code, just a file paste.</em>
           </p>
           <p>
-            I push updates to the main Choc-collab repo, not to your fork. A tiny GitHub Actions
+            I push updates to the main Dulceria repo, not to your fork. A tiny GitHub Actions
             workflow can pull those updates into your fork nightly, and Vercel redeploys
             automatically.
           </p>
@@ -962,7 +962,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote add upstream https://github.com/choc-collab/app.git
+          git remote add upstream https://github.com/manuelatorres-cmd/dulceria-production.git
           git fetch upstream
           git checkout main
           git merge upstream/main --ff-only
@@ -1105,7 +1105,7 @@ jobs:
           <summary>Can anyone see my recipes or business data — including you?</summary>
           <p>
             <strong>No — and in the default setup, it&apos;s not a question of trust, it&apos;s
-            architectural.</strong> Choc-collab has no server I run. There is no admin panel,
+            architectural.</strong> Dulceria has no server I run. There is no admin panel,
             no &ldquo;all users&rdquo; dashboard on my end, no database on my laptop with your
             recipes in it. I literally cannot see your data because there&apos;s nowhere for me
             to see it from.
@@ -1130,8 +1130,8 @@ jobs:
           </ul>
           <p>
             You can verify all of this yourself: the app is open source at{" "}
-            <a href="https://github.com/choc-collab/app" target="_blank" rel="noreferrer">
-              github.com/choc-collab/app
+            <a href="https://github.com/manuelatorres-cmd/dulceria-production" target="_blank" rel="noreferrer">
+              github.com/manuelatorres-cmd/dulceria-production
             </a>
             . There&apos;s no hidden telemetry, no analytics beaconing back to me, no
             phone-home. If you ever catch me adding any, open an issue and shame me loudly.
@@ -1140,7 +1140,7 @@ jobs:
         <details>
           <summary>Is this built for a team, or just for one chocolatier?</summary>
           <p>
-            <strong>Just for one.</strong> Choc-collab is designed top-to-bottom for a single
+            <strong>Just for one.</strong> Dulceria is designed top-to-bottom for a single
             chocolatier running their own workshop. There&apos;s no concept of a shared workshop,
             shared pantry, or team workspace inside the app — by design.
           </p>
@@ -1234,7 +1234,7 @@ jobs:
             <a href="https://www.instagram.com/l.artisan.chocolates" target="_blank" rel="noreferrer">
               @l.artisan.chocolates
             </a>
-            {" "}on Instagram. Choc-collab started as my own tool — the thing I kept wishing existed at an affordable price
+            {" "}on Instagram. Dulceria started as my own tool — the thing I kept wishing existed at an affordable price
             while juggling spreadsheets, a notebook, and a recipe Google doc in the middle of a
             tempering session. Once it was usable, it felt wrong to keep it to myself, so here it
             is. If you want to see what I&apos;m making with it, the Instagram is the best window.
@@ -1266,8 +1266,8 @@ jobs:
           <ul>
             <li>
               <strong>Code.</strong> Bug fixes, features, polish — pull requests welcome at{" "}
-              <a href="https://github.com/choc-collab/app" target="_blank" rel="noreferrer">
-                github.com/choc-collab/app
+              <a href="https://github.com/manuelatorres-cmd/dulceria-production" target="_blank" rel="noreferrer">
+                github.com/manuelatorres-cmd/dulceria-production
               </a>
               . Open an issue first for anything non-trivial so we can talk through scope.
             </li>
@@ -1292,16 +1292,16 @@ jobs:
           </ul>
           <p>
             Easiest starting point for any of the above: open an issue describing what you want to
-            contribute, or email <code>choccollab@proton.me</code>.
+            contribute, or email <code>manuela.torres@dulceria-gmbh.com</code>.
           </p>
         </details>
         <details>
           <summary>I want a feature / I found a bug.</summary>
           <p>
-            <a href="https://github.com/choc-collab/app/issues" target="_blank" rel="noreferrer">
+            <a href="https://github.com/manuelatorres-cmd/dulceria-production/issues" target="_blank" rel="noreferrer">
               Open an issue on the repo
             </a>
-            , or email me at <code>choccollab@proton.me</code>. I read every message. Be specific —
+            , or email me at <code>manuela.torres@dulceria-gmbh.com</code>. I read every message. Be specific —
             screenshots help.
           </p>
         </details>
@@ -1376,7 +1376,7 @@ export default function GettingStartedPage() {
         <div className="kicker">Help · getting started · reference</div>
         <h1>Find what you need, jump straight in.</h1>
         <p className="lede">
-          Everything you need to know about Choc-collab, organised by what you&apos;re trying to do.
+          Everything you need to know about Dulceria, organised by what you&apos;re trying to do.
           Each card opens the full guide — read it in order your first time, then come back to
           whichever section you need next.
         </p>

@@ -252,7 +252,7 @@ function BackupTab({
       <section className="space-y-1">
         <h2 className="text-sm font-semibold text-primary">About</h2>
         <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-1">
-          <p className="text-sm font-medium">Choc-collab{isCloudConfigured ? "" : " — local only"}</p>
+          <p className="text-sm font-medium">Dulceria{isCloudConfigured ? "" : " — local only"}</p>
           {isCloudConfigured ? (
             <>
               <p className="text-xs text-muted-foreground">Chocolatier toolkit, synced via Supabase.</p>

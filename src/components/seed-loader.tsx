@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Historically bootstrapped a fresh browser with ChocCollab's default product /
+ * Historically bootstrapped a fresh browser with the upstream app's default product /
  * filling / ingredient / decoration / shell-design categories. Intentionally
  * empty now: under the "no seed data" rule (2026-04-19) the app ships empty.
  * Users populate their own categories via Settings → Import backup, or by

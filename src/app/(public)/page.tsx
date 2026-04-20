@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Choc-collab — Make chocolate. Not spreadsheets.",
+  title: "Dulceria — Fine vegan chocolates",
   description:
-    "A local-first, open-source PWA for artisan chocolatiers. Ingredients, fillings, products, production, stock, and margins — all in one place.",
+    "Dulceria — fine vegan chocolates production planning.",
 };
 
 export default function LandingPage() {
@@ -23,11 +23,10 @@ export default function LandingPage() {
           Not spreadsheets.
         </h1>
         <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl">
-          Choc-collab sits on your iPad, phone, or laptop and keeps your entire
+          Dulceria sits on your iPad, phone, or laptop and keeps your entire
           chocolate workshop in one place: ingredients, fillings, products,
           production plans, stock, collections, and a little bit of business
-          intelligence. Your data lives in your browser — no account, no
-          server, no lock-in.
+          intelligence.
         </p>
       </section>
 
@@ -120,7 +119,7 @@ export default function LandingPage() {
         </Link>
 
         <a
-          href="https://github.com/choc-collab/app"
+          href="https://github.com/manuelatorres-cmd/dulceria-production"
           target="_blank"
           rel="noreferrer"
           className="group flex flex-col justify-between bg-card border border-border rounded-lg p-6 min-h-[220px] transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-offset-2"

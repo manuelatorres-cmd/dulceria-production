@@ -176,8 +176,8 @@ export function SideNav() {
         title="Home"
         className="flex items-center gap-2 px-2 py-3 shrink-0 rounded-lg hover:bg-muted/60 transition-colors"
       >
-        <img src="/logo.png" alt="Choc-collab — home" className="w-9 h-9 shrink-0 rounded object-contain" />
-        <span className={`${labelClass} text-sm font-semibold text-foreground truncate`}>Choc-collab</span>
+        <img src="/logo.png" alt="Dulceria — home" className="w-9 h-9 shrink-0 rounded object-contain" />
+        <span className={`${labelClass} text-sm font-semibold text-foreground truncate`}>Dulceria</span>
       </Link>
 
       {/* Floating collapse toggle — half-overhangs the nav's right edge.

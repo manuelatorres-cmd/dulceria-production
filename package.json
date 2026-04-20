@@ -1,12 +1,12 @@
 {
-  "name": "choc-collab",
+  "name": "dulceria",
   "version": "0.1.0",
-  "description": "A chocolatier's toolkit — manage products, fillings, ingredients, moulds, and production plans. Local-first, runs entirely in the browser.",
-  "author": "Choc-collab contributors",
+  "description": "Dulceria — fine vegan chocolates production planning.",
+  "author": "Dulceria GmbH",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/choc-collab/choc-collab.git"
+    "url": "https://github.com/manuelatorres-cmd/dulceria-production.git"
   },
   "keywords": [
     "chocolatier",
@@ -14,10 +14,8 @@
     "production",
     "recipe-management",
     "ganache",
-    "local-first",
-    "pwa",
     "nextjs",
-    "indexeddb"
+    "supabase"
   ],
   "scripts": {
     "dev": "next dev",

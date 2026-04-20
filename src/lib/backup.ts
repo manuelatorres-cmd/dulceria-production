@@ -138,7 +138,7 @@ export async function exportBackup(): Promise<void> {
   const date = new Date().toISOString().slice(0, 10);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `choc-collab-backup-${date}.json`;
+  a.download = `dulceria-backup-${date}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

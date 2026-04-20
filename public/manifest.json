@@ -1,7 +1,7 @@
 {
-  "name": "Choc-collab",
-  "short_name": "choc-collab",
-  "description": "The all in open source app for artisan chocolatiers.",
+  "name": "Dulceria",
+  "short_name": "Dulceria",
+  "description": "Dulceria — fine vegan chocolates production planning.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

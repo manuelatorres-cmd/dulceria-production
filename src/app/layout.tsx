@@ -13,11 +13,11 @@ const inter = Inter({
   display: "swap",
 });
 
-const appTitle = "Choc-collab";
+const appTitle = "Dulceria";
 
 export const metadata: Metadata = {
   title: appTitle,
-  description: "The all in open source app for artisan chocolatiers.",
+  description: "Dulceria — fine vegan chocolates production planning.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

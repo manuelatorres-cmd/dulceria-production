@@ -14,7 +14,7 @@ export default function MarketingLayout({
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center gap-4">
           <Link href="/" className="flex items-center gap-2 text-foreground hover:opacity-80 transition-opacity">
             <img src="/logo.png" alt="" className="w-7 h-7 rounded object-contain" />
-            <span className="text-sm font-semibold tracking-tight">Choc-collab</span>
+            <span className="text-sm font-semibold tracking-tight">Dulceria</span>
           </Link>
           <nav className="ml-auto flex items-center gap-1 text-sm">
             <Link
@@ -35,7 +35,7 @@ export default function MarketingLayout({
       <main className="flex-1">{children}</main>
       <footer className="border-t border-border mt-16">
         <div className="max-w-5xl mx-auto px-6 py-8 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-          <div>Choc-collab · MIT licensed · <a href="https://github.com/choc-collab" className="hover:text-foreground">https://github.com/choc-collab</a></div>
+          <div>Dulceria · Fine vegan chocolates · Lilienbrunngasse 5/1A, 1020 Wien</div>
           <div>Made with ❤️ for you. The world needs more kindness (and more chocolate!)</div>
         </div>
       </footer>
