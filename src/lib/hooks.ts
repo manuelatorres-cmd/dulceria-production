@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -4229,6 +4229,13 @@ export async function saveOrder(order: Omit<Order, "createdAt" | "updatedAt">): 
     return out;
   };
   if (order.id) {
+    // Read the previous status so we can detect a transition (avoids
+    // re-draining if the user re-saves an already-done order).
+    const previous = assertOkMaybe(
+      await supabase.from("orders").select("status").eq("id", order.id).maybeSingle(),
+    ) as { status?: OrderStatus } | null;
+    const prevStatus = previous?.status;
+
     const { error } = await supabase
       .from("orders")
       .update(stripUndef({ ...order, updatedAt: now }))
@@ -4236,10 +4243,15 @@ export async function saveOrder(order: Omit<Order, "createdAt" | "updatedAt">): 
     if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ["orders"] });
     // When the order moves to cancelled, drop every allocation and its
-    // linked replenishment order. Done status keeps the allocation intact —
-    // those pieces have already left the Store on fulfilment.
+    // linked replenishment order.
     if (order.status === "cancelled") {
       await revertBorrowsForOrder(order.id);
+    }
+    // When the order ships / is marked done, the Allocated pieces
+    // have physically left the Store — drain them permanently so the
+    // 4-location dashboard and the shop-stock view reflect reality.
+    if (order.status === "done" && prevStatus !== "done") {
+      await drainAllocatedForOrder(order.id);
     }
     return order.id;
   }
@@ -4452,10 +4464,147 @@ async function onOrderItemChanged(orderId: string): Promise<void> {
     await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
   ) as Order | null;
   if (!order) return;
+  // Every order (parent or replenishment) with produce-fresh lines gets
+  // an auto-batch on the production board. Keeps /production in sync
+  // without the user clicking + every time.
+  await syncProductionBatchForOrder(orderId);
   // A replenishment order is itself a 'shop' order with sourceOrderId set —
   // we never recursively generate children for children.
   if (order.channel === "shop" && order.sourceOrderId) return;
   await syncReplenishmentOrder(orderId);
+}
+
+/** Keep a single auto-batch in sync with an order's produce-fresh lines.
+ *
+ *  - Identifies the auto-batch by productionPlans.sourceOrderId = orderId.
+ *  - Consolidates line items by productId (sums quantities).
+ *  - Creates the batch if missing and produce-fresh lines exist.
+ *  - Rebuilds planProducts to match the current set (replace strategy).
+ *  - Drops the batch entirely when no produce-fresh lines remain.
+ *
+ *  Only orders that have status 'pending' or 'in_production' get a
+ *  batch — done + cancelled orders leave the board as-is so historical
+ *  views stay stable. */
+export async function syncProductionBatchForOrder(orderId: string): Promise<void> {
+  const order = assertOkMaybe(
+    await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
+  ) as Order | null;
+  if (!order) return;
+
+  const existing = assertOkMaybe(
+    await supabase
+      .from("productionPlans")
+      .select("*")
+      .eq("sourceOrderId", orderId)
+      .maybeSingle(),
+  ) as ProductionPlan | null;
+
+  // Closed orders: leave their batch alone so the History view remains
+  // an accurate record of what shipped.
+  if (order.status === "done" || order.status === "cancelled") {
+    return;
+  }
+
+  const items = assertOk(
+    await supabase.from("orderItems").select("*").eq("orderId", orderId),
+  ) as OrderItem[];
+  const produceItems = items.filter((i) => (i.fulfilmentMode ?? "produce") === "produce");
+
+  // No produce lines left → drop the batch if one existed.
+  if (produceItems.length === 0) {
+    if (existing?.id) {
+      await supabase.from("planProducts").delete().eq("planId", existing.id);
+      await supabase.from("productionPlans").delete().eq("id", existing.id);
+      queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["plan-products"] });
+    }
+    return;
+  }
+
+  // Consolidate by product: sum pieces across lines, keep one entry per product.
+  const piecesByProduct = new Map<string, number>();
+  for (const it of produceItems) {
+    piecesByProduct.set(it.productId, (piecesByProduct.get(it.productId) ?? 0) + it.quantity);
+  }
+
+  // Look up each product's mould + cavity count so we can convert
+  // "ordered pieces" into "number of mould fills".
+  const productIds = [...piecesByProduct.keys()];
+  const products = assertOk(
+    await supabase
+      .from("products")
+      .select("id, defaultMouldId, defaultBatchQty")
+      .in("id", productIds),
+  ) as Array<{ id: string; defaultMouldId?: string; defaultBatchQty?: number }>;
+  const productById = new Map(products.map((p) => [p.id, p]));
+
+  const mouldIds = products.map((p) => p.defaultMouldId).filter((x): x is string => !!x);
+  const moulds = mouldIds.length > 0
+    ? assertOk(
+        await supabase.from("moulds").select("id, numberOfCavities").in("id", mouldIds),
+      ) as Array<{ id: string; numberOfCavities: number }>
+    : [];
+  const mouldById = new Map(moulds.map((m) => [m.id, m]));
+
+  const now = new Date();
+  // Create the batch if missing.
+  let planId = existing?.id;
+  const batchName = `Order: ${order.customerName || order.eventName || orderId.slice(0, 8)}`;
+  if (!planId) {
+    planId = newId();
+    const { error } = await supabase.from("productionPlans").insert({
+      id: planId,
+      name: batchName,
+      status: "draft",
+      sourceOrderId: orderId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (error) throw error;
+  } else if (existing && existing.name !== batchName) {
+    // Keep the batch name aligned with the current customer/event.
+    await supabase
+      .from("productionPlans")
+      .update({ name: batchName, updatedAt: now })
+      .eq("id", planId);
+  }
+
+  // Replace strategy: delete existing planProducts then insert the new
+  // consolidated set. Correct for small N and avoids diff juggling.
+  await supabase.from("planProducts").delete().eq("planId", planId);
+
+  const rows: Array<Record<string, unknown>> = [];
+  let sortOrder = 0;
+  for (const [productId, pieces] of piecesByProduct) {
+    const product = productById.get(productId);
+    const mould = product?.defaultMouldId ? mouldById.get(product.defaultMouldId) : undefined;
+    const cavities = mould?.numberOfCavities ?? 0;
+    // Number of mould fills to make `pieces` pieces. Falls back to
+    // `pieces` when cavities is unknown (single-piece products).
+    const fills = cavities > 0 ? Math.ceil(pieces / cavities) : pieces;
+    rows.push({
+      id: newId(),
+      planId,
+      productId,
+      mouldId: product?.defaultMouldId ?? "",
+      quantity: fills,
+      sortOrder: sortOrder++,
+      notes: cavities > 0
+        ? `${pieces} pc requested · ${cavities} cavities × ${fills} fill${fills === 1 ? "" : "s"}`
+        : `${pieces} pc requested`,
+    });
+  }
+  // Drop rows that have no mould configured — planProducts.mouldId is
+  // not-null. Warn the user by leaving them out of the batch; the /plan
+  // page's warnings list surfaces the gap already.
+  const insertable = rows.filter((r) => !!r.mouldId);
+  if (insertable.length > 0) {
+    const { error } = await supabase.from("planProducts").insert(insertable);
+    if (error) throw error;
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+  queryClient.invalidateQueries({ queryKey: ["plan-products"] });
 }
 
 export async function syncReplenishmentOrder(parentOrderId: string): Promise<void> {
@@ -4575,6 +4724,44 @@ export async function syncReplenishmentOrder(parentOrderId: string): Promise<voi
 
   queryClient.invalidateQueries({ queryKey: ["orders"] });
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
+}
+
+/** Done / delivered path: the order's Allocated pieces have physically
+ *  left the shop. Drain every Allocated stockLocations row tagged with
+ *  this orderId (outake — no destination; logs the movement as 'sold').
+ *  Called from saveOrder when status transitions to 'done'. Idempotent —
+ *  safe to call on an order that has no allocated rows. */
+export async function drainAllocatedForOrder(orderId: string): Promise<void> {
+  const allocated = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("*")
+      .eq("orderId", orderId)
+      .eq("location", "allocated"),
+  ) as StockLocationRow[];
+  if (allocated.length === 0) return;
+
+  for (const row of allocated) {
+    // productId for the movement log — look up the batch.
+    const batch = assertOkMaybe(
+      await supabase
+        .from("planProducts")
+        .select("productId")
+        .eq("id", row.planProductId)
+        .maybeSingle(),
+    ) as { productId?: string } | null;
+    await outakeBatchStock({
+      planProductId: row.planProductId,
+      productId: batch?.productId ?? "",
+      fromLocation: "allocated",
+      quantity: row.quantity,
+      orderId,
+      reason: "sold",
+      notes: "Order marked done — allocated stock shipped.",
+    });
+  }
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
 }
 
 /** Cancel-path: release every Allocated piece this order holds and drop

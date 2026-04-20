@@ -346,6 +346,9 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        {/* Today's production steps — scheduled runs for today */}
+        <TodaysProductionSection schedule={schedule} productMap={productMap} orders={orders} />
+
         {/* Close Production summary */}
         {closeSummary && (
           <section className="rounded-lg border border-status-ok-edge bg-status-ok-bg p-3 text-sm">
@@ -733,4 +736,72 @@ function toIsoDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+// ─── Today's production ─────────────────────────────────────────
+
+function TodaysProductionSection({
+  schedule, productMap, orders,
+}: {
+  schedule: ProductionScheduleEntry[];
+  productMap: Map<string, import("@/types").Product>;
+  orders: ReturnType<typeof useOrders>;
+}) {
+  const todayIso = toIsoDate(new Date());
+  const todays = useMemo(() => schedule
+    .filter((s) => s.startAt.slice(0, 10) === todayIso)
+    .sort((a, b) => a.startAt.localeCompare(b.startAt)),
+    [schedule, todayIso]);
+  const orderById = useMemo(() => new Map(orders.map((o) => [o.id!, o])), [orders]);
+  if (todays.length === 0) return null;
+
+  const totalMin = todays.filter((e) => e.isActive).reduce((a, e) => a + e.durationMinutes, 0);
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
+          <Clock className="w-4 h-4" /> Today&apos;s production
+        </h2>
+        <span className="text-[11px] text-muted-foreground tabular-nums">
+          {todays.length} step{todays.length === 1 ? "" : "s"} · {Math.round(totalMin / 6) / 10}h active
+        </span>
+      </div>
+      <ul className="divide-y divide-border">
+        {todays.map((e) => {
+          const order = e.orderId ? orderById.get(e.orderId) : undefined;
+          const doneStyle = e.status === "done" ? "opacity-60 line-through" : "";
+          return (
+            <li key={e.id} className="flex items-center gap-3 px-1 py-1.5 text-sm">
+              <span className="tabular-nums text-muted-foreground w-11 shrink-0">
+                {e.startAt.slice(11, 16)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className={`truncate ${doneStyle}`}>
+                  <span className="font-medium">{productMap.get(e.productId)?.name ?? e.productId}</span>
+                  <span className="text-muted-foreground"> · {e.phase}</span>
+                </p>
+                {order && (
+                  <Link
+                    href={`/orders/${encodeURIComponent(order.id!)}`}
+                    className="text-[11px] text-primary hover:underline truncate inline-block max-w-full"
+                  >
+                    {order.customerName || order.eventName || "Order"}
+                  </Link>
+                )}
+              </div>
+              <span className="tabular-nums text-xs text-muted-foreground shrink-0">
+                {e.durationMinutes}m
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="pt-1 text-right">
+        <Link href="/production" className="text-[11px] text-primary hover:underline">
+          Full schedule →
+        </Link>
+      </div>
+    </section>
+  );
 }

@@ -1184,7 +1184,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice }: {
             disabled={switchingMode}
             className="text-[11px] text-muted-foreground hover:text-foreground hover:underline mt-0.5 disabled:opacity-50"
           >
-            {switchingMode ? "Switching…" : isBorrow ? "Produce fresh instead" : "Fulfil from Store stock"}
+            {switchingMode ? "Switching…" : isBorrow ? "Produce fresh" : "Use from stock"}
           </button>
         </div>
 

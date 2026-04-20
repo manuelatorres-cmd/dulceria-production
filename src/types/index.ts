@@ -423,6 +423,11 @@ export interface ProductionPlan {
   fillingPreviousBatches?: string;
   // Plain-text snapshot generated when the batch is marked done — used for recall tracing
   batchSummary?: string;
+  /** Source order whose produce-fresh lines drove the creation of this
+   *  batch. Null on manually-created batches; set on auto-created ones
+   *  so the sync layer can find and rebuild them. ON DELETE CASCADE
+   *  at the DB layer — when the order disappears, the batch does too. */
+  sourceOrderId?: string;
 }
 
 /** @deprecated Shelf-stability is now a per-category flag stored on `fillingCategories.shelfStable`.
