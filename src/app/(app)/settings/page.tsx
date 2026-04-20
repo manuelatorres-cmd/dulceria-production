@@ -1926,11 +1926,20 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
       // unique (productType, name) constraint that's easy to trip when
       // re-adding a previously-used step name — without this message the
       // save button looks like it's just ignoring the click.
-      const message = err instanceof Error ? err.message : "Save failed";
-      const pretty = /duplicate|unique/i.test(message)
+      //
+      // Supabase throws PostgrestError as a plain object, not an Error
+      // instance, so `instanceof Error` misses it and we fall back to
+      // reading the shape directly: { message, code, details, hint }.
+      const raw: { message?: string; code?: string; details?: string; hint?: string } =
+        err instanceof Error ? { message: err.message } : (err as Record<string, string>) ?? {};
+      const core = raw.message || raw.details || "Save failed — check the browser console for details";
+      const code = raw.code ? ` (code ${raw.code})` : "";
+      const pretty = raw.code === "23505" || /duplicate|unique/i.test(core)
         ? `A step called "${name.trim()}" already exists for ${productType}.`
-        : message;
+        : `${core}${code}`;
       setSaveError(pretty);
+      // Log the full payload so we can diagnose if the UI message isn't enough.
+      console.error("saveProductionStep failed:", err);
     } finally {
       setSaving(false);
     }
