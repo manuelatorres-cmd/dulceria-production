@@ -125,6 +125,25 @@ export default function DashboardPage() {
   const [closeSummary, setCloseSummary] = useState<CloseProductionSummary | null>(null);
   const [busyDayAction, setBusyDayAction] = useState<"opening" | "closing" | null>(null);
 
+  // Dismiss the production-day prompt for the current local day. The
+  // banner reappears tomorrow on reload — it's a daily nudge, not a
+  // hard dependency.
+  const productionBannerKey = `dashboard:productionDay:dismissed:${todayIso}`;
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(productionBannerKey) === "1";
+  });
+  function dismissBanner() {
+    if (typeof window !== "undefined") window.localStorage.setItem(productionBannerKey, "1");
+    setBannerDismissed(true);
+  }
+  // Show the banner only when there's something actionable: an open
+  // day's pending temp log, or (no day yet AND user has temp-check
+  // equipment to log) — otherwise the prompt is noise.
+  const hasActionableProductionState = (todayDay && !todayDay.closedAt && tempCheckDevices.length > 0 && !todayDay.tempLogComplete)
+    || (!todayDay && tempCheckDevices.length > 0);
+  const showProductionBanner = hasActionableProductionState && !bannerDismissed;
+
   async function handleOpenProduction() {
     setBusyDayAction("opening");
     try {
@@ -286,65 +305,77 @@ export default function DashboardPage() {
       <PageHeader title="Dashboard" description={new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} />
 
       <div className="px-4 pb-8 space-y-6">
-        {/* Production day controls */}
-        <section className="rounded-lg border border-border bg-card p-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className={`w-2 h-2 rounded-full ${
-              !todayDay
-                ? "bg-muted-foreground"
-                : todayDay.closedAt
+        {/* Production day controls — shown only when there's something
+            HACCP-actionable (open day with pending temp log, or no day
+            yet and the user actually has temp-check equipment). The
+            user can also dismiss for the rest of today. */}
+        {showProductionBanner && (
+          <section className="rounded-lg border border-border bg-card p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className={`w-2 h-2 rounded-full ${
+                !todayDay
                   ? "bg-muted-foreground"
-                  : "bg-status-ok"
-            }`} />
-            <div>
-              <p className="text-sm font-semibold">
-                {!todayDay
-                  ? "Production day not opened"
                   : todayDay.closedAt
-                    ? "Production closed for today"
-                    : "Production open"}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {todayDay?.tempLogComplete
-                  ? "Temperature log complete for today"
-                  : tempCheckDevices.length > 0
-                    ? `${tempCheckDevices.length} device${tempCheckDevices.length === 1 ? "" : "s"} pending check`
-                    : "No equipment tagged for HACCP tracking"}
-              </p>
+                    ? "bg-muted-foreground"
+                    : "bg-status-ok"
+              }`} />
+              <div>
+                <p className="text-sm font-semibold">
+                  {!todayDay
+                    ? "Production day not opened"
+                    : "Temperatures pending"}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {tempCheckDevices.length} device{tempCheckDevices.length === 1 ? "" : "s"} need a check today
+                </p>
+              </div>
             </div>
+            <div className="flex items-center gap-2">
+              {todayDay && !todayDay.closedAt && (
+                <button
+                  onClick={async () => {
+                    setPreviousReadings(await yesterdayTemperatureReadings());
+                    setTempModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-status-warn-edge bg-status-warn-bg text-status-warn px-3 py-1.5 text-xs font-medium"
+                >
+                  <Thermometer className="w-3.5 h-3.5" /> Log temperatures
+                </button>
+              )}
+              {!todayDay && (
+                <button
+                  onClick={handleOpenProduction}
+                  disabled={busyDayAction === "opening"}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                >
+                  <Play className="w-3.5 h-3.5" /> Open production
+                </button>
+              )}
+              <button
+                onClick={dismissBanner}
+                className="text-muted-foreground hover:text-foreground p-1"
+                title="Hide for today"
+                aria-label="Hide for today"
+              >
+                ×
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Compact close-production control — surfaced inline when
+            production is open but the banner is hidden / not actionable. */}
+        {todayDay && !todayDay.closedAt && !showProductionBanner && (
+          <div className="flex justify-end">
+            <button
+              onClick={handleCloseProduction}
+              disabled={busyDayAction === "closing"}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary disabled:opacity-50"
+            >
+              <Square className="w-3 h-3" /> Close production day
+            </button>
           </div>
-          <div className="flex items-center gap-2">
-            {todayDay && !todayDay.closedAt && tempCheckDevices.length > 0 && !todayDay.tempLogComplete && (
-              <button
-                onClick={async () => {
-                  setPreviousReadings(await yesterdayTemperatureReadings());
-                  setTempModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1 rounded-full border border-status-warn-edge bg-status-warn-bg text-status-warn px-3 py-1.5 text-xs font-medium"
-              >
-                <Thermometer className="w-3.5 h-3.5" /> Log temperatures
-              </button>
-            )}
-            {!todayDay && (
-              <button
-                onClick={handleOpenProduction}
-                disabled={busyDayAction === "opening"}
-                className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-              >
-                <Play className="w-3.5 h-3.5" /> Open production
-              </button>
-            )}
-            {todayDay && !todayDay.closedAt && (
-              <button
-                onClick={handleCloseProduction}
-                disabled={busyDayAction === "closing"}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary disabled:opacity-50"
-              >
-                <Square className="w-3.5 h-3.5" /> Close production
-              </button>
-            )}
-          </div>
-        </section>
+        )}
 
         {/* Today's production steps — scheduled runs for today */}
         <TodaysProductionSection schedule={schedule} productMap={productMap} orders={orders} />
@@ -747,12 +778,34 @@ function TodaysProductionSection({
   productMap: Map<string, import("@/types").Product>;
   orders: ReturnType<typeof useOrders>;
 }) {
-  const todayIso = toIsoDate(new Date());
-  const todays = useMemo(() => schedule
-    .filter((s) => s.startAt.slice(0, 10) === todayIso)
-    .sort((a, b) => a.startAt.localeCompare(b.startAt)),
-    [schedule, todayIso]);
+  // "Today" must be the local-time day, not the UTC day. Reading
+  // startAt.slice(0,10) on an ISO string gives UTC; we'd silently miss
+  // entries whose local day differs from UTC (e.g., late-evening CEST).
+  const todays = useMemo(() => {
+    const todayLocal = localIsoDate(new Date());
+    return schedule
+      .filter((s) => localIsoDate(new Date(s.startAt)) === todayLocal)
+      .sort((a, b) => a.startAt.localeCompare(b.startAt));
+  }, [schedule]);
+
   const orderById = useMemo(() => new Map(orders.map((o) => [o.id!, o])), [orders]);
+
+  // Collapse rows that share the same start-time + step name into one
+  // line. The mould-wave scheduler emits one row per (product, slot)
+  // running concurrently — without grouping the user sees four
+  // identical "06:00 Praline X · Cap" lines instead of one
+  // "08:00 Cap · 4 products · 60m".
+  const groups = useMemo(() => {
+    const m = new Map<string, ProductionScheduleEntry[]>();
+    for (const e of todays) {
+      const key = `${e.startAt}|${e.phase}|${e.orderId ?? ""}`;
+      const arr = m.get(key) ?? [];
+      arr.push(e);
+      m.set(key, arr);
+    }
+    return [...m.values()].sort((a, b) => a[0].startAt.localeCompare(b[0].startAt));
+  }, [todays]);
+
   if (todays.length === 0) return null;
 
   const totalMin = todays.filter((e) => e.isActive).reduce((a, e) => a + e.durationMinutes, 0);
@@ -764,23 +817,36 @@ function TodaysProductionSection({
           <Clock className="w-4 h-4" /> Today&apos;s production
         </h2>
         <span className="text-[11px] text-muted-foreground tabular-nums">
-          {todays.length} step{todays.length === 1 ? "" : "s"} · {Math.round(totalMin / 6) / 10}h active
+          {groups.length} step{groups.length === 1 ? "" : "s"} · {Math.round(totalMin / 6) / 10}h active
         </span>
       </div>
       <ul className="divide-y divide-border">
-        {todays.map((e) => {
-          const order = e.orderId ? orderById.get(e.orderId) : undefined;
-          const doneStyle = e.status === "done" ? "opacity-60 line-through" : "";
+        {groups.map((group, i) => {
+          const head = group[0];
+          const order = head.orderId ? orderById.get(head.orderId) : undefined;
+          const doneStyle = group.every((e) => e.status === "done") ? "opacity-60 line-through" : "";
+          const productNames = group
+            .map((e) => productMap.get(e.productId)?.name ?? e.productId)
+            .filter((n, idx, arr) => arr.indexOf(n) === idx);
+          const groupMinutes = group.reduce((s, e) => s + e.durationMinutes, 0);
+          const productLabel = productNames.length === 1
+            ? productNames[0]
+            : `${productNames.length} products`;
           return (
-            <li key={e.id} className="flex items-center gap-3 px-1 py-1.5 text-sm">
+            <li key={i} className="flex items-center gap-3 px-1 py-1.5 text-sm">
               <span className="tabular-nums text-muted-foreground w-11 shrink-0">
-                {e.startAt.slice(11, 16)}
+                {formatLocalTime(head.startAt)}
               </span>
               <div className="flex-1 min-w-0">
                 <p className={`truncate ${doneStyle}`}>
-                  <span className="font-medium">{productMap.get(e.productId)?.name ?? e.productId}</span>
-                  <span className="text-muted-foreground"> · {e.phase}</span>
+                  <span className="font-medium">{head.phase}</span>
+                  <span className="text-muted-foreground"> · {productLabel}</span>
                 </p>
+                {productNames.length > 1 && (
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    {productNames.join(", ")}
+                  </p>
+                )}
                 {order && (
                   <Link
                     href={`/orders/${encodeURIComponent(order.id!)}`}
@@ -791,7 +857,7 @@ function TodaysProductionSection({
                 )}
               </div>
               <span className="tabular-nums text-xs text-muted-foreground shrink-0">
-                {e.durationMinutes}m
+                {groupMinutes}m
               </span>
             </li>
           );
@@ -804,4 +870,15 @@ function TodaysProductionSection({
       </div>
     </section>
   );
+}
+
+function localIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatLocalTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }

@@ -1995,6 +1995,21 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
           <p className="text-xs text-muted-foreground mt-1">
             Hands-on time per mould. Counts toward daily capacity.
           </p>
+          {(() => {
+            const v = parseFloat(activeMinutes);
+            if (!Number.isFinite(v) || v <= 240) return null;
+            // Schedulers multiply this by mouldsNeeded across the wave;
+            // a 4 h+ value almost always means the user typed batch
+            // total instead of per-mould (e.g., 600 min for "Cooking"
+            // turns a 1-h job into a 10-h day).
+            return (
+              <p className="text-xs text-status-warn mt-1">
+                ⚠ {v} min per mould is unusually high. If this is the
+                total for a whole batch, divide by the number of moulds
+                — the scheduler multiplies this value by mouldsNeeded.
+              </p>
+            );
+          })()}
         </div>
         <div>
           <label className="label">Waiting time (min)</label>

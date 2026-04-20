@@ -114,6 +114,9 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
   const stepsByType = groupBy(productionSteps, (s) => s.productType);
 
   const usedByDate = new Map<string, number>();
+  // Per-day capacity cache so we don't recompute for the same date
+  // when several steps land on it.
+  const capacityByDate = new Map<string, number>();
 
   const scheduleable = orders.filter((o) => o.status === "pending" || o.status === "in_production");
   const sorted = [...scheduleable].sort((a, b) => a.deadline.localeCompare(b.deadline));
@@ -200,21 +203,35 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
 
         // Pack totalActive minutes into working days ending at
         // activeEndDay and rolling back through earlier working days.
+        // Each slot records its end-offset (minutes from start of work
+        // day) so within-day sequencing is correct: step N (placed first
+        // in code, latest in time) sits at the day's end; step N-1 ends
+        // where step N starts.
         let remaining = totalActive;
-        const slots: Array<{ date: Date; minutes: number }> = [];
+        const slots: Array<{ date: Date; minutes: number; endOffsetMinutes: number }> = [];
         const probe = new Date(activeEndDay);
         let safety = 365;
         while (remaining > 0 && safety-- > 0) {
-          const available = effectiveDailyCapacityMinutes(
-            probe, config, people, unavailability, blockedDays,
-          );
+          const iso = isoDate(probe);
+          let available = capacityByDate.get(iso);
+          if (available === undefined) {
+            available = effectiveDailyCapacityMinutes(
+              probe, config, people, unavailability, blockedDays,
+            );
+            capacityByDate.set(iso, available);
+          }
           if (available > 0) {
-            const iso = isoDate(probe);
             const used = usedByDate.get(iso) ?? 0;
             const free = Math.max(0, available - used);
             if (free > 0) {
               const take = Math.min(free, remaining);
-              slots.push({ date: new Date(probe), minutes: take });
+              // The slot ends where the day's free time starts (reverse
+              // pack — earlier-placed slots in this day already sit
+              // later in the clock). End offset from start of day:
+              //   endOffsetMinutes = available - used
+              // Slot start offset = endOffset - take.
+              const endOffset = available - used;
+              slots.push({ date: new Date(probe), minutes: take, endOffsetMinutes: endOffset });
               usedByDate.set(iso, used + take);
               remaining -= take;
             }
@@ -231,27 +248,37 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
           unscheduled.add(order.id!);
         }
 
-        // Emit per-(product × slot) rows. Within a slot every product
-        // row shares startAt — visually concurrent on /production —
-        // and its duration is that product's share of the slot's
+        // Emit per-(product × slot) rows. Each slot lands at its real
+        // wall-clock position within the day. All products in a slot
+        // share startAt (concurrent on their own moulds); each row's
+        // durationMinutes is that product's share of the slot's
         // placed minutes, proportional to the product's share of the
         // step's total.
-        slots.sort((a, b) => a.date.getTime() - b.date.getTime());
+        slots.sort((a, b) => {
+          const tDiff = a.date.getTime() - b.date.getTime();
+          // Within the same day, the earlier-time slot has the smaller
+          // endOffsetMinutes — render it first for stable ordering.
+          if (tDiff !== 0) return tDiff;
+          return a.endOffsetMinutes - b.endOffsetMinutes;
+        });
         const totalPlaced = slots.reduce((s, r) => s + r.minutes, 0);
         for (const slot of slots) {
           const slotShare = totalPlaced > 0 ? slot.minutes / totalPlaced : 0;
-          const start = startOfDay(slot.date);
+          const slotStartOffset = slot.endOffsetMinutes - slot.minutes;
+          // Wall-clock start within the day: WORKDAY_START_HOUR + offset.
+          const dayStart = startOfDay(slot.date);
+          const slotStart = new Date(dayStart.getTime() + slotStartOffset * 60 * 1000);
           for (const pp of perProductMinutes) {
             const productMinutes = Math.round(pp.minutes * slotShare);
             if (productMinutes <= 0) continue;
-            const end = new Date(start.getTime() + productMinutes * 60 * 1000);
+            const end = new Date(slotStart.getTime() + productMinutes * 60 * 1000);
             entries.push({
               orderId: order.id,
               productId: pp.product.id!,
               mouldId: pp.product.defaultMouldId,
               stepId: step.id,
               phase: step.name,
-              startAt: start.toISOString(),
+              startAt: slotStart.toISOString(),
               endAt: end.toISOString(),
               durationMinutes: productMinutes,
               isActive: true,
@@ -261,8 +288,13 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
         }
 
         // Previous step must end before this step's active starts.
+        // Use the earliest slot's start as the cap.
         if (slots.length > 0) {
-          nextStartDay = startOfDay(slots[0].date);
+          const earliest = slots[0];
+          const dayStart = startOfDay(earliest.date);
+          nextStartDay = new Date(
+            dayStart.getTime() + (earliest.endOffsetMinutes - earliest.minutes) * 60 * 1000,
+          );
         }
       }
     }

@@ -134,6 +134,39 @@ describe("mould-wave scheduler", () => {
     expect(result.entries).toHaveLength(0);
   });
 
+  it("sequences steps within the same day — earlier steps end where later steps start", () => {
+    // Two steps, both small enough to fit on the deadline day. Reverse
+    // pack: step 2 (Cap) lands at end-of-day; step 1 (Shell) ends where
+    // step 2 starts. Distinct startAt times.
+    const moulds: Mould[] = [{ id: "m", name: "M", cavityWeightG: 10, numberOfCavities: 10 }];
+    const products = [{
+      id: "p1", name: "P", productCategoryId: catId,
+      defaultMouldId: "m", defaultBatchQty: 1,
+    }] as unknown as Product[];
+    const order: Order = {
+      id: "oseq", channel: "b2b", customerName: "X",
+      deadline: baseDeadline, priority: "normal", status: "pending",
+    } as Order;
+    const orderItems: OrderItem[] = [{
+      id: "oi", orderId: "oseq", productId: "p1", quantity: 10, sortOrder: 0,
+    }] as OrderItem[];
+    const steps = [
+      mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 30, waitingMinutes: 0, sortOrder: 0 }),
+      mkStep({ name: "Cap",   productType: "Moulded", activeMinutes: 60, waitingMinutes: 0, sortOrder: 1 }),
+    ];
+    const result = buildSchedule(makeInput({
+      orders: [order], orderItems, products, moulds,
+      productionSteps: steps, categoryNameById,
+    }));
+
+    const shell = result.entries.find((e) => e.phase === "Shell")!;
+    const cap = result.entries.find((e) => e.phase === "Cap")!;
+    expect(shell.startAt.slice(0, 10)).toBe(cap.startAt.slice(0, 10));
+    // Shell ends at Cap's start (within a tolerance of seconds).
+    expect(new Date(shell.endAt).getTime()).toBe(new Date(cap.startAt).getTime());
+    expect(shell.startAt).not.toBe(cap.startAt);
+  });
+
   it("spills a step across days when its active minutes exceed daily capacity", () => {
     // Wave needs 600 min active for step 1. Capacity 480 min/day (8h × 1 person).
     // Should split across two days — 480 on day N, 120 on day N-1.

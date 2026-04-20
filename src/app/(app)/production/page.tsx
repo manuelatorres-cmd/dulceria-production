@@ -519,17 +519,16 @@ function ScheduledRunsSection({
 
   const orderById = useMemo(() => new Map(orders.map((o) => [o.id!, o])), [orders]);
 
-  // Filter to future-or-today entries by default; only show completed if
-  // they're on today — old 'done' rows clutter the view.
-  const now = new Date();
-  const todayIso = now.toISOString().slice(0, 10);
+  // Filter to future-or-today entries by default; only show completed
+  // if they're on today — old 'done' rows clutter the view. "Today"
+  // here is the LOCAL day, not the UTC day — slicing the ISO string
+  // would silently shift entries across the date line.
+  const todayIso = localIsoDate(new Date());
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return schedule.filter((s) => {
-      const dayIso = s.startAt.slice(0, 10);
-      // Keep today + future; always keep non-done older rows so stuck
-      // entries stay visible.
+      const dayIso = localIsoDate(new Date(s.startAt));
       if (dayIso < todayIso && s.status === "done") return false;
       if (!q) return true;
       const pName = productMap.get(s.productId)?.name?.toLowerCase() ?? "";
@@ -546,7 +545,7 @@ function ScheduledRunsSection({
   const byDay = useMemo(() => {
     const m = new Map<string, typeof filtered>();
     for (const s of filtered) {
-      const k = s.startAt.slice(0, 10);
+      const k = localIsoDate(new Date(s.startAt));
       const arr = m.get(k) ?? [];
       arr.push(s);
       m.set(k, arr);
@@ -615,8 +614,13 @@ function ScheduledRunsSection({
               </div>
             </div>
             <ul className="divide-y divide-border">
-              {entries.map((e) => (
-                <ScheduleRow key={e.id} entry={e} product={productMap.get(e.productId)} order={e.orderId ? orderById.get(e.orderId) : undefined} />
+              {groupScheduleByStep(entries).map((group, gi) => (
+                <ScheduleStepRow
+                  key={gi}
+                  group={group}
+                  productMap={productMap}
+                  order={group[0].orderId ? orderById.get(group[0].orderId) : undefined}
+                />
               ))}
             </ul>
           </div>
@@ -626,33 +630,67 @@ function ScheduledRunsSection({
   );
 }
 
-function ScheduleRow({ entry, product, order }: {
-  entry: import("@/types").ProductionScheduleEntry;
-  product?: { id?: string; name: string };
+/** Collapse rows that share start-time + step name + order — the
+ *  mould-wave scheduler emits one per (product, slot) running
+ *  concurrently. The user reads the wave as a single step ("Cap ·
+ *  4 products · 60m"), not four individual rows. */
+function groupScheduleByStep(
+  entries: import("@/types").ProductionScheduleEntry[],
+): import("@/types").ProductionScheduleEntry[][] {
+  const m = new Map<string, import("@/types").ProductionScheduleEntry[]>();
+  for (const e of entries) {
+    const k = `${e.startAt}|${e.phase}|${e.orderId ?? ""}`;
+    const arr = m.get(k) ?? [];
+    arr.push(e);
+    m.set(k, arr);
+  }
+  return [...m.values()].sort((a, b) => a[0].startAt.localeCompare(b[0].startAt));
+}
+
+function ScheduleStepRow({ group, productMap, order }: {
+  group: import("@/types").ProductionScheduleEntry[];
+  productMap: Map<string, Product>;
   order?: { id?: string; customerName?: string; eventName?: string };
 }) {
+  const head = group[0];
+  // A group can mix statuses if a partial run was logged; pick the
+  // earliest non-done as representative, fall back to the first.
+  const statusForChip = group.find((e) => e.status !== "done")?.status ?? head.status;
   const statusColor = {
     pending: "bg-muted text-muted-foreground",
     in_progress: "bg-primary/10 text-primary",
     done: "bg-status-ok/15 text-status-ok",
     skipped: "bg-muted text-muted-foreground line-through",
     blocked: "bg-status-alert/15 text-status-alert",
-  }[entry.status];
+  }[statusForChip];
+  const allDone = group.every((e) => e.status === "done");
 
-  const timeStr = entry.startAt.slice(11, 16);
+  const timeStr = new Date(head.startAt).toLocaleTimeString([], {
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  const totalMinutes = group.reduce((s, e) => s + e.durationMinutes, 0);
+  const productNames = Array.from(new Set(group.map((e) => productMap.get(e.productId)?.name ?? e.productId)));
+  const productLabel = productNames.length === 1
+    ? productNames[0]
+    : `${productNames.length} products`;
   const orderLabel = order?.customerName || order?.eventName || "";
 
   return (
-    <li className={`flex items-center gap-3 px-3 py-2 text-sm ${entry.status === "done" ? "opacity-60" : ""}`}>
+    <li className={`flex items-center gap-3 px-3 py-2 text-sm ${allDone ? "opacity-60" : ""}`}>
       <span className="tabular-nums text-muted-foreground w-11 shrink-0">{timeStr}</span>
       <div className="flex-1 min-w-0">
-        <p className={`truncate ${entry.status === "done" ? "line-through" : ""}`}>
-          <span className="font-medium">{product?.name ?? entry.productId}</span>
-          <span className="text-muted-foreground"> · {entry.phase}</span>
+        <p className={`truncate ${allDone ? "line-through" : ""}`}>
+          <span className="font-medium">{head.phase}</span>
+          <span className="text-muted-foreground"> · {productLabel}</span>
         </p>
-        {orderLabel && entry.orderId && (
+        {productNames.length > 1 && (
+          <p className="text-[11px] text-muted-foreground truncate">
+            {productNames.join(", ")}
+          </p>
+        )}
+        {orderLabel && head.orderId && (
           <Link
-            href={`/orders/${encodeURIComponent(entry.orderId)}`}
+            href={`/orders/${encodeURIComponent(head.orderId)}`}
             className="text-[11px] text-primary hover:underline truncate inline-block max-w-full"
           >
             Order: {orderLabel}
@@ -660,11 +698,18 @@ function ScheduleRow({ entry, product, order }: {
         )}
       </div>
       <span className="tabular-nums text-xs text-muted-foreground shrink-0">
-        {entry.durationMinutes}m
+        {totalMinutes}m
       </span>
       <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${statusColor}`}>
-        {entry.status.replace("_", " ")}
+        {statusForChip.replace("_", " ")}
       </span>
     </li>
   );
+}
+
+function localIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
