@@ -75,6 +75,9 @@ export interface Ingredient {
   lowStockSince?: number;     // Date.now() when flagged
   lowStockOrdered?: boolean;  // true = order placed, awaiting delivery
   outOfStock?: boolean;       // true = completely out, higher urgency than lowStock
+  /** Current stock in grams. Nullable — treated as 0 when unset.
+   *  Feeds the planned-demand minus stock calculation on /shopping. */
+  currentStockG?: number;
   // Nutrition data (all values per 100g of ingredient)
   nutrition?: import("@/lib/nutrition").NutritionData;
   /** Optional text-only breakdown of what this compound ingredient is made of.

@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useIngredients, usePackagingList, useShoppingItems, setIngredientLowStock, markIngredientOrdered, unorderIngredient, setPackagingLowStock, markPackagingOrdered, unorderPackaging, saveShoppingItem, markShoppingItemOrdered, deleteShoppingItem, useDecorationMaterials, setDecorationMaterialLowStock, markDecorationMaterialOrdered, unorderDecorationMaterial } from "@/lib/hooks";
+import { useIngredients, usePackagingList, useShoppingItems, setIngredientLowStock, markIngredientOrdered, unorderIngredient, setPackagingLowStock, markPackagingOrdered, unorderPackaging, saveShoppingItem, markShoppingItemOrdered, deleteShoppingItem, useDecorationMaterials, setDecorationMaterialLowStock, markDecorationMaterialOrdered, unorderDecorationMaterial, useOrders, useAllOrderItems, useProductsList, useMouldsList, useCapacityConfig, saveIngredient } from "@/lib/hooks";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { assertOk } from "@/lib/supabase-query";
+import { computeShoppingNeeds } from "@/lib/shopping-needs";
 import { PageHeader } from "@/components/page-header";
-import { ShoppingCart, Check, ChevronDown, Plus, X, Trash2 } from "lucide-react";
+import { ShoppingCart, Check, ChevronDown, Plus, X, Trash2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { SHOPPING_ITEM_CATEGORIES, DECORATION_MATERIAL_TYPE_LABELS } from "@/types";
+import { SHOPPING_ITEM_CATEGORIES, DECORATION_MATERIAL_TYPE_LABELS, type ProductFilling, type FillingIngredient } from "@/types";
 
 function timeAgo(ts: number): string {
   const days = Math.floor((Date.now() - ts) / 86_400_000);
@@ -133,6 +137,8 @@ export default function ShoppingPage() {
     <div>
       <PageHeader title="Shopping List" description="Items to reorder for the workshop" />
       <div className="px-4 pb-8 space-y-4">
+
+        <PlannedDemandSection />
 
         {totalPending === 0 && totalOrdered === 0 && !showAddForm && (
           <div className="py-12 text-center">
@@ -585,4 +591,176 @@ export default function ShoppingPage() {
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Planned-demand section (§6 production planning)
+// ---------------------------------------------------------------------------
+
+function PlannedDemandSection() {
+  const orders = useOrders();
+  const orderItems = useAllOrderItems();
+  const products = useProductsList(true);
+  const moulds = useMouldsList(true);
+  const ingredients = useIngredients(true);
+  const config = useCapacityConfig();
+
+  const productIds = useMemo(() => products.map((p) => p.id!).filter(Boolean), [products]);
+
+  const { data: productFillings = [] } = useQuery({
+    queryKey: ["product-fillings", "all-for-shopping"],
+    enabled: productIds.length > 0,
+    queryFn: async () =>
+      assertOk(await supabase.from("productFillings").select("*")) as ProductFilling[],
+  });
+
+  const fillingIds = useMemo(
+    () => [...new Set(productFillings.map((pf) => pf.fillingId))],
+    [productFillings],
+  );
+
+  const { data: fillingIngredients = [] } = useQuery({
+    queryKey: ["filling-ingredients", "all-for-shopping"],
+    enabled: fillingIds.length > 0,
+    queryFn: async () =>
+      assertOk(await supabase.from("fillingIngredients").select("*")) as FillingIngredient[],
+  });
+
+  const fiByFilling = useMemo(() => {
+    const m = new Map<string, FillingIngredient[]>();
+    for (const li of fillingIngredients) {
+      const arr = m.get(li.fillingId) ?? [];
+      arr.push(li);
+      m.set(li.fillingId, arr);
+    }
+    return m;
+  }, [fillingIngredients]);
+
+  const { rows, warnings } = useMemo(
+    () => computeShoppingNeeds({
+      orders,
+      orderItems,
+      products,
+      moulds,
+      productFillings,
+      fillingIngredientsByFillingId: fiByFilling,
+      ingredients,
+      config,
+    }),
+    [orders, orderItems, products, moulds, productFillings, fiByFilling, ingredients, config],
+  );
+
+  const shortfalls = rows.filter((r) => r.shortageG > 0);
+  if (shortfalls.length === 0 && warnings.length === 0) return null;
+
+  return (
+    <section className="space-y-2">
+      <h2 className="text-sm font-semibold text-primary">Planned demand</h2>
+      <p className="text-xs text-muted-foreground">
+        Ingredients needed to fulfil open orders, minus current stock. Update stock values from
+        each ingredient's detail page or the inline field below.
+      </p>
+
+      {warnings.length > 0 && (
+        <div className="rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2 space-y-1">
+          {warnings.slice(0, 5).map((w, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs text-status-warn">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>{w}</span>
+            </div>
+          ))}
+          {warnings.length > 5 && (
+            <p className="text-xs text-status-warn">…and {warnings.length - 5} more.</p>
+          )}
+        </div>
+      )}
+
+      {shortfalls.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+          You have enough stock for every open order.
+        </p>
+      ) : (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
+            <span className="flex-1">Ingredient</span>
+            <span className="w-24 text-right">Needed</span>
+            <span className="w-28 text-right">On hand</span>
+            <span className="w-24 text-right">Short by</span>
+          </div>
+          {shortfalls.map((row) => (
+            <ShortageRow key={row.ingredientId} row={row} ingredients={ingredients} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ShortageRow({ row, ingredients }: {
+  row: { ingredientId: string; name: string; neededG: number; onHandG: number; shortageG: number; purchaseUnit?: string; gramsPerUnit?: number };
+  ingredients: import("@/types").Ingredient[];
+}) {
+  const [stockStr, setStockStr] = useState(String(row.onHandG));
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSaveStock() {
+    const n = parseFloat(stockStr);
+    if (isNaN(n) || n < 0) return;
+    const ing = ingredients.find((i) => i.id === row.ingredientId);
+    if (!ing) return;
+    setSaving(true);
+    try {
+      await saveIngredient({ ...ing, currentStockG: n });
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center px-3 py-1.5 text-sm border-b border-border last:border-b-0">
+      <Link
+        href={`/ingredients/${encodeURIComponent(row.ingredientId)}`}
+        className="flex-1 truncate hover:underline"
+      >
+        {row.name}
+      </Link>
+      <span className="w-24 text-right tabular-nums">{formatGrams(row.neededG)}</span>
+      <span className="w-28 text-right tabular-nums">
+        {editing ? (
+          <span className="inline-flex items-center gap-1">
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={stockStr}
+              onChange={(e) => setStockStr(e.target.value)}
+              onBlur={handleSaveStock}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSaveStock(); if (e.key === "Escape") setEditing(false); }}
+              className="input !w-20 text-xs !py-0.5"
+              autoFocus
+            />
+            <span className="text-xs text-muted-foreground">g</span>
+          </span>
+        ) : (
+          <button
+            onClick={() => setEditing(true)}
+            className="hover:underline"
+            disabled={saving}
+          >
+            {formatGrams(row.onHandG)}
+          </button>
+        )}
+      </span>
+      <span className="w-24 text-right tabular-nums font-medium text-destructive">
+        {formatGrams(row.shortageG)}
+      </span>
+    </div>
+  );
+}
+
+function formatGrams(g: number): string {
+  if (g >= 1000) return `${(g / 1000).toFixed(1)} kg`;
+  return `${Math.round(g)} g`;
 }
