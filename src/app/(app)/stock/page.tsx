@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   useAllPlanProducts, useProductionPlans, useProductsList, useMouldsList,
   setPlanProductStockStatus, useFillingStockItems, useFillings, adjustFillingStock, discardFillingStock, saveFillingStock,
@@ -110,21 +111,30 @@ export default function StockPage() {
     <div>
       <PageHeader title="Stock" description="Track what's still in stock" />
 
-      {/* Tab strip */}
-      <div className="px-4 pb-3 flex gap-1">
-        {(["products", "fillings"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              activeTab === tab
-                ? "bg-accent text-accent-foreground"
-                : "bg-muted text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {tab === "products" ? "Products" : "Fillings"}
-          </button>
-        ))}
+      {/* Tab strip + adjust link */}
+      <div className="px-4 pb-3 flex items-center gap-2">
+        <div className="flex gap-1">
+          {(["products", "fillings"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                activeTab === tab
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab === "products" ? "Products" : "Fillings"}
+            </button>
+          ))}
+        </div>
+        <Link
+          href="/stock/adjust"
+          className="ml-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary"
+          title="Opening balance, recounts, breakage"
+        >
+          Adjust stock →
+        </Link>
       </div>
 
       {activeTab === "products" ? <ProductStockTab /> : <FillingStockTab />}

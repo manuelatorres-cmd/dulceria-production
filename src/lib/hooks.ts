@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -5699,4 +5699,242 @@ export async function closeProductionDay(closedBy?: string): Promise<CloseProduc
   queryClient.invalidateQueries({ queryKey: ["production-days"] });
   queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
   return summary;
+}
+
+// ---------------------------------------------------------------
+// Stock adjustments (opening balance, recounts, breakage) — §0031
+// ---------------------------------------------------------------
+//
+// Four item types live in four different stock tables. The
+// adjustment log is a single polymorphic `stockAdjustments` row per
+// tweak; the actual stock total update depends on the type:
+//
+//   product     → synthetic "Opening balance" plan + stockLocations
+//                 (re-uses the batch-based Phase 2 machinery)
+//   filling     → fillingStock row (grams)
+//   packaging   → packaging.quantityOnHand column (units)
+//   ingredient  → ingredients.currentStockG column (grams)
+//
+// A positive delta adds stock, a negative delta subtracts.
+// Subtractions are clamped at zero so we never go negative — the
+// adjustment log still records what was attempted.
+
+export function useStockAdjustments(
+  filter?: { itemType?: StockAdjustmentItemType; itemId?: string; limit?: number },
+): StockAdjustment[] {
+  const { data } = useQuery({
+    queryKey: ["stock-adjustments", filter ?? null],
+    queryFn: async () => {
+      let q = supabase.from("stockAdjustments").select("*").order("createdAt", { ascending: false });
+      if (filter?.itemType) q = q.eq("itemType", filter.itemType);
+      if (filter?.itemId) q = q.eq("itemId", filter.itemId);
+      if (filter?.limit) q = q.limit(filter.limit);
+      return assertOk(await q) as StockAdjustment[];
+    },
+  });
+  return data ?? [];
+}
+
+export interface StockAdjustmentInput {
+  itemType: StockAdjustmentItemType;
+  itemId: string;
+  /** Required for products, ignored for other item types. */
+  location?: StockLocation;
+  deltaQty: number;
+  reason: StockAdjustmentReason;
+  note?: string;
+  createdBy?: string;
+}
+
+/** The shared virtual plan that holds opening-balance product stock.
+ *  Created lazily the first time a product adjustment is applied.
+ *  Stable name + status='done' so it doesn't clutter active-plan lists. */
+const OPENING_BALANCE_PLAN_NAME = "Opening balance";
+
+async function ensureOpeningBalancePlanId(): Promise<string> {
+  const existing = assertOkMaybe(
+    await supabase
+      .from("productionPlans")
+      .select("id")
+      .eq("name", OPENING_BALANCE_PLAN_NAME)
+      .maybeSingle(),
+  ) as { id: string } | null;
+  if (existing) return existing.id;
+  const id = newId();
+  const now = new Date();
+  const { error } = await supabase.from("productionPlans").insert({
+    id,
+    name: OPENING_BALANCE_PLAN_NAME,
+    status: "done",
+    notes: "Synthetic plan holding pre-app opening-balance stock adjustments.",
+    createdAt: now,
+    updatedAt: now,
+    completedAt: now,
+  });
+  if (error) throw error;
+  return id;
+}
+
+/** Find (or create) the virtual planProduct used to hold opening-balance
+ *  stock for this product. One planProduct per product, re-used across
+ *  every adjustment to the same product. */
+async function ensureOpeningBalancePlanProductId(productId: string): Promise<string> {
+  const planId = await ensureOpeningBalancePlanId();
+  const existing = assertOkMaybe(
+    await supabase
+      .from("planProducts")
+      .select("id")
+      .eq("planId", planId)
+      .eq("productId", productId)
+      .maybeSingle(),
+  ) as { id: string } | null;
+  if (existing) return existing.id;
+  // Look up default mould + batch qty for sensible seed values.
+  const product = assertOkMaybe(
+    await supabase.from("products").select("defaultMouldId, defaultBatchQty").eq("id", productId).maybeSingle(),
+  ) as { defaultMouldId?: string; defaultBatchQty?: number } | null;
+  const id = newId();
+  const { error } = await supabase.from("planProducts").insert({
+    id,
+    planId,
+    productId,
+    mouldId: product?.defaultMouldId ?? null,
+    quantity: product?.defaultBatchQty ?? 1,
+    sortOrder: 0,
+  });
+  if (error) throw error;
+  return id;
+}
+
+async function applyProductAdjustment(args: StockAdjustmentInput): Promise<void> {
+  const location: StockLocation = args.location ?? "production";
+  const planProductId = await ensureOpeningBalancePlanProductId(args.itemId);
+  const qty = Math.abs(Math.round(args.deltaQty));
+  if (qty === 0) return;
+  if (args.deltaQty > 0) {
+    await intakeBatchStock({
+      planProductId,
+      productId: args.itemId,
+      toLocation: location,
+      quantity: qty,
+      reason: args.reason === "opening_balance" ? "transfer" : "recount",
+      notes: args.note,
+    });
+  } else {
+    await outakeBatchStock({
+      planProductId,
+      productId: args.itemId,
+      fromLocation: location,
+      quantity: qty,
+      reason: args.reason === "damaged" ? "waste" : "recount",
+      notes: args.note,
+    });
+  }
+}
+
+async function applyFillingAdjustment(args: StockAdjustmentInput): Promise<void> {
+  const now = new Date();
+  if (args.deltaQty > 0) {
+    // Positive → new stock row.
+    const { error } = await supabase.from("fillingStock").insert({
+      id: newId(),
+      fillingId: args.itemId,
+      remainingG: Math.round(args.deltaQty),
+      madeAt: now.toISOString(),
+      notes: args.note ?? null,
+      createdAt: now.getTime(),
+    });
+    if (error) throw error;
+  } else {
+    // Negative → draw down from existing stock, oldest first.
+    const rows = assertOk(
+      await supabase
+        .from("fillingStock")
+        .select("id, remainingG, madeAt")
+        .eq("fillingId", args.itemId)
+        .order("madeAt", { ascending: true }),
+    ) as Array<{ id: string; remainingG: number; madeAt: string }>;
+    let remaining = Math.abs(Math.round(args.deltaQty));
+    for (const row of rows) {
+      if (remaining <= 0) break;
+      const take = Math.min(row.remainingG, remaining);
+      const next = row.remainingG - take;
+      if (next <= 0) {
+        await supabase.from("fillingStock").delete().eq("id", row.id);
+      } else {
+        await supabase.from("fillingStock").update({ remainingG: next }).eq("id", row.id);
+      }
+      remaining -= take;
+    }
+  }
+  queryClient.invalidateQueries({ queryKey: ["filling-stock"] });
+}
+
+async function applyPackagingAdjustment(args: StockAdjustmentInput): Promise<void> {
+  if (args.deltaQty > 0) {
+    await addPackagingStock(args.itemId, Math.round(args.deltaQty));
+  } else {
+    await consumePackaging({
+      packagingId: args.itemId,
+      quantity: Math.abs(Math.round(args.deltaQty)),
+      note: args.note,
+    });
+  }
+}
+
+async function applyIngredientAdjustment(args: StockAdjustmentInput): Promise<void> {
+  const row = assertOkMaybe(
+    await supabase.from("ingredients").select("currentStockG").eq("id", args.itemId).maybeSingle(),
+  ) as { currentStockG?: number } | null;
+  const current = row?.currentStockG ?? 0;
+  const next = Math.max(0, current + args.deltaQty);
+  const { error } = await supabase
+    .from("ingredients")
+    .update({ currentStockG: next, updatedAt: new Date() })
+    .eq("id", args.itemId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["ingredients"] });
+}
+
+/** Apply a single stock adjustment: update the relevant stock total +
+ *  append an audit row to stockAdjustments. Throws on any error. */
+export async function applyStockAdjustment(args: StockAdjustmentInput): Promise<void> {
+  if (args.deltaQty === 0) return;
+  switch (args.itemType) {
+    case "product":    await applyProductAdjustment(args); break;
+    case "filling":    await applyFillingAdjustment(args); break;
+    case "packaging":  await applyPackagingAdjustment(args); break;
+    case "ingredient": await applyIngredientAdjustment(args); break;
+  }
+  const { error } = await supabase.from("stockAdjustments").insert({
+    id: newId(),
+    itemType: args.itemType,
+    itemId: args.itemId,
+    location: args.itemType === "product" ? (args.location ?? "production") : null,
+    deltaQty: args.deltaQty,
+    reason: args.reason,
+    note: args.note ?? null,
+    createdBy: args.createdBy ?? null,
+    createdAt: new Date(),
+  });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["stock-adjustments"] });
+}
+
+/** Apply a batch of adjustments one at a time. Stops at the first
+ *  failure and returns how many succeeded — caller can report partial
+ *  success to the user. */
+export async function applyStockAdjustments(
+  inputs: StockAdjustmentInput[],
+): Promise<{ applied: number; failed: StockAdjustmentInput | null; error?: unknown }> {
+  let applied = 0;
+  for (const input of inputs) {
+    try {
+      await applyStockAdjustment(input);
+      applied++;
+    } catch (error) {
+      return { applied, failed: input, error };
+    }
+  }
+  return { applied, failed: null };
 }

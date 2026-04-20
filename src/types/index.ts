@@ -1092,6 +1092,49 @@ export interface CapacityConfig {
   updatedAt?: Date;
 }
 
+// --- Stock adjustments (opening balance + corrections) ---
+
+export const STOCK_ADJUSTMENT_ITEM_TYPES = [
+  "product", "filling", "packaging", "ingredient",
+] as const;
+export type StockAdjustmentItemType = (typeof STOCK_ADJUSTMENT_ITEM_TYPES)[number];
+
+export const STOCK_ADJUSTMENT_ITEM_TYPE_LABELS: Record<StockAdjustmentItemType, string> = {
+  product: "Finished product",
+  filling: "Filling",
+  packaging: "Packaging",
+  ingredient: "Ingredient",
+};
+
+export const STOCK_ADJUSTMENT_REASONS = [
+  "opening_balance", "found", "damaged", "correction", "other",
+] as const;
+export type StockAdjustmentReason = (typeof STOCK_ADJUSTMENT_REASONS)[number];
+
+export const STOCK_ADJUSTMENT_REASON_LABELS: Record<StockAdjustmentReason, string> = {
+  opening_balance: "Opening balance",
+  found: "Found during count",
+  damaged: "Damaged / discarded",
+  correction: "Correction",
+  other: "Other",
+};
+
+/** One stock adjustment — a permanent audit row. Never deleted; a
+ *  reversal is a second row with the opposite deltaQty. */
+export interface StockAdjustment {
+  id?: string;
+  itemType: StockAdjustmentItemType;
+  itemId: string;
+  /** Only meaningful for products. */
+  location?: StockLocation;
+  /** Signed delta — positive to add stock, negative to remove. */
+  deltaQty: number;
+  reason: StockAdjustmentReason;
+  note?: string;
+  createdBy?: string;
+  createdAt: Date;
+}
+
 /** One waste entry, typically created at unmould when actual yield falls
  *  short of the planned (moulds × cavities) count. */
 export interface WasteLogEntry {
