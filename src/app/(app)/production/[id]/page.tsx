@@ -8,7 +8,9 @@ import {
   useDecorationMaterials, setDecorationMaterialLowStock,
   saveFillingStock, deductFillingStock, useShelfStableCategoryNames,
   recordUnmouldIntake, checkDeadlineImpactForProduct,
+  usePackagingList, consumePackaging,
 } from "@/lib/hooks";
+import { PackingModal } from "@/components/packing-modal";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
 import type { Filling, Mould, PlanProduct, Product, DecorationMaterial } from "@/types";
 import { normalizeApplyAt } from "@/types";
@@ -29,6 +31,7 @@ const PHASES = [
   { id: "fill",    label: "Fill"     },
   { id: "cap",     label: "Cap"      },
   { id: "unmould", label: "Unmould"  },
+  { id: "packing", label: "Packing"  },
 ] as const;
 
 type PhaseId = typeof PHASES[number]["id"];
@@ -137,6 +140,10 @@ function PlanContent({
   const [deadlineImpact, setDeadlineImpact] = useState<Array<{
     orderId: string; orderName: string; deadline: Date; required: number; projected: number; shortfall: number;
   }> | null>(null);
+
+  // Packing modal state — open when the user ticks a "packing-*" step on.
+  const packagingList = usePackagingList(false);
+  const [packingTarget, setPackingTarget] = useState<{ stepKey: string; planProductId: string; productName: string; totalPieces: number } | null>(null);
 
   // Leftover filling modal state
   const [leftoverModal, setLeftoverModal] = useState<{
@@ -337,6 +344,20 @@ function PlanContent({
           // No leftover modal, deduct stock now
           await deductPreviousBatchStock();
         }
+        return;
+      }
+    }
+
+    // Intercept packing steps being checked ON → show packing modal
+    if (!current && key.startsWith("packing-")) {
+      const step = steps.find((s) => s.key === key);
+      if (step?.planProductId) {
+        setPackingTarget({
+          stepKey: key,
+          planProductId: step.planProductId,
+          productName: step.label.replace("Pack: ", ""),
+          totalPieces: step.totalProducts ?? 0,
+        });
         return;
       }
     }
@@ -1089,6 +1110,30 @@ function PlanContent({
           mode={yieldModal.mode}
           onConfirm={handleYieldConfirm}
           onCancel={() => setYieldModal(null)}
+        />
+      )}
+
+      {/* Packing modal */}
+      {packingTarget && (
+        <PackingModal
+          productName={packingTarget.productName}
+          totalPieces={packingTarget.totalPieces}
+          packaging={packagingList}
+          onConfirm={async ({ packagingId, units, note }) => {
+            const actual = await consumePackaging({
+              packagingId,
+              quantity: units,
+              planId,
+              planProductId: packingTarget.planProductId,
+              note,
+            });
+            await toggleStep(planId, packingTarget.stepKey, true);
+            setPackingTarget(null);
+            if (actual < units) {
+              alert(`Only ${actual} of the ${units} requested units were on hand. The rest weren't deducted — add stock on the Packaging page before the next pack.`);
+            }
+          }}
+          onCancel={() => setPackingTarget(null)}
         />
       )}
 

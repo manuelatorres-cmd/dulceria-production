@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -2868,6 +2868,7 @@ export async function isPackagingInUse(id: string): Promise<boolean> {
 
 export async function savePackagingOrder(obj: Omit<PackagingOrder, "id"> & { id?: string }): Promise<string> {
   if (obj.id) {
+    // Updates don't change on-hand stock — only brand-new receipts do.
     const { error } = await supabase.from("packagingOrders").update(obj).eq("id", obj.id);
     if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ["packaging-orders"] });
@@ -2876,6 +2877,10 @@ export async function savePackagingOrder(obj: Omit<PackagingOrder, "id"> & { id?
   const createdId = newId();
   const { error } = await supabase.from("packagingOrders").insert({ ...obj, id: createdId });
   if (error) throw error;
+  // Received receipt → bump quantityOnHand + clear low-stock flags.
+  if (obj.quantity > 0) {
+    await addPackagingStock(obj.packagingId, obj.quantity);
+  }
   queryClient.invalidateQueries({ queryKey: ["packaging-orders"] });
   return createdId;
 }
@@ -5171,4 +5176,463 @@ export function useOrderBoxes(orderId: string | undefined): OrderBox[] {
     },
   });
   return data ?? [];
+}
+
+// ---------------------------------------------------------------
+// Phase 6 — Online order import (Shopify CSV)
+// ---------------------------------------------------------------
+
+export interface OnlineOrderImportInput {
+  sourceRef: string;
+  customerName?: string;
+  email?: string;
+  placedAt?: string;
+  shippingAddress?: string;
+  phone?: string;
+  deadline: string;
+  items: Array<{ productId: string; quantity: number; unitPrice?: number; notes?: string }>;
+}
+
+/** Import multiple online orders (+ their items). Rows whose
+ *  `sourceRef` already exists in the database are skipped — re-
+ *  importing the same Shopify CSV is a no-op for already-imported
+ *  orders. Returns how many new orders landed. */
+export async function importOnlineOrders(input: OnlineOrderImportInput[]): Promise<number> {
+  if (input.length === 0) return 0;
+
+  const refs = input.map((o) => o.sourceRef);
+  const existing = assertOk(
+    await supabase.from("orders").select("id, sourceRef").in("sourceRef", refs),
+  ) as Array<{ id: string; sourceRef: string }>;
+  const existingRefs = new Set(existing.map((e) => e.sourceRef));
+  const fresh = input.filter((o) => !existingRefs.has(o.sourceRef));
+  if (fresh.length === 0) return 0;
+
+  const now = new Date();
+  const orderRows = fresh.map((o) => ({
+    id: newId(),
+    channel: "online",
+    customerName: o.customerName ?? o.email ?? null,
+    customerId: null,
+    deadline: o.deadline,
+    priority: "normal",
+    status: "pending",
+    notes: o.email ? `Email: ${o.email}` : null,
+    sourceRef: o.sourceRef,
+    deliveryAddress: o.shippingAddress ?? null,
+    deliveryType: o.shippingAddress ? "ship" : null,
+    createdAt: o.placedAt ?? now,
+    updatedAt: now,
+  }));
+
+  const { error: insOrdersErr } = await supabase.from("orders").insert(orderRows);
+  if (insOrdersErr) throw insOrdersErr;
+
+  const itemRows = fresh.flatMap((o, oi) =>
+    o.items.map((it, ii) => ({
+      id: newId(),
+      orderId: orderRows[oi].id,
+      productId: it.productId,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice ?? null,
+      sortOrder: ii,
+      notes: it.notes ?? null,
+    })),
+  );
+  if (itemRows.length > 0) {
+    const { error: insItemsErr } = await supabase.from("orderItems").insert(itemRows);
+    if (insItemsErr) throw insItemsErr;
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  return fresh.length;
+}
+
+/** Ship an online order: deduct required pieces from Production Storage
+ *  FIFO and mark the order 'done'. Short stock is tolerated — the
+ *  fulfilment view surfaces the shortage first. */
+export async function shipOnlineOrder(orderId: string): Promise<void> {
+  const order = assertOkMaybe(
+    await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
+  ) as Order | null;
+  if (!order) throw new Error(`Order ${orderId} not found`);
+  const items = assertOk(
+    await supabase.from("orderItems").select("*").eq("orderId", orderId),
+  ) as OrderItem[];
+
+  for (const it of items) {
+    await moveProductStockFifo({
+      productId: it.productId,
+      fromLocation: "production",
+      toLocation: null,
+      quantity: it.quantity,
+      orderId,
+      reason: "sold",
+    });
+  }
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: "done", updatedAt: new Date() })
+    .eq("id", orderId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+}
+
+// ---------------------------------------------------------------
+// Phase 3 — Packaging numeric stock + consumption
+// ---------------------------------------------------------------
+
+/** Add stock to a packaging type. Called when a new PackagingOrder is
+ *  received; also exposed for manual adjustments. Clears the
+ *  `lowStock` / `outOfStock` flags when the new total is back above
+ *  the threshold. */
+export async function addPackagingStock(packagingId: string, quantity: number): Promise<void> {
+  if (quantity <= 0) return;
+  const row = assertOkMaybe(
+    await supabase.from("packaging").select("quantityOnHand, lowStockThreshold").eq("id", packagingId).maybeSingle(),
+  ) as { quantityOnHand?: number; lowStockThreshold?: number } | null;
+  const current = row?.quantityOnHand ?? 0;
+  const next = current + Math.round(quantity);
+  const threshold = row?.lowStockThreshold;
+  const patch: Record<string, unknown> = { quantityOnHand: next, updatedAt: new Date() };
+  if (threshold != null && next >= threshold) {
+    patch.lowStock = false;
+    patch.outOfStock = false;
+  }
+  const { error } = await supabase.from("packaging").update(patch).eq("id", packagingId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["packaging"] });
+}
+
+export interface ConsumePackagingArgs {
+  packagingId: string;
+  quantity: number;
+  planId?: string;
+  planProductId?: string;
+  orderId?: string;
+  loggedBy?: string;
+  note?: string;
+}
+
+/** Decrement packaging stock and append a consumption log entry. Called
+ *  by the Packing step. Clamps to the current quantity so we never go
+ *  below zero; returns the actual amount decremented (caller should
+ *  warn if `actual < requested`). */
+export async function consumePackaging(args: ConsumePackagingArgs): Promise<number> {
+  const row = assertOkMaybe(
+    await supabase.from("packaging").select("quantityOnHand, lowStockThreshold").eq("id", args.packagingId).maybeSingle(),
+  ) as { quantityOnHand?: number; lowStockThreshold?: number } | null;
+  const current = row?.quantityOnHand ?? 0;
+  const requested = Math.max(0, Math.round(args.quantity));
+  const actual = Math.min(current, requested);
+  if (actual === 0) return 0;
+
+  const next = current - actual;
+  const threshold = row?.lowStockThreshold;
+  const patch: Record<string, unknown> = { quantityOnHand: next, updatedAt: new Date() };
+  if (next === 0) {
+    patch.outOfStock = true;
+    patch.lowStock = true;
+    patch.lowStockSince = Date.now();
+  } else if (threshold != null && next < threshold) {
+    patch.lowStock = true;
+    if (current >= threshold) patch.lowStockSince = Date.now();
+  }
+
+  const { error: upErr } = await supabase.from("packaging").update(patch).eq("id", args.packagingId);
+  if (upErr) throw upErr;
+
+  const { error: logErr } = await supabase.from("packagingConsumption").insert({
+    id: newId(),
+    packagingId: args.packagingId,
+    quantity: actual,
+    planId: args.planId ?? null,
+    planProductId: args.planProductId ?? null,
+    orderId: args.orderId ?? null,
+    loggedBy: args.loggedBy ?? null,
+    note: args.note ?? null,
+    loggedAt: new Date(),
+  });
+  if (logErr) throw logErr;
+
+  queryClient.invalidateQueries({ queryKey: ["packaging"] });
+  queryClient.invalidateQueries({ queryKey: ["packaging-consumption"] });
+  return actual;
+}
+
+export function usePackagingConsumption(packagingId?: string): PackagingConsumption[] {
+  const { data } = useQuery({
+    queryKey: ["packaging-consumption", packagingId ?? "all"],
+    queryFn: async () => {
+      const q = supabase.from("packagingConsumption").select("*").order("loggedAt", { ascending: false });
+      return assertOk(
+        await (packagingId ? q.eq("packagingId", packagingId) : q),
+      ) as PackagingConsumption[];
+    },
+  });
+  return data ?? [];
+}
+
+// ---------------------------------------------------------------
+// Phase 1 HACCP — production days + temperature log
+// ---------------------------------------------------------------
+
+function todayDateString(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+export function useTodayProductionDay(): ProductionDay | null | undefined {
+  const { data } = useQuery({
+    queryKey: ["production-day", "today"],
+    queryFn: async () => {
+      const today = todayDateString();
+      const row = assertOkMaybe(
+        await supabase.from("productionDays").select("*").eq("date", today).maybeSingle(),
+      ) as ProductionDay | null;
+      return row ?? null;
+    },
+  });
+  return data;
+}
+
+export function useProductionDays(limit = 30): ProductionDay[] {
+  const { data } = useQuery({
+    queryKey: ["production-days", limit],
+    queryFn: async () =>
+      assertOk(
+        await supabase.from("productionDays").select("*").order("date", { ascending: false }).limit(limit),
+      ) as ProductionDay[],
+  });
+  return data ?? [];
+}
+
+/** Create — or return — today's productionDay row. Fires when the user
+ *  clicks "Open Production" on the dashboard. Idempotent so clicking it
+ *  twice is safe. */
+export async function openProductionDay(openedBy?: string): Promise<ProductionDay> {
+  const today = todayDateString();
+  const existing = assertOkMaybe(
+    await supabase.from("productionDays").select("*").eq("date", today).maybeSingle(),
+  ) as ProductionDay | null;
+  if (existing) return existing;
+  const id = newId();
+  const now = new Date();
+  const { error } = await supabase.from("productionDays").insert({
+    id,
+    date: today,
+    openedAt: now,
+    openedBy: openedBy ?? null,
+    tempLogComplete: false,
+    cleaningComplete: false,
+    summaryJson: {},
+    createdAt: now,
+    updatedAt: now,
+  });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["production-day"] });
+  queryClient.invalidateQueries({ queryKey: ["production-days"] });
+  return {
+    id, date: today, openedAt: now, openedBy,
+    tempLogComplete: false, cleaningComplete: false, summary: {},
+    createdAt: now, updatedAt: now,
+  };
+}
+
+export function useHaccpTemperatureLogs(productionDayId?: string): HaccpTemperatureLog[] {
+  const { data } = useQuery({
+    queryKey: ["haccp-temperature-logs", productionDayId ?? "all"],
+    queryFn: async () => {
+      const q = supabase.from("haccpTemperatureLogs").select("*").order("loggedAt", { ascending: false });
+      return assertOk(
+        await (productionDayId ? q.eq("productionDayId", productionDayId) : q),
+      ) as HaccpTemperatureLog[];
+    },
+  });
+  return data ?? [];
+}
+
+export interface TempLogEntry {
+  equipmentId: string;
+  temperatureC: number;
+  note?: string;
+  isWithinRange: boolean;
+}
+
+/** Save one round of temperature readings and mark the day's temp-log
+ *  flag complete. Each call appends a fresh set of rows — a device can
+ *  be re-logged later the same day. */
+export async function saveTemperatureReadings(
+  entries: TempLogEntry[],
+  productionDayId: string,
+  loggedBy?: string,
+): Promise<void> {
+  if (entries.length === 0) return;
+  const now = new Date();
+  const rows = entries.map((e) => ({
+    id: newId(),
+    equipmentId: e.equipmentId,
+    temperatureC: e.temperatureC,
+    isWithinRange: e.isWithinRange,
+    note: e.note ?? null,
+    loggedBy: loggedBy ?? null,
+    productionDayId,
+    loggedAt: now,
+  }));
+  const { error } = await supabase.from("haccpTemperatureLogs").insert(rows);
+  if (error) throw error;
+  const { error: upErr } = await supabase
+    .from("productionDays")
+    .update({ tempLogComplete: true, updatedAt: now })
+    .eq("id", productionDayId);
+  if (upErr) throw upErr;
+  queryClient.invalidateQueries({ queryKey: ["haccp-temperature-logs"] });
+  queryClient.invalidateQueries({ queryKey: ["production-day"] });
+  queryClient.invalidateQueries({ queryKey: ["production-days"] });
+}
+
+/** Latest reading per equipment in the last 48h. Drives the pre-fill
+ *  behaviour of the temperature log popup. */
+export async function yesterdayTemperatureReadings(): Promise<Map<string, number>> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const rows = assertOk(
+    await supabase
+      .from("haccpTemperatureLogs")
+      .select("equipmentId, temperatureC, loggedAt")
+      .gte("loggedAt", since.toISOString()),
+  ) as Array<{ equipmentId: string; temperatureC: number; loggedAt: string }>;
+  const latest = new Map<string, { t: number; reading: number }>();
+  for (const r of rows) {
+    const t = new Date(r.loggedAt).getTime();
+    const prev = latest.get(r.equipmentId);
+    if (!prev || t > prev.t) latest.set(r.equipmentId, { t, reading: Number(r.temperatureC) });
+  }
+  return new Map(Array.from(latest.entries()).map(([k, v]) => [k, v.reading]));
+}
+
+// ---------------------------------------------------------------
+// Close Production — carry forward unfinished schedule rows
+// ---------------------------------------------------------------
+
+export interface CloseProductionSummary {
+  productionDayId: string;
+  stepsCompleted: number;
+  stepsCarriedForward: number;
+  piecesProduced: number;
+  batchesRun: number;
+  /** Orders whose deadline is today or tomorrow and had steps carried
+   *  forward — these need Manuela's attention. */
+  carriedDeadlineAffected: Array<{ orderId: string; orderName: string; deadline: string }>;
+}
+
+/** Close today's production day. Unfinished productionSchedule rows whose
+ *  startAt falls today or earlier get pushed forward by one day, preserving
+ *  their status + duration. Returns a summary for the UI to display. */
+export async function closeProductionDay(closedBy?: string): Promise<CloseProductionSummary> {
+  const today = todayDateString();
+  const dayRow = assertOkMaybe(
+    await supabase.from("productionDays").select("*").eq("date", today).maybeSingle(),
+  ) as ProductionDay | null;
+  if (!dayRow) throw new Error("No production day is open. Click Open Production first.");
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+
+  const schedule = assertOk(
+    await supabase.from("productionSchedule").select("*").lte("startAt", endOfToday.toISOString()),
+  ) as ProductionScheduleEntry[];
+
+  let stepsCompleted = 0;
+  const toCarry: ProductionScheduleEntry[] = [];
+  for (const s of schedule) {
+    if (s.status === "done" || s.status === "skipped") stepsCompleted++;
+    else if (s.status === "pending" || s.status === "in_progress" || s.status === "blocked") toCarry.push(s);
+  }
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  if (toCarry.length > 0) {
+    await Promise.all(toCarry.map(async (s) => {
+      const newStart = new Date(new Date(s.startAt).getTime() + DAY_MS);
+      const newEnd = new Date(new Date(s.endAt).getTime() + DAY_MS);
+      const { error } = await supabase
+        .from("productionSchedule")
+        .update({
+          startAt: newStart.toISOString(),
+          endAt: newEnd.toISOString(),
+          updatedAt: new Date(),
+        })
+        .eq("id", s.id!);
+      if (error) throw error;
+    }));
+  }
+
+  // Pieces produced today — sum of unmould intake movements that landed
+  // between startOfToday and now.
+  const movements = assertOk(
+    await supabase
+      .from("stockMovements")
+      .select("quantity, reason, movedAt")
+      .eq("reason", "unmould")
+      .gte("movedAt", startOfToday.toISOString())
+      .lte("movedAt", endOfToday.toISOString()),
+  ) as Array<{ quantity: number }>;
+  const piecesProduced = movements.reduce((a, m) => a + m.quantity, 0);
+
+  const batchesRun = new Set(
+    schedule.filter((s) => s.status === "done" && s.planId != null).map((s) => s.planId),
+  ).size;
+
+  const carriedOrderIds = Array.from(new Set(toCarry.map((s) => s.orderId).filter((x): x is string => !!x)));
+  let carriedDeadlineAffected: CloseProductionSummary["carriedDeadlineAffected"] = [];
+  if (carriedOrderIds.length > 0) {
+    const orders = assertOk(
+      await supabase.from("orders").select("id, customerName, eventName, deadline").in("id", carriedOrderIds),
+    ) as Array<{ id: string; customerName?: string; eventName?: string; deadline: string }>;
+    carriedDeadlineAffected = orders
+      .filter((o) => new Date(o.deadline).getTime() <= endOfToday.getTime() + DAY_MS)
+      .map((o) => ({
+        orderId: o.id,
+        orderName: o.customerName ?? o.eventName ?? "Order",
+        deadline: o.deadline,
+      }));
+  }
+
+  const summary: CloseProductionSummary = {
+    productionDayId: dayRow.id!,
+    stepsCompleted,
+    stepsCarriedForward: toCarry.length,
+    piecesProduced,
+    batchesRun,
+    carriedDeadlineAffected,
+  };
+
+  const now = new Date();
+  const { error } = await supabase
+    .from("productionDays")
+    .update({
+      closedAt: now,
+      closedBy: closedBy ?? null,
+      summaryJson: {
+        batchesRun,
+        piecesProduced,
+        stepsCompleted,
+        stepsCarriedForward: toCarry.length,
+      },
+      updatedAt: now,
+    })
+    .eq("id", dayRow.id!);
+  if (error) throw error;
+
+  queryClient.invalidateQueries({ queryKey: ["production-day"] });
+  queryClient.invalidateQueries({ queryKey: ["production-days"] });
+  queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+  return summary;
 }

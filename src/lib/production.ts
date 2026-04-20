@@ -16,13 +16,13 @@ export const DENSITY_G_PER_ML = 1.2;
 export type ProductionStep = {
   key: string;
   label: string;
-  group: "colour" | "shell" | "filling" | "fill" | "cap" | "unmould";
+  group: "colour" | "shell" | "filling" | "fill" | "cap" | "unmould" | "packing";
   detail?: string;
   colors?: string[];
   coating?: string;   // set on shell/cap steps for grouping by chocolate type
-  mouldCount?: number; // number of physical moulds for this step (shell/fill/cap/unmould)
+  mouldCount?: number; // number of physical moulds for this step (shell/fill/cap/unmould/packing)
   subgroup?: "after_cap"; // decoration steps applied after capping
-  planProductId?: string; // set on unmould steps to reference the specific PlanProduct
+  planProductId?: string; // set on unmould / packing steps to reference the specific PlanProduct
   totalProducts?: number; // total product count for this step (moulds × cavities)
 };
 
@@ -848,6 +848,16 @@ export function generateSteps(
       group: "unmould",
       detail: `${pb.quantity} mould${pb.quantity !== 1 ? "s" : ""} · ${mouldName} · ${totalProducts} products`,
       mouldCount: pb.quantity,
+      planProductId: pb.id,
+      totalProducts,
+    });
+    // Packing step — one per plan product. Ticking it opens a modal that
+    // records packaging consumption against the linked order (if any).
+    steps.push({
+      key: `packing-${pb.id}`,
+      label: `Pack: ${productName}`,
+      group: "packing",
+      detail: totalProducts > 0 ? `${totalProducts} pieces to pack` : undefined,
       planProductId: pb.id,
       totalProducts,
     });

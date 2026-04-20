@@ -11,7 +11,7 @@ import {
   ORDER_STATUSES, ORDER_STATUS_LABELS,
   type Order, type OrderChannel, type OrderPriority, type OrderStatus,
 } from "@/types";
-import { Plus, Search, AlertTriangle } from "lucide-react";
+import { Plus, Search, AlertTriangle, ShoppingBag } from "lucide-react";
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   pending: "bg-muted text-muted-foreground",
@@ -88,14 +88,22 @@ export default function OrdersPage() {
               ))}
             </select>
           </div>
-          {!adding && (
-            <button
-              onClick={() => setAdding(true)}
-              className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium shrink-0"
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/orders/online"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"
             >
-              <Plus className="w-3.5 h-3.5" /> New order
-            </button>
-          )}
+              <ShoppingBag className="w-3.5 h-3.5" /> Online
+            </Link>
+            {!adding && (
+              <button
+                onClick={() => setAdding(true)}
+                className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" /> New order
+              </button>
+            )}
+          </div>
         </div>
 
         {adding && <NewOrderForm onSaved={() => setAdding(false)} onCancel={() => setAdding(false)} />}

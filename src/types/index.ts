@@ -842,6 +842,28 @@ export interface Packaging {
   lowStockSince?: number;
   lowStockOrdered?: boolean;
   outOfStock?: boolean;       // true = completely out, higher urgency than lowStock
+  /** Current on-hand count. Incremented when a PackagingOrder is received;
+   *  decremented by the Packing step in the production wizard. */
+  quantityOnHand?: number;
+  /** Alert threshold (units). When `quantityOnHand` < this, the low-stock
+   *  flag auto-flips to true and the dashboard surfaces the shortage. */
+  lowStockThreshold?: number;
+  /** Supplier lead time in days — reserved for the "auto-add to shopping
+   *  list" escalation. */
+  leadTimeDays?: number;
+}
+
+/** One consumption log entry from the Packing step. */
+export interface PackagingConsumption {
+  id?: string;
+  packagingId: string;
+  quantity: number;
+  planId?: string;
+  planProductId?: string;
+  orderId?: string;
+  loggedBy?: string;
+  note?: string;
+  loggedAt: Date;
 }
 
 export interface PackagingOrder {
@@ -1337,6 +1359,9 @@ export interface Order {
   priority: OrderPriority;
   status: OrderStatus;
   notes?: string;
+  /** External reference for imported orders (e.g. Shopify's order
+   *  name "#1001"). Used to dedup re-imports. */
+  sourceRef?: string;
   deliveryType?: DeliveryType;
   /** ISO-timestamp string for the delivery/pickup appointment. */
   deliveryAt?: string;
@@ -1407,6 +1432,14 @@ export interface ProductionStep {
  * / `currentScheduleId`. Users edit name / kind / quantity / kgPerHour
  * and metadata; the scheduler owns the occupancy columns.
  */
+export const EQUIPMENT_LOCATIONS = ["shop", "production", "storage"] as const;
+export type EquipmentLocation = (typeof EQUIPMENT_LOCATIONS)[number];
+export const EQUIPMENT_LOCATION_LABELS: Record<EquipmentLocation, string> = {
+  shop: "Shop",
+  production: "Production",
+  storage: "Storage",
+};
+
 export interface Equipment {
   id?: string;
   name: string;
@@ -1428,8 +1461,52 @@ export interface Equipment {
   occupiedSince?: Date;
   expectedFreeAt?: Date;
   archived?: boolean;
+  // HACCP extensions (migration 0020)
+  /** When true, this device appears in the daily HACCP temperature log. */
+  requiresTempCheck?: boolean;
+  /** Target temperature range in Celsius. min ≤ max when both are set. */
+  tempMinC?: number;
+  tempMaxC?: number;
+  /** Physical location — drives the HACCP history grouping. */
+  location?: EquipmentLocation;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+/** One row per calendar day the workshop is open. Created by the
+ *  "Open Production" action on the dashboard. */
+export interface ProductionDay {
+  id?: string;
+  /** ISO-date string "YYYY-MM-DD". Unique per row. */
+  date: string;
+  openedAt: Date;
+  openedBy?: string;
+  closedAt?: Date;
+  closedBy?: string;
+  tempLogComplete: boolean;
+  cleaningComplete: boolean;
+  /** Free-form daily diary snapshot. Written by Close Production. */
+  summary?: {
+    batchesRun?: number;
+    piecesProduced?: number;
+    stepsCompleted?: number;
+    stepsCarriedForward?: number;
+    notes?: string;
+  };
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** One temperature reading against a piece of equipment. */
+export interface HaccpTemperatureLog {
+  id?: string;
+  equipmentId: string;
+  temperatureC: number;
+  isWithinRange: boolean;
+  note?: string;
+  loggedBy?: string;
+  loggedAt: Date;
+  productionDayId?: string;
 }
 
 export type EventCalendarKind = "event" | "peak" | "blocked" | "holiday";

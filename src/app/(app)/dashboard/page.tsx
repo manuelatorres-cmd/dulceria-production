@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -12,7 +12,11 @@ import {
   useProductionPlans, DEFAULT_LOCATION_MINIMUM,
   useFillings, useFillingCategories, useFillingStockItems,
   useCustomerFollowups, useCustomers, completeCustomerFollowup,
+  useTodayProductionDay, openProductionDay, closeProductionDay,
+  saveTemperatureReadings, yesterdayTemperatureReadings,
+  type CloseProductionSummary,
 } from "@/lib/hooks";
+import { TemperatureLogModal } from "@/components/temperature-log-modal";
 import { buildSchedule } from "@/lib/scheduler";
 import { capacityConfigStatus } from "@/lib/capacity";
 import { equipmentReadiness } from "@/lib/equipment";
@@ -22,7 +26,7 @@ import { ORDER_CHANNEL_LABELS, ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS, STOCK
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import { AlertTriangle, Clock, CheckCircle, Calendar, ShoppingCart, Flame, Users } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle, Calendar, ShoppingCart, Flame, Users, Play, Square, Thermometer } from "lucide-react";
 
 const LEVEL_STYLE: Record<string, string> = {
   ok: "bg-status-ok-bg text-status-ok border-status-ok-edge",
@@ -112,6 +116,40 @@ export default function DashboardPage() {
     const cutoffIso = toIsoDate(cutoff);
     return preview.dailySummary.filter((d) => d.date >= todayIso && d.date <= cutoffIso);
   }, [orders, orderItems, products, steps, config, people, unavailability, blockedDays, categoryNameById, todayIso]);
+
+  // Production day — Open + Close Production actions and HACCP temperature log
+  const todayDay = useTodayProductionDay();
+  const tempCheckDevices = useMemo(() => equipment.filter((e) => e.requiresTempCheck && !e.archived), [equipment]);
+  const [tempModalOpen, setTempModalOpen] = useState(false);
+  const [previousReadings, setPreviousReadings] = useState<Map<string, number>>(new Map());
+  const [closeSummary, setCloseSummary] = useState<CloseProductionSummary | null>(null);
+  const [busyDayAction, setBusyDayAction] = useState<"opening" | "closing" | null>(null);
+
+  async function handleOpenProduction() {
+    setBusyDayAction("opening");
+    try {
+      await openProductionDay();
+      if (tempCheckDevices.length > 0) {
+        setPreviousReadings(await yesterdayTemperatureReadings());
+        setTempModalOpen(true);
+      }
+    } finally {
+      setBusyDayAction(null);
+    }
+  }
+
+  async function handleCloseProduction() {
+    if (!confirm("Close today's production? Unfinished steps will carry forward to tomorrow.")) return;
+    setBusyDayAction("closing");
+    try {
+      const summary = await closeProductionDay();
+      setCloseSummary(summary);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to close production");
+    } finally {
+      setBusyDayAction(null);
+    }
+  }
 
   // Capacity alerts from the preview
   const warnOrCritical = capacityPreview.filter((d) => d.level === "warn" || d.level === "critical" || d.level === "over");
@@ -239,12 +277,109 @@ export default function DashboardPage() {
   if (lowStock.length > 0) alerts.push({ level: "warn", text: `${lowStock.length} product/location below minimum`, href: "/stock" });
   if (expiryWarn.length > 0) alerts.push({ level: expiryWarn.some((r) => r.remainingDays <= 0) ? "critical" : "warn", text: `${expiryWarn.length} batch${expiryWarn.length > 1 ? "es" : ""} approaching sell-by`, href: "/stock" });
   if (overdueFollowups.length > 0) alerts.push({ level: "warn", text: `${overdueFollowups.length} overdue follow-up${overdueFollowups.length > 1 ? "s" : ""}`, href: "/customers" });
+  if (todayDay && !todayDay.closedAt && tempCheckDevices.length > 0 && !todayDay.tempLogComplete) {
+    alerts.push({ level: "warn", text: "Daily temperature log not completed", href: "/" });
+  }
 
   return (
     <div>
       <PageHeader title="Dashboard" description={new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} />
 
       <div className="px-4 pb-8 space-y-6">
+        {/* Production day controls */}
+        <section className="rounded-lg border border-border bg-card p-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className={`w-2 h-2 rounded-full ${
+              !todayDay
+                ? "bg-muted-foreground"
+                : todayDay.closedAt
+                  ? "bg-muted-foreground"
+                  : "bg-status-ok"
+            }`} />
+            <div>
+              <p className="text-sm font-semibold">
+                {!todayDay
+                  ? "Production day not opened"
+                  : todayDay.closedAt
+                    ? "Production closed for today"
+                    : "Production open"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {todayDay?.tempLogComplete
+                  ? "Temperature log complete for today"
+                  : tempCheckDevices.length > 0
+                    ? `${tempCheckDevices.length} device${tempCheckDevices.length === 1 ? "" : "s"} pending check`
+                    : "No equipment tagged for HACCP tracking"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {todayDay && !todayDay.closedAt && tempCheckDevices.length > 0 && !todayDay.tempLogComplete && (
+              <button
+                onClick={async () => {
+                  setPreviousReadings(await yesterdayTemperatureReadings());
+                  setTempModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1 rounded-full border border-status-warn-edge bg-status-warn-bg text-status-warn px-3 py-1.5 text-xs font-medium"
+              >
+                <Thermometer className="w-3.5 h-3.5" /> Log temperatures
+              </button>
+            )}
+            {!todayDay && (
+              <button
+                onClick={handleOpenProduction}
+                disabled={busyDayAction === "opening"}
+                className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              >
+                <Play className="w-3.5 h-3.5" /> Open production
+              </button>
+            )}
+            {todayDay && !todayDay.closedAt && (
+              <button
+                onClick={handleCloseProduction}
+                disabled={busyDayAction === "closing"}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary disabled:opacity-50"
+              >
+                <Square className="w-3.5 h-3.5" /> Close production
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* Close Production summary */}
+        {closeSummary && (
+          <section className="rounded-lg border border-status-ok-edge bg-status-ok-bg p-3 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-status-ok">Production closed</p>
+                <p className="text-xs text-foreground/80 mt-0.5">
+                  {closeSummary.stepsCompleted} step{closeSummary.stepsCompleted === 1 ? "" : "s"} completed
+                  {closeSummary.piecesProduced > 0 && ` · ${closeSummary.piecesProduced} pieces produced`}
+                  {closeSummary.batchesRun > 0 && ` · ${closeSummary.batchesRun} batch${closeSummary.batchesRun === 1 ? "" : "es"} run`}
+                </p>
+                {closeSummary.stepsCarriedForward > 0 && (
+                  <p className="text-xs text-foreground/80 mt-0.5">
+                    {closeSummary.stepsCarriedForward} unfinished step{closeSummary.stepsCarriedForward === 1 ? "" : "s"} carried forward to tomorrow.
+                  </p>
+                )}
+                {closeSummary.carriedDeadlineAffected.length > 0 && (
+                  <div className="mt-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-2.5 py-1.5 text-[11px] text-status-warn">
+                    <p className="font-medium">Deadlines at risk:</p>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {closeSummary.carriedDeadlineAffected.map((o) => (
+                        <li key={o.orderId}>
+                          {o.orderName} · due {new Date(o.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setCloseSummary(null)} className="text-xs text-muted-foreground hover:text-foreground">Dismiss</button>
+            </div>
+          </section>
+        )}
+
         {/* Alerts */}
         {alerts.length > 0 ? (
           <section className="space-y-2">
@@ -562,6 +697,25 @@ export default function DashboardPage() {
           </section>
         )}
       </div>
+
+      {/* HACCP temperature log popup */}
+      {tempModalOpen && todayDay && (
+        <TemperatureLogModal
+          devices={tempCheckDevices}
+          previousReadings={previousReadings}
+          onSave={async (entries) => {
+            await saveTemperatureReadings(entries, todayDay.id!);
+            setTempModalOpen(false);
+          }}
+          onSnooze={async () => {
+            // Snooze for today: close the popup. The dashboard banner keeps
+            // reminding via the persistent "Log temperatures" button, and the
+            // top-banner alert fires on the next page load. Reason is kept in
+            // a local-only memo for now (no schema hook yet).
+            setTempModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

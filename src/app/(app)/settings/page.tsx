@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { exportBackup, importBackup, clearAllData } from "@/lib/backup";
 import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry, usePeople, savePerson, deletePerson, archivePerson, usePersonUnavailability, savePersonUnavailability, deletePersonUnavailability, useEquipment, saveEquipment, deleteEquipment, archiveEquipment, useProductionSteps, saveProductionStep, deleteProductionStep, reorderProductionSteps } from "@/lib/hooks";
-import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, EQUIPMENT_KINDS, EQUIPMENT_KIND_LABELS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability, type Equipment, type EquipmentKind, type ProductionStep } from "@/types";
+import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, EQUIPMENT_KINDS, EQUIPMENT_KIND_LABELS, EQUIPMENT_LOCATIONS, EQUIPMENT_LOCATION_LABELS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability, type Equipment, type EquipmentKind, type ProductionStep } from "@/types";
 import { capacityConfigStatus, sortWeekdays, collectRoles } from "@/lib/capacity";
 import { equipmentAvailability, equipmentReadiness, EQUIPMENT_AVAILABILITY_LABEL } from "@/lib/equipment";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
@@ -1453,6 +1453,10 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
   const [manufacturer, setManufacturer] = useState(equipment?.manufacturer ?? "");
   const [model, setModel] = useState(equipment?.model ?? "");
   const [notes, setNotes] = useState(equipment?.notes ?? "");
+  const [requiresTempCheck, setRequiresTempCheck] = useState<boolean>(equipment?.requiresTempCheck ?? false);
+  const [tempMinC, setTempMinC] = useState(equipment?.tempMinC != null ? String(equipment.tempMinC) : "");
+  const [tempMaxC, setTempMaxC] = useState(equipment?.tempMaxC != null ? String(equipment.tempMaxC) : "");
+  const [location, setLocation] = useState<string>(equipment?.location ?? "");
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -1474,6 +1478,10 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
         currentScheduleId: equipment?.currentScheduleId,
         occupiedSince: equipment?.occupiedSince,
         expectedFreeAt: equipment?.expectedFreeAt,
+        requiresTempCheck,
+        tempMinC: parseOptionalFloat(tempMinC),
+        tempMaxC: parseOptionalFloat(tempMaxC),
+        location: (location === "shop" || location === "production" || location === "storage") ? location : undefined,
       });
       if (isNew) {
         setName("");
@@ -1483,6 +1491,10 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
         setManufacturer("");
         setModel("");
         setNotes("");
+        setRequiresTempCheck(false);
+        setTempMinC("");
+        setTempMaxC("");
+        setLocation("");
       }
       onSaved();
     } finally {
@@ -1581,6 +1593,59 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
           placeholder="Anything the scheduler should ignore but you want to remember"
           className="input resize-none"
         />
+      </div>
+
+      {/* HACCP temperature tracking — applies to fridges, freezers, chocolate
+          storage, and any other device that needs a daily temperature check. */}
+      <div className="rounded-md bg-muted/30 border border-border p-3 space-y-2">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={requiresTempCheck}
+            onChange={(e) => setRequiresTempCheck(e.target.checked)}
+            className="w-4 h-4"
+          />
+          Include in daily HACCP temperature log
+        </label>
+        {requiresTempCheck && (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="label">Location</label>
+              <select
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="input text-sm"
+              >
+                <option value="">—</option>
+                {EQUIPMENT_LOCATIONS.map((l) => (
+                  <option key={l} value={l}>{EQUIPMENT_LOCATION_LABELS[l]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Min °C</label>
+              <input
+                type="number"
+                step="0.5"
+                value={tempMinC}
+                onChange={(e) => setTempMinC(e.target.value)}
+                placeholder="e.g. 2"
+                className="input text-sm"
+              />
+            </div>
+            <div>
+              <label className="label">Max °C</label>
+              <input
+                type="number"
+                step="0.5"
+                value={tempMaxC}
+                onChange={(e) => setTempMaxC(e.target.value)}
+                placeholder="e.g. 5"
+                className="input text-sm"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2 pt-1">
@@ -2107,6 +2172,12 @@ function parsePositiveNum(s: string): number | undefined {
   if (isNaN(n) || n <= 0) return undefined;
   return n;
 }
+function parseOptionalFloat(s: string): number | undefined {
+  if (!s) return undefined;
+  const n = parseFloat(s);
+  return isNaN(n) ? undefined : n;
+}
+
 function parsePositiveInt(s: string): number | undefined {
   const n = parseInt(s, 10);
   if (isNaN(n) || n <= 0) return undefined;
