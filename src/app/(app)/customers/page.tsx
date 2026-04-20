@@ -7,7 +7,8 @@ import {
   useCustomers, saveCustomer, useOrders, useAllOrderItems,
 } from "@/lib/hooks";
 import { computeCustomerAnalytics } from "@/lib/customerAnalytics";
-import { Plus, Search, X, Archive } from "lucide-react";
+import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
+import { Plus, Search, X, Archive, AlertTriangle } from "lucide-react";
 
 export default function CustomersPage() {
   const customers = useCustomers(true);
@@ -218,6 +219,19 @@ export default function CustomersPage() {
                           {c.companyName}
                           {c.archived && <span className="ml-1.5 text-[10px] text-muted-foreground uppercase">archived</span>}
                         </p>
+                        {(() => {
+                          const miss = computeMissingRequiredCustomerFields(c);
+                          if (miss.length === 0) return null;
+                          return (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[10px] text-status-warn"
+                              title={`Missing: ${miss.join(", ")}`}
+                            >
+                              <AlertTriangle className="w-3 h-3" />
+                              {miss.length}
+                            </span>
+                          );
+                        })()}
                         {c.tags?.map((t) => (
                           <span key={t} className="rounded-full border border-border px-1.5 py-0 text-[10px] text-muted-foreground">
                             {t}

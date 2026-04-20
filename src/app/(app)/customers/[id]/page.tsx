@@ -8,16 +8,22 @@ import {
   useCustomerContacts, saveCustomerContact, deleteCustomerContact,
   useCustomerFollowups, saveCustomerFollowup, completeCustomerFollowup, deleteCustomerFollowup,
   useOrders, useAllOrderItems, useProductsList, useQuotes,
+  useCollections,
+  useCustomerProductPrices, saveCustomerProductPrice, deleteCustomerProductPrice,
 } from "@/lib/hooks";
 import { computeCustomerAnalytics } from "@/lib/customerAnalytics";
+import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
 import {
-  ArrowLeft, Phone, Mail, Users, ClipboardList, Plus, Trash2, Check, Archive, FileText,
+  ArrowLeft, Phone, Mail, Users, ClipboardList, Plus, Trash2, Check, Archive, FileText, AlertTriangle, Tag,
 } from "lucide-react";
 import {
   CUSTOMER_CONTACT_KINDS, CUSTOMER_CONTACT_LABELS,
   type CustomerContactKind,
   ORDER_STATUS_LABELS,
   QUOTE_STATUS_LABELS,
+  CUSTOMER_TYPES, CUSTOMER_TYPE_LABELS,
+  DELIVERY_TYPES, DELIVERY_TYPE_LABELS,
+  type CustomerType, type DeliveryType,
 } from "@/types";
 
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,6 +35,8 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const orderItems = useAllOrderItems();
   const products = useProductsList(true);
   const quotes = useQuotes({ customerId: id });
+  const collections = useCollections();
+  const customerProductPrices = useCustomerProductPrices(id);
 
   // Inline edit state
   const [editing, setEditing] = useState(false);
@@ -41,6 +49,15 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     vatNumber: "",
     tags: "",
     notes: "",
+    type: "" as CustomerType | "",
+    defaultDeliveryMethod: "" as DeliveryType | "",
+    invoiceAddress: "",
+    paymentTerms: "",
+    allergenNotes: "",
+    packagingPrefs: "",
+    language: "",
+    defaultPriceListId: "",
+    defaultDiscountPercent: "",
   }));
 
   // Hydrate form when the customer first loads
@@ -55,6 +72,16 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       vatNumber: customer.vatNumber ?? "",
       tags: (customer.tags ?? []).join(", "),
       notes: customer.notes ?? "",
+      type: customer.type ?? "",
+      defaultDeliveryMethod: customer.defaultDeliveryMethod ?? "",
+      invoiceAddress: customer.invoiceAddress ?? "",
+      paymentTerms: customer.paymentTerms ?? "",
+      allergenNotes: customer.allergenNotes ?? "",
+      packagingPrefs: customer.packagingPrefs ?? "",
+      language: customer.language ?? "",
+      defaultPriceListId: customer.defaultPriceListId ?? "",
+      defaultDiscountPercent: customer.defaultDiscountPercent != null
+        ? String(customer.defaultDiscountPercent) : "",
     });
     setHydratedFor(customer.id!);
   }
@@ -90,6 +117,11 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     return m;
   }, [orderItems]);
 
+  const missingRequired = useMemo(
+    () => customer ? computeMissingRequiredCustomerFields(customer) : [],
+    [customer],
+  );
+
   if (customer === undefined) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   }
@@ -107,6 +139,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   async function handleSaveProfile() {
     if (!customer) return;
     const tags = form.tags.split(",").map((t) => t.trim()).filter(Boolean);
+    const discountN = parseFloat(form.defaultDiscountPercent);
     await saveCustomer({
       id: customer.id,
       companyName: form.companyName.trim(),
@@ -117,6 +150,15 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       vatNumber: form.vatNumber.trim() || undefined,
       tags,
       notes: form.notes.trim() || undefined,
+      type: form.type === "" ? undefined : form.type,
+      defaultDeliveryMethod: form.defaultDeliveryMethod === "" ? undefined : form.defaultDeliveryMethod,
+      invoiceAddress: form.invoiceAddress.trim() || undefined,
+      paymentTerms: form.paymentTerms.trim() || undefined,
+      allergenNotes: form.allergenNotes.trim() || undefined,
+      packagingPrefs: form.packagingPrefs.trim() || undefined,
+      language: form.language.trim() || undefined,
+      defaultPriceListId: form.defaultPriceListId || undefined,
+      defaultDiscountPercent: Number.isFinite(discountN) && discountN >= 0 ? discountN : undefined,
       archived: customer.archived,
     });
     setEditing(false);
@@ -172,10 +214,35 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
+        {/* Missing data banner */}
+        {missingRequired.length > 0 && (
+          <button
+            onClick={() => setEditing(true)}
+            className="w-full flex items-center gap-2 rounded-lg border border-status-warn/40 bg-status-warn/5 px-3 py-2 text-left hover:bg-status-warn/10"
+          >
+            <AlertTriangle className="w-4 h-4 text-status-warn shrink-0" />
+            <span className="flex-1 text-sm">
+              <span className="font-medium text-status-warn">{missingRequired.length} missing field{missingRequired.length === 1 ? "" : "s"}</span>
+              <span className="text-muted-foreground"> — {missingRequired.join(", ")}</span>
+            </span>
+            <span className="text-xs text-status-warn">Fill →</span>
+          </button>
+        )}
+
         {/* Profile */}
         <section className="rounded-lg border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-primary">Profile</h2>
+            <h2 className="text-sm font-semibold text-primary flex items-center gap-2">
+              Profile
+              {missingRequired.length > 0 && (
+                <span
+                  className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-status-warn text-white text-[10px] font-bold"
+                  title={`Missing: ${missingRequired.join(", ")}`}
+                >
+                  {missingRequired.length}
+                </span>
+              )}
+            </h2>
             {!editing && (
               <button onClick={() => setEditing(true)} className="text-xs text-primary hover:underline">Edit</button>
             )}
@@ -183,11 +250,22 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {editing ? (
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className="label">Company name</label>
+                <label className="label">Company / name</label>
                 <input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} className="input text-sm" />
               </div>
               <div>
-                <label className="label">Contact name</label>
+                <label className="label">Type</label>
+                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as CustomerType | "" })} className="input text-sm">
+                  <option value="">— pick —</option>
+                  {CUSTOMER_TYPES.map((t) => <option key={t} value={t}>{CUSTOMER_TYPE_LABELS[t]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Language</label>
+                <input value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} placeholder="de / en / it" className="input text-sm" />
+              </div>
+              <div>
+                <label className="label">Contact person</label>
                 <input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className="input text-sm" />
               </div>
               <div>
@@ -199,12 +277,65 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input text-sm" />
               </div>
               <div>
-                <label className="label">VAT number</label>
+                <label className="label">VAT / UID</label>
                 <input value={form.vatNumber} onChange={(e) => setForm({ ...form, vatNumber: e.target.value })} className="input text-sm" />
               </div>
+              <div>
+                <label className="label">Default fulfilment</label>
+                <select value={form.defaultDeliveryMethod} onChange={(e) => setForm({ ...form, defaultDeliveryMethod: e.target.value as DeliveryType | "" })} className="input text-sm">
+                  <option value="">— pick —</option>
+                  {DELIVERY_TYPES.map((t) => <option key={t} value={t}>{DELIVERY_TYPE_LABELS[t]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Payment terms</label>
+                <input value={form.paymentTerms} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })} placeholder="Net 30, prepaid, …" className="input text-sm" />
+              </div>
               <div className="col-span-2">
-                <label className="label">Address</label>
+                <label className="label">Delivery / shop address</label>
                 <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="input text-sm" />
+              </div>
+              <div className="col-span-2">
+                <label className="label">Invoice address (if different)</label>
+                <input value={form.invoiceAddress} onChange={(e) => setForm({ ...form, invoiceAddress: e.target.value })} className="input text-sm" />
+              </div>
+
+              <div className="col-span-2 pt-2 border-t border-border">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Pricing</p>
+              </div>
+              <div>
+                <label className="label">Default price list</label>
+                <select value={form.defaultPriceListId} onChange={(e) => setForm({ ...form, defaultPriceListId: e.target.value })} className="input text-sm">
+                  <option value="">— none —</option>
+                  {collections.map((c) => <option key={c.id} value={c.id!}>{c.name}</option>)}
+                </select>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Used for per-product prices when the customer doesn't have a bespoke override.
+                </p>
+              </div>
+              <div>
+                <label className="label">Default discount (%)</label>
+                <input
+                  type="number" min={0} max={100} step={0.5}
+                  value={form.defaultDiscountPercent}
+                  onChange={(e) => setForm({ ...form, defaultDiscountPercent: e.target.value })}
+                  className="input text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Applied to retail when no list / override matches.
+                </p>
+              </div>
+
+              <div className="col-span-2 pt-2 border-t border-border">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Preferences</p>
+              </div>
+              <div className="col-span-2">
+                <label className="label">Allergen notes</label>
+                <textarea value={form.allergenNotes} onChange={(e) => setForm({ ...form, allergenNotes: e.target.value })} placeholder="e.g. no nuts, lactose-free only" rows={2} className="input text-sm resize-none" />
+              </div>
+              <div className="col-span-2">
+                <label className="label">Packaging preferences</label>
+                <textarea value={form.packagingPrefs} onChange={(e) => setForm({ ...form, packagingPrefs: e.target.value })} placeholder="e.g. always ribbon, no plastic" rows={2} className="input text-sm resize-none" />
               </div>
               <div className="col-span-2">
                 <label className="label">Tags (comma-separated)</label>
@@ -221,11 +352,26 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             </div>
           ) : (
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              {customer.type && <><dt className="text-muted-foreground text-xs">Type</dt><dd>{CUSTOMER_TYPE_LABELS[customer.type]}</dd></>}
               {customer.contactName && <><dt className="text-muted-foreground text-xs">Contact</dt><dd>{customer.contactName}</dd></>}
               {customer.email && <><dt className="text-muted-foreground text-xs">Email</dt><dd className="inline-flex items-center gap-1"><Mail className="w-3 h-3" /> <a href={`mailto:${customer.email}`} className="hover:underline">{customer.email}</a></dd></>}
               {customer.phone && <><dt className="text-muted-foreground text-xs">Phone</dt><dd className="inline-flex items-center gap-1"><Phone className="w-3 h-3" /> {customer.phone}</dd></>}
-              {customer.vatNumber && <><dt className="text-muted-foreground text-xs">VAT</dt><dd className="font-mono text-xs">{customer.vatNumber}</dd></>}
-              {customer.address && <><dt className="text-muted-foreground text-xs">Address</dt><dd>{customer.address}</dd></>}
+              {customer.defaultDeliveryMethod && <><dt className="text-muted-foreground text-xs">Default fulfilment</dt><dd>{DELIVERY_TYPE_LABELS[customer.defaultDeliveryMethod]}</dd></>}
+              {customer.vatNumber && <><dt className="text-muted-foreground text-xs">VAT / UID</dt><dd className="font-mono text-xs">{customer.vatNumber}</dd></>}
+              {customer.paymentTerms && <><dt className="text-muted-foreground text-xs">Payment</dt><dd>{customer.paymentTerms}</dd></>}
+              {customer.language && <><dt className="text-muted-foreground text-xs">Language</dt><dd className="uppercase">{customer.language}</dd></>}
+              {customer.address && <><dt className="text-muted-foreground text-xs">Delivery address</dt><dd>{customer.address}</dd></>}
+              {customer.invoiceAddress && <><dt className="text-muted-foreground text-xs">Invoice address</dt><dd>{customer.invoiceAddress}</dd></>}
+              {customer.defaultPriceListId && (
+                <><dt className="text-muted-foreground text-xs">Price list</dt>
+                <dd>{collections.find((c) => c.id === customer.defaultPriceListId)?.name ?? "—"}</dd></>
+              )}
+              {customer.defaultDiscountPercent != null && customer.defaultDiscountPercent > 0 && (
+                <><dt className="text-muted-foreground text-xs">Default discount</dt>
+                <dd>{customer.defaultDiscountPercent}%</dd></>
+              )}
+              {customer.allergenNotes && <><dt className="text-muted-foreground text-xs col-span-2">Allergen notes</dt><dd className="col-span-2 text-xs">{customer.allergenNotes}</dd></>}
+              {customer.packagingPrefs && <><dt className="text-muted-foreground text-xs col-span-2">Packaging preferences</dt><dd className="col-span-2 text-xs">{customer.packagingPrefs}</dd></>}
               {customer.tags?.length ? (
                 <><dt className="text-muted-foreground text-xs">Tags</dt>
                 <dd className="flex gap-1 flex-wrap">
@@ -236,6 +382,13 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             </dl>
           )}
         </section>
+
+        {/* Per-product custom prices */}
+        <CustomerProductPricesSection
+          customerId={customer.id!}
+          prices={customerProductPrices}
+          products={products}
+        />
 
         {/* Analytics */}
         {analytics && (
@@ -514,5 +667,125 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="text-lg font-semibold tabular-nums">{value}</p>
     </div>
+  );
+}
+
+// ─── Per-customer product pricing section ──────────────────────
+
+function CustomerProductPricesSection({
+  customerId, prices, products,
+}: {
+  customerId: string;
+  prices: Array<{ id?: string; productId: string; unitPrice: number; notes?: string }>;
+  products: Array<{ id?: string; name: string; archived?: boolean }>;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [productId, setProductId] = useState("");
+  const [price, setPrice] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  const productById = new Map(products.map((p) => [p.id!, p]));
+  const active = products.filter((p) => !p.archived);
+
+  async function handleAdd() {
+    if (!productId || !price) return;
+    const priceN = parseFloat(price);
+    if (!Number.isFinite(priceN) || priceN < 0) { setSaveError("Invalid price"); return; }
+    setSaving(true);
+    setSaveError("");
+    try {
+      await saveCustomerProductPrice({
+        customerId,
+        productId,
+        unitPrice: priceN,
+        notes: notes.trim() || undefined,
+      });
+      setProductId("");
+      setPrice("");
+      setNotes("");
+      setAdding(false);
+    } catch (err) {
+      const raw: { message?: string; code?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      setSaveError(raw.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
+          <Tag className="w-4 h-4" /> Custom product prices ({prices.length})
+        </h2>
+        {!adding && (
+          <button onClick={() => setAdding(true)} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+            <Plus className="w-3 h-3" /> Add
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="rounded-md border border-border p-3 space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <select value={productId} onChange={(e) => setProductId(e.target.value)} className="input text-sm">
+                <option value="">— pick product —</option>
+                {active.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <input
+                type="number" min={0} step={0.01}
+                value={price} onChange={(e) => setPrice(e.target.value)}
+                placeholder="€ net"
+                className="input text-sm"
+              />
+            </div>
+          </div>
+          <input
+            value={notes} onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            className="input text-sm"
+          />
+          <div className="flex items-center gap-2">
+            <button onClick={handleAdd} disabled={saving || !productId || !price}
+              className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
+              {saving ? "Saving…" : "Add"}
+            </button>
+            <button onClick={() => setAdding(false)} className="text-xs text-muted-foreground hover:underline">Cancel</button>
+          </div>
+          {saveError && <p className="text-xs text-status-alert">{saveError}</p>}
+        </div>
+      )}
+
+      {prices.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">
+          No custom prices. The customer pays the price list / default.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border rounded-md border border-border">
+          {prices.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 px-3 py-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm truncate">{productById.get(p.productId)?.name ?? p.productId}</p>
+                {p.notes && <p className="text-[11px] text-muted-foreground truncate">{p.notes}</p>}
+              </div>
+              <p className="text-sm font-medium tabular-nums">€{p.unitPrice.toFixed(2)}</p>
+              <button
+                onClick={() => p.id && deleteCustomerProductPrice(p.id)}
+                className="text-muted-foreground hover:text-destructive"
+                aria-label="Remove custom price"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
