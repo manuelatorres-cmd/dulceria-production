@@ -3,9 +3,12 @@
 import {
   useProductionPlans, useProductsList, useMouldsList,
   useAllPlanProducts, useAllPlanStepStatuses, deleteProductionPlan,
+  useProductionSchedule, useOrders,
+  useCapacityConfig, usePeople, usePersonUnavailability, useBlockedDays,
 } from "@/lib/hooks";
+import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import { PageHeader } from "@/components/page-header";
-import { Plus, Trash2, ChevronRight, ChevronDown, BookOpen, Search, StickyNote, Copy } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronDown, BookOpen, Search, StickyNote, Copy, Calendar } from "lucide-react";
 import { CollapseControls } from "@/components/pantry";
 import Link from "next/link";
 import { useState, useMemo } from "react";
@@ -31,7 +34,7 @@ export default function ProductionPage() {
   const allStepStatuses = useAllPlanStepStatuses();
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [view, setView] = useState<"active" | "history">("active");
+  const [view, setView] = useState<"active" | "scheduled" | "history">("active");
   const [search, setSearch] = useState("");
   const [range, setRange] = useState<TimeRange>("90d");
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
@@ -136,6 +139,7 @@ export default function ProductionPage() {
   }
 
   const isHistory = view === "history";
+  const isScheduled = view === "scheduled";
   const totalHistory = historyPlans.length;
   const showingStrip = isHistory && totalHistory > 0;
 
@@ -150,6 +154,13 @@ export default function ProductionPage() {
               className={`px-3 py-1.5 transition-colors ${view === "active" ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground"}`}
             >
               Active
+            </button>
+            <button
+              onClick={() => setView("scheduled")}
+              className={`px-3 py-1.5 transition-colors ${view === "scheduled" ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground"}`}
+              title="Upcoming schedule from the Plan page's Regenerate"
+            >
+              Scheduled
             </button>
             <button
               onClick={() => setView("history")}
@@ -217,7 +228,9 @@ export default function ProductionPage() {
           </p>
         )}
 
-        {filtered.length === 0 ? (
+        {isScheduled ? (
+          <ScheduledRunsSection productMap={productMap} search={search.trim()} />
+        ) : filtered.length === 0 ? (
           <p className="text-muted-foreground text-sm py-8 text-center">
             {search
               ? isHistory && outsideRangeCount > 0
@@ -485,6 +498,173 @@ function PlanRow({
           )}
         </div>
       </div>
+    </li>
+  );
+}
+
+// ─── Scheduled runs (scheduler output from Plan → Regenerate) ────
+
+function ScheduledRunsSection({
+  productMap, search,
+}: {
+  productMap: Map<string, Product>;
+  search: string;
+}) {
+  const schedule = useProductionSchedule();
+  const orders = useOrders();
+  const config = useCapacityConfig();
+  const people = usePeople(false);
+  const unavailability = usePersonUnavailability();
+  const blocked = useBlockedDays();
+
+  const orderById = useMemo(() => new Map(orders.map((o) => [o.id!, o])), [orders]);
+
+  // Filter to future-or-today entries by default; only show completed if
+  // they're on today — old 'done' rows clutter the view.
+  const now = new Date();
+  const todayIso = now.toISOString().slice(0, 10);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return schedule.filter((s) => {
+      const dayIso = s.startAt.slice(0, 10);
+      // Keep today + future; always keep non-done older rows so stuck
+      // entries stay visible.
+      if (dayIso < todayIso && s.status === "done") return false;
+      if (!q) return true;
+      const pName = productMap.get(s.productId)?.name?.toLowerCase() ?? "";
+      const oName = s.orderId
+        ? (orderById.get(s.orderId)?.customerName ?? "").toLowerCase()
+        : "";
+      return s.phase.toLowerCase().includes(q)
+        || pName.includes(q)
+        || oName.includes(q)
+        || dayIso.includes(q);
+    });
+  }, [schedule, search, productMap, orderById, todayIso]);
+
+  const byDay = useMemo(() => {
+    const m = new Map<string, typeof filtered>();
+    for (const s of filtered) {
+      const k = s.startAt.slice(0, 10);
+      const arr = m.get(k) ?? [];
+      arr.push(s);
+      m.set(k, arr);
+    }
+    for (const arr of m.values()) {
+      arr.sort((a, b) => a.startAt.localeCompare(b.startAt));
+    }
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [filtered]);
+
+  if (schedule.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm py-8 text-center">
+        No schedule yet. Open <Link href="/plan" className="text-primary hover:underline">Plan</Link>
+        {" "}and tap Regenerate to build one from pending orders.
+      </p>
+    );
+  }
+  if (filtered.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm py-8 text-center">
+        {search ? "No scheduled runs match your search." : "Nothing left on the schedule — all future work is done."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {byDay.map(([dayIso, entries]) => {
+        const dayDate = new Date(dayIso + "T12:00:00");
+        const capacityMinutes = effectiveDailyCapacityMinutes(
+          dayDate, config, people, unavailability, blocked,
+        );
+        const activeMinutes = entries.filter((e) => e.isActive)
+          .reduce((a, e) => a + e.durationMinutes, 0);
+        const util = capacityMinutes > 0
+          ? Math.round((activeMinutes / capacityMinutes) * 100)
+          : 0;
+        const barColor =
+          capacityMinutes > 0 && activeMinutes > capacityMinutes ? "bg-status-alert"
+            : util >= 90 ? "bg-status-warn"
+              : "bg-status-ok";
+        const isPast = dayIso < todayIso;
+
+        return (
+          <div key={dayIso} className="rounded-lg border border-border bg-card">
+            <div className={`flex items-center justify-between gap-3 px-3 py-2 border-b border-border ${isPast ? "bg-muted/30" : ""}`}>
+              <div className="flex items-center gap-2 min-w-0">
+                <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <p className="text-sm font-medium">
+                  {dayDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                  {isPast && <span className="ml-1.5 text-[10px] uppercase text-muted-foreground">past</span>}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full ${barColor}`}
+                    style={{ width: capacityMinutes > 0 ? `${Math.min(100, util)}%` : "0%" }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground tabular-nums">
+                  {Math.round(activeMinutes / 6) / 10}h
+                  {capacityMinutes > 0 && ` / ${Math.round(capacityMinutes / 60)}h`}
+                </p>
+              </div>
+            </div>
+            <ul className="divide-y divide-border">
+              {entries.map((e) => (
+                <ScheduleRow key={e.id} entry={e} product={productMap.get(e.productId)} order={e.orderId ? orderById.get(e.orderId) : undefined} />
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScheduleRow({ entry, product, order }: {
+  entry: import("@/types").ProductionScheduleEntry;
+  product?: { id?: string; name: string };
+  order?: { id?: string; customerName?: string; eventName?: string };
+}) {
+  const statusColor = {
+    pending: "bg-muted text-muted-foreground",
+    in_progress: "bg-primary/10 text-primary",
+    done: "bg-status-ok/15 text-status-ok",
+    skipped: "bg-muted text-muted-foreground line-through",
+    blocked: "bg-status-alert/15 text-status-alert",
+  }[entry.status];
+
+  const timeStr = entry.startAt.slice(11, 16);
+  const orderLabel = order?.customerName || order?.eventName || "";
+
+  return (
+    <li className={`flex items-center gap-3 px-3 py-2 text-sm ${entry.status === "done" ? "opacity-60" : ""}`}>
+      <span className="tabular-nums text-muted-foreground w-11 shrink-0">{timeStr}</span>
+      <div className="flex-1 min-w-0">
+        <p className={`truncate ${entry.status === "done" ? "line-through" : ""}`}>
+          <span className="font-medium">{product?.name ?? entry.productId}</span>
+          <span className="text-muted-foreground"> · {entry.phase}</span>
+        </p>
+        {orderLabel && entry.orderId && (
+          <Link
+            href={`/orders/${encodeURIComponent(entry.orderId)}`}
+            className="text-[11px] text-primary hover:underline truncate inline-block max-w-full"
+          >
+            Order: {orderLabel}
+          </Link>
+        )}
+      </div>
+      <span className="tabular-nums text-xs text-muted-foreground shrink-0">
+        {entry.durationMinutes}m
+      </span>
+      <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${statusColor}`}>
+        {entry.status.replace("_", " ")}
+      </span>
     </li>
   );
 }

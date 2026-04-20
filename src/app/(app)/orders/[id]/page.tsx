@@ -171,6 +171,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     quantity: i.quantity,
     activeMinutesPerUnit: activeMinutesMap.get(i.productId) ?? 0,
     unitCost: productUnitCost.get(i.productId) ?? 0,
+    isBorrow: i.fulfilmentMode === "borrow",
   }));
   const orderPackagingRollupLines: OrderPackagingRollupLine[] = packagingLines.map((l) => ({
     packagingId: l.packagingId,
@@ -1722,7 +1723,7 @@ function OrderSummaryCard({
         : "border-status-alert/40 bg-status-alert/5 text-status-alert";
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3 lg:sticky lg:top-4">
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
       {/* Customer-facing totals */}
       <div className="space-y-1.5">
         <TotalLine label="Products (net)" value={productsSubtotalNet} />

@@ -23,6 +23,12 @@ export interface OrderProductLine {
   /** Current ingredient + decoration cost for one piece (from the
    *  latest productCostSnapshot). */
   unitCost: number;
+  /** True when the line is fulfilled by borrowing from Store stock.
+   *  Borrow lines contribute zero production minutes (pralines are
+   *  already made — only order-specific packing runs, which is
+   *  captured separately via OrderPackagingRollupLine) and are always
+   *  green in the feasibility check. */
+  isBorrow?: boolean;
 }
 
 export interface OrderPackagingRollupLine {
@@ -49,7 +55,12 @@ export function computeOrderLabourHours(
   packaging: OrderPackagingRollupLine[],
 ): LabourHoursResult {
   const productMinutes = products.reduce(
-    (acc, p) => acc + Math.max(0, (p.activeMinutesPerUnit || 0) * Math.max(0, p.quantity)),
+    (acc, p) => {
+      // Borrow lines carry zero production labour — pieces come out
+      // of Store already finished.
+      if (p.isBorrow) return acc;
+      return acc + Math.max(0, (p.activeMinutesPerUnit || 0) * Math.max(0, p.quantity));
+    },
     0,
   );
   const packagingMinutes = packaging.reduce(
@@ -159,6 +170,9 @@ export function checkOrderFeasibility(input: OrderFeasibilityInput): OrderFeasib
 
   const shortfalls: ProductShortfall[] = [];
   for (const line of input.productLines) {
+    // Borrow lines are fulfilled from Store stock that was allocated
+    // at order-save time — they can't cause a shortfall.
+    if (line.isBorrow) continue;
     const s = stockByProduct.get(line.productId) ?? {
       productId: line.productId,
       availablePieces: 0,

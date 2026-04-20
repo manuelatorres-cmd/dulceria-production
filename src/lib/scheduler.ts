@@ -120,10 +120,23 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
         continue;
       }
 
-      const steps = (stepsByType.get(productType) ?? []).sort((a, b) => a.sortOrder - b.sortOrder);
-      if (steps.length === 0) {
+      const allSteps = (stepsByType.get(productType) ?? []).sort((a, b) => a.sortOrder - b.sortOrder);
+      if (allSteps.length === 0) {
         unscheduled.add(order.id!);
         warnings.push(`No production steps defined for category "${productType}". Add them under Settings → Production Steps.`);
+        continue;
+      }
+
+      // Borrow lines come straight out of Store stock — the full
+      // production cycle already ran on the replenishment order. Only
+      // packing-into-boxes for this specific order remains, so filter
+      // the step list to isPackingStep=true. If no packing steps are
+      // defined, the line is treated as needing zero work.
+      const isBorrow = item.fulfilmentMode === "borrow";
+      const steps = isBorrow ? allSteps.filter((s) => s.isPackingStep) : allSteps;
+      if (isBorrow && steps.length === 0) {
+        // Nothing to schedule — borrow from Store with no packing work
+        // defined is still a valid "green" line; don't warn, just skip.
         continue;
       }
 

@@ -29,6 +29,20 @@ describe("computeOrderLabourHours", () => {
     );
     expect(result.totalMinutes).toBe(0);
   });
+
+  it("borrow lines contribute zero product minutes", () => {
+    const result = computeOrderLabourHours(
+      [
+        { productId: "p1", quantity: 20, activeMinutesPerUnit: 3, unitCost: 0 },
+        { productId: "p2", quantity: 10, activeMinutesPerUnit: 5, unitCost: 0, isBorrow: true },
+      ],
+      [{ packagingId: "bx", quantity: 10, packingMinutesPerUnit: 2, unitCost: 0 }],
+    );
+    // Only p1's 60 min count; p2 borrowed → 0.
+    expect(result.productMinutes).toBe(60);
+    expect(result.packagingMinutes).toBe(20);
+    expect(result.totalMinutes).toBe(80);
+  });
 });
 
 describe("computeOrderCalculatedCost", () => {
@@ -115,5 +129,20 @@ describe("checkOrderFeasibility", () => {
     });
     expect(r.severity).toBe("red");
     expect(r.shortfalls[0].shortPieces).toBe(30);
+  });
+
+  it("borrow lines never contribute to shortfalls even without stock", () => {
+    const r = checkOrderFeasibility({
+      productLines: [
+        { productId: "p1", quantity: 30, activeMinutesPerUnit: 3, unitCost: 1, isBorrow: true },
+      ],
+      stock: [],
+      totalLabourHours: 0,
+      dailyCapacityHours: 8,
+      workingDaysToDeadline: 5,
+      committedHoursToDeadline: 0,
+    });
+    expect(r.shortfalls).toHaveLength(0);
+    expect(r.severity).toBe("green");
   });
 });
