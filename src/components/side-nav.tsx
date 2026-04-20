@@ -170,7 +170,7 @@ export function SideNav() {
       style={{ backgroundColor: "var(--color-nav)" }}
     >
       <Link
-        href="/app"
+        href="/dashboard"
         title="Home"
         className="flex items-center gap-2 px-2 py-3 shrink-0 rounded-lg hover:bg-muted/60 transition-colors"
       >
@@ -195,12 +195,12 @@ export function SideNav() {
           <>
             {/* Home — always available so testers can return to the main menu */}
             <Link
-              href="/app"
-              title="Main menu"
+              href="/dashboard"
+              title="Dashboard"
               className="flex items-center gap-3 px-2 py-2.5 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
             >
               <HomeIcon className="w-5 h-5 shrink-0" />
-              <span className={`${labelClass} text-sm truncate`}>Main menu</span>
+              <span className={`${labelClass} text-sm truncate`}>Dashboard</span>
             </Link>
             {/* Section label */}
             <span className={`${labelClass} px-2 pt-3 pb-1 text-xs font-semibold text-muted-foreground/60 uppercase tracking-wide truncate`}>
