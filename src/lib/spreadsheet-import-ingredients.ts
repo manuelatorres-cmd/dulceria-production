@@ -70,6 +70,20 @@ function parseNutritionColumns(row: Record<string, string>): NutritionData | und
   return Object.keys(data).length > 0 ? data : undefined;
 }
 
+/** Look up an allergen value across tolerant header variants.
+ *  Accepts `allergen_gluten`, `allergen_Gluten`, `ALLERGEN_GLUTEN`,
+ *  `gluten`, `Gluten`, etc. — so users who stripped the prefix or
+ *  changed casing in their CSV still get their allergen flags read. */
+function readAllergenCell(row: Record<string, string>, id: string): string | undefined {
+  const prefixed = `allergen_${id}`.toLowerCase();
+  const bare = id.toLowerCase();
+  for (const key in row) {
+    const k = key.toLowerCase().trim();
+    if (k === prefixed || k === bare) return row[key];
+  }
+  return undefined;
+}
+
 export function mapIngredientRow(row: Record<string, string>): Omit<Ingredient, "id"> {
   return {
     name: (row.name ?? "").trim(),
@@ -93,7 +107,7 @@ export function mapIngredientRow(row: Record<string, string>): Omit<Ingredient, 
     solids: toNum(row.solids),
     otherFats: toNum(row.otherFats),
     alcohol: toNumOpt(row.alcohol),
-    allergens: ALLERGEN_COLUMNS.filter((id) => toBoolOpt(row[`allergen_${id}`]) === true),
+    allergens: ALLERGEN_COLUMNS.filter((id) => toBoolOpt(readAllergenCell(row, id)) === true),
     // Default to false when the cell is empty so we don't depend on the
     // DB `default false` clause firing. Some environments have reported
     // 23502 NOT-NULL violations on these columns — sending an explicit

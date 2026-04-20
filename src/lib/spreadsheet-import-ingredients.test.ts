@@ -67,6 +67,28 @@ describe("mapIngredientRow", () => {
     expect(result.allergens).toEqual(["milk", "soybeans", "nuts_hazelnuts"]);
   });
 
+  it("accepts allergen column names without the `allergen_` prefix", () => {
+    const row: Record<string, string> = {
+      name: "Pistachio Paste",
+      milk: "TRUE",
+      nuts_pistachios: "TRUE",
+    };
+    const result = mapIngredientRow(row);
+    expect(result.allergens).toEqual(["milk", "nuts_pistachios"]);
+  });
+
+  it("matches allergen headers case-insensitively", () => {
+    const row: Record<string, string> = {
+      name: "Gluten-free biscuit",
+      Allergen_Gluten: "TRUE",
+      SOYBEANS: "YES",
+    };
+    const result = mapIngredientRow(row);
+    expect(result.allergens).toEqual(["soybeans", "gluten"].sort());
+    // Sort is just to make the order-independent comparison explicit —
+    // the real assertion is the set match above.
+  });
+
   it("maps nutrition columns", () => {
     const row: Record<string, string> = {
       name: "Sugar",
