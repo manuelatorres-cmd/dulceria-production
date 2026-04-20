@@ -1,34 +1,56 @@
 /**
- * Reverse scheduler — pure logic.
+ * Reverse scheduler — mould-wave model.
  *
- * Input: open orders + their line items + products + production steps +
- * per-day capacity (people + unavailability + blocked days). Output: one
- * `ProductionScheduleEntry` per step per order-line, placed on calendar
- * dates working backwards from each order's deadline so the last step
- * finishes by the deadline day.
+ * The workshop makes chocolates in *waves*: every product in an order
+ * that shares a category goes through the same mould flow together.
+ * The team tempers everyone's shell chocolate, shells every mould,
+ * fills every mould, caps, rests, unmoulds, polishes, packs — in that
+ * order, one step at a time, not one product at a time.
  *
- * Simplifying assumptions (v1):
- *   - Every step's active time scales linearly with quantity (activeMinutes
- *     is per-mould × quantity worth of mould-fills). Waiting time is fixed
- *     per step (a resting window, not per-mould).
- *   - Active time books against the per-day people-hours budget. The
- *     scheduler won't stuff more minutes into a day than `effectiveDailyCapacityMinutes`
- *     allows. When a day is full, remaining minutes roll to the previous
- *     working day.
- *   - Waiting time only affects the calendar position of the next step
- *     (you can't start step N+1 until the waiting window has elapsed);
- *     it doesn't eat capacity.
- *   - Equipment + mould allocation is NOT done at this layer. Schedule
- *     rows land with `mouldId` = product.defaultMouldId and `equipmentId`
- *     undefined. §5+ work can assign specific instances later.
+ * A previous version scheduled each product's full step chain
+ * serially before starting the next product. That spread a realistic
+ * one-day run across eight days because every "temper" landed on its
+ * own day. The fix is to treat the unit of scheduling as *a step
+ * across the whole wave*, not *a product's entire chain*.
  *
- * This is deliberately minimal — enough to produce a daily view + capacity
- * alerts without getting tangled in equipment/mould bin-packing up front.
+ * Rules (mirrors the spec):
+ *   1. Group order lines by productCategoryId — each category is one
+ *      wave within the order.
+ *   2. For each step in the wave: total active minutes =
+ *      Σ (step.activeMinutes × mouldsNeeded_p) for every product p in
+ *      the wave. mouldsNeeded = ceil(item.quantity / mould.cavities).
+ *   3. Daily capacity budget consumes active minutes only. Waiting
+ *      time adds calendar time between steps but never consumes the
+ *      people-hours budget.
+ *   4. Reverse packing: the last step ends by the order deadline;
+ *      earlier steps finish before the next step's start minus the
+ *      current step's waiting window. A step overflowing one day rolls
+ *      back into the previous working day, respecting blocked days +
+ *      unavailability.
+ *   5. Per-product rows are emitted one per (product, day-slot). All
+ *      products in a wave share the same startAt within a slot — they
+ *      run concurrently on their own moulds. Each row's
+ *      durationMinutes is the product's share so the daily capacity
+ *      tally stays correct (Σ durations = total step active minutes).
+ *
+ * Borrow lines (fulfilmentMode === 'borrow') are skipped entirely
+ * here — pralines come out of Store stock already finished. Packing-
+ * step filtering for borrow lines runs elsewhere when the engine
+ * wires into a wave (not yet implemented in this rewrite).
+ *
+ * Simplifying assumptions still in place:
+ *   - Wave time is bucketed by working day; within a day everything
+ *     starts at 08:00. Wall-clock precision is not needed for the
+ *     capacity / day-grouping view the /plan + /production pages show.
+ *   - Waiting windows bump the "next step" back by one working day
+ *     when the window is long (≥ 4h), otherwise they're absorbed in
+ *     the same day. Overnight rests (shell cooling, cap setting) model
+ *     correctly this way; short rests don't introduce phantom days.
  */
 
 import type {
   Order, OrderItem, Product, ProductionStep, Person, PersonUnavailability,
-  EventCalendarEntry, CapacityConfig, ProductionScheduleEntry,
+  EventCalendarEntry, CapacityConfig, ProductionScheduleEntry, Mould,
 } from "@/types";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 
@@ -37,6 +59,7 @@ export interface SchedulerInput {
   orderItems: OrderItem[];
   products: Product[];
   productionSteps: ProductionStep[];
+  moulds: Mould[];
   config: CapacityConfig | null;
   people: Person[];
   unavailability: PersonUnavailability[];
@@ -67,13 +90,17 @@ export interface SchedulerResult {
   unscheduledOrderIds: string[];
 }
 
-/**
- * Build a full schedule from the current order set. Pure — caller writes
- * entries to Supabase via `saveProductionSchedule`.
- */
+/** Waiting windows at or above this threshold (in minutes) force the
+ *  next step onto the previous working day when reverse-packing. Below
+ *  the threshold, waiting is absorbed inside the same day — same-day
+ *  rests (short cooling / drying) don't add calendar days. */
+const LONG_WAIT_MINUTES = 240;
+
+/** Build a full schedule from the current order set. Pure — caller writes
+ *  entries to Supabase via `replaceProductionSchedule`. */
 export function buildSchedule(input: SchedulerInput): SchedulerResult {
   const {
-    orders, orderItems, products, productionSteps,
+    orders, orderItems, products, productionSteps, moulds,
     config, people, unavailability, blockedDays, categoryNameById,
   } = input;
 
@@ -82,27 +109,30 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
   const unscheduled = new Set<string>();
 
   const productMap = new Map<string, Product>(products.map((p) => [p.id!, p]));
+  const mouldMap = new Map<string, Mould>(moulds.map((m) => [m.id!, m]));
   const itemsByOrder = groupBy(orderItems, (i) => i.orderId);
   const stepsByType = groupBy(productionSteps, (s) => s.productType);
 
-  // Book-keeping: minutes consumed per ISO date
   const usedByDate = new Map<string, number>();
 
-  // Only schedule orders that are pending or in_production
   const scheduleable = orders.filter((o) => o.status === "pending" || o.status === "in_production");
-
-  // Process by deadline — earliest first so later deadlines can still find capacity
   const sorted = [...scheduleable].sort((a, b) => a.deadline.localeCompare(b.deadline));
 
   for (const order of sorted) {
-    const items = itemsByOrder.get(order.id!) ?? [];
+    const items = (itemsByOrder.get(order.id!) ?? [])
+      .filter((i) => (i.fulfilmentMode ?? "produce") === "produce");
     if (items.length === 0) {
-      warnings.push(`Order "${order.customerName ?? order.eventName ?? order.id}" has no product lines — nothing to schedule.`);
+      // Either an empty order or a 100 %-borrow order — nothing to
+      // produce either way. Don't warn for borrow-only orders; they're
+      // intentionally empty on the production board.
       continue;
     }
 
-    const deadline = new Date(order.deadline);
+    const deadline = dateOnly(new Date(order.deadline));
 
+    // Group items into per-category waves. The productType used as the
+    // productionSteps key is the category name.
+    const wavesByType = new Map<string, OrderItem[]>();
     for (const item of items) {
       const product = productMap.get(item.productId);
       if (!product) {
@@ -110,61 +140,81 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
         warnings.push(`Order "${order.customerName ?? order.id}" references unknown product ${item.productId}.`);
         continue;
       }
-
-      const productType = product.productCategoryId
+      const typeName = product.productCategoryId
         ? categoryNameById.get(product.productCategoryId)
         : undefined;
-      if (!productType) {
+      if (!typeName) {
         unscheduled.add(order.id!);
         warnings.push(`Product "${product.name}" has no category — no step list available. Assign a category in Products.`);
         continue;
       }
+      const arr = wavesByType.get(typeName) ?? [];
+      arr.push(item);
+      wavesByType.set(typeName, arr);
+    }
 
-      const allSteps = (stepsByType.get(productType) ?? []).sort((a, b) => a.sortOrder - b.sortOrder);
-      if (allSteps.length === 0) {
+    for (const [typeName, waveItems] of wavesByType) {
+      const steps = (stepsByType.get(typeName) ?? []).sort((a, b) => a.sortOrder - b.sortOrder);
+      if (steps.length === 0) {
         unscheduled.add(order.id!);
-        warnings.push(`No production steps defined for category "${productType}". Add them under Settings → Production Steps.`);
+        warnings.push(`No production steps defined for category "${typeName}". Add them under Settings → Production Steps.`);
         continue;
       }
 
-      // Borrow lines come straight out of Store stock — the full
-      // production cycle already ran on the replenishment order. Only
-      // packing-into-boxes for this specific order remains, so filter
-      // the step list to isPackingStep=true. If no packing steps are
-      // defined, the line is treated as needing zero work.
-      const isBorrow = item.fulfilmentMode === "borrow";
-      const steps = isBorrow ? allSteps.filter((s) => s.isPackingStep) : allSteps;
-      if (isBorrow && steps.length === 0) {
-        // Nothing to schedule — borrow from Store with no packing work
-        // defined is still a valid "green" line; don't warn, just skip.
-        continue;
-      }
+      // Pre-compute mould count per product. Borrow filtering already
+      // happened — everyone in the wave is produce-fresh.
+      const waveLines = waveItems.map((item) => {
+        const product = productMap.get(item.productId)!;
+        const mould = product.defaultMouldId ? mouldMap.get(product.defaultMouldId) : undefined;
+        const cavities = mould?.numberOfCavities ?? 0;
+        const mouldsNeeded = cavities > 0 ? Math.ceil(item.quantity / cavities) : 1;
+        return { item, product, mouldsNeeded };
+      });
 
-      // Walk steps in reverse: last step ends by deadline, earlier steps
-      // finish before the next step's start (minus waiting window).
-      let nextStartDate = dateOnly(deadline);
-      const reverseSteps = [...steps].reverse();
+      // Reverse-pack the wave. `nextStartDay` is the day the next step
+      // (the one AFTER the one we're about to place) starts on.
+      let nextStartDay = deadline;
 
-      for (const step of reverseSteps) {
-        const activeTotal = step.activeMinutes * item.quantity;
-        const waiting = step.waitingMinutes;
-        let remaining = activeTotal;
-        const placed: { date: Date; minutes: number }[] = [];
+      for (let stepIdx = steps.length - 1; stepIdx >= 0; stepIdx--) {
+        const step = steps[stepIdx];
 
-        // Fit `activeTotal` minutes into working days walking backward
-        // from `nextStartDate` (the day after which the waiting window
-        // would start for the following step).
-        let probe = new Date(nextStartDate);
+        // Long waits force step N onto the previous working day —
+        // "shell chocolate has to set overnight" and similar.
+        let activeEndDay = new Date(nextStartDay);
+        if (step.waitingMinutes >= LONG_WAIT_MINUTES) {
+          activeEndDay.setDate(activeEndDay.getDate() - 1);
+        }
+
+        // Per-product active minutes for this step.
+        const perProductMinutes = waveLines.map((w) => ({
+          ...w,
+          minutes: Math.round(step.activeMinutes * w.mouldsNeeded),
+        }));
+        const totalActive = perProductMinutes.reduce((s, r) => s + r.minutes, 0);
+        if (totalActive === 0) {
+          // Zero-duration step (edge case — fully-manual step with
+          // activeMinutes=0). Don't emit rows, just roll the clock.
+          // nextStartDay stays put for the previous step.
+          continue;
+        }
+
+        // Pack totalActive minutes into working days ending at
+        // activeEndDay and rolling back through earlier working days.
+        let remaining = totalActive;
+        const slots: Array<{ date: Date; minutes: number }> = [];
+        const probe = new Date(activeEndDay);
         let safety = 365;
         while (remaining > 0 && safety-- > 0) {
-          const available = effectiveDailyCapacityMinutes(probe, config, people, unavailability, blockedDays);
+          const available = effectiveDailyCapacityMinutes(
+            probe, config, people, unavailability, blockedDays,
+          );
           if (available > 0) {
             const iso = isoDate(probe);
             const used = usedByDate.get(iso) ?? 0;
             const free = Math.max(0, available - used);
             if (free > 0) {
               const take = Math.min(free, remaining);
-              placed.push({ date: new Date(probe), minutes: take });
+              slots.push({ date: new Date(probe), minutes: take });
               usedByDate.set(iso, used + take);
               remaining -= take;
             }
@@ -175,49 +225,49 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
         }
 
         if (remaining > 0) {
-          warnings.push(`Couldn't fit all "${step.name}" minutes for "${product.name}" before order "${order.customerName ?? order.id}" deadline — ${remaining} min overflowed.`);
+          warnings.push(
+            `Couldn't fit all "${step.name}" minutes for order "${order.customerName ?? order.id}" — ${remaining} min overflowed.`,
+          );
           unscheduled.add(order.id!);
         }
 
-        // Emit schedule rows. Earliest placed date becomes the new
-        // `nextStartDate` minus the waiting window for the previous step.
-        placed.sort((a, b) => a.date.getTime() - b.date.getTime());
-        for (const slot of placed) {
+        // Emit per-(product × slot) rows. Within a slot every product
+        // row shares startAt — visually concurrent on /production —
+        // and its duration is that product's share of the slot's
+        // placed minutes, proportional to the product's share of the
+        // step's total.
+        slots.sort((a, b) => a.date.getTime() - b.date.getTime());
+        const totalPlaced = slots.reduce((s, r) => s + r.minutes, 0);
+        for (const slot of slots) {
+          const slotShare = totalPlaced > 0 ? slot.minutes / totalPlaced : 0;
           const start = startOfDay(slot.date);
-          const end = new Date(start.getTime() + slot.minutes * 60 * 1000);
-          entries.push({
-            orderId: order.id,
-            productId: product.id!,
-            mouldId: product.defaultMouldId,
-            stepId: step.id,
-            phase: step.name,
-            startAt: start.toISOString(),
-            endAt: end.toISOString(),
-            durationMinutes: Math.round(slot.minutes),
-            isActive: true,
-            status: "pending",
-          });
+          for (const pp of perProductMinutes) {
+            const productMinutes = Math.round(pp.minutes * slotShare);
+            if (productMinutes <= 0) continue;
+            const end = new Date(start.getTime() + productMinutes * 60 * 1000);
+            entries.push({
+              orderId: order.id,
+              productId: pp.product.id!,
+              mouldId: pp.product.defaultMouldId,
+              stepId: step.id,
+              phase: step.name,
+              startAt: start.toISOString(),
+              endAt: end.toISOString(),
+              durationMinutes: productMinutes,
+              isActive: true,
+              status: "pending",
+            });
+          }
         }
 
-        // Earliest placed date becomes the anchor for the next (earlier) step.
-        // Apply waiting time by rolling nextStartDate back by the ceil of
-        // (waiting minutes / (24 × 60)) days — coarse, but enough to keep
-        // resting windows visible on the daily view.
-        if (placed.length > 0) {
-          nextStartDate = startOfDay(placed[0].date);
-        }
-        if (waiting > 0) {
-          const waitingDays = Math.max(1, Math.ceil(waiting / (24 * 60)));
-          nextStartDate.setDate(nextStartDate.getDate() - waitingDays);
-        } else {
-          // Even without waiting, step N+1 starts after step N — keep going backwards
-          nextStartDate.setDate(nextStartDate.getDate() - 1);
+        // Previous step must end before this step's active starts.
+        if (slots.length > 0) {
+          nextStartDay = startOfDay(slots[0].date);
         }
       }
     }
   }
 
-  // Build daily summary covering today → max scheduled date
   const dailySummary = buildDailySummary(
     usedByDate, config, people, unavailability, blockedDays, entries,
   );
@@ -238,7 +288,6 @@ function buildDailySummary(
   blockedDays: EventCalendarEntry[],
   entries: SchedulerResult["entries"],
 ): DailyCapacityRow[] {
-  // Collect every date with either scheduled work or a starting "today"
   const dates = new Set<string>();
   for (const k of usedByDate.keys()) dates.add(k);
   for (const e of entries) dates.add(e.startAt.slice(0, 10));

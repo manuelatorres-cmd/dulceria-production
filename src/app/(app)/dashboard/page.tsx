@@ -107,7 +107,7 @@ export default function DashboardPage() {
   // Capacity preview for next 7 working days
   const capacityPreview = useMemo(() => {
     const preview = buildSchedule({
-      orders, orderItems, products, productionSteps: steps,
+      orders, orderItems, products, productionSteps: steps, moulds,
       config, people, unavailability, blockedDays, categoryNameById,
     });
     // Keep today + next 7 days
@@ -115,7 +115,7 @@ export default function DashboardPage() {
     cutoff.setDate(cutoff.getDate() + 7);
     const cutoffIso = toIsoDate(cutoff);
     return preview.dailySummary.filter((d) => d.date >= todayIso && d.date <= cutoffIso);
-  }, [orders, orderItems, products, steps, config, people, unavailability, blockedDays, categoryNameById, todayIso]);
+  }, [orders, orderItems, products, steps, moulds, config, people, unavailability, blockedDays, categoryNameById, todayIso]);
 
   // Production day — Open + Close Production actions and HACCP temperature log
   const todayDay = useTodayProductionDay();

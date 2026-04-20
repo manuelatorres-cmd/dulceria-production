@@ -51,10 +51,10 @@ export default function PlanPage() {
   // Preview the schedule that WOULD result from current inputs (without writing)
   const preview = useMemo(
     () => buildSchedule({
-      orders, orderItems, products, productionSteps,
+      orders, orderItems, products, productionSteps, moulds,
       config, people, unavailability, blockedDays, categoryNameById,
     }),
-    [orders, orderItems, products, productionSteps, config, people, unavailability, blockedDays, categoryNameById],
+    [orders, orderItems, products, productionSteps, moulds, config, people, unavailability, blockedDays, categoryNameById],
   );
 
   // Group stored schedule rows by date
