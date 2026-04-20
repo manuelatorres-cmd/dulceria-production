@@ -22,7 +22,12 @@ import {
   type OrderProductLine, type OrderPackagingRollupLine, type ProductStockState,
 } from "@/lib/orderRollup";
 import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
-import { resolveUnitPrice, effectiveVatRate } from "@/lib/pricing";
+import {
+  resolveUnitPrice, effectiveVatRate,
+  aggregateVatByRate, computeOrderMargin,
+  computeVatFromGross,
+  type VatBreakdown,
+} from "@/lib/pricing";
 import {
   ORDER_CHANNELS, ORDER_CHANNEL_LABELS,
   ORDER_PRIORITIES, ORDER_PRIORITY_LABELS,
@@ -241,6 +246,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
    *  on OrderLineRow. */
   const shortProductIds = new Set(feasibility.shortfalls.map((s) => s.productId));
 
+  // ── Customer-facing totals (net + VAT breakdown + gross) ───────
+  // Each line contributes its own net + rate so orders with mixed
+  // rates split correctly into { vat 10 %, vat 20 %, vat 0 % } rows.
+  const productLineTotals = items.map((i) => {
+    const p = productMap.get(i.productId);
+    const resolved = resolveProductPrice(i.productId);
+    const unitPrice = i.unitPrice ?? resolved.unitPrice ?? 0;
+    const rate = effectiveVatRate(i.vatRate, p?.defaultVatRate);
+    return { net: unitPrice * i.quantity, rate };
+  });
+  const packagingLineTotals = packagingLines.map((l) => {
+    const p = packagingMap.get(l.packagingId);
+    const unitPrice = l.unitPrice ?? packagingUnitCost.get(l.packagingId) ?? 0;
+    const rate = effectiveVatRate(l.vatRate, p?.defaultVatRate);
+    return { net: unitPrice * l.quantity, rate };
+  });
+  const productsSubtotalNet = productLineTotals.reduce((s, l) => s + l.net, 0);
+  const packagingSubtotalNet = packagingLineTotals.reduce((s, l) => s + l.net, 0);
+  const totalNet = productsSubtotalNet + packagingSubtotalNet;
+  const vatBreakdown = aggregateVatByRate([...productLineTotals, ...packagingLineTotals]);
+  const totalVat = vatBreakdown.reduce((s, b) => s + b.vat, 0);
+  const totalGross = Math.round((totalNet + totalVat) * 100) / 100;
+  const marginResult = computeOrderMargin(totalNet, calculatedCost.totalCost);
+
   // ── Schedule filtered to this order ────────────────────────────
   const orderSchedule = schedule
     .filter((s) => s.orderId === orderId)
@@ -433,6 +462,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             feasibility={feasibility}
             labourHourlyRate={capacityConfig?.labourHourlyRate ?? null}
             productNameById={productMap}
+            productsSubtotalNet={productsSubtotalNet}
+            packagingSubtotalNet={packagingSubtotalNet}
+            totalNet={totalNet}
+            totalVat={totalVat}
+            totalGross={totalGross}
+            vatBreakdown={vatBreakdown}
+            margin={marginResult}
           />
         )}
 
@@ -1661,6 +1697,8 @@ function OrderPackagingLineRow({ line, packagingItem, latestCost }: {
 
 function OrderSummaryCard({
   order, labour, calculatedCost, feasibility, labourHourlyRate, productNameById,
+  productsSubtotalNet, packagingSubtotalNet, totalNet, totalVat, totalGross,
+  vatBreakdown, margin,
 }: {
   order: import("@/types").Order;
   labour: ReturnType<typeof computeOrderLabourHours>;
@@ -1668,6 +1706,13 @@ function OrderSummaryCard({
   feasibility: ReturnType<typeof checkOrderFeasibility>;
   labourHourlyRate: number | null;
   productNameById: Map<string, { name: string }>;
+  productsSubtotalNet: number;
+  packagingSubtotalNet: number;
+  totalNet: number;
+  totalVat: number;
+  totalGross: number;
+  vatBreakdown: VatBreakdown[];
+  margin: ReturnType<typeof computeOrderMargin>;
 }) {
   const sevColor =
     feasibility.severity === "green"
@@ -1676,35 +1721,66 @@ function OrderSummaryCard({
         ? "border-status-warn/40 bg-status-warn/5 text-status-warn"
         : "border-status-alert/40 bg-status-alert/5 text-status-alert";
 
-  const margin = order.pricePaid != null
-    ? order.pricePaid - calculatedCost.totalCost
-    : null;
-
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <Metric
-          label="Labour"
-          value={`${labour.totalHours}h`}
-          hint={`${labour.productMinutes}m prod · ${labour.packagingMinutes}m pack`}
-        />
-        <Metric
-          label="Calculated cost"
-          value={`€${calculatedCost.totalCost.toFixed(2)}`}
-          hint={labourHourlyRate == null
-            ? "Set labour rate in Settings"
-            : `@ €${labourHourlyRate.toFixed(2)}/h`}
-        />
-        <PricePaidField order={order} />
-        <Metric
-          label="Margin"
-          value={margin == null ? "—" : `€${margin.toFixed(2)}`}
-          hint={margin == null || calculatedCost.totalCost <= 0
-            ? "Enter price paid"
-            : `${((margin / calculatedCost.totalCost) * 100).toFixed(0)}% vs cost`}
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3 lg:sticky lg:top-4">
+      {/* Customer-facing totals */}
+      <div className="space-y-1.5">
+        <TotalLine label="Products (net)" value={productsSubtotalNet} />
+        <TotalLine label="Packaging (net)" value={packagingSubtotalNet} />
+        <TotalLine label="Subtotal (net)" value={totalNet} emphasis />
+        {vatBreakdown.length === 0 ? (
+          <TotalLine label="VAT (10%)" value={0} muted />
+        ) : (
+          vatBreakdown.map((b) => (
+            <TotalLine key={b.rate} label={`VAT ${b.rate}%`} value={b.vat} muted />
+          ))
+        )}
+        <div className="border-t border-border pt-1.5">
+          <TotalLine label="Total (gross)" value={totalGross} emphasis />
+        </div>
+      </div>
+
+      {/* Price paid — toggles net / gross */}
+      <div className="pt-2 border-t border-border">
+        <PricePaidField
+          order={order}
+          suggestedNet={totalNet > 0 ? totalNet : undefined}
+          suggestedGross={totalGross > 0 ? totalGross : undefined}
+          vatBreakdown={vatBreakdown}
         />
       </div>
 
+      {/* Internal cost + labour + margin (never shown to customer) */}
+      <div className="pt-2 border-t border-border space-y-1.5">
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+          Internal (not on invoice)
+        </p>
+        <TotalLine
+          label="Labour"
+          value={calculatedCost.labourCost}
+          hint={labourHourlyRate == null ? "set rate in Settings" : `${labour.totalHours}h @ €${labourHourlyRate.toFixed(2)}`}
+          muted
+        />
+        <TotalLine label="Total cost (ingredients + packaging + labour)" value={calculatedCost.totalCost} muted />
+        <div className="border-t border-border pt-1.5 flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Margin</span>
+          <span className={`tabular-nums font-semibold ${
+            margin.marginPercent == null
+              ? "text-muted-foreground"
+              : margin.marginPercent < 0
+                ? "text-status-alert"
+                : margin.marginPercent < 20
+                  ? "text-status-warn"
+                  : "text-status-ok"
+          }`}>
+            {order.pricePaid == null ? "—" : (
+              margin.marginPercent == null ? "—" : `${margin.marginPercent.toFixed(0)}% · €${margin.profit.toFixed(2)}`
+            )}
+          </span>
+        </div>
+      </div>
+
+      {/* Feasibility */}
       <div className={`rounded-md border px-3 py-2 flex items-start gap-2 ${sevColor}`}>
         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
@@ -1728,33 +1804,84 @@ function OrderSummaryCard({
   );
 }
 
-function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function TotalLine({ label, value, hint, muted, emphasis }: {
+  label: string;
+  value: number;
+  hint?: string;
+  muted?: boolean;
+  emphasis?: boolean;
+}) {
   return (
-    <div>
-      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</p>
-      <p className="text-base font-semibold tabular-nums">{value}</p>
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    <div className={`flex items-center justify-between text-sm ${muted ? "text-muted-foreground" : ""}`}>
+      <span className={emphasis ? "font-semibold text-foreground" : ""}>{label}</span>
+      <span className="flex items-baseline gap-1.5">
+        {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
+        <span className={`tabular-nums ${emphasis ? "font-semibold text-foreground" : ""}`}>
+          €{value.toFixed(2)}
+        </span>
+      </span>
     </div>
   );
 }
 
-function PricePaidField({ order }: { order: import("@/types").Order }) {
+/** Price paid — stored NET on the order. The UI lets the user toggle
+ *  between entering net or gross; when the user types gross we back out
+ *  net using a blended VAT rate (proportional to each line's net) so
+ *  mixed-rate orders round correctly. Stored value is always net. */
+function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
+  order: import("@/types").Order;
+  suggestedNet?: number;
+  suggestedGross?: number;
+  vatBreakdown: VatBreakdown[];
+}) {
+  const [mode, setMode] = useState<"net" | "gross">("net");
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(order.pricePaid != null ? String(order.pricePaid) : "");
+  const [value, setValue] = useState(
+    order.pricePaid != null ? String(order.pricePaid) : "",
+  );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+
+  // Blended rate derived from the aggregated VAT rows. When the order
+  // has no lines yet, fall back to the app's food default (10%).
+  const blendedRate = useMemo(() => {
+    const totalNet = vatBreakdown.reduce((s, b) => s + b.net, 0);
+    if (totalNet <= 0) return 10;
+    const totalVat = vatBreakdown.reduce((s, b) => s + b.vat, 0);
+    return (totalVat / totalNet) * 100;
+  }, [vatBreakdown]);
+
+  // Derive the display value for the current mode from the stored NET
+  // amount. When `editing` is true, `value` holds what the user typed.
+  function displayFor(m: "net" | "gross"): string {
+    if (order.pricePaid == null) return "";
+    if (m === "net") return order.pricePaid.toFixed(2);
+    return ((order.pricePaid * (1 + blendedRate / 100))).toFixed(2);
+  }
 
   async function commit() {
     setSaveError("");
     const trimmed = value.trim();
-    const parsed = trimmed === "" ? undefined : Number(trimmed);
-    if (parsed !== undefined && (!Number.isFinite(parsed) || parsed < 0)) {
+    if (trimmed === "") {
+      setSaving(true);
+      try {
+        await saveOrder({ ...order, pricePaid: undefined });
+        setEditing(false);
+      } finally { setSaving(false); }
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
       setSaveError("Invalid amount");
       return;
     }
+    // Convert to net if the user typed gross.
+    const net = mode === "net"
+      ? parsed
+      : computeVatFromGross(parsed, blendedRate).net;
     setSaving(true);
     try {
-      await saveOrder({ ...order, pricePaid: parsed });
+      await saveOrder({ ...order, pricePaid: Math.round(net * 100) / 100 });
       setEditing(false);
     } catch (err) {
       const raw: { message?: string; code?: string } =
@@ -1765,11 +1892,31 @@ function PricePaidField({ order }: { order: import("@/types").Order }) {
     }
   }
 
+  const otherDisplay = order.pricePaid != null
+    ? `€${displayFor(mode === "net" ? "gross" : "net")} ${mode === "net" ? "gross" : "net"}`
+    : "";
+
+  const suggestion = mode === "net" ? suggestedNet : suggestedGross;
+
   return (
     <div>
-      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Price paid</p>
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Price paid</p>
+        <div className="flex gap-0.5 text-[10px] rounded-full border border-border p-0.5">
+          {(["net", "gross"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => { setMode(m); if (editing) setValue(displayFor(m)); }}
+              className={`px-1.5 py-0 rounded-full uppercase tracking-wide ${
+                mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+              }`}
+            >{m}</button>
+          ))}
+        </div>
+      </div>
       {editing ? (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 mt-0.5">
           <span className="text-base font-semibold">€</span>
           <input
             type="number"
@@ -1779,27 +1926,29 @@ function PricePaidField({ order }: { order: import("@/types").Order }) {
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") { e.preventDefault(); commit(); }
-              if (e.key === "Escape") {
-                setValue(order.pricePaid != null ? String(order.pricePaid) : "");
-                setEditing(false);
-              }
+              if (e.key === "Escape") { setValue(displayFor(mode)); setEditing(false); }
             }}
             onBlur={commit}
             autoFocus
-            className="input !py-0.5 !text-base !font-semibold !w-24"
-            placeholder="0.00"
+            className="input !py-0.5 !text-base !font-semibold !w-28"
+            placeholder={suggestion != null ? suggestion.toFixed(2) : "0.00"}
           />
+          {suggestion != null && value === "" && (
+            <button
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); setValue(suggestion.toFixed(2)); }}
+              className="text-[10px] text-primary hover:underline"
+            >use calc</button>
+          )}
         </div>
       ) : (
         <button
-          onClick={() => {
-            setValue(order.pricePaid != null ? String(order.pricePaid) : "");
-            setEditing(true);
-          }}
-          className="text-base font-semibold tabular-nums hover:bg-muted rounded px-1 -ml-1"
+          onClick={() => { setValue(displayFor(mode)); setEditing(true); }}
+          className="text-base font-semibold tabular-nums hover:bg-muted rounded px-1 -ml-1 mt-0.5 inline-flex items-baseline gap-2"
           title="Click to edit price paid"
         >
-          {order.pricePaid != null ? `€${order.pricePaid.toFixed(2)}` : <span className="text-muted-foreground">—</span>}
+          {order.pricePaid != null ? `€${displayFor(mode)}` : <span className="text-muted-foreground">—</span>}
+          {otherDisplay && <span className="text-[10px] text-muted-foreground">({otherDisplay})</span>}
         </button>
       )}
       {saving && <p className="text-[11px] text-muted-foreground">Saving…</p>}
