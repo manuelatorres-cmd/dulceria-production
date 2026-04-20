@@ -1,5 +1,6 @@
 import { supabase, newId } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
+import { queryClient } from "@/lib/query-client";
 
 const BACKUP_VERSION = 1;
 
@@ -196,11 +197,15 @@ async function bulkUpsert(table: string, rows: Record<string, unknown>[]): Promi
 }
 
 export async function clearAllData(): Promise<void> {
-  // Atomic server-side wipe (migration 0004). One round-trip, all-or-nothing.
+  // Atomic server-side wipe (migration 0021 replaced the hand-written
+  // DELETE list with a dynamic TRUNCATE across every public table).
   const { error } = await supabase.rpc("clear_all_data");
   if (error) throw error;
   // Prevent the client-side "first run" path from re-seeding on next visit.
   localStorage.setItem("chocolatier-seeded", "true");
+  // Drop React Query's cache so every page re-fetches fresh (empty)
+  // data instead of showing stale rows until the next manual refresh.
+  queryClient.clear();
 }
 
 // --- Legacy-field migrators (applied on import so old Recipe/Layer/Bonbon backups keep working) ---
