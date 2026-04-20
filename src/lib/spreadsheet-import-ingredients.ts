@@ -94,8 +94,12 @@ export function mapIngredientRow(row: Record<string, string>): Omit<Ingredient, 
     otherFats: toNum(row.otherFats),
     alcohol: toNumOpt(row.alcohol),
     allergens: ALLERGEN_COLUMNS.filter((id) => toBoolOpt(row[`allergen_${id}`]) === true),
-    shellCapable: toBoolOpt(row.shellCapable),
-    pricingIrrelevant: toBoolOpt(row.pricingIrrelevant),
+    // Default to false when the cell is empty so we don't depend on the
+    // DB `default false` clause firing. Some environments have reported
+    // 23502 NOT-NULL violations on these columns — sending an explicit
+    // boolean sidesteps the whole question.
+    shellCapable: toBoolOpt(row.shellCapable) ?? false,
+    pricingIrrelevant: toBoolOpt(row.pricingIrrelevant) ?? false,
     subIngredients: parseSubIngredients(row.subIngredients),
     nutrition: parseNutritionColumns(row),
   };
