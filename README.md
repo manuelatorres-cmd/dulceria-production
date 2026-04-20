@@ -1,4 +1,4 @@
-# Choc-collab
+# Dulceria
 
 Your entire chocolate workshop in one app. Product development, production planning, cost tracking, and business analytics — running on your iPad, phone, or laptop.
 
@@ -15,20 +15,20 @@ not for someone making bonbons in a home kitchen.
 
 So I built the tool I wished I had.
 
-Choc-collab is designed for a single chocolatier running a small workshop. The 
+Dulceria is designed for a single chocolatier running a small workshop. The 
 UI favours speed: one-tap production plans, inline editing, no clutter. The data 
 model is currently opinionated toward moulded and bar-style products, though the 
 category system is flexible enough for other formats.
 
 I'm sharing it as open source in the same spirit as people like James Parsons of 
 [SoSaSe Chocolat](https://www.sosasechocolat.com), who freely shares his craft 
-and knowledge with the chocolate community through his weekly Chocy Chats. choc-collab 
+and knowledge with the chocolate community through his weekly Chocy Chats. Dulceria 
 is my way of giving something back. If it saves you a batch of wasted ganache, 
-[I'd love to hear from you](mailto:choccollab@proton.me) — and a [coffee is always welcome](https://ko-fi.com/choccollab).
+[I'd love to hear from you](mailto:manuela.torres@dulceria-gmbh.com) — and a [coffee is always welcome](https://dulceria-gmbh.com).
 
 ## About
 
-Choc-collab keeps everything a chocolatier needs in one place: products built from reusable fillings, ingredient libraries with full composition and allergen data, production plans that auto-scale to your moulds, and an observatory that tracks your costs and margins over time. All data lives in your browser — no account required, no server dependency. You own your data completely. For multi-device sync, you can optionally connect your own [Dexie Cloud](https://dexie.org/cloud/) database.
+Dulceria keeps everything a chocolatier needs in one place: products built from reusable fillings, ingredient libraries with full composition and allergen data, production plans that auto-scale to your moulds, and an observatory that tracks your costs and margins over time. All data lives in your browser — no account required, no server dependency. You own your data completely. For multi-device sync, you can optionally connect your own [Dexie Cloud](https://dexie.org/cloud/) database.
 
 ## Table of contents
 
@@ -348,4 +348,4 @@ Cross-device sync is available via [Dexie Cloud](https://dexie.org/cloud/), a th
 
 ## License
 
-Choc-collab is MIT-licensed — see [LICENSE](LICENSE).
+Dulceria is MIT-licensed — see [LICENSE](LICENSE).

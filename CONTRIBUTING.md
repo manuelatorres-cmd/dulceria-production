@@ -1,10 +1,8 @@
-# Contributing to Choc-collab
+# Contributing to Dulceria
 
-Thanks for your interest in contributing! 
+Thanks for your interest in contributing!
 
-Choc-collab was initially 100% vibe-coded, but we're excited to welcome contributions from humans too!
-
-This guide will get you up and running.
+Dulceria is a fork of the open-source Choc-collab app, extended with a full production planning layer. This guide will get you up and running.
 
 ## Prerequisites
 
@@ -14,8 +12,8 @@ This guide will get you up and running.
 ## Getting started
 
 ```bash
-git clone https://github.com/choc-collab/choc-collab.git
-cd choc-collab
+git clone https://github.com/manuelatorres-cmd/dulceria-production.git
+cd dulceria-production
 npm install
 cp .env.example .env.local   # all vars are optional
 npm run dev                   # http://localhost:3000

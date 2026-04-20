@@ -1,7 +1,7 @@
-# ChocCollab — Agent Instructions
+# Dulceria — Agent Instructions
 
 ## Project Philosophy
-ChocCollab is an **open-source, local-first** chocolatier's toolkit. All data lives in the browser's IndexedDB. There is no proprietary backend and no hosted subscription tier — users own their data completely.
+Dulceria is an **open-source, local-first** chocolatier's toolkit. All data lives in the browser's IndexedDB. There is no proprietary backend and no hosted subscription tier — users own their data completely.
 
 **Distribution model** (in order of preference):
 1. **Self-hosted** — users clone/fork the repo and run it themselves. Primary path.

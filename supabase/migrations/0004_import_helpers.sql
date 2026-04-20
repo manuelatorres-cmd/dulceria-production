@@ -15,7 +15,7 @@
 --   do — and takes a single round-trip.
 --
 -- Scope:
---   Only the tables that appear in the ChocCollab backup payload. The new
+--   Only the tables that appear in the upstream backup payload. The new
 --   Dulceria planning tables from 0002 (orders, productionSchedule,
 --   mouldPool, equipment, productTypeStepDurations, capacityConfig,
 --   eventCalendar, stockMinimums) are NOT deleted directly — no backup

@@ -4,7 +4,7 @@
 -- =============================================================
 --
 -- What this is:
---   1:1 port of the current Dexie/IndexedDB schema (ChocCollab v6)
+--   1:1 port of the current Dexie/IndexedDB schema (the upstream app v6)
 --   into Supabase Postgres. Table + column names are kept in
 --   camelCase and double-quoted so the TypeScript type names in
 --   src/types/index.ts map straight through without a translation
@@ -24,7 +24,7 @@
 -- NOT in this migration (intentional — to be reviewed separately):
 --   Row-Level Security policies. RLS is DISABLED on every table for
 --     now so the data-migration script can bulk-load existing
---     ChocCollab backup JSON without auth gymnastics. Migration 0003
+--     the upstream app backup JSON without auth gymnastics. Migration 0003
 --     will enable RLS and wire in Supabase Auth (single shared
 --     workspace for Manuela + partner).
 --   Seed data of ANY kind, and business-value defaults on columns.
@@ -505,7 +505,7 @@ create index on "decorationMaterials" (type);
 --      replace with a public URL? Moving reduces row size + egress
 --      but adds an upload step in the UI.
 --   3. Import cutover: one-shot script reads the existing
---      ChocCollab JSON backup and bulk-loads every table above,
+--      the upstream app JSON backup and bulk-loads every table above,
 --      preserving UUIDs so foreign keys line up. That script is
 --      the deliverable immediately after this migration lands.
 -- =============================================================

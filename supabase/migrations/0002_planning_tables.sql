@@ -1,6 +1,6 @@
 -- =============================================================
 -- Dulceria Production — planning tables
--- Migration 0002: the 9 new tables that turn ChocCollab into a
+-- Migration 0002: the 9 new tables that turn the upstream app into a
 --                 production planning system (Section 4 of brief)
 -- =============================================================
 --

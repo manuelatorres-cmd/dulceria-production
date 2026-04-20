@@ -5,7 +5,7 @@
 --
 -- Depends on migrations 0001–0005.
 --
--- The `coatingChocolateMappings` table was part of ChocCollab's legacy
+-- The `coatingChocolateMappings` table was part of the upstream app's legacy
 -- coating system: ingredients tagged with `shellCapable=true` would also
 -- register a `(coatingName, ingredientId, effectiveFrom)` mapping so
 -- products with a `coating` string ("dark", "milk") could resolve to an
