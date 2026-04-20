@@ -47,6 +47,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
   const [instructions, setInstructions] = useState("");
   const [status, setStatus] = useState("");
   const [shelfLifeWeeks, setShelfLifeWeeks] = useState<string>("");
+  const [waterActivity, setWaterActivity] = useState<string>("");
   const [syncedId, setSyncedId] = useState<string | null>(null);
 
   // Fork state
@@ -89,6 +90,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
     setInstructions(filling.instructions || "");
     setStatus(filling.status || "");
     setShelfLifeWeeks(filling.shelfLifeWeeks != null ? String(filling.shelfLifeWeeks) : "");
+    setWaterActivity(filling.waterActivity != null ? String(filling.waterActivity) : "");
     setSyncedId(filling.id);
   }
 
@@ -105,7 +107,8 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
     description !== (filling.description || "") ||
     instructions !== (filling.instructions || "") ||
     status !== (filling.status || "") ||
-    shelfLifeWeeks !== (filling.shelfLifeWeeks != null ? String(filling.shelfLifeWeeks) : "")
+    shelfLifeWeeks !== (filling.shelfLifeWeeks != null ? String(filling.shelfLifeWeeks) : "") ||
+    waterActivity !== (filling.waterActivity != null ? String(filling.waterActivity) : "")
   );
   const isDirty = (isNew && !savedOnce) || formDirty;
 
@@ -164,6 +167,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
 
   async function handleSave() {
     const parsedShelfLife = parseFloat(shelfLifeWeeks);
+    const parsedAw = parseFloat(waterActivity);
     await saveFilling({
       ...filling!,
       category: category || "",
@@ -171,6 +175,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
       instructions: (instructions || "").trim(),
       status: status.trim() || undefined,
       shelfLifeWeeks: !isNaN(parsedShelfLife) && parsedShelfLife > 0 ? parsedShelfLife : undefined,
+      waterActivity: !isNaN(parsedAw) && parsedAw >= 0 && parsedAw <= 1 ? parsedAw : undefined,
     });
     setEditing(false);
     setSavedOnce(true);
@@ -183,6 +188,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
     setInstructions(filling!.instructions);
     setStatus(filling!.status || "");
     setShelfLifeWeeks(filling!.shelfLifeWeeks != null ? String(filling!.shelfLifeWeeks) : "");
+    setWaterActivity(filling!.waterActivity != null ? String(filling!.waterActivity) : "");
     setEditing(false);
     if (isNew) router.replace(`/fillings/${encodeURIComponent(fillingId)}`);
   }
@@ -193,6 +199,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
     setInstructions(filling!.instructions);
     setStatus(filling!.status || "");
     setShelfLifeWeeks(filling!.shelfLifeWeeks != null ? String(filling!.shelfLifeWeeks) : "");
+    setWaterActivity(filling!.waterActivity != null ? String(filling!.waterActivity) : "");
     setEditing(true);
   }
 
@@ -303,18 +310,34 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                 </datalist>
               )}
             </div>
-            <div>
-              <label className="label">Shelf life (weeks)</label>
-              <input
-                type="number"
-                min="0.5"
-                step="0.5"
-                value={shelfLifeWeeks}
-                onChange={(e) => setShelfLifeWeeks(e.target.value)}
-                placeholder="e.g. 8"
-                className="input w-32"
-              />
-              <p className="text-xs text-muted-foreground mt-1">How long this filling stays fresh. Used to auto-suggest product shelf life and track previous batch freshness.</p>
+            <div className="flex gap-4 flex-wrap">
+              <div>
+                <label className="label">Shelf life (weeks)</label>
+                <input
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  value={shelfLifeWeeks}
+                  onChange={(e) => setShelfLifeWeeks(e.target.value)}
+                  placeholder="e.g. 8"
+                  className="input w-32"
+                />
+                <p className="text-xs text-muted-foreground mt-1">How long this filling stays fresh. Used to auto-suggest product shelf life and track previous batch freshness.</p>
+              </div>
+              <div>
+                <label className="label">Water activity (Aw)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.001"
+                  value={waterActivity}
+                  onChange={(e) => setWaterActivity(e.target.value)}
+                  placeholder="e.g. 0.750"
+                  className="input w-32"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Measured with a meter on the finished filling. Lower = longer shelf life; food-safety threshold is typically 0.85.</p>
+              </div>
             </div>
             <div>
               <label className="label">Instructions</label>
@@ -343,6 +366,14 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
             )}
             {filling.shelfLifeWeeks != null && (
               <p className="text-xs text-muted-foreground">Shelf life: {filling.shelfLifeWeeks} weeks</p>
+            )}
+            {filling.waterActivity != null && (
+              <p className="text-xs text-muted-foreground">
+                Water activity (Aw): {filling.waterActivity.toFixed(3)}
+                {filling.waterActivity < 0.6 ? " · shelf-stable" :
+                  filling.waterActivity < 0.85 ? " · intermediate — pathogens inhibited" :
+                  " · high — most pathogens can grow, keep refrigerated"}
+              </p>
             )}
             {filling.allergens.length > 0 && (
               <div className="flex flex-wrap gap-1">
@@ -994,7 +1025,7 @@ function FillingNutritionTab({
 
   const nutrients = getNutrientsByMarket(market);
   const panelTitle = getNutritionPanelTitle(market);
-  const { per100g, totalWeightG, ingredientsWithData, ingredientsTotal, warnings } = nutrition;
+  const { per100g, totalWeightG, ingredientsWithData, ingredientsTotal, missingIngredients, warnings } = nutrition;
   const hasData = Object.keys(per100g).length > 0;
 
   if (ingredientsTotal === 0) {
@@ -1025,7 +1056,20 @@ function FillingNutritionTab({
             <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span>
               Nutrition data for {ingredientsWithData} of {ingredientsTotal} ingredients.
-              Values are partial — add data to remaining ingredients for complete figures.
+              Values are partial — add data to{" "}
+              {missingIngredients.length > 0 ? (
+                <>
+                  {missingIngredients.map((name, i) => (
+                    <span key={name}>
+                      {i > 0 && ", "}
+                      <strong>{name}</strong>
+                    </span>
+                  ))}
+                  {" "}for complete figures.
+                </>
+              ) : (
+                "remaining ingredients for complete figures."
+              )}
             </span>
           </div>
         )}

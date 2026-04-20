@@ -2774,7 +2774,7 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
     [mould, productFillings, fillingIngredientsMap, ingredientMap, shellIngredient, effectiveShellPercentage],
   );
 
-  const { per100g, perProduct, productWeightG, ingredientsWithData, ingredientsTotal, warnings } = result;
+  const { per100g, perProduct, productWeightG, ingredientsWithData, ingredientsTotal, missingIngredients, warnings } = result;
   const nutrients = getNutrientsByMarket(market);
   const panelTitle = getNutritionPanelTitle(market);
   const showDV = market === "US";
@@ -2824,7 +2824,20 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
             Nutrition data for {ingredientsWithData} of {ingredientsTotal} ingredients.
-            Values are partial — add data to remaining ingredients for complete figures.
+            Values are partial — add data to{" "}
+            {missingIngredients.length > 0 ? (
+              <>
+                {missingIngredients.map((name, i) => (
+                  <span key={name}>
+                    {i > 0 && ", "}
+                    <strong>{name}</strong>
+                  </span>
+                ))}
+                {" "}for complete figures.
+              </>
+            ) : (
+              "remaining ingredients for complete figures."
+            )}
           </span>
         </div>
       )}

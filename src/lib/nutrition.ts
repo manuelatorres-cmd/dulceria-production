@@ -294,6 +294,9 @@ export interface FillingNutritionResult {
   ingredientsWithData: number;
   /** Total ingredients on the filling */
   ingredientsTotal: number;
+  /** Names of ingredients that are missing nutrition data — so the UI can
+   *  tell the user exactly which ones to go fix. */
+  missingIngredients: string[];
   warnings: string[];
 }
 
@@ -310,6 +313,7 @@ export function calculateFillingNutrition(
   ingredientMap: Map<string, Ingredient>,
 ): FillingNutritionResult {
   const warnings: string[] = [];
+  const missingIngredients: string[] = [];
   const entries: IngredientNutritionEntry[] = [];
   let ingredientsTotal = 0;
   let ingredientsWithData = 0;
@@ -322,11 +326,13 @@ export function calculateFillingNutrition(
     const amountG = toGramsForNutrition(li.amount, li.unit);
     if (amountG == null) {
       warnings.push(`"${ing.name}" uses unit "${li.unit}" — skipped (nutrition needs a mass/volume amount).`);
+      missingIngredients.push(ing.name);
       continue;
     }
 
     if (!ing.nutrition || !hasNutritionData(ing.nutrition)) {
       warnings.push(`"${ing.name}" has no nutrition data.`);
+      missingIngredients.push(ing.name);
       continue;
     }
 
@@ -338,7 +344,7 @@ export function calculateFillingNutrition(
   }
 
   const { per100g, totalWeightG } = aggregateNutrition(entries);
-  return { per100g, totalWeightG, ingredientsWithData, ingredientsTotal, warnings };
+  return { per100g, totalWeightG, ingredientsWithData, ingredientsTotal, missingIngredients, warnings };
 }
 
 /** Convert a filling-ingredient amount to grams for nutrition weighting.
@@ -379,6 +385,9 @@ export interface ProductNutritionResult {
   ingredientsWithData: number;
   /** Total unique ingredients in the product */
   ingredientsTotal: number;
+  /** Names of ingredients that are missing nutrition data — drives the
+   *  "X, Y, Z are missing data" list in the product detail UI. */
+  missingIngredients: string[];
   warnings: string[];
 }
 
@@ -399,10 +408,11 @@ export function calculateProductNutrition(input: ProductNutritionInput): Product
     fillMode = "percentage",
   } = input;
   const warnings: string[] = [];
+  const missingIngredientNames = new Map<string, string>(); // id → name
 
   if (!mould) {
     warnings.push("No default mould set — cannot calculate nutrition.");
-    return { perProduct: {}, per100g: {}, productWeightG: 0, ingredientsWithData: 0, ingredientsTotal: 0, warnings };
+    return { perProduct: {}, per100g: {}, productWeightG: 0, ingredientsWithData: 0, ingredientsTotal: 0, missingIngredients: [], warnings };
   }
 
   // Collect all weighted entries (actual grams per product + per-100g nutrition)
@@ -423,6 +433,7 @@ export function calculateProductNutrition(input: ProductNutritionInput): Product
       });
     } else if (shellIngredient) {
       allIngredientIds.add(shellIngredient.id!);
+      missingIngredientNames.set(shellIngredient.id!, shellIngredient.name);
       warnings.push(`Shell chocolate "${shellIngredient.name}" has no nutrition data.`);
     } else {
       warnings.push("No shell chocolate set — shell nutrition excluded.");
@@ -440,7 +451,10 @@ export function calculateProductNutrition(input: ProductNutritionInput): Product
     for (const li of lis) {
       allIngredientIds.add(li.ingredientId);
       const ing = ingredientMap.get(li.ingredientId);
-      if (!ing?.nutrition || !hasNutritionData(ing.nutrition)) continue;
+      if (!ing?.nutrition || !hasNutritionData(ing.nutrition)) {
+        if (ing) missingIngredientNames.set(li.ingredientId, ing.name);
+        continue;
+      }
 
       ingredientIdsWithData.add(li.ingredientId);
       const fraction = fillingTotalProductG > 0 ? li.amount / fillingTotalProductG : 0;
@@ -462,6 +476,7 @@ export function calculateProductNutrition(input: ProductNutritionInput): Product
     productWeightG: totalWeightG,
     ingredientsWithData: ingredientIdsWithData.size,
     ingredientsTotal: allIngredientIds.size,
+    missingIngredients: Array.from(missingIngredientNames.values()).sort((a, b) => a.localeCompare(b)),
     warnings,
   };
 }

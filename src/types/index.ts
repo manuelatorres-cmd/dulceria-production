@@ -261,6 +261,10 @@ export interface Filling {
   instructions: string;
   status?: FillingStatus;
   shelfLifeWeeks?: number; // shelf life in weeks — relevant for shelf-stable categories (Pralines, Fruit-Based)
+  /** Water activity (Aw) measurement — 0.000–1.000. Measured with a
+   *  meter on the finished filling; a primary food-safety indicator
+   *  (thresholds like 0.85 matter for microbial safety). Optional. */
+  waterActivity?: number;
   // Versioning fields
   rootId?: string;        // undefined for unforked fillings; set to v1.id once any fork is made
   version?: number;       // 1-indexed; undefined = legacy unforked filling (treat as v1)
