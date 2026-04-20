@@ -181,6 +181,28 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     setLocalShelfLife(String(recommendedShelfLife.weeks));
   }, [product?.id, recommendedShelfLife]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Aggregated product allergens — union of the shell ingredient's
+  // allergens plus every linked filling's allergens (fillings already
+  // roll up their own ingredient allergens, so this inherits for free).
+  // Computed live rather than stored: the UI always shows the current
+  // ingredient state, even if a filling's composition changed after
+  // the product was last opened.
+  const productAllergens = useMemo(() => {
+    const ids = new Set<string>();
+    // Shell chocolate's allergens.
+    const shell = product?.shellIngredientId
+      ? shellCapableIngredients.find((i) => i.id === product.shellIngredientId)
+      : undefined;
+    if (shell?.allergens) for (const a of shell.allergens) ids.add(a);
+    // Each filling's pre-aggregated allergen list.
+    for (const pf of productFillings) {
+      const f = allFillings.find((l) => l.id === pf.fillingId);
+      if (!f?.allergens) continue;
+      for (const a of f.allergens) ids.add(a);
+    }
+    return Array.from(ids).sort((a, b) => a.localeCompare(b));
+  }, [product?.shellIngredientId, shellCapableIngredients, productFillings, allFillings]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
@@ -952,6 +974,28 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             {(product.tags ?? []).map((tag) => (
               <span key={tag} className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium capitalize">{tag}</span>
             ))}
+          </div>
+        )}
+
+        {/* Allergens (aggregated from shell + fillings) */}
+        {productAllergens.length > 0 && (
+          <div className="px-4 pb-4">
+            <h2 className="text-sm font-medium text-muted-foreground mb-1">Allergens</h2>
+            <div className="flex flex-wrap gap-1">
+              {productAllergens.map((a) => (
+                <span
+                  key={a}
+                  className="rounded-full border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-xs"
+                >
+                  {allergenLabel(a)}
+                </span>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Aggregated from the shell chocolate and every filling&apos;s
+              ingredients. Updates automatically when you change fillings
+              or edit ingredient allergens.
+            </p>
           </div>
         )}
 
