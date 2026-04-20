@@ -855,6 +855,9 @@ export interface Packaging {
   /** Supplier lead time in days — reserved for the "auto-add to shopping
    *  list" escalation. */
   leadTimeDays?: number;
+  /** Minutes of hands-on packing time per unit of this packaging. Feeds
+   *  directly into the labour-hours rollup on orders + quotes. */
+  packingTimePerUnit?: number;
 }
 
 /** One consumption log entry from the Packing step. */
@@ -1420,11 +1423,28 @@ export interface Order {
   /** External reference for imported orders (e.g. Shopify's order
    *  name "#1001"). Used to dedup re-imports. */
   sourceRef?: string;
+  /** Invoiced amount — what the customer actually paid. Editable,
+   *  separate from any calculated retail / quote total. */
+  pricePaid?: number;
   deliveryType?: DeliveryType;
   /** ISO-timestamp string for the delivery/pickup appointment. */
   deliveryAt?: string;
   deliveryAddress?: string;
   deliveryNotes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** A packaging line on an order — ribbons / gift bags / shipping
+ *  boxes / sticker packs. Separate from orderItems (products) and
+ *  orderBoxes (composition of a single gift box). */
+export interface OrderPackagingLine {
+  id?: string;
+  orderId: string;
+  packagingId: string;
+  quantity: number;
+  sortOrder: number;
+  notes?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

@@ -1,8 +1,9 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -5938,3 +5939,89 @@ export async function applyStockAdjustments(
   }
   return { applied, failed: null };
 }
+
+// ---------------------------------------------------------------
+// Order detail rework — packaging lines, labour rollup helpers
+// ---------------------------------------------------------------
+
+export function useOrderPackagingLines(orderId: string | undefined): OrderPackagingLine[] {
+  const { data } = useQuery({
+    queryKey: ["order-packaging-lines", orderId],
+    enabled: !!orderId,
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase
+          .from("orderPackagingLines")
+          .select("*")
+          .eq("orderId", orderId!)
+          .order("sortOrder", { ascending: true }),
+      ) as OrderPackagingLine[];
+      return rows;
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveOrderPackagingLine(
+  line: Omit<OrderPackagingLine, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const now = new Date();
+  if (line.id) {
+    const { error } = await supabase
+      .from("orderPackagingLines")
+      .update({ ...line, updatedAt: now })
+      .eq("id", line.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["order-packaging-lines"] });
+    return line.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("orderPackagingLines")
+    .insert({ ...line, id, createdAt: now, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["order-packaging-lines"] });
+  return id;
+}
+
+export async function deleteOrderPackagingLine(id: string): Promise<void> {
+  const { error } = await supabase.from("orderPackagingLines").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["order-packaging-lines"] });
+}
+
+/** Computes per-product active production minutes derived from the
+ *  user-defined productionSteps. For a given product, we sum the
+ *  activeMinutes of every step configured for its category and
+ *  divide by the typical batch output (default mould cavities ×
+ *  default batch qty). Returns 0 when the product has no mould,
+ *  no category, or no matching steps — caller decides how to
+ *  flag the gap. */
+export function useProductActiveMinutesMap(): Map<string, number> {
+  const products = useProductsList(true);
+  const moulds = useMouldsList(true);
+  const categories = useProductCategories(true);
+  const steps = useProductionSteps();
+
+  return useMemo(() => {
+    const categoryById = new Map(categories.map((c) => [c.id!, c.name] as const));
+    const mouldById = new Map(moulds.map((m) => [m.id!, m] as const));
+    const stepsByType = new Map<string, number>();
+    for (const s of steps) {
+      stepsByType.set(s.productType, (stepsByType.get(s.productType) ?? 0) + (s.activeMinutes ?? 0));
+    }
+    const out = new Map<string, number>();
+    for (const p of products) {
+      const categoryName = p.productCategoryId ? categoryById.get(p.productCategoryId) : undefined;
+      const totalBatchMinutes = categoryName ? (stepsByType.get(categoryName) ?? 0) : 0;
+      const mould = p.defaultMouldId ? mouldById.get(p.defaultMouldId) : undefined;
+      const cavities = mould?.numberOfCavities ?? 0;
+      const batchQty = p.defaultBatchQty ?? 1;
+      const piecesPerBatch = cavities * batchQty;
+      const perPiece = piecesPerBatch > 0 ? totalBatchMinutes / piecesPerBatch : 0;
+      out.set(p.id!, perPiece);
+    }
+    return out;
+  }, [products, moulds, categories, steps]);
+}
+
