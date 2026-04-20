@@ -12,6 +12,7 @@ import {
   usePeople, usePersonUnavailability, useBlockedDays,
   useProductLocationTotals,
   useReplenishmentOrderFor,
+  useCustomerProductPrices,
 } from "@/lib/hooks";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
@@ -21,6 +22,7 @@ import {
   type OrderProductLine, type OrderPackagingRollupLine, type ProductStockState,
 } from "@/lib/orderRollup";
 import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
+import { resolveUnitPrice, effectiveVatRate } from "@/lib/pricing";
 import {
   ORDER_CHANNELS, ORDER_CHANNEL_LABELS,
   ORDER_PRIORITIES, ORDER_PRIORITY_LABELS,
@@ -71,6 +73,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     queryFn: async () =>
       assertOk(await supabase.from("packagingOrders").select("*")) as PackagingOrder[],
   });
+  // Collection rows (for price-list resolution via migration 0035's
+  // unitPrice column). One query covers every collection since the
+  // table is small and the hierarchy is evaluated per product.
+  const { data: collectionProducts = [] } = useQuery({
+    queryKey: ["collection-products", "all-for-order-detail"],
+    queryFn: async () =>
+      assertOk(
+        await supabase.from("collectionProducts").select("collectionId, productId, unitPrice"),
+      ) as Array<{ collectionId: string; productId: string; unitPrice?: number }>,
+  });
+  const customerProductPrices = useCustomerProductPrices(order?.customerId);
 
   const productUnitCost = useMemo(() => {
     const latest = new Map<string, ProductCostSnapshot>();
@@ -99,6 +112,33 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
     return map;
   }, [packagingOrders]);
+
+  // productId → a plausible "retail" unit price, picked as the highest
+  // unitPrice on any collection that lists it. Consumed by
+  // resolveUnitPrice as the last-resort fallback before "none".
+  const productRetailPrice = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const cp of collectionProducts) {
+      if (cp.unitPrice == null) continue;
+      const prev = map.get(cp.productId);
+      if (prev == null || cp.unitPrice > prev) map.set(cp.productId, cp.unitPrice);
+    }
+    return map;
+  }, [collectionProducts]);
+
+  function resolveProductPrice(productId: string) {
+    return resolveUnitPrice({
+      productId,
+      customerId: order?.customerId,
+      customerProductPrices: customerProductPrices.map((p) => ({
+        productId: p.productId, unitPrice: p.unitPrice,
+      })),
+      customerPriceListId: linkedCustomer?.defaultPriceListId,
+      priceListEntries: collectionProducts,
+      customerDiscountPercent: linkedCustomer?.defaultDiscountPercent,
+      retailPrice: productRetailPrice.get(productId),
+    });
+  }
 
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -196,6 +236,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     workingDaysToDeadline: Math.max(0, workingDays - unavailabilityAdj),
     committedHoursToDeadline: committedMinutes / 60,
   });
+  /** Product ids that don't fit within available stock + producibility
+   *  for this order's quantities. Used by the per-line feasibility dot
+   *  on OrderLineRow. */
+  const shortProductIds = new Set(feasibility.shortfalls.map((s) => s.productId));
 
   // ── Schedule filtered to this order ────────────────────────────
   const orderSchedule = schedule
@@ -413,6 +457,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               orderId={orderId}
               nextSortOrder={items.length}
               products={products}
+              resolveProductPrice={resolveProductPrice}
               onSaved={() => setAddingLine(false)}
               onCancel={() => setAddingLine(false)}
             />
@@ -428,7 +473,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <OrderLineRow
                   key={item.id}
                   item={item}
-                  productName={productMap.get(item.productId)?.name ?? item.productId}
+                  product={productMap.get(item.productId)}
+                  short={shortProductIds.has(item.productId)}
+                  resolveProductPrice={resolveProductPrice}
                 />
               ))}
             </ul>
@@ -436,7 +483,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </section>
 
         {/* Packaging lines */}
-        <OrderPackagingSection orderId={orderId} packaging={packaging} />
+        <OrderPackagingSection
+          orderId={orderId}
+          packaging={packaging}
+          packagingUnitCost={packagingUnitCost}
+        />
 
         {/* Inline production schedule */}
         <OrderScheduleSection
@@ -769,47 +820,70 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   );
 }
 
-function AddOrderLine({ orderId, nextSortOrder, products, onCancel }: {
+function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, onCancel }: {
   orderId: string;
   nextSortOrder: number;
-  products: { id?: string; name: string }[];
+  products: { id?: string; name: string; archived?: boolean }[];
+  resolveProductPrice: (productId: string) => ReturnType<typeof resolveUnitPrice>;
   onSaved: () => void;
   onCancel: () => void;
 }) {
   const [productId, setProductId] = useState("");
+  const [productQuery, setProductQuery] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(true);
   const [quantity, setQuantity] = useState("1");
+  const [unitPriceInput, setUnitPriceInput] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [addedCount, setAddedCount] = useState(0);
-  const productSelectRef = useRef<HTMLSelectElement>(null);
+  const productInputRef = useRef<HTMLInputElement>(null);
 
   const qty = parseInt(quantity, 10);
   const canSave = !!productId && !isNaN(qty) && qty > 0 && !saving;
+
+  const matches = useMemo(() => {
+    const q = productQuery.trim().toLowerCase();
+    const active = products.filter((p) => p.id && !p.archived);
+    if (!q) return active.slice(0, 20);
+    return active.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 20);
+  }, [products, productQuery]);
+
+  // When the user picks a product, pre-fill the net unit price from the
+  // pricing hierarchy so they can save-and-go. They can still override
+  // per line before clicking Add.
+  function pickProduct(p: { id?: string; name: string }) {
+    if (!p.id) return;
+    setProductId(p.id);
+    setProductQuery(p.name);
+    setPickerOpen(false);
+    const r = resolveProductPrice(p.id);
+    if (r.unitPrice != null) setUnitPriceInput(r.unitPrice.toFixed(2));
+    else setUnitPriceInput("");
+  }
 
   async function handleAdd() {
     if (!canSave) return;
     setSaving(true);
     setSaveError("");
     try {
+      const priceNum = parseFloat(unitPriceInput);
       await saveOrderItem({
         orderId,
         productId,
-        // sortOrder bumps by 1 per add so multiple adds stay in the
-        // order the user entered them.
         quantity: qty,
         sortOrder: nextSortOrder + addedCount,
         notes: notes.trim() || undefined,
+        unitPrice: Number.isFinite(priceNum) && priceNum >= 0 ? priceNum : undefined,
       });
-      // Reset the fields and keep the form open so the user can add
-      // the next line without re-clicking "Add product". Focus the
-      // product select so they can start typing the next product
-      // immediately.
       setProductId("");
+      setProductQuery("");
+      setPickerOpen(true);
       setQuantity("1");
+      setUnitPriceInput("");
       setNotes("");
       setAddedCount((n) => n + 1);
-      productSelectRef.current?.focus();
+      productInputRef.current?.focus();
     } catch (err) {
       const raw: { message?: string; code?: string; details?: string } =
         err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
@@ -823,20 +897,43 @@ function AddOrderLine({ orderId, nextSortOrder, products, onCancel }: {
 
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-2 mb-2">
-      <div className="grid grid-cols-3 gap-2">
-        <div className="col-span-2">
-          <select
-            ref={productSelectRef}
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
+      <div className="grid grid-cols-6 gap-2">
+        <div className="col-span-3 relative">
+          <input
+            ref={productInputRef}
+            type="text"
+            value={productQuery}
+            onChange={(e) => {
+              setProductQuery(e.target.value);
+              setProductId("");
+              setPickerOpen(true);
+            }}
+            onFocus={() => setPickerOpen(true)}
+            placeholder="Search product…"
             className="input"
             autoFocus
-          >
-            <option value="">— select product —</option>
-            {products.filter((p) => p.id).map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+            autoComplete="off"
+          />
+          {pickerOpen && matches.length > 0 && (
+            <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border border-border bg-card shadow-lg max-h-56 overflow-y-auto">
+              {matches.map((p) => {
+                const r = resolveProductPrice(p.id!);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => pickProduct(p)}
+                    className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <span className="flex-1 truncate">{p.name}</span>
+                    {r.unitPrice != null && (
+                      <span className="text-xs text-muted-foreground tabular-nums">€{r.unitPrice.toFixed(2)}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div>
           <input
@@ -845,16 +942,18 @@ function AddOrderLine({ orderId, nextSortOrder, products, onCancel }: {
             step="1"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter on the quantity field saves + advances. The user
-              // asked for this explicitly — "jump to next line" without
-              // having to click Add product again.
-              if (e.key === "Enter" && canSave) {
-                e.preventDefault();
-                handleAdd();
-              }
-            }}
+            onKeyDown={(e) => { if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); } }}
             placeholder="Qty"
+            className="input"
+          />
+        </div>
+        <div className="col-span-2">
+          <input
+            type="number" min={0} step={0.01}
+            value={unitPriceInput}
+            onChange={(e) => setUnitPriceInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); } }}
+            placeholder="€ net / unit"
             className="input"
           />
         </div>
@@ -864,10 +963,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, onCancel }: {
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && canSave) {
-            e.preventDefault();
-            handleAdd();
-          }
+          if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); }
         }}
         placeholder="Line notes (optional)"
         className="input"
@@ -892,51 +988,92 @@ function AddOrderLine({ orderId, nextSortOrder, products, onCancel }: {
   );
 }
 
-function OrderLineRow({ item, productName }: {
+function OrderLineRow({ item, product, short, resolveProductPrice }: {
   item: OrderItem;
-  productName: string;
+  product?: { id?: string; name: string; defaultVatRate?: number };
+  short: boolean;
+  resolveProductPrice: (productId: string) => ReturnType<typeof resolveUnitPrice>;
 }) {
+  const productName = product?.name ?? item.productId;
   const [pendingRemove, setPendingRemove] = useState(false);
   const [editingQty, setEditingQty] = useState(false);
   const [qtyInput, setQtyInput] = useState(String(item.quantity));
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [priceInput, setPriceInput] = useState(item.unitPrice != null ? String(item.unitPrice) : "");
+  const [editingVat, setEditingVat] = useState(false);
+  const [vatInput, setVatInput] = useState(item.vatRate != null ? String(item.vatRate) : "");
   const [saveError, setSaveError] = useState("");
   const [switchingMode, setSwitchingMode] = useState(false);
+
+  // Resolved unit price — shown as placeholder hint when the line
+  // doesn't have its own. Stored per line as `unitPrice`; empty means
+  // "fall back to resolved at display time".
+  const resolved = resolveProductPrice(item.productId);
+  const effectiveUnitPrice = item.unitPrice ?? resolved.unitPrice;
+  const effectiveVat = effectiveVatRate(item.vatRate, product?.defaultVatRate);
+  const lineTotalNet = effectiveUnitPrice != null
+    ? Math.round(effectiveUnitPrice * item.quantity * 100) / 100
+    : null;
 
   async function handleDelete() {
     if (!item.id) return;
     await deleteOrderItem(item.id);
   }
 
-  async function commitQty() {
-    const n = parseInt(qtyInput, 10);
-    if (!Number.isFinite(n) || n <= 0) {
-      setQtyInput(String(item.quantity));
-      setEditingQty(false);
-      return;
-    }
-    if (n === item.quantity) {
-      setEditingQty(false);
-      return;
-    }
+  async function persistLine(patch: Partial<OrderItem>) {
+    if (!item.id) return;
     setSaveError("");
     try {
       await saveOrderItem({
         id: item.id,
         orderId: item.orderId,
         productId: item.productId,
-        quantity: n,
+        quantity: item.quantity,
         sortOrder: item.sortOrder,
         notes: item.notes,
         fulfilmentMode: item.fulfilmentMode,
+        unitPrice: item.unitPrice,
+        vatRate: item.vatRate,
+        ...patch,
       });
-      setEditingQty(false);
     } catch (err) {
       const raw: { message?: string; code?: string } =
         err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
       const code = raw.code ? ` (code ${raw.code})` : "";
       setSaveError(`${raw.message || "Save failed"}${code}`);
-      setQtyInput(String(item.quantity));
     }
+  }
+
+  async function commitQty() {
+    const n = parseInt(qtyInput, 10);
+    if (!Number.isFinite(n) || n <= 0) { setQtyInput(String(item.quantity)); setEditingQty(false); return; }
+    if (n === item.quantity) { setEditingQty(false); return; }
+    await persistLine({ quantity: n });
+    setEditingQty(false);
+  }
+
+  async function commitPrice() {
+    const trimmed = priceInput.trim();
+    const next = trimmed === "" ? undefined : parseFloat(trimmed);
+    if (next !== undefined && (!Number.isFinite(next) || next < 0)) {
+      setPriceInput(item.unitPrice != null ? String(item.unitPrice) : "");
+      setEditingPrice(false);
+      return;
+    }
+    await persistLine({ unitPrice: next });
+    setEditingPrice(false);
+  }
+
+  async function commitVat() {
+    const trimmed = vatInput.trim();
+    const next = trimmed === "" ? undefined : parseFloat(trimmed);
+    if (next !== undefined && (!Number.isFinite(next) || next < 0 || next > 100)) {
+      setVatInput(item.vatRate != null ? String(item.vatRate) : "");
+      setEditingVat(false);
+      return;
+    }
+    await persistLine({ vatRate: next });
+    setEditingVat(false);
   }
 
   async function toggleFulfilmentMode() {
@@ -981,10 +1118,20 @@ function OrderLineRow({ item, productName }: {
   }
 
   const isBorrow = item.fulfilmentMode === "borrow";
+  // Feasibility dot: red if this line's qty can't be satisfied even
+  // with producible-before-deadline; green if it fits. Borrow lines
+  // are always fine by definition — they're allocated from Store.
+  const feasibilityColor = isBorrow
+    ? "bg-primary"
+    : short ? "bg-status-alert" : "bg-status-ok";
 
   return (
     <li className={`rounded-lg border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
       <div className="flex items-center gap-3">
+        <span
+          className={`w-2 h-2 rounded-full shrink-0 ${feasibilityColor}`}
+          title={isBorrow ? "From Store stock" : short ? "Won't fit by deadline" : "Fits within capacity"}
+        />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">
             {productName}
@@ -1003,6 +1150,67 @@ function OrderLineRow({ item, productName }: {
             {switchingMode ? "Switching…" : isBorrow ? "Produce fresh instead" : "Fulfil from Store stock"}
           </button>
         </div>
+
+        {/* Unit price (net) */}
+        <div className="text-right shrink-0">
+          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Net / unit</p>
+          {editingPrice ? (
+            <input
+              type="number" min={0} step={0.01}
+              value={priceInput}
+              onChange={(e) => setPriceInput(e.target.value)}
+              onBlur={commitPrice}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") { setPriceInput(item.unitPrice != null ? String(item.unitPrice) : ""); setEditingPrice(false); }
+              }}
+              autoFocus
+              placeholder={resolved.unitPrice != null ? resolved.unitPrice.toFixed(2) : "—"}
+              className="input !w-20 !text-sm text-right"
+            />
+          ) : (
+            <button
+              onClick={() => { setPriceInput(item.unitPrice != null ? String(item.unitPrice) : ""); setEditingPrice(true); }}
+              className="text-sm font-medium tabular-nums rounded px-1 hover:bg-muted"
+              title={`From ${resolved.source === "none" ? "— no price" : resolved.source}`}
+            >
+              {effectiveUnitPrice != null ? `€${effectiveUnitPrice.toFixed(2)}` : <span className="text-muted-foreground">—</span>}
+              {item.unitPrice == null && resolved.unitPrice != null && (
+                <span className="ml-1 text-[9px] text-muted-foreground uppercase">auto</span>
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* VAT */}
+        <div className="text-right shrink-0">
+          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">VAT</p>
+          {editingVat ? (
+            <input
+              type="number" min={0} max={100} step={0.5}
+              value={vatInput}
+              onChange={(e) => setVatInput(e.target.value)}
+              onBlur={commitVat}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") { setVatInput(item.vatRate != null ? String(item.vatRate) : ""); setEditingVat(false); }
+              }}
+              autoFocus
+              placeholder={String(effectiveVat)}
+              className="input !w-14 !text-sm text-right"
+            />
+          ) : (
+            <button
+              onClick={() => { setVatInput(item.vatRate != null ? String(item.vatRate) : ""); setEditingVat(true); }}
+              className="text-sm tabular-nums rounded px-1 hover:bg-muted"
+            >
+              {effectiveVat}%
+              {item.vatRate == null && <span className="ml-0.5 text-[9px] text-muted-foreground uppercase">d</span>}
+            </button>
+          )}
+        </div>
+
+        {/* Qty */}
         {editingQty ? (
           <input
             type="number"
@@ -1016,7 +1224,7 @@ function OrderLineRow({ item, productName }: {
               if (e.key === "Escape") { setQtyInput(String(item.quantity)); setEditingQty(false); }
             }}
             autoFocus
-            className="input !w-20 text-sm text-right"
+            className="input !w-16 text-sm text-right"
           />
         ) : (
           <button
@@ -1027,6 +1235,15 @@ function OrderLineRow({ item, productName }: {
             {item.quantity}
           </button>
         )}
+
+        {/* Line total */}
+        <div className="text-right shrink-0 w-20">
+          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Total</p>
+          <p className="text-sm font-semibold tabular-nums">
+            {lineTotalNet != null ? `€${lineTotalNet.toFixed(2)}` : "—"}
+          </p>
+        </div>
+
         {pendingRemove ? (
           <span className="flex items-center gap-1.5 text-xs shrink-0">
             <button onClick={handleDelete} className="text-red-600 font-medium hover:underline">Yes</button>
@@ -1045,9 +1262,10 @@ function OrderLineRow({ item, productName }: {
 
 // ─── Packaging section ──────────────────────────────────────────
 
-function OrderPackagingSection({ orderId, packaging }: {
+function OrderPackagingSection({ orderId, packaging, packagingUnitCost }: {
   orderId: string;
   packaging: Packaging[];
+  packagingUnitCost: Map<string, number>;
 }) {
   const lines = useOrderPackagingLines(orderId);
   const packagingById = useMemo(() => new Map(packaging.map((p) => [p.id!, p])), [packaging]);
@@ -1072,6 +1290,7 @@ function OrderPackagingSection({ orderId, packaging }: {
           orderId={orderId}
           nextSortOrder={lines.length}
           packaging={packaging.filter((p) => !p.archived)}
+          packagingUnitCost={packagingUnitCost}
           onCancel={() => setAdding(false)}
         />
       )}
@@ -1085,7 +1304,8 @@ function OrderPackagingSection({ orderId, packaging }: {
             <OrderPackagingLineRow
               key={line.id}
               line={line}
-              packagingName={packagingById.get(line.packagingId)?.name ?? line.packagingId}
+              packagingItem={packagingById.get(line.packagingId)}
+              latestCost={packagingUnitCost.get(line.packagingId)}
             />
           ))}
         </ul>
@@ -1094,40 +1314,63 @@ function OrderPackagingSection({ orderId, packaging }: {
   );
 }
 
-function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, onCancel }: {
+function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, packagingUnitCost, onCancel }: {
   orderId: string;
   nextSortOrder: number;
   packaging: Packaging[];
+  packagingUnitCost: Map<string, number>;
   onCancel: () => void;
 }) {
   const [packagingId, setPackagingId] = useState("");
+  const [packagingQuery, setPackagingQuery] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(true);
   const [quantity, setQuantity] = useState("1");
+  const [unitPriceInput, setUnitPriceInput] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const [saveError, setSaveError] = useState("");
-  const selectRef = useRef<HTMLSelectElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const qty = parseInt(quantity, 10);
   const canSave = !!packagingId && Number.isFinite(qty) && qty > 0 && !saving;
+
+  const matches = useMemo(() => {
+    const q = packagingQuery.trim().toLowerCase();
+    if (!q) return packaging.slice(0, 20);
+    return packaging.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 20);
+  }, [packaging, packagingQuery]);
+
+  function pickPackaging(p: Packaging) {
+    setPackagingId(p.id!);
+    setPackagingQuery(p.name);
+    setPickerOpen(false);
+    const latest = packagingUnitCost.get(p.id!);
+    if (latest != null) setUnitPriceInput(latest.toFixed(2));
+  }
 
   async function handleAdd() {
     if (!canSave) return;
     setSaving(true);
     setSaveError("");
     try {
+      const priceNum = parseFloat(unitPriceInput);
       await saveOrderPackagingLine({
         orderId,
         packagingId,
         quantity: qty,
         sortOrder: nextSortOrder + addedCount,
         notes: notes.trim() || undefined,
+        unitPrice: Number.isFinite(priceNum) && priceNum >= 0 ? priceNum : undefined,
       });
       setPackagingId("");
+      setPackagingQuery("");
+      setPickerOpen(true);
       setQuantity("1");
+      setUnitPriceInput("");
       setNotes("");
       setAddedCount((n) => n + 1);
-      selectRef.current?.focus();
+      inputRef.current?.focus();
     } catch (err) {
       const raw: { message?: string; code?: string } =
         err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
@@ -1140,35 +1383,55 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, onCancel }: 
 
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-2 mb-2">
-      <div className="grid grid-cols-3 gap-2">
-        <div className="col-span-2">
-          <select
-            ref={selectRef}
-            value={packagingId}
-            onChange={(e) => setPackagingId(e.target.value)}
+      <div className="grid grid-cols-6 gap-2">
+        <div className="col-span-3 relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={packagingQuery}
+            onChange={(e) => { setPackagingQuery(e.target.value); setPackagingId(""); setPickerOpen(true); }}
+            onFocus={() => setPickerOpen(true)}
+            placeholder="Search packaging…"
             className="input"
             autoFocus
-          >
-            <option value="">— select packaging —</option>
-            {packaging.map((p) => (
-              <option key={p.id} value={p.id!}>
-                {p.name}
-                {p.packingTimePerUnit != null ? ` · ${p.packingTimePerUnit}min/unit` : ""}
-              </option>
-            ))}
-          </select>
+            autoComplete="off"
+          />
+          {pickerOpen && matches.length > 0 && (
+            <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border border-border bg-card shadow-lg max-h-56 overflow-y-auto">
+              {matches.map((p) => {
+                const cost = packagingUnitCost.get(p.id!);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => pickPackaging(p)}
+                    className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <span className="flex-1 truncate">{p.name}</span>
+                    {cost != null && <span className="text-xs text-muted-foreground tabular-nums">€{cost.toFixed(2)}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div>
           <input
-            type="number"
-            min="1"
-            step="1"
+            type="number" min="1" step="1"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); }
-            }}
+            onKeyDown={(e) => { if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); } }}
             placeholder="Qty"
+            className="input"
+          />
+        </div>
+        <div className="col-span-2">
+          <input
+            type="number" min={0} step={0.01}
+            value={unitPriceInput}
+            onChange={(e) => setUnitPriceInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); } }}
+            placeholder="€ net / unit"
             className="input"
           />
         </div>
@@ -1201,45 +1464,82 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, onCancel }: 
   );
 }
 
-function OrderPackagingLineRow({ line, packagingName }: {
+function OrderPackagingLineRow({ line, packagingItem, latestCost }: {
   line: OrderPackagingLine;
-  packagingName: string;
+  packagingItem?: Packaging;
+  latestCost?: number;
 }) {
+  const packagingName = packagingItem?.name ?? line.packagingId;
   const [pendingRemove, setPendingRemove] = useState(false);
   const [editingQty, setEditingQty] = useState(false);
   const [qtyInput, setQtyInput] = useState(String(line.quantity));
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [priceInput, setPriceInput] = useState(line.unitPrice != null ? String(line.unitPrice) : "");
+  const [editingVat, setEditingVat] = useState(false);
+  const [vatInput, setVatInput] = useState(line.vatRate != null ? String(line.vatRate) : "");
   const [saveError, setSaveError] = useState("");
+
+  const effectiveUnitPrice = line.unitPrice ?? latestCost;
+  const effectiveVat = effectiveVatRate(line.vatRate, packagingItem?.defaultVatRate);
+  const lineTotalNet = effectiveUnitPrice != null
+    ? Math.round(effectiveUnitPrice * line.quantity * 100) / 100
+    : null;
 
   async function handleDelete() {
     if (!line.id) return;
     await deleteOrderPackagingLine(line.id);
   }
-  async function commitQty() {
-    const n = parseInt(qtyInput, 10);
-    if (!Number.isFinite(n) || n <= 0) {
-      setQtyInput(String(line.quantity));
-      setEditingQty(false);
-      return;
-    }
-    if (n === line.quantity) { setEditingQty(false); return; }
+
+  async function persistLine(patch: Partial<OrderPackagingLine>) {
+    if (!line.id) return;
     setSaveError("");
     try {
       await saveOrderPackagingLine({
         id: line.id,
         orderId: line.orderId,
         packagingId: line.packagingId,
-        quantity: n,
+        quantity: line.quantity,
         sortOrder: line.sortOrder,
         notes: line.notes,
+        unitPrice: line.unitPrice,
+        vatRate: line.vatRate,
+        ...patch,
       });
-      setEditingQty(false);
     } catch (err) {
       const raw: { message?: string; code?: string } =
         err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
-      const code = raw.code ? ` (code ${raw.code})` : "";
-      setSaveError(`${raw.message || "Save failed"}${code}`);
-      setQtyInput(String(line.quantity));
+      setSaveError(`${raw.message || "Save failed"}`);
     }
+  }
+
+  async function commitQty() {
+    const n = parseInt(qtyInput, 10);
+    if (!Number.isFinite(n) || n <= 0) { setQtyInput(String(line.quantity)); setEditingQty(false); return; }
+    if (n === line.quantity) { setEditingQty(false); return; }
+    await persistLine({ quantity: n });
+    setEditingQty(false);
+  }
+
+  async function commitPrice() {
+    const next = priceInput.trim() === "" ? undefined : parseFloat(priceInput);
+    if (next !== undefined && (!Number.isFinite(next) || next < 0)) {
+      setPriceInput(line.unitPrice != null ? String(line.unitPrice) : "");
+      setEditingPrice(false);
+      return;
+    }
+    await persistLine({ unitPrice: next });
+    setEditingPrice(false);
+  }
+
+  async function commitVat() {
+    const next = vatInput.trim() === "" ? undefined : parseFloat(vatInput);
+    if (next !== undefined && (!Number.isFinite(next) || next < 0 || next > 100)) {
+      setVatInput(line.vatRate != null ? String(line.vatRate) : "");
+      setEditingVat(false);
+      return;
+    }
+    await persistLine({ vatRate: next });
+    setEditingVat(false);
   }
 
   return (
@@ -1249,6 +1549,66 @@ function OrderPackagingLineRow({ line, packagingName }: {
           <p className="text-sm font-medium truncate">{packagingName}</p>
           {line.notes && <p className="text-xs text-muted-foreground truncate">{line.notes}</p>}
         </div>
+
+        {/* Net / unit */}
+        <div className="text-right shrink-0">
+          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Net / unit</p>
+          {editingPrice ? (
+            <input
+              type="number" min={0} step={0.01}
+              value={priceInput}
+              onChange={(e) => setPriceInput(e.target.value)}
+              onBlur={commitPrice}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") { setPriceInput(line.unitPrice != null ? String(line.unitPrice) : ""); setEditingPrice(false); }
+              }}
+              autoFocus
+              placeholder={latestCost != null ? latestCost.toFixed(2) : "—"}
+              className="input !w-20 !text-sm text-right"
+            />
+          ) : (
+            <button
+              onClick={() => { setPriceInput(line.unitPrice != null ? String(line.unitPrice) : ""); setEditingPrice(true); }}
+              className="text-sm font-medium tabular-nums rounded px-1 hover:bg-muted"
+              title={line.unitPrice == null ? "Auto — latest purchase cost" : "Per-line override"}
+            >
+              {effectiveUnitPrice != null ? `€${effectiveUnitPrice.toFixed(2)}` : <span className="text-muted-foreground">—</span>}
+              {line.unitPrice == null && latestCost != null && (
+                <span className="ml-1 text-[9px] text-muted-foreground uppercase">auto</span>
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* VAT */}
+        <div className="text-right shrink-0">
+          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">VAT</p>
+          {editingVat ? (
+            <input
+              type="number" min={0} max={100} step={0.5}
+              value={vatInput}
+              onChange={(e) => setVatInput(e.target.value)}
+              onBlur={commitVat}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") { setVatInput(line.vatRate != null ? String(line.vatRate) : ""); setEditingVat(false); }
+              }}
+              autoFocus
+              placeholder={String(effectiveVat)}
+              className="input !w-14 !text-sm text-right"
+            />
+          ) : (
+            <button
+              onClick={() => { setVatInput(line.vatRate != null ? String(line.vatRate) : ""); setEditingVat(true); }}
+              className="text-sm tabular-nums rounded px-1 hover:bg-muted"
+            >
+              {effectiveVat}%
+              {line.vatRate == null && <span className="ml-0.5 text-[9px] text-muted-foreground uppercase">d</span>}
+            </button>
+          )}
+        </div>
+
         {editingQty ? (
           <input
             type="number"
@@ -1262,7 +1622,7 @@ function OrderPackagingLineRow({ line, packagingName }: {
               if (e.key === "Escape") { setQtyInput(String(line.quantity)); setEditingQty(false); }
             }}
             autoFocus
-            className="input !w-20 text-sm text-right"
+            className="input !w-16 text-sm text-right"
           />
         ) : (
           <button
@@ -1273,6 +1633,14 @@ function OrderPackagingLineRow({ line, packagingName }: {
             {line.quantity}
           </button>
         )}
+
+        {/* Line total */}
+        <div className="text-right shrink-0 w-20">
+          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Total</p>
+          <p className="text-sm font-semibold tabular-nums">
+            {lineTotalNet != null ? `€${lineTotalNet.toFixed(2)}` : "—"}
+          </p>
+        </div>
         {pendingRemove ? (
           <span className="flex items-center gap-1.5 text-xs shrink-0">
             <button onClick={handleDelete} className="text-red-600 font-medium hover:underline">Yes</button>
