@@ -1171,6 +1171,33 @@ export interface OrderItem {
   notes?: string;
 }
 
+/** One row on the production schedule — the scheduler's output. One per
+ *  step per order item. `isActive=true` rows count toward the daily
+ *  people-hours budget; `false` rows (dry/wait) don't. */
+export interface ProductionScheduleEntry {
+  id?: string;
+  orderId?: string;
+  productId: string;
+  mouldId?: string;
+  fillingId?: string;
+  planId?: string;
+  planProductId?: string;
+  stepId?: string;
+  equipmentId?: string;
+  /** Step name at the time the row was scheduled (convenience label). */
+  phase: string;
+  startAt: string;
+  endAt: string;
+  durationMinutes: number;
+  isActive: boolean;
+  assignedTo?: string;
+  status: "pending" | "in_progress" | "done" | "skipped" | "blocked";
+  dependsOnId?: string;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 /** One step in the production sequence for a specific product type.
  *  Step names are free-text; reuse across types is via UI autocomplete,
  *  not enforced at the DB level. Duration has two parts so the scheduler

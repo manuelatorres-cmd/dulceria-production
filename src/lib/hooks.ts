@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -4134,6 +4134,55 @@ export async function deleteOrderItem(id: string): Promise<void> {
   const { error } = await supabase.from("orderItems").delete().eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
+}
+
+// ---------------------------------------------------------------------------
+// Production schedule (scheduler output)
+// ---------------------------------------------------------------------------
+
+export function useProductionSchedule(): ProductionScheduleEntry[] {
+  const { data } = useQuery({
+    queryKey: ["production-schedule"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("productionSchedule").select("*"),
+      ) as ProductionScheduleEntry[];
+      return rows.sort((a, b) => a.startAt.localeCompare(b.startAt));
+    },
+  });
+  return data ?? [];
+}
+
+/** Replace every scheduled row with the given entries, in one transaction-ish
+ *  flow: delete all then bulk-insert. Triggered by the Plan page's Regenerate
+ *  button. */
+export async function replaceProductionSchedule(
+  entries: Omit<ProductionScheduleEntry, "id" | "createdAt" | "updatedAt">[],
+): Promise<void> {
+  // Clear — PostgREST needs a filter, `id=not.is.null` matches everything
+  const { error: delErr } = await supabase
+    .from("productionSchedule")
+    .delete()
+    .not("id", "is", null);
+  if (delErr) throw delErr;
+  if (entries.length > 0) {
+    const withIds = entries.map((e) => ({ ...e, id: newId() }));
+    const { error: insErr } = await supabase.from("productionSchedule").insert(withIds);
+    if (insErr) throw insErr;
+  }
+  queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+}
+
+export async function updateScheduleStatus(
+  id: string,
+  status: ProductionScheduleEntry["status"],
+): Promise<void> {
+  const { error } = await supabase
+    .from("productionSchedule")
+    .update({ status, updatedAt: new Date() })
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
 }
 
 export function useEventCalendar(): EventCalendarEntry[] {
