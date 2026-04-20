@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   useOrder, useOrderItems, useProductsList, saveOrder, deleteOrder,
-  saveOrderItem, deleteOrderItem,
+  saveOrderItem, deleteOrderItem, useCustomers,
 } from "@/lib/hooks";
 import {
   ORDER_CHANNELS, ORDER_CHANNEL_LABELS,
@@ -68,6 +68,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {" "}
               {deadlineDate.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
             </p>
+            {order.customerId && (
+              <Link
+                href={`/customers/${encodeURIComponent(order.customerId)}`}
+                className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                View customer profile →
+              </Link>
+            )}
           </div>
           {!editing && (
             <button onClick={() => setEditing(true)} className="p-1.5 rounded-full hover:bg-muted">
@@ -193,11 +201,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 }
 
 function OrderEditForm({ order, onSaved, onCancel }: {
-  order: { id?: string; channel: OrderChannel; customerName?: string; eventName?: string; deadline: string; priority: OrderPriority; status: OrderStatus; notes?: string };
+  order: { id?: string; channel: OrderChannel; customerName?: string; customerId?: string; eventName?: string; deadline: string; priority: OrderPriority; status: OrderStatus; notes?: string };
   onSaved: () => void;
   onCancel: () => void;
 }) {
   const [channel, setChannel] = useState<OrderChannel>(order.channel);
+  const [customerId, setCustomerId] = useState<string>(order.customerId ?? "");
   const [customerName, setCustomerName] = useState(order.customerName ?? "");
   const [eventName, setEventName] = useState(order.eventName ?? "");
   const [deadline, setDeadline] = useState(toLocalDatetime(order.deadline));
@@ -205,12 +214,23 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   const [notes, setNotes] = useState(order.notes ?? "");
   const [saving, setSaving] = useState(false);
 
+  const customers = useCustomers(false);
+
+  // When the dropdown picks a customer, mirror the company name into the
+  // text field so legacy display code (and non-B2B rows) keeps working.
+  function pickCustomer(id: string) {
+    setCustomerId(id);
+    const c = customers.find((x) => x.id === id);
+    if (c) setCustomerName(c.companyName);
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
       await saveOrder({
         id: order.id,
         channel,
+        customerId: customerId || undefined,
         customerName: customerName.trim() || undefined,
         eventName: channel === "event" && eventName.trim() ? eventName.trim() : undefined,
         deadline: new Date(deadline).toISOString(),
@@ -243,7 +263,35 @@ function OrderEditForm({ order, onSaved, onCancel }: {
 
       <div>
         <label className="label">Customer</label>
-        <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="input" />
+        {customers.length > 0 && (
+          <select
+            value={customerId}
+            onChange={(e) => {
+              if (e.target.value === "") {
+                setCustomerId("");
+              } else {
+                pickCustomer(e.target.value);
+              }
+            }}
+            className="input mb-1.5"
+          >
+            <option value="">— no linked customer —</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>{c.companyName}</option>
+            ))}
+          </select>
+        )}
+        <input
+          type="text"
+          value={customerName}
+          onChange={(e) => { setCustomerName(e.target.value); setCustomerId(""); }}
+          placeholder="Customer / contact name"
+          className="input"
+        />
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          Pick an existing customer for full CRM tracking, or type a one-off name.
+          {" "}<Link href="/customers" className="text-primary hover:underline">Manage customers →</Link>
+        </p>
       </div>
 
       {channel === "event" && (

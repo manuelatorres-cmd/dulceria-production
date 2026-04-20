@@ -11,6 +11,7 @@ import {
   useProductLocationTotals, useStockLocationMinimums, useAllPlanProducts,
   useProductionPlans, DEFAULT_LOCATION_MINIMUM,
   useFillings, useFillingCategories, useFillingStockItems,
+  useCustomerFollowups, useCustomers, completeCustomerFollowup,
 } from "@/lib/hooks";
 import { buildSchedule } from "@/lib/scheduler";
 import { capacityConfigStatus } from "@/lib/capacity";
@@ -21,7 +22,7 @@ import { ORDER_CHANNEL_LABELS, ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS, STOCK
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import { AlertTriangle, Clock, CheckCircle, Calendar, ShoppingCart, Flame } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle, Calendar, ShoppingCart, Flame, Users } from "lucide-react";
 
 const LEVEL_STYLE: Record<string, string> = {
   ok: "bg-status-ok-bg text-status-ok border-status-ok-edge",
@@ -149,6 +150,21 @@ export default function DashboardPage() {
     return rows.sort((a, b) => (a.quantity / Math.max(1, a.minimum)) - (b.quantity / Math.max(1, b.minimum)));
   }, [locationTotals, locationMinimums, productMap]);
 
+  // Customer follow-ups — due today or overdue + soon (next 14 days)
+  const followups = useCustomerFollowups();
+  const customersAll = useCustomers(true);
+  const customerByIdDash = useMemo(() => new Map(customersAll.map((c) => [c.id!, c])), [customersAll]);
+  const todayIsoStr = todayIso;
+  const upcomingFollowups = useMemo(() => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() + 14);
+    const cutoffIso = toIsoDate(cutoff);
+    return followups
+      .filter((f) => !f.completedAt && f.dueDate <= cutoffIso)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  }, [followups]);
+  const overdueFollowups = upcomingFollowups.filter((f) => f.dueDate < todayIsoStr);
+
   // Filling cooking list — next 7 days
   const fillingsList = useFillings(true);
   const fillingCategoriesList = useFillingCategories(true);
@@ -222,6 +238,7 @@ export default function DashboardPage() {
   if (shortages.length > 0) alerts.push({ level: "warn", text: `${shortages.length} ingredient${shortages.length > 1 ? "s" : ""} short for open orders`, href: "/shopping" });
   if (lowStock.length > 0) alerts.push({ level: "warn", text: `${lowStock.length} product/location below minimum`, href: "/stock" });
   if (expiryWarn.length > 0) alerts.push({ level: expiryWarn.some((r) => r.remainingDays <= 0) ? "critical" : "warn", text: `${expiryWarn.length} batch${expiryWarn.length > 1 ? "es" : ""} approaching sell-by`, href: "/stock" });
+  if (overdueFollowups.length > 0) alerts.push({ level: "warn", text: `${overdueFollowups.length} overdue follow-up${overdueFollowups.length > 1 ? "s" : ""}`, href: "/customers" });
 
   return (
     <div>
@@ -366,6 +383,53 @@ export default function DashboardPage() {
             </ul>
           )}
         </section>
+
+        {/* Customer follow-ups */}
+        {upcomingFollowups.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
+                <Users className="w-4 h-4" /> Follow-ups
+              </h2>
+              <Link href="/customers" className="text-xs text-primary hover:underline">All customers →</Link>
+            </div>
+            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              {upcomingFollowups.slice(0, 6).map((f) => {
+                const overdue = f.dueDate < todayIsoStr;
+                const customer = customerByIdDash.get(f.customerId);
+                return (
+                  <li key={f.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                    <button
+                      onClick={() => completeCustomerFollowup(f.id!, true)}
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${overdue ? "border-status-alert" : "border-border"}`}
+                      aria-label="Mark follow-up complete"
+                    >
+                      <CheckCircle className="w-3 h-3 opacity-0" />
+                    </button>
+                    <Link
+                      href={f.customerId ? `/customers/${encodeURIComponent(f.customerId)}` : "/customers"}
+                      className="flex-1 min-w-0 hover:underline"
+                    >
+                      <p className="truncate">{f.subject}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {customer?.companyName ?? "—"}
+                        {" · "}
+                        <span className={overdue ? "text-status-alert" : ""}>
+                          due {new Date(f.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                        </span>
+                      </p>
+                    </Link>
+                  </li>
+                );
+              })}
+              {upcomingFollowups.length > 6 && (
+                <li className="px-3 py-2 text-xs text-muted-foreground text-center">
+                  +{upcomingFollowups.length - 6} more
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
 
         {/* Filling cooking list — next 7 days */}
         {fillingsToCook.length > 0 && (

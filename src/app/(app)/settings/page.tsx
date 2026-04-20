@@ -539,6 +539,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
   const [warnThreshold, setWarnThreshold] = useState<string>("");
   const [criticalThreshold, setCriticalThreshold] = useState<string>("");
   const [expiryWarnDays, setExpiryWarnDays] = useState<string>("");
+  const [labourRate, setLabourRate] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
 
@@ -550,6 +551,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
     setWarnThreshold(config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "");
     setCriticalThreshold(config?.criticalThresholdPercent != null ? String(config.criticalThresholdPercent) : "");
     setExpiryWarnDays(config?.stockExpiryWarnDays != null ? String(config.stockExpiryWarnDays) : "");
+    setLabourRate(config?.labourHourlyRate != null ? String(config.labourHourlyRate) : "");
     setSyncedAt(configKey);
     onDirtyChange(false);
   }
@@ -559,7 +561,8 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
     fillingBuffer !== (config?.fillingBufferPercent != null ? String(config.fillingBufferPercent) : "") ||
     warnThreshold !== (config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "") ||
     criticalThreshold !== (config?.criticalThresholdPercent != null ? String(config.criticalThresholdPercent) : "") ||
-    expiryWarnDays !== (config?.stockExpiryWarnDays != null ? String(config.stockExpiryWarnDays) : "")
+    expiryWarnDays !== (config?.stockExpiryWarnDays != null ? String(config.stockExpiryWarnDays) : "") ||
+    labourRate !== (config?.labourHourlyRate != null ? String(config.labourHourlyRate) : "")
   );
 
   useEffect(() => { onDirtyChange(isDirty); }, [isDirty]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -573,6 +576,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
         warnThresholdPercent: parsePercent(warnThreshold),
         criticalThresholdPercent: parsePercent(criticalThreshold),
         stockExpiryWarnDays: parseNonNegativeInt(expiryWarnDays),
+        labourHourlyRate: parseNonNegativeFloat(labourRate),
       });
     } finally {
       setSaving(false);
@@ -585,6 +589,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
     warnThresholdPercent: parsePercent(warnThreshold),
     criticalThresholdPercent: parsePercent(criticalThreshold),
     stockExpiryWarnDays: parseNonNegativeInt(expiryWarnDays),
+    labourHourlyRate: parseNonNegativeFloat(labourRate),
   };
   const status = capacityConfigStatus(previewConfig, people);
   const knownRoles = collectRoles(people);
@@ -714,6 +719,22 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
             <p className="text-xs text-muted-foreground mt-1">
               Batches with this many days or fewer until their sell-by date appear
               in the dashboard expiry widget.
+            </p>
+          </div>
+          <div>
+            <label className="label">Labour hourly rate</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={labourRate}
+              onChange={(e) => setLabourRate(e.target.value)}
+              placeholder="e.g. 15.00"
+              className="input"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Used by the B2B quote calculator to include labour cost. Set in your
+              local currency unit per hour.
             </p>
           </div>
         </div>
@@ -2099,6 +2120,12 @@ function parsePercent(s: string): number | undefined {
 
 function parseNonNegativeInt(s: string): number | undefined {
   const n = parseInt(s, 10);
+  if (isNaN(n) || n < 0) return undefined;
+  return n;
+}
+
+function parseNonNegativeFloat(s: string): number | undefined {
+  const n = parseFloat(s);
   if (isNaN(n) || n < 0) return undefined;
   return n;
 }

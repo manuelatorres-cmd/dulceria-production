@@ -1060,6 +1060,9 @@ export interface CapacityConfig {
   /** Days before sell-by that a stock batch starts appearing on the
    *  dashboard expiry warning list. */
   stockExpiryWarnDays?: number;
+  /** Labour hourly rate (currency units/hour) used in quote + margin
+   *  calculations. Nullable until the user sets it in Settings. */
+  labourHourlyRate?: number;
   updatedAt?: Date;
 }
 
@@ -1074,6 +1077,160 @@ export interface WasteLogEntry {
   loggedBy?: string;
   loggedAt: Date;
 }
+
+// --- B2B CRM + quotes (Phase 7) ---
+
+/** One B2B customer profile. Analytics (lifetime value, avg order,
+ *  frequency, last order) are derived in the app from `orders` + `orderItems`
+ *  — not stored here. */
+export interface Customer {
+  id?: string;
+  companyName: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  vatNumber?: string;
+  /** Free-form tags for segmenting: "wholesale", "hotel", "pastry_shop", etc. */
+  tags: string[];
+  notes?: string;
+  archived?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const CUSTOMER_CONTACT_KINDS = ["call", "email", "meeting", "note"] as const;
+export type CustomerContactKind = (typeof CUSTOMER_CONTACT_KINDS)[number];
+
+export const CUSTOMER_CONTACT_LABELS: Record<CustomerContactKind, string> = {
+  call: "Call",
+  email: "Email",
+  meeting: "Meeting",
+  note: "Note",
+};
+
+/** One entry in the contact log. `body` holds the full text; `summary`
+ *  is what the log list renders. */
+export interface CustomerContact {
+  id?: string;
+  customerId: string;
+  kind: CustomerContactKind;
+  summary: string;
+  body?: string;
+  contactedAt: Date;
+  loggedBy?: string;
+  createdAt?: Date;
+}
+
+export const FOLLOWUP_ORIGINS = ["manual", "seasonal"] as const;
+export type FollowupOrigin = (typeof FOLLOWUP_ORIGINS)[number];
+
+/** A reminder to get back in touch with a customer by a given date. */
+export interface CustomerFollowup {
+  id?: string;
+  customerId: string;
+  dueDate: string; // ISO date
+  subject: string;
+  notes?: string;
+  relatedOrderId?: string;
+  relatedContactId?: string;
+  origin: FollowupOrigin;
+  completedAt?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const QUOTE_STATUSES = ["draft", "sent", "won", "lost", "expired"] as const;
+export type QuoteStatus = (typeof QUOTE_STATUSES)[number];
+
+export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  won: "Accepted",
+  lost: "Declined",
+  expired: "Expired",
+};
+
+/** Line item inside a quote. `packagingId` + `boxContents` are set when
+ *  the line represents a box of assorted products (B2B gift box). */
+export interface QuoteItem {
+  productId?: string;
+  quantity: number;
+  unitPrice?: number;
+  packagingId?: string;
+  /** For boxes: [{ productId, pieces }]. */
+  boxContents?: Array<{ productId: string; pieces: number }>;
+  notes?: string;
+}
+
+/** Cost-breakdown snapshot saved alongside the quote so the PDF view
+ *  stays stable even as ingredient prices drift afterwards. */
+export interface QuoteCostBreakdown {
+  ingredientsCost: number;
+  decorationCost: number;
+  packagingCost: number;
+  labourCost: number;
+  totalCost: number;
+  /** Per-line attribution for the PDF/summary view. */
+  perLine: Array<{
+    productId?: string;
+    label: string;
+    quantity: number;
+    unitCost: number;
+    lineCost: number;
+  }>;
+}
+
+export interface Quote {
+  id?: string;
+  customerId?: string;
+  /** Hypothetical quote that does not affect capacity or convert to an
+   *  order. Used by the What-If mode. */
+  isWhatIf: boolean;
+  title: string;
+  status: QuoteStatus;
+  deadline?: Date;
+  items: QuoteItem[];
+  costBreakdown?: QuoteCostBreakdown;
+  totalCost?: number;
+  sellPrice?: number;
+  marginPercent?: number;
+  labourHoursEstimate?: number;
+  /** Discount % vs the standard retail price for the same mix (negative
+   *  = premium over retail). */
+  retailComparePct?: number;
+  feasible?: boolean;
+  feasibilityNote?: string;
+  expiresAt?: Date;
+  convertedToOrderId?: string;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** One packaging-unit line for a B2B order: N boxes of packaging P,
+ *  each containing a specific product mix. */
+export interface OrderBox {
+  id?: string;
+  orderId: string;
+  packagingId?: string;
+  quantity: number;
+  priceOverride?: number;
+  contents: Array<{ productId: string; pieces: number }>;
+  sortOrder: number;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const DELIVERY_TYPES = ["pickup", "delivery", "ship"] as const;
+export type DeliveryType = (typeof DELIVERY_TYPES)[number];
+
+export const DELIVERY_TYPE_LABELS: Record<DeliveryType, string> = {
+  pickup: "Pickup",
+  delivery: "Local delivery",
+  ship: "Shipping",
+};
 
 /**
  * A production worker. The reverse scheduler sums available hours per
@@ -1168,6 +1325,10 @@ export interface Order {
   id?: string;
   channel: OrderChannel;
   customerName?: string;
+  /** Link to a B2B customer record. Nullable so non-B2B channels
+   *  (events, walk-in shop replenishment) can skip it. Text
+   *  `customerName` is preserved for display + legacy rows. */
+  customerId?: string;
   /** Only set when channel = 'event'. */
   eventName?: string;
   /** ISO-timestamp string (timestamptz). Reverse scheduler works
@@ -1176,6 +1337,11 @@ export interface Order {
   priority: OrderPriority;
   status: OrderStatus;
   notes?: string;
+  deliveryType?: DeliveryType;
+  /** ISO-timestamp string for the delivery/pickup appointment. */
+  deliveryAt?: string;
+  deliveryAddress?: string;
+  deliveryNotes?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -1185,6 +1351,9 @@ export interface OrderItem {
   orderId: string;
   productId: string;
   quantity: number;
+  /** Agreed unit price for this line. Nullable — when absent, customer
+   *  analytics fall back to the product's current retail price. */
+  unitPrice?: number;
   sortOrder: number;
   notes?: string;
 }

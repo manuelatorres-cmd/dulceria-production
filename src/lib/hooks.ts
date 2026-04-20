@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -3821,6 +3821,7 @@ export async function saveCapacityConfig(partial: Partial<CapacityConfig>): Prom
       capacityBufferPercent: partial.capacityBufferPercent ?? null,
       fillingBufferPercent: partial.fillingBufferPercent ?? null,
       stockExpiryWarnDays: partial.stockExpiryWarnDays ?? null,
+      labourHourlyRate: partial.labourHourlyRate ?? null,
       updatedAt: new Date(),
     }, { onConflict: "id" });
   if (error) throw error;
@@ -4812,4 +4813,362 @@ export async function checkDeadlineImpactForProduct(productId: string): Promise<
     running = Math.max(0, running - quantity);
   }
   return issues;
+}
+
+// ---------------------------------------------------------------
+// Customers (Phase 7 — B2B CRM)
+// ---------------------------------------------------------------
+
+export function useCustomers(includeArchived = false): Customer[] {
+  const { data } = useQuery({
+    queryKey: ["customers", { includeArchived }],
+    queryFn: async () => {
+      const rows = assertOk(await supabase.from("customers").select("*")) as Customer[];
+      return rows
+        .filter((c) => includeArchived || !c.archived)
+        .sort((a, b) => a.companyName.localeCompare(b.companyName));
+    },
+  });
+  return data ?? [];
+}
+
+export function useCustomer(id: string | undefined): Customer | null | undefined {
+  const { data } = useQuery({
+    queryKey: ["customers", "one", id],
+    enabled: !!id,
+    queryFn: async () => assertOkMaybe(
+      await supabase.from("customers").select("*").eq("id", id!).maybeSingle(),
+    ) as Customer | null,
+  });
+  return data;
+}
+
+export async function saveCustomer(c: Omit<Customer, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<string> {
+  const now = new Date();
+  if (c.id) {
+    const { error } = await supabase
+      .from("customers")
+      .update({ ...c, updatedAt: now })
+      .eq("id", c.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["customers"] });
+    return c.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("customers")
+    .insert({ ...c, id, createdAt: now, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["customers"] });
+  return id;
+}
+
+export async function setCustomerArchived(id: string, archived: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("customers")
+    .update({ archived, updatedAt: new Date() })
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["customers"] });
+}
+
+// Contact log
+
+export function useCustomerContacts(customerId: string | undefined): CustomerContact[] {
+  const { data } = useQuery({
+    queryKey: ["customer-contacts", customerId],
+    enabled: !!customerId,
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("customerContacts").select("*").eq("customerId", customerId!)
+          .order("contactedAt", { ascending: false }),
+      ) as CustomerContact[];
+      return rows;
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveCustomerContact(entry: Omit<CustomerContact, "id" | "createdAt"> & { id?: string }): Promise<string> {
+  const now = new Date();
+  if (entry.id) {
+    const { error } = await supabase.from("customerContacts").update(entry).eq("id", entry.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["customer-contacts"] });
+    return entry.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("customerContacts")
+    .insert({ ...entry, id, createdAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["customer-contacts"] });
+  return id;
+}
+
+export async function deleteCustomerContact(id: string): Promise<void> {
+  const { error } = await supabase.from("customerContacts").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["customer-contacts"] });
+}
+
+// Follow-ups
+
+export function useCustomerFollowups(customerId?: string): CustomerFollowup[] {
+  const { data } = useQuery({
+    queryKey: ["customer-followups", customerId ?? "all"],
+    queryFn: async () => {
+      const q = supabase.from("customerFollowups").select("*").order("dueDate", { ascending: true });
+      const rows = assertOk(
+        await (customerId ? q.eq("customerId", customerId) : q),
+      ) as CustomerFollowup[];
+      return rows;
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveCustomerFollowup(entry: Omit<CustomerFollowup, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<string> {
+  const now = new Date();
+  if (entry.id) {
+    const { error } = await supabase
+      .from("customerFollowups")
+      .update({ ...entry, updatedAt: now })
+      .eq("id", entry.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["customer-followups"] });
+    return entry.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("customerFollowups")
+    .insert({ ...entry, id, createdAt: now, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["customer-followups"] });
+  return id;
+}
+
+export async function completeCustomerFollowup(id: string, completed: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("customerFollowups")
+    .update({ completedAt: completed ? new Date() : null, updatedAt: new Date() })
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["customer-followups"] });
+}
+
+export async function deleteCustomerFollowup(id: string): Promise<void> {
+  const { error } = await supabase.from("customerFollowups").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["customer-followups"] });
+}
+
+// Quotes
+
+export function useQuotes(filter?: { customerId?: string; status?: Quote["status"] }): Quote[] {
+  const { data } = useQuery({
+    queryKey: ["quotes", filter ?? null],
+    queryFn: async () => {
+      let q = supabase.from("quotes").select("*").order("createdAt", { ascending: false });
+      if (filter?.customerId) q = q.eq("customerId", filter.customerId);
+      if (filter?.status) q = q.eq("status", filter.status);
+      const rows = assertOk(await q) as Quote[];
+      // The JSON columns come back as parsed objects — they don't need post-processing here.
+      return rows;
+    },
+  });
+  return data ?? [];
+}
+
+export function useQuote(id: string | undefined): Quote | null | undefined {
+  const { data } = useQuery({
+    queryKey: ["quotes", "one", id],
+    enabled: !!id,
+    queryFn: async () => assertOkMaybe(
+      await supabase.from("quotes").select("*").eq("id", id!).maybeSingle(),
+    ) as Quote | null,
+  });
+  return data;
+}
+
+export async function saveQuote(q: Omit<Quote, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<string> {
+  const now = new Date();
+  // Map the flat TS Quote onto the DB shape (items + costBreakdown live in jsonb
+  // columns, so we pass them through as-is).
+  const payload: Record<string, unknown> = {
+    customerId: q.customerId ?? null,
+    isWhatIf: q.isWhatIf,
+    title: q.title,
+    status: q.status,
+    deadline: q.deadline ?? null,
+    itemsJson: q.items ?? [],
+    costBreakdownJson: q.costBreakdown ?? null,
+    totalCost: q.totalCost ?? null,
+    sellPrice: q.sellPrice ?? null,
+    marginPercent: q.marginPercent ?? null,
+    labourHoursEstimate: q.labourHoursEstimate ?? null,
+    retailComparePct: q.retailComparePct ?? null,
+    feasible: q.feasible ?? null,
+    feasibilityNote: q.feasibilityNote ?? null,
+    expiresAt: q.expiresAt ?? null,
+    convertedToOrderId: q.convertedToOrderId ?? null,
+    notes: q.notes ?? null,
+    updatedAt: now,
+  };
+  if (q.id) {
+    const { error } = await supabase.from("quotes").update(payload).eq("id", q.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    return q.id;
+  }
+  const id = newId();
+  const { error } = await supabase.from("quotes").insert({ ...payload, id, createdAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["quotes"] });
+  return id;
+}
+
+export async function deleteQuote(id: string): Promise<void> {
+  const { error } = await supabase.from("quotes").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["quotes"] });
+}
+
+/** Rehydrate a raw DB row into the flat TS Quote shape (items/costBreakdown
+ *  come back in *Json columns). */
+export function quoteFromRow(row: Record<string, unknown>): Quote {
+  return {
+    id: row.id as string,
+    customerId: (row.customerId as string) ?? undefined,
+    isWhatIf: Boolean(row.isWhatIf),
+    title: (row.title as string) ?? "",
+    status: (row.status as Quote["status"]) ?? "draft",
+    deadline: row.deadline ? new Date(row.deadline as string) : undefined,
+    items: (row.itemsJson as Quote["items"]) ?? [],
+    costBreakdown: (row.costBreakdownJson as Quote["costBreakdown"]) ?? undefined,
+    totalCost: row.totalCost == null ? undefined : Number(row.totalCost),
+    sellPrice: row.sellPrice == null ? undefined : Number(row.sellPrice),
+    marginPercent: row.marginPercent == null ? undefined : Number(row.marginPercent),
+    labourHoursEstimate: row.labourHoursEstimate == null ? undefined : Number(row.labourHoursEstimate),
+    retailComparePct: row.retailComparePct == null ? undefined : Number(row.retailComparePct),
+    feasible: row.feasible == null ? undefined : Boolean(row.feasible),
+    feasibilityNote: (row.feasibilityNote as string) ?? undefined,
+    expiresAt: row.expiresAt ? new Date(row.expiresAt as string) : undefined,
+    convertedToOrderId: (row.convertedToOrderId as string) ?? undefined,
+    notes: (row.notes as string) ?? undefined,
+    createdAt: row.createdAt ? new Date(row.createdAt as string) : undefined,
+    updatedAt: row.updatedAt ? new Date(row.updatedAt as string) : undefined,
+  };
+}
+
+/** Convert a quote into a confirmed order. Creates an Order row + OrderItem
+ *  rows from the quote's items, links the quote back via convertedToOrderId,
+ *  and bumps the quote status to 'won'. Returns the new order id. */
+export async function convertQuoteToOrder(quoteId: string): Promise<string> {
+  const row = assertOkMaybe(
+    await supabase.from("quotes").select("*").eq("id", quoteId).maybeSingle(),
+  );
+  if (!row) throw new Error(`Quote ${quoteId} not found`);
+  const quote = quoteFromRow(row as Record<string, unknown>);
+
+  // Must have a customer to convert — What-If quotes can't become orders.
+  if (quote.isWhatIf || !quote.customerId) {
+    throw new Error("What-If quotes cannot be converted into orders");
+  }
+
+  const now = new Date();
+  const orderId = newId();
+  const customer = assertOkMaybe(
+    await supabase.from("customers").select("*").eq("id", quote.customerId).maybeSingle(),
+  ) as Customer | null;
+
+  const { error: insOrderErr } = await supabase.from("orders").insert({
+    id: orderId,
+    channel: "b2b",
+    customerId: quote.customerId,
+    customerName: customer?.companyName ?? "",
+    deadline: quote.deadline ?? now,
+    priority: "normal",
+    status: "pending",
+    notes: quote.notes ?? null,
+    createdAt: now,
+    updatedAt: now,
+  });
+  if (insOrderErr) throw insOrderErr;
+
+  // Product-line items (box lines are captured in orderBoxes instead).
+  const productLines = quote.items.filter((it) => it.productId && !(it.boxContents && it.boxContents.length > 0));
+  if (productLines.length > 0) {
+    const { error: insItemsErr } = await supabase.from("orderItems").insert(
+      productLines.map((it, i) => ({
+        id: newId(),
+        orderId,
+        productId: it.productId!,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice ?? null,
+        sortOrder: i,
+        notes: it.notes ?? null,
+      })),
+    );
+    if (insItemsErr) throw insItemsErr;
+  }
+
+  // Box lines → orderBoxes rows.
+  const boxLines = quote.items.filter((it) => it.boxContents && it.boxContents.length > 0);
+  if (boxLines.length > 0) {
+    const { error: insBoxesErr } = await supabase.from("orderBoxes").insert(
+      boxLines.map((it, i) => ({
+        id: newId(),
+        orderId,
+        packagingId: it.packagingId ?? null,
+        quantity: it.quantity,
+        priceOverride: it.unitPrice ?? null,
+        contentsJson: it.boxContents ?? [],
+        sortOrder: i,
+        notes: it.notes ?? null,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    );
+    if (insBoxesErr) throw insBoxesErr;
+  }
+
+  // Update quote status + link back to order.
+  const { error: updQErr } = await supabase
+    .from("quotes")
+    .update({ status: "won", convertedToOrderId: orderId, updatedAt: now })
+    .eq("id", quoteId);
+  if (updQErr) throw updQErr;
+
+  queryClient.invalidateQueries({ queryKey: ["quotes"] });
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  return orderId;
+}
+
+// Order boxes
+
+export function useOrderBoxes(orderId: string | undefined): OrderBox[] {
+  const { data } = useQuery({
+    queryKey: ["order-boxes", orderId],
+    enabled: !!orderId,
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("orderBoxes").select("*").eq("orderId", orderId!).order("sortOrder"),
+      ) as Array<Record<string, unknown>>;
+      return rows.map((r) => ({
+        id: r.id as string,
+        orderId: r.orderId as string,
+        packagingId: (r.packagingId as string) ?? undefined,
+        quantity: Number(r.quantity),
+        priceOverride: r.priceOverride == null ? undefined : Number(r.priceOverride),
+        contents: (r.contentsJson as Array<{ productId: string; pieces: number }>) ?? [],
+        sortOrder: Number(r.sortOrder ?? 0),
+        notes: (r.notes as string) ?? undefined,
+        createdAt: r.createdAt ? new Date(r.createdAt as string) : undefined,
+        updatedAt: r.updatedAt ? new Date(r.updatedAt as string) : undefined,
+      }) as OrderBox);
+    },
+  });
+  return data ?? [];
 }

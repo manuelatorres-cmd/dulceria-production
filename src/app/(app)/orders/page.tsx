@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { useOrders, saveOrder, useProductsList, useAllOrderItems } from "@/lib/hooks";
+import { useOrders, saveOrder, useProductsList, useAllOrderItems, useCustomers } from "@/lib/hooks";
 import {
   ORDER_CHANNELS, ORDER_CHANNEL_LABELS,
   ORDER_PRIORITIES, ORDER_PRIORITY_LABELS,
@@ -173,12 +173,14 @@ export default function OrdersPage() {
 function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {
   const router = useRouter();
   const [channel, setChannel] = useState<OrderChannel>("b2b");
+  const [customerId, setCustomerId] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
   const [eventName, setEventName] = useState("");
   const [deadline, setDeadline] = useState("");
   const [priority, setPriority] = useState<OrderPriority>("normal");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const customers = useCustomers(false);
 
   const canSave = !!deadline && (channel !== "shop" ? customerName.trim() || eventName.trim() : true) && !saving;
 
@@ -187,6 +189,7 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
     try {
       const id = await saveOrder({
         channel,
+        customerId: customerId || undefined,
         customerName: customerName.trim() || undefined,
         eventName: channel === "event" && eventName.trim() ? eventName.trim() : undefined,
         deadline: new Date(deadline).toISOString(),
@@ -221,10 +224,26 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
 
       <div>
         <label className="label">Customer {channel === "shop" && <span className="text-muted-foreground font-normal">(optional for shop)</span>}</label>
+        {customers.length > 0 && (
+          <select
+            value={customerId}
+            onChange={(e) => {
+              setCustomerId(e.target.value);
+              const c = customers.find((x) => x.id === e.target.value);
+              if (c) setCustomerName(c.companyName);
+            }}
+            className="input mb-1.5"
+          >
+            <option value="">— no linked customer —</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>{c.companyName}</option>
+            ))}
+          </select>
+        )}
         <input
           type="text"
           value={customerName}
-          onChange={(e) => setCustomerName(e.target.value)}
+          onChange={(e) => { setCustomerName(e.target.value); setCustomerId(""); }}
           placeholder="e.g. Hotel Sacher"
           className="input"
         />
