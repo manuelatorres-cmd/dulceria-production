@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   useOrder, useOrderItems, useProductsList, saveOrder, deleteOrder,
-  saveOrderItem, deleteOrderItem, useCustomers,
+  saveOrderItem, deleteOrderItem, useCustomers, useCustomer, saveCustomer,
   usePackagingList, useOrderPackagingLines, saveOrderPackagingLine, deleteOrderPackagingLine,
   useProductActiveMinutesMap, useProductionSchedule, useCapacityConfig,
   usePeople, usePersonUnavailability, useBlockedDays,
@@ -20,18 +20,20 @@ import {
   computeOrderLabourHours, computeOrderCalculatedCost, checkOrderFeasibility,
   type OrderProductLine, type OrderPackagingRollupLine, type ProductStockState,
 } from "@/lib/orderRollup";
+import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
 import {
   ORDER_CHANNELS, ORDER_CHANNEL_LABELS,
   ORDER_PRIORITIES, ORDER_PRIORITY_LABELS,
   ORDER_STATUSES, ORDER_STATUS_LABELS,
   DELIVERY_TYPES, DELIVERY_TYPE_LABELS,
+  CUSTOMER_TYPES, CUSTOMER_TYPE_LABELS,
   type OrderChannel, type OrderPriority, type OrderStatus,
   type DeliveryType,
   type Packaging, type OrderPackagingLine,
   type ProductCostSnapshot, type PackagingOrder,
-  type OrderItem,
+  type OrderItem, type Customer, type CustomerType,
 } from "@/types";
-import { ArrowLeft, Plus, Trash2, X, Pencil, AlertTriangle, Calendar, Package } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, X, Pencil, AlertTriangle, Calendar, Package, UserPlus, User } from "lucide-react";
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);
@@ -44,6 +46,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const packaging = usePackagingList(true);
   const replenishmentOrder = useReplenishmentOrderFor(orderId);
   const parentOrder = useOrder(order?.sourceOrderId);
+  // Full customer record for the preferences banner + missing-data badge.
+  const linkedCustomer = useCustomer(order?.customerId);
   const packagingLines = useOrderPackagingLines(orderId);
   const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
   const packagingMap = useMemo(() => new Map(packaging.map((p) => [p.id!, p])), [packaging]);
@@ -233,7 +237,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 href={`/customers/${encodeURIComponent(order.customerId)}`}
                 className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
               >
-                View customer profile →
+                View customer profile
+                {linkedCustomer && computeMissingRequiredCustomerFields(linkedCustomer).length > 0 && (
+                  <span
+                    className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-status-warn text-white text-[9px] font-bold"
+                    title={`Missing: ${computeMissingRequiredCustomerFields(linkedCustomer).join(", ")}`}
+                  >
+                    {computeMissingRequiredCustomerFields(linkedCustomer).length}
+                  </span>
+                )}
+                {" "}→
               </Link>
             )}
           </div>
@@ -243,6 +256,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </button>
           )}
         </div>
+
+        {/* Customer preferences banner (read-only, always visible when linked) */}
+        {linkedCustomer && (
+          linkedCustomer.allergenNotes
+          || linkedCustomer.packagingPrefs
+          || linkedCustomer.language
+          || linkedCustomer.paymentTerms
+        ) && (
+          <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs space-y-1">
+            <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+              <User className="w-3.5 h-3.5" /> Customer preferences
+            </div>
+            {linkedCustomer.allergenNotes && (
+              <p><span className="text-muted-foreground">Allergens:</span> {linkedCustomer.allergenNotes}</p>
+            )}
+            {linkedCustomer.packagingPrefs && (
+              <p><span className="text-muted-foreground">Packaging:</span> {linkedCustomer.packagingPrefs}</p>
+            )}
+            <div className="flex gap-3 text-muted-foreground">
+              {linkedCustomer.language && <span>Lang: <span className="uppercase text-foreground">{linkedCustomer.language}</span></span>}
+              {linkedCustomer.paymentTerms && <span>Payment: <span className="text-foreground">{linkedCustomer.paymentTerms}</span></span>}
+            </div>
+          </div>
+        )}
 
         {/* Replenishment / borrow linkage banners */}
         {parentOrder && (
@@ -465,13 +502,42 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   const [saveError, setSaveError] = useState("");
 
   const customers = useCustomers(false);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerListOpen, setCustomerListOpen] = useState(false);
+  const [addingCustomer, setAddingCustomer] = useState(false);
 
-  // When the dropdown picks a customer, mirror the company name into the
-  // text field so legacy display code (and non-B2B rows) keeps working.
-  function pickCustomer(id: string) {
-    setCustomerId(id);
-    const c = customers.find((x) => x.id === id);
-    if (c) setCustomerName(c.companyName);
+  const customerMatches = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase();
+    if (!q) return customers.slice(0, 20);
+    return customers
+      .filter((c) =>
+        c.companyName.toLowerCase().includes(q)
+        || (c.contactName ?? "").toLowerCase().includes(q)
+        || (c.email ?? "").toLowerCase().includes(q)
+        || (c.phone ?? "").toLowerCase().includes(q)
+      )
+      .slice(0, 20);
+  }, [customers, customerQuery]);
+
+  /** Pick a customer and preload any useful defaults onto the order form.
+   *  Per spec: channel (from type), deliveryType (from defaultDeliveryMethod),
+   *  deliveryAddress (from address, only when delivery/ship). We never
+   *  overwrite a field the user has already changed by hand — preload
+   *  is for empty fields only. */
+  function pickCustomer(c: Customer) {
+    setCustomerId(c.id!);
+    setCustomerName(c.companyName);
+    setCustomerQuery("");
+    setCustomerListOpen(false);
+    // Channel inference: B2B customer defaults to 'b2b', private to 'online'.
+    if (!order.customerId && c.type === "b2b" && channel === "online") setChannel("b2b");
+    if (!order.customerId && c.type === "private" && channel === "b2b") setChannel("online");
+    // Fulfilment preloads — only when the order's fulfilment fields are
+    // still empty (don't clobber user-entered data on re-pick).
+    if (!deliveryType && c.defaultDeliveryMethod) setDeliveryType(c.defaultDeliveryMethod);
+    if (!deliveryAddress && c.address && (c.defaultDeliveryMethod === "delivery" || c.defaultDeliveryMethod === "ship")) {
+      setDeliveryAddress(c.address);
+    }
   }
 
   async function handleSave() {
@@ -523,35 +589,95 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         </div>
       </div>
 
-      <div>
-        <label className="label">Customer</label>
-        {customers.length > 0 && (
-          <select
-            value={customerId}
-            onChange={(e) => {
-              if (e.target.value === "") {
-                setCustomerId("");
-              } else {
-                pickCustomer(e.target.value);
-              }
-            }}
-            className="input mb-1.5"
-          >
-            <option value="">— no linked customer —</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.companyName}</option>
-            ))}
-          </select>
+      <div className="relative">
+        <label className="label flex items-center gap-2">
+          Customer
+          {customerId && (
+            (() => {
+              const c = customers.find((x) => x.id === customerId);
+              if (!c) return null;
+              const miss = computeMissingRequiredCustomerFields(c);
+              return miss.length > 0 ? (
+                <span
+                  className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-status-warn text-white text-[10px] font-bold"
+                  title={`Missing on customer: ${miss.join(", ")}`}
+                >{miss.length}</span>
+              ) : null;
+            })()
+          )}
+        </label>
+        {customerId ? (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm">
+              {customerName || "(linked)"}
+            </div>
+            <button
+              onClick={() => { setCustomerId(""); setCustomerName(""); setCustomerListOpen(true); }}
+              className="text-xs text-primary hover:underline"
+            >
+              Change
+            </button>
+          </div>
+        ) : (
+          <>
+            <input
+              type="text"
+              value={customerQuery || customerName}
+              onChange={(e) => {
+                setCustomerQuery(e.target.value);
+                setCustomerName(e.target.value);
+                setCustomerListOpen(true);
+              }}
+              onFocus={() => setCustomerListOpen(true)}
+              placeholder="Search or type a one-off name"
+              className="input"
+              autoComplete="off"
+            />
+            {customerListOpen && (
+              <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border border-border bg-card shadow-lg max-h-64 overflow-y-auto">
+                {customerMatches.map((c) => {
+                  const miss = computeMissingRequiredCustomerFields(c);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => pickCustomer(c)}
+                      className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      <span className="flex-1 min-w-0">
+                        <span className="font-medium">{c.companyName}</span>
+                        {c.type && <span className="ml-2 text-[10px] uppercase text-muted-foreground">{CUSTOMER_TYPE_LABELS[c.type]}</span>}
+                        {c.contactName && <span className="text-xs text-muted-foreground block truncate">{c.contactName}{c.email ? ` · ${c.email}` : ""}</span>}
+                      </span>
+                      {miss.length > 0 && (
+                        <span className="text-[10px] text-status-warn inline-flex items-center gap-0.5">
+                          <AlertTriangle className="w-3 h-3" /> {miss.length}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => { setAddingCustomer(true); setCustomerListOpen(false); }}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm border-t border-border bg-muted/40 hover:bg-muted text-primary font-medium"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  {customerQuery.trim() ? `+ New customer "${customerQuery.trim()}"` : "+ New customer"}
+                </button>
+              </div>
+            )}
+          </>
         )}
-        <input
-          type="text"
-          value={customerName}
-          onChange={(e) => { setCustomerName(e.target.value); setCustomerId(""); }}
-          placeholder="Customer / contact name"
-          className="input"
-        />
+        {addingCustomer && (
+          <InlineNewCustomer
+            initialName={customerQuery.trim() || customerName.trim()}
+            onCreated={(c) => { setAddingCustomer(false); pickCustomer(c); }}
+            onCancel={() => setAddingCustomer(false)}
+          />
+        )}
         <p className="text-[11px] text-muted-foreground mt-0.5">
-          Pick an existing customer for full CRM tracking, or type a one-off name.
+          Pick for CRM tracking + price / preference preload.
           {" "}<Link href="/customers" className="text-primary hover:underline">Manage customers →</Link>
         </p>
       </div>
@@ -1372,6 +1498,97 @@ function OrderScheduleSection({
         </div>
       )}
     </section>
+  );
+}
+
+/** Compact "+ New customer" form used inline from the order page.
+ *  Creates a minimal customer (name, type, phone, email, default
+ *  fulfilment) and returns it to the caller, which then runs the
+ *  normal preload flow. The customer detail page is one click away
+ *  for filling the rest. */
+function InlineNewCustomer({
+  initialName, onCreated, onCancel,
+}: {
+  initialName: string;
+  onCreated: (c: Customer) => void;
+  onCancel: () => void;
+}) {
+  const [companyName, setCompanyName] = useState(initialName);
+  const [type, setType] = useState<CustomerType | "">("");
+  const [contactName, setContactName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [defaultDeliveryMethod, setDefaultDeliveryMethod] = useState<DeliveryType | "">("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  async function handleCreate() {
+    if (!companyName.trim()) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const id = await saveCustomer({
+        companyName: companyName.trim(),
+        type: type === "" ? undefined : type,
+        contactName: contactName.trim() || undefined,
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+        defaultDeliveryMethod: defaultDeliveryMethod === "" ? undefined : defaultDeliveryMethod,
+        tags: [],
+      });
+      // saveCustomer returns the id; reconstruct the customer shape.
+      onCreated({
+        id,
+        companyName: companyName.trim(),
+        type: type === "" ? undefined : type,
+        contactName: contactName.trim() || undefined,
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+        defaultDeliveryMethod: defaultDeliveryMethod === "" ? undefined : defaultDeliveryMethod,
+        tags: [],
+      });
+    } catch (err) {
+      const raw: { message?: string; code?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      setSaveError(raw.message || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-border bg-card p-3 space-y-2">
+      <p className="text-xs font-semibold text-muted-foreground">New customer (quick)</p>
+      <input
+        value={companyName}
+        onChange={(e) => setCompanyName(e.target.value)}
+        placeholder="Company / name *"
+        className="input text-sm"
+        autoFocus
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <select value={type} onChange={(e) => setType(e.target.value as CustomerType | "")} className="input text-sm">
+          <option value="">— type —</option>
+          {CUSTOMER_TYPES.map((t) => <option key={t} value={t}>{CUSTOMER_TYPE_LABELS[t]}</option>)}
+        </select>
+        <select value={defaultDeliveryMethod} onChange={(e) => setDefaultDeliveryMethod(e.target.value as DeliveryType | "")} className="input text-sm">
+          <option value="">— fulfilment —</option>
+          {DELIVERY_TYPES.map((t) => <option key={t} value={t}>{DELIVERY_TYPE_LABELS[t]}</option>)}
+        </select>
+        <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Contact person" className="input text-sm" />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" className="input text-sm" />
+      </div>
+      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="input text-sm" />
+      <div className="flex items-center gap-2">
+        <button onClick={handleCreate} disabled={saving || !companyName.trim()}
+          className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
+          {saving ? "Creating…" : "Create + link"}
+        </button>
+        <button onClick={onCancel} className="text-xs text-muted-foreground hover:underline">Cancel</button>
+        <p className="text-[10px] text-muted-foreground">Fill the rest from the customer page later.</p>
+      </div>
+      {saveError && <p className="text-xs text-status-alert">{saveError}</p>}
+    </div>
   );
 }
 
