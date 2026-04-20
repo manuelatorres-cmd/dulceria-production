@@ -156,7 +156,10 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    if (!compEmpty && !compValid) return;
+    // Composition should sum to 100%, but we accept partial/off-by-X
+    // data as a warning (matching the CSV import) rather than blocking
+    // every other field from being saved. The total is displayed in
+    // red above the composition inputs so the user sees the issue.
     setSaving(true);
     setSaveError("");
     try {
@@ -660,7 +663,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
-          disabled={saving || !name.trim() || (!compEmpty && !compValid)}
+          disabled={saving || !name.trim()}
           className="btn-primary flex-1 py-2"
         >
           {saving ? "Saving..." : ingredient?.id ? "Update" : "Add Ingredient"}
