@@ -10,6 +10,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   useDecorationMaterials, saveDecorationMaterial, setDecorationMaterialLowStock,
   useDecorationMaterialUsageCounts,
@@ -289,15 +290,28 @@ function MaterialsTab() {
             autoFocus
             required
           />
-          <select
-            value={newType || defaultType}
-            onChange={(e) => setNewType(e.target.value)}
-            className="input w-full"
-          >
-            {categories.map((c) => (
-              <option key={c.slug} value={c.slug}>{c.name}</option>
-            ))}
-          </select>
+          {categories.length === 0 ? (
+            <div className="rounded-md border border-status-warn-edge bg-status-warn-bg px-3 py-2 text-xs text-status-warn">
+              No decoration categories exist yet.{" "}
+              <Link
+                href="/pantry/decoration/categories"
+                className="font-medium underline underline-offset-2 hover:text-foreground"
+              >
+                Create one first
+              </Link>
+              , then come back to add a material.
+            </div>
+          ) : (
+            <select
+              value={newType || defaultType}
+              onChange={(e) => setNewType(e.target.value)}
+              className="input w-full"
+            >
+              {categories.map((c) => (
+                <option key={c.slug} value={c.slug}>{c.name}</option>
+              ))}
+            </select>
+          )}
         </QuickAddForm>
       )}
 

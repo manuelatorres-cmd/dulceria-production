@@ -3233,9 +3233,13 @@ export async function saveDecorationCategory(obj: Omit<DecorationCategory, "id">
     return obj.id;
   }
   const createdId = newId();
+  // Always send archived as an explicit boolean. The column is NOT NULL
+  // with a DB default of false, but some environments drop the default
+  // and reject the insert with a 23502 — mirroring the pricingIrrelevant
+  // issue we hit on ingredients.
   const { error } = await supabase
     .from("decorationCategories")
-    .insert({ ...obj, id: createdId, createdAt: now, updatedAt: now });
+    .insert({ archived: false, ...obj, id: createdId, createdAt: now, updatedAt: now });
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["decoration-categories"] });
   return createdId;
@@ -4136,10 +4140,21 @@ export function useAllOrderItems(): OrderItem[] {
 
 export async function saveOrder(order: Omit<Order, "createdAt" | "updatedAt">): Promise<string> {
   const now = new Date();
+  // Strip undefined before sending. The Supabase client serialises
+  // undefined fields as `null` on the wire, which trips NOT-NULL
+  // columns (channel / deadline / priority / status) if the form
+  // ever emits undefined by accident. The form's `field: x || undefined`
+  // patterns only matter for nullable columns; centralising the
+  // strip here makes the save safe regardless.
+  const stripUndef = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
+    const out: Partial<T> = {};
+    for (const key in obj) if (obj[key] !== undefined) out[key] = obj[key];
+    return out;
+  };
   if (order.id) {
     const { error } = await supabase
       .from("orders")
-      .update({ ...order, updatedAt: now })
+      .update(stripUndef({ ...order, updatedAt: now }))
       .eq("id", order.id);
     if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -4148,7 +4163,7 @@ export async function saveOrder(order: Omit<Order, "createdAt" | "updatedAt">): 
   const id = newId();
   const { error } = await supabase
     .from("orders")
-    .insert({ ...order, id, createdAt: now, updatedAt: now });
+    .insert(stripUndef({ ...order, id, createdAt: now, updatedAt: now }));
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["orders"] });
   return id;

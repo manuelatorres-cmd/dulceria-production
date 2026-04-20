@@ -213,6 +213,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   const [priority, setPriority] = useState<OrderPriority>(order.priority);
   const [notes, setNotes] = useState(order.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const customers = useCustomers(false);
 
@@ -226,6 +227,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
 
   async function handleSave() {
     setSaving(true);
+    setSaveError("");
     try {
       await saveOrder({
         id: order.id,
@@ -239,6 +241,12 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         notes: notes.trim() || undefined,
       });
       onSaved();
+    } catch (err) {
+      const raw: { message?: string; code?: string; details?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      const code = raw.code ? ` (code ${raw.code})` : "";
+      setSaveError(`${raw.message || raw.details || "Save failed"}${code}`);
+      console.error("saveOrder failed:", err);
     } finally {
       setSaving(false);
     }
@@ -323,6 +331,9 @@ function OrderEditForm({ order, onSaved, onCancel }: {
           Cancel
         </button>
       </div>
+      {saveError && (
+        <p className="text-xs text-status-alert pt-1">{saveError}</p>
+      )}
     </div>
   );
 }

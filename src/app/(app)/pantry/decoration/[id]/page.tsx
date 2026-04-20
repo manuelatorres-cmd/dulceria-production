@@ -206,20 +206,34 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
           <form onSubmit={handleSave} className="space-y-3">
             <div>
               <label className="label">Type</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="input"
-                autoFocus={isNew}
-              >
-                {decorationCategories.map((c) => (
-                  <option key={c.slug} value={c.slug}>{c.name}</option>
-                ))}
-                {/* Fallback for legacy types not in the DB */}
-                {decorationCategories.length > 0 && !decorationCategories.some((c) => c.slug === type) && (
-                  <option value={type}>{DECORATION_MATERIAL_TYPE_LABELS[type as keyof typeof DECORATION_MATERIAL_TYPE_LABELS] ?? type}</option>
-                )}
-              </select>
+              {decorationCategories.length === 0 ? (
+                <div className="rounded-md border border-status-warn-edge bg-status-warn-bg px-3 py-2 text-xs text-status-warn">
+                  No decoration categories exist yet.{" "}
+                  <Link
+                    href="/pantry/decoration/categories"
+                    className="font-medium underline underline-offset-2 hover:text-foreground"
+                  >
+                    Create one first
+                  </Link>
+                  , then come back to select it.
+                </div>
+              ) : (
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  className="input"
+                  autoFocus={isNew}
+                >
+                  {decorationCategories.map((c) => (
+                    <option key={c.slug} value={c.slug}>{c.name}</option>
+                  ))}
+                  {/* Fallback for legacy types not in the DB — keeps the current
+                      saved value visible even if no matching category exists. */}
+                  {!decorationCategories.some((c) => c.slug === type) && (
+                    <option value={type}>{DECORATION_MATERIAL_TYPE_LABELS[type as keyof typeof DECORATION_MATERIAL_TYPE_LABELS] ?? type}</option>
+                  )}
+                </select>
+              )}
             </div>
 
             {type === "cocoa_butter" && (

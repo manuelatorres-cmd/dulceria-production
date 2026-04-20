@@ -188,12 +188,14 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
   const [priority, setPriority] = useState<OrderPriority>("normal");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const customers = useCustomers(false);
 
   const canSave = !!deadline && (channel !== "shop" ? customerName.trim() || eventName.trim() : true) && !saving;
 
   async function handleSave() {
     setSaving(true);
+    setSaveError("");
     try {
       const id = await saveOrder({
         channel,
@@ -207,6 +209,15 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
       });
       onSaved();
       router.push(`/orders/${encodeURIComponent(id)}`);
+    } catch (err) {
+      // Surface the real reason instead of letting the promise reject
+      // into the console. Supabase throws PostgrestError as a plain
+      // object ({ message, code, details, hint }), not an Error instance.
+      const raw: { message?: string; code?: string; details?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      const code = raw.code ? ` (code ${raw.code})` : "";
+      setSaveError(`${raw.message || raw.details || "Save failed"}${code}`);
+      console.error("saveOrder failed:", err);
     } finally {
       setSaving(false);
     }
@@ -303,6 +314,9 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
           Cancel
         </button>
       </div>
+      {saveError && (
+        <p className="text-xs text-status-alert pt-1">{saveError}</p>
+      )}
     </div>
   );
 }
