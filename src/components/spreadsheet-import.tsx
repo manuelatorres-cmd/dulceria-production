@@ -14,7 +14,7 @@
 import { useRef, useState, useCallback } from "react";
 import { Download, Upload, AlertTriangle, CheckCircle, X, FileSpreadsheet } from "lucide-react";
 import type { ImportConfig, ParseResult, ImportResult, ParsedRow } from "@/lib/spreadsheet-import";
-import { parseImport, commitImport, downloadTemplate } from "@/lib/spreadsheet-import";
+import { parseImport, commitImport, downloadTemplate, formatImportError } from "@/lib/spreadsheet-import";
 
 type ImportPhase = "idle" | "parsing" | "preview" | "importing" | "done" | "error";
 
@@ -56,7 +56,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
         setPhase("preview");
         setErrorMessage("");
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : "Failed to parse the spreadsheet.");
+        setErrorMessage(formatImportError(err));
         setPhase("error");
       }
     },
@@ -72,7 +72,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
       setImportResult(result);
       setPhase("done");
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Import failed.");
+      setErrorMessage(formatImportError(err));
       setPhase("error");
     }
   }, [parseResult, config, getExistingKeys]);
@@ -145,7 +145,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
           {phase === "error" && (
             <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2">
               <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-xs text-destructive">{errorMessage}</p>
+              <p className="text-xs text-destructive whitespace-pre-wrap break-words">{errorMessage}</p>
             </div>
           )}
         </div>

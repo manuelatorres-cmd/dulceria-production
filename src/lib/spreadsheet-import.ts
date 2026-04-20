@@ -245,6 +245,48 @@ export async function commitImport<T>(
 // Template download
 // ---------------------------------------------------------------------------
 
+/**
+ * Turn any error thrown during the import flow into a readable, multi-line
+ * string for the UI + the browser console. Handles:
+ *   - PostgrestError (the plain-object rejection from `supabase.from(...)` —
+ *     has `message` + `details` + `hint` + `code` but isn't an Error instance).
+ *   - Standard Error instances.
+ *   - Strings.
+ *   - Anything else → JSON-stringified.
+ *
+ * The result gets rendered with whitespace-pre-wrap so the newlines survive.
+ */
+export function formatImportError(err: unknown): string {
+  // Always log the raw object to the console so DevTools shows the full shape.
+  if (typeof console !== "undefined") {
+    console.error("[spreadsheet-import] error:", err);
+  }
+
+  if (err == null) return "Import failed (unknown error).";
+  if (typeof err === "string") return err;
+
+  if (typeof err === "object") {
+    const e = err as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+      name?: unknown;
+    };
+    const parts: string[] = [];
+    if (typeof e.message === "string" && e.message.trim()) parts.push(e.message.trim());
+    if (typeof e.details === "string" && e.details.trim()) parts.push(`Details: ${e.details.trim()}`);
+    if (typeof e.hint === "string" && e.hint.trim()) parts.push(`Hint: ${e.hint.trim()}`);
+    if (typeof e.code === "string" && e.code.trim()) parts.push(`Code: ${e.code.trim()}`);
+    if (parts.length > 0) return parts.join("\n");
+
+    // Fallback — stringify whatever we got
+    try { return JSON.stringify(err); } catch { /* fallthrough */ }
+  }
+
+  return String(err);
+}
+
 /** Download a blank template .xlsx for the given config. Header bolded,
  *  columns sized for readability. */
 export async function downloadTemplate(config: ImportConfig<unknown>): Promise<void> {
