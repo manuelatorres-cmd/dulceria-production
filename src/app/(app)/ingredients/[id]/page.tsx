@@ -168,13 +168,15 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
         )}
       </div>
 
-      {/* Tab strip — always visible. The Shell tab shows whenever the saved
-          ingredient is category=Chocolate OR the user is actively editing
-          (so they can reach the shellCapable checkbox on a new/edited row
-          before the category is committed). */}
+      {/* Tab strip — always visible. The Shell tab shows whenever the
+          ingredient is flagged shellCapable OR the user is actively editing
+          (so they can reach the checkbox on a fresh row before saving).
+          Previously gated on `category === "Chocolate"`, which hid the tab
+          after reload for any ingredient whose category string didn't match
+          that exact casing. */}
       <div className="flex border-b border-border mb-4 px-4 overflow-x-auto">
         {(
-          (editing || ingredient.category === "Chocolate")
+          (editing || ingredient.shellCapable)
             ? ["details", "shell", "composition", "ingredients", "allergens", "pricing", "nutrition"] as const
             : ["details", "composition", "ingredients", "allergens", "pricing", "nutrition"] as const
         ).map((tab) => (

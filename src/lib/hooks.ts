@@ -144,16 +144,21 @@ export async function unarchiveIngredient(id: string) {
 }
 
 /** Reactive list of ingredients that can serve as shell chocolates.
- *  Filters on `category === "Chocolate" && shellCapable === true && !archived`. */
+ *  Filters purely on `shellCapable === true && !archived`. The old
+ *  `category === "Chocolate"` server-side filter was a case-sensitive
+ *  string match that excluded ingredients with any non-canonical
+ *  category label (empty, "chocolate", "Couverture", imported with
+ *  a variant name, etc.). `shellCapable` is the explicit "yes, this
+ *  is couverture" flag — trust it and let the category stay free-text. */
 export function useShellCapableIngredients(): Ingredient[] {
   const { data } = useQuery({
     queryKey: ["ingredients", "shell-capable"],
     queryFn: async () => {
       const rows = assertOk(
-        await supabase.from("ingredients").select("*").eq("category", "Chocolate"),
+        await supabase.from("ingredients").select("*").eq("shellCapable", true),
       );
       return (rows as Ingredient[])
-        .filter((i) => i.shellCapable && !i.archived)
+        .filter((i) => !i.archived)
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
     },
   });
