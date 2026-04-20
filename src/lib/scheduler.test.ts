@@ -110,6 +110,43 @@ describe("mould-wave scheduler", () => {
     expect(byStep.get("Shell")).not.toBe(byStep.get("Cap"));
   });
 
+  it("perBatch step's total active is the fixed activeMinutes regardless of mould count", () => {
+    // 4 products × 1 mould each = 4 moulds. A per-mould step at 60min
+    // would charge 240min total. The same step flagged perBatch should
+    // charge a fixed 60min — cooking the filling once covers the wave.
+    const moulds: Mould[] = [
+      { id: "m", name: "M", cavityWeightG: 10, numberOfCavities: 20 },
+    ];
+    const products = ["A", "B", "C", "D"].map((l) => ({
+      id: `p${l}`,
+      name: `P ${l}`,
+      productCategoryId: catId,
+      defaultMouldId: "m",
+      defaultBatchQty: 1,
+    })) as unknown as Product[];
+    const order: Order = {
+      id: "obatch", channel: "b2b", customerName: "X",
+      deadline: baseDeadline, priority: "normal", status: "pending",
+    } as Order;
+    const orderItems: OrderItem[] = products.map((p, i) => ({
+      id: `oi${i}`, orderId: "obatch", productId: p.id!, quantity: 20, sortOrder: i,
+    })) as OrderItem[];
+    const steps = [
+      mkStep({ name: "Cooking", productType: "Moulded", activeMinutes: 60, waitingMinutes: 0, sortOrder: 0 }),
+    ];
+    steps[0].perBatch = true;
+
+    const result = buildSchedule(makeInput({
+      orders: [order], orderItems, products, moulds,
+      productionSteps: steps, categoryNameById,
+    }));
+
+    const totalDur = result.entries.reduce((s, e) => s + e.durationMinutes, 0);
+    expect(totalDur).toBe(60);
+    // Still emits one row per product so the wave's traceability stays.
+    expect(result.entries.length).toBe(4);
+  });
+
   it("borrow lines skip the wave entirely", () => {
     const moulds: Mould[] = [{ id: "m", name: "M", cavityWeightG: 10, numberOfCavities: 10 }];
     const products: Product[] = [{

@@ -189,11 +189,25 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
         }
 
         // Per-product active minutes for this step.
+        // - Per-mould steps (default): activeMinutes × mouldsNeeded for
+        //   each product, summed.
+        // - Per-batch steps (cooking a filling, tempering a vat): one
+        //   fixed duration shared by every product in the wave. We
+        //   split it equally across products for the per-product display
+        //   rows so the daily-capacity tally stays correct.
+        const isBatchStep = !!step.perBatch;
+        const totalActive = isBatchStep
+          ? Math.max(0, Math.round(step.activeMinutes))
+          : waveLines.reduce(
+              (s, w) => s + Math.round(step.activeMinutes * w.mouldsNeeded),
+              0,
+            );
         const perProductMinutes = waveLines.map((w) => ({
           ...w,
-          minutes: Math.round(step.activeMinutes * w.mouldsNeeded),
+          minutes: isBatchStep
+            ? Math.round(step.activeMinutes / Math.max(1, waveLines.length))
+            : Math.round(step.activeMinutes * w.mouldsNeeded),
         }));
-        const totalActive = perProductMinutes.reduce((s, r) => s + r.minutes, 0);
         if (totalActive === 0) {
           // Zero-duration step (edge case — fully-manual step with
           // activeMinutes=0). Don't emit rows, just roll the clock.

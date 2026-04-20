@@ -1851,6 +1851,11 @@ function ProductionStepRow({ step, knownStepNames, index, total, onMoveUp, onMov
                   Packing
                 </span>
               )}
+              {step.perBatch && (
+                <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground bg-muted rounded px-1.5 py-0.5 align-middle">
+                  Per batch
+                </span>
+              )}
             </p>
             <p className="text-xs text-muted-foreground">
               Active {step.activeMinutes} min · Waiting {step.waitingMinutes} min
@@ -1906,6 +1911,7 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
   const [activeMinutes, setActiveMinutes] = useState(step?.activeMinutes != null ? String(step.activeMinutes) : "");
   const [waitingMinutes, setWaitingMinutes] = useState(step?.waitingMinutes != null ? String(step.waitingMinutes) : "");
   const [isPackingStep, setIsPackingStep] = useState(!!step?.isPackingStep);
+  const [perBatch, setPerBatch] = useState(!!step?.perBatch);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -1925,12 +1931,14 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
         waitingMinutes: waiting,
         sortOrder: step?.sortOrder ?? nextSortOrder ?? 0,
         isPackingStep,
+        perBatch,
       });
       if (isNew) {
         setName("");
         setActiveMinutes("");
         setWaitingMinutes("");
         setIsPackingStep(false);
+        setPerBatch(false);
       }
       onSaved();
     } catch (err) {
@@ -1982,7 +1990,9 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="label">Active time (min / mould)</label>
+          <label className="label">
+            Active time ({perBatch ? "min / batch" : "min / mould"})
+          </label>
           <input
             type="number"
             min="0"
@@ -1993,20 +2003,20 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
             className="input"
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Hands-on time per mould. Counts toward daily capacity.
+            {perBatch
+              ? "Fixed total for one batch. The scheduler uses this as-is, ignoring how many moulds the wave needs."
+              : "Hands-on time per mould. Scheduler multiplies by the number of moulds in the wave."}
           </p>
           {(() => {
             const v = parseFloat(activeMinutes);
-            if (!Number.isFinite(v) || v <= 240) return null;
-            // Schedulers multiply this by mouldsNeeded across the wave;
-            // a 4 h+ value almost always means the user typed batch
-            // total instead of per-mould (e.g., 600 min for "Cooking"
-            // turns a 1-h job into a 10-h day).
+            if (!Number.isFinite(v) || v <= 240 || perBatch) return null;
+            // Per-mould only — a per-batch step legitimately runs hours.
             return (
               <p className="text-xs text-status-warn mt-1">
                 ⚠ {v} min per mould is unusually high. If this is the
-                total for a whole batch, divide by the number of moulds
-                — the scheduler multiplies this value by mouldsNeeded.
+                total for a whole batch, tick &ldquo;Fixed per batch&rdquo;
+                below — otherwise the scheduler multiplies by every
+                mould in the wave.
               </p>
             );
           })()}
@@ -2027,6 +2037,24 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
           </p>
         </div>
       </div>
+
+      <label className="flex items-start gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={perBatch}
+          onChange={(e) => setPerBatch(e.target.checked)}
+          className="w-4 h-4 mt-0.5"
+        />
+        <span>
+          <span className="font-medium">Fixed per batch</span>
+          <span className="block text-xs text-muted-foreground">
+            Active time is independent of mould count. Use for batch-prep
+            tasks like cooking a filling, tempering a vat — the pot takes
+            the same hour whether it serves one mould or twenty. With this
+            off (default), active time is multiplied by mouldsNeeded.
+          </span>
+        </span>
+      </label>
 
       <label className="flex items-start gap-2 text-sm cursor-pointer">
         <input

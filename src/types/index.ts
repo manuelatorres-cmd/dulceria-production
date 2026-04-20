@@ -1634,6 +1634,12 @@ export interface ProductionStep {
    *  this flag is for workshop-level packing tasks that don't map
    *  cleanly to one packaging SKU. */
   isPackingStep?: boolean;
+  /** When true, `activeMinutes` is the FIXED total for the step — the
+   *  scheduler does NOT multiply it by mouldsNeeded. Use for batch-prep
+   *  tasks whose duration is independent of yield: cooking a filling,
+   *  tempering a vat of chocolate, etc. The pot takes the same hour
+   *  whether it serves one mould or twenty. */
+  perBatch?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
