@@ -4216,20 +4216,50 @@ export function useProductionSchedule(): ProductionScheduleEntry[] {
 /** Replace every scheduled row with the given entries, in one transaction-ish
  *  flow: delete all then bulk-insert. Triggered by the Plan page's Regenerate
  *  button. */
+/** Replace the production schedule atomically-enough that a failed
+ *  INSERT doesn't wipe the existing plan.
+ *
+ *  The old version deleted first, then inserted — if the INSERT failed
+ *  (e.g. the stepId column was missing from the schema cache) the user
+ *  was left with an empty schedule and no way to recover. This variant:
+ *
+ *    1. Reads the IDs of every existing schedule row.
+ *    2. Inserts the new rows (with fresh UUIDs). The table briefly
+ *       holds both old + new.
+ *    3. Deletes only the old rows by their ID list.
+ *
+ *  If step 2 throws, step 3 never runs and the existing plan stays
+ *  intact. Any stale row from a prior failed attempt gets cleaned up
+ *  on the next successful regenerate. Cleanup is bounded to the
+ *  known-old ID set so we never accidentally delete the new rows.
+ */
 export async function replaceProductionSchedule(
   entries: Omit<ProductionScheduleEntry, "id" | "createdAt" | "updatedAt">[],
 ): Promise<void> {
-  // Clear — PostgREST needs a filter, `id=not.is.null` matches everything
-  const { error: delErr } = await supabase
-    .from("productionSchedule")
-    .delete()
-    .not("id", "is", null);
-  if (delErr) throw delErr;
+  // Snapshot existing IDs before we write anything.
+  const existing = assertOk(
+    await supabase.from("productionSchedule").select("id"),
+  ) as Array<{ id: string }>;
+  const existingIds = existing.map((r) => r.id);
+
+  // Insert new rows first. If this throws (e.g. PGRST204 for a missing
+  // column, 23502 NOT-NULL, 23503 FK violation), the caller sees the
+  // error and the old schedule is still fully intact.
   if (entries.length > 0) {
     const withIds = entries.map((e) => ({ ...e, id: newId() }));
     const { error: insErr } = await supabase.from("productionSchedule").insert(withIds);
     if (insErr) throw insErr;
   }
+
+  // Only once the insert has landed do we clean up the previous set.
+  if (existingIds.length > 0) {
+    const { error: delErr } = await supabase
+      .from("productionSchedule")
+      .delete()
+      .in("id", existingIds);
+    if (delErr) throw delErr;
+  }
+
   queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
 }
 

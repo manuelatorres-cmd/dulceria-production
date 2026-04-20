@@ -44,6 +44,7 @@ export default function PlanPage() {
 
   const [regenerating, setRegenerating] = useState(false);
   const [lastResult, setLastResult] = useState<{ warnings: string[]; unscheduledOrderIds: string[]; count: number } | null>(null);
+  const [regenerateError, setRegenerateError] = useState("");
 
   const configStatus = capacityConfigStatus(config, people);
 
@@ -70,6 +71,7 @@ export default function PlanPage() {
 
   async function handleRegenerate() {
     setRegenerating(true);
+    setRegenerateError("");
     try {
       await replaceProductionSchedule(preview.entries);
       setLastResult({
@@ -77,6 +79,16 @@ export default function PlanPage() {
         unscheduledOrderIds: preview.unscheduledOrderIds,
         count: preview.entries.length,
       });
+    } catch (err) {
+      // Surface the real Postgres error — previously this was a
+      // silent promise rejection. Supabase throws PostgrestError as a
+      // plain object, not an Error instance, so read the shape defensively.
+      const raw: { message?: string; code?: string; details?: string; hint?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      const code = raw.code ? ` (code ${raw.code})` : "";
+      const hint = raw.hint ? ` — ${raw.hint}` : "";
+      setRegenerateError(`${raw.message || raw.details || "Regenerate failed"}${code}${hint}`);
+      console.error("replaceProductionSchedule failed:", err);
     } finally {
       setRegenerating(false);
     }
@@ -148,6 +160,18 @@ export default function PlanPage() {
             <div className="flex items-start gap-2 text-xs text-status-ok">
               <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>Plan regenerated: {lastResult.count} task{lastResult.count !== 1 ? "s" : ""} saved.</span>
+            </div>
+          </div>
+        )}
+
+        {regenerateError && (
+          <div className="rounded-md bg-status-alert-bg border border-status-alert-edge px-3 py-2">
+            <div className="flex items-start gap-2 text-xs text-status-alert">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium">Regenerate failed — existing plan preserved.</p>
+                <p className="mt-0.5 opacity-90">{regenerateError}</p>
+              </div>
             </div>
           </div>
         )}
