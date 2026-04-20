@@ -160,6 +160,42 @@ export function buildFillingImportConfig(ingredientLookup: Map<string, Ingredien
       }
     }
 
+    // Auto-create any fillingCategories that the batch references but
+    // doesn't yet exist in the DB. Same reason as ingredients — the
+    // category field on fillings is free-text, so without this the
+    // list page and edit dropdown would show empty even though every
+    // filling row is tagged. shelfStable defaults to false; users flip
+    // it in Settings for categories where it matters (pralines etc.).
+    const usedCategories = Array.from(new Set(
+      items
+        .map((i) => (i.filling.category ?? "").trim())
+        .filter((c) => c.length > 0),
+    ));
+    if (usedCategories.length > 0) {
+      const existing = assertOk(
+        await supabase.from("fillingCategories").select("name"),
+      ) as { name: string }[];
+      const existingNames = new Set(existing.map((e) => e.name.toLowerCase().trim()));
+      const toCreate = usedCategories.filter(
+        (c) => !existingNames.has(c.toLowerCase().trim()),
+      );
+      if (toCreate.length > 0) {
+        const now = new Date();
+        const rows = toCreate.map((name) => ({
+          id: newId(),
+          name,
+          shelfStable: false,
+          archived: false,
+          createdAt: now,
+          updatedAt: now,
+        }));
+        const { error: catErr } = await supabase
+          .from("fillingCategories")
+          .insert(rows);
+        if (catErr) throw catErr;
+      }
+    }
+
     const { error: fErr } = await supabase
       .from("fillings")
       .insert(fillingInserts.map((r) => stripUndefined(r)));

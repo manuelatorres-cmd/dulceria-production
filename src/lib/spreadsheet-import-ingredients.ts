@@ -178,6 +178,42 @@ export const ingredientImportConfig: ImportConfig<Omit<Ingredient, "id">> = {
   dedupKey: (data) => `${data.name.toLowerCase().trim()}::${(data.manufacturer || "").toLowerCase().trim()}`,
   commitBatch: async (items) => {
     if (items.length === 0) return 0;
+
+    // Auto-create any category string used in the batch that isn't
+    // already in ingredientCategories. Without this, ingredients land
+    // with a category string that has no matching row in the categories
+    // table — the edit form's dropdown stays empty and category chips
+    // on the list page don't show, even though the rows themselves are
+    // correctly grouped.
+    const usedCategories = Array.from(new Set(
+      items
+        .map((i) => (i.category ?? "").trim())
+        .filter((c) => c.length > 0),
+    ));
+    if (usedCategories.length > 0) {
+      const existing = assertOk(
+        await supabase.from("ingredientCategories").select("name"),
+      ) as { name: string }[];
+      const existingNames = new Set(existing.map((e) => e.name.toLowerCase().trim()));
+      const toCreate = usedCategories.filter(
+        (c) => !existingNames.has(c.toLowerCase().trim()),
+      );
+      if (toCreate.length > 0) {
+        const now = new Date();
+        const rows = toCreate.map((name) => ({
+          id: newId(),
+          name,
+          archived: false,
+          createdAt: now,
+          updatedAt: now,
+        }));
+        const { error: catErr } = await supabase
+          .from("ingredientCategories")
+          .insert(rows);
+        if (catErr) throw catErr;
+      }
+    }
+
     const withIds = items.map((item) => stripUndefined({ ...item, id: newId() }));
     const { error } = await supabase.from("ingredients").insert(withIds);
     if (error) throw error;
