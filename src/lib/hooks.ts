@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -5519,7 +5519,10 @@ export function quoteFromRow(row: Record<string, unknown>): Quote {
 /** Convert a quote into a confirmed order. Creates an Order row + OrderItem
  *  rows from the quote's items, links the quote back via convertedToOrderId,
  *  and bumps the quote status to 'won'. Returns the new order id. */
-export async function convertQuoteToOrder(quoteId: string): Promise<string> {
+export async function convertQuoteToOrder(
+  quoteId: string,
+  overrides?: { deadline?: string | Date },
+): Promise<string> {
   const row = assertOkMaybe(
     await supabase.from("quotes").select("*").eq("id", quoteId).maybeSingle(),
   );
@@ -5537,12 +5540,21 @@ export async function convertQuoteToOrder(quoteId: string): Promise<string> {
     await supabase.from("customers").select("*").eq("id", quote.customerId).maybeSingle(),
   ) as Customer | null;
 
+  // Deadline: override wins, then the quote's deadline, and only then
+  // fall back to "now" (caller is expected to have prompted for one
+  // when the quote had none — we don't silently ship with now).
+  const deadline = overrides?.deadline ?? quote.deadline ?? now;
+
+  // Channel inference from customer.type. Private → online (catch-all
+  // for individual buyers); B2B → b2b; otherwise leave as b2b.
+  const channel: OrderChannel = customer?.type === "private" ? "online" : "b2b";
+
   const { error: insOrderErr } = await supabase.from("orders").insert({
     id: orderId,
-    channel: "b2b",
+    channel,
     customerId: quote.customerId,
     customerName: customer?.companyName ?? "",
-    deadline: quote.deadline ?? now,
+    deadline,
     priority: "normal",
     status: "pending",
     notes: quote.notes ?? null,
@@ -5551,7 +5563,7 @@ export async function convertQuoteToOrder(quoteId: string): Promise<string> {
   });
   if (insOrderErr) throw insOrderErr;
 
-  // Product-line items (box lines are captured in orderBoxes instead).
+  // Product-line items — anything with a productId and no box contents.
   const productLines = quote.items.filter((it) => it.productId && !(it.boxContents && it.boxContents.length > 0));
   if (productLines.length > 0) {
     const { error: insItemsErr } = await supabase.from("orderItems").insert(
@@ -5568,7 +5580,7 @@ export async function convertQuoteToOrder(quoteId: string): Promise<string> {
     if (insItemsErr) throw insItemsErr;
   }
 
-  // Box lines → orderBoxes rows.
+  // Box lines → orderBoxes rows (legacy B2B gift-box composition).
   const boxLines = quote.items.filter((it) => it.boxContents && it.boxContents.length > 0);
   if (boxLines.length > 0) {
     const { error: insBoxesErr } = await supabase.from("orderBoxes").insert(
@@ -5588,6 +5600,30 @@ export async function convertQuoteToOrder(quoteId: string): Promise<string> {
     if (insBoxesErr) throw insBoxesErr;
   }
 
+  // Standalone packaging lines (packagingId set, no productId, no box
+  // contents) → orderPackagingLines. These didn't make it across in
+  // the original convert path, leaving ribbons + outer boxes off the
+  // order.
+  const packagingOnlyLines = quote.items.filter(
+    (it) => it.packagingId && !it.productId && !(it.boxContents && it.boxContents.length > 0),
+  );
+  if (packagingOnlyLines.length > 0) {
+    const { error: insPackErr } = await supabase.from("orderPackagingLines").insert(
+      packagingOnlyLines.map((it, i) => ({
+        id: newId(),
+        orderId,
+        packagingId: it.packagingId!,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice ?? null,
+        sortOrder: i,
+        notes: it.notes ?? null,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    );
+    if (insPackErr) throw insPackErr;
+  }
+
   // Update quote status + link back to order.
   const { error: updQErr } = await supabase
     .from("quotes")
@@ -5598,6 +5634,7 @@ export async function convertQuoteToOrder(quoteId: string): Promise<string> {
   queryClient.invalidateQueries({ queryKey: ["quotes"] });
   queryClient.invalidateQueries({ queryKey: ["orders"] });
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  queryClient.invalidateQueries({ queryKey: ["order-packaging-lines"] });
   return orderId;
 }
 

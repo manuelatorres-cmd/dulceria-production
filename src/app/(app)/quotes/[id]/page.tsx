@@ -25,6 +25,8 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
   const packagingById = new Map(packaging.map((p) => [p.id!, p]));
   const [converting, setConverting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deadlinePrompt, setDeadlinePrompt] = useState<string | null>(null);
+  const [convertError, setConvertError] = useState("");
 
   if (quote === undefined) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (quote === null) {
@@ -43,16 +45,35 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
     await saveQuote({ ...quote, status: next });
   }
 
-  async function handleConvert() {
+  function startConvert() {
+    if (!quote?.id) return;
+    setConvertError("");
+    // Spec: prompt for a delivery date if the quote has none.
+    if (!quote.deadline) {
+      setDeadlinePrompt(toLocalDatetimeInput(new Date()));
+      return;
+    }
+    finishConvert();
+  }
+
+  async function finishConvert(deadlineOverride?: string) {
     if (!quote?.id) return;
     setConverting(true);
+    setConvertError("");
     try {
-      const newOrderId = await convertQuoteToOrder(quote.id);
+      const newOrderId = await convertQuoteToOrder(quote.id, {
+        deadline: deadlineOverride ? new Date(deadlineOverride) : undefined,
+      });
       router.push(`/orders/${encodeURIComponent(newOrderId)}`);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Conversion failed");
+      setConvertError(e instanceof Error ? e.message : "Conversion failed");
       setConverting(false);
     }
+  }
+
+  function toLocalDatetimeInput(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   async function handleDelete() {
@@ -81,7 +102,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             </button>
             {!quote.convertedToOrderId && !quote.isWhatIf && (
               <button
-                onClick={handleConvert}
+                onClick={startConvert}
                 disabled={converting}
                 className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               >
@@ -105,6 +126,38 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             </button>
           </div>
         </div>
+
+        {deadlinePrompt !== null && (
+          <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 print:hidden space-y-2">
+            <p className="text-xs">
+              This quote has no delivery date. Set one before creating the order:
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="datetime-local"
+                value={deadlinePrompt}
+                onChange={(e) => setDeadlinePrompt(e.target.value)}
+                className="input text-sm w-auto"
+              />
+              <button
+                onClick={() => { const d = deadlinePrompt; setDeadlinePrompt(null); finishConvert(d!); }}
+                disabled={!deadlinePrompt || converting}
+                className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50"
+              >
+                {converting ? "Converting…" : "Convert with this date"}
+              </button>
+              <button onClick={() => setDeadlinePrompt(null)} className="text-xs text-muted-foreground hover:underline">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {convertError && (
+          <div className="rounded-lg border border-status-alert/30 bg-status-alert/5 p-2 text-xs text-status-alert print:hidden">
+            {convertError}
+          </div>
+        )}
 
         {confirmDelete && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-center justify-between">
