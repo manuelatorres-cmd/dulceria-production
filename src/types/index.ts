@@ -1519,11 +1519,16 @@ export interface ProductionStep {
   activeMinutes: number;
   waitingMinutes: number;
   sortOrder: number;
-  /** Post-storage finishing task (polish, pack, label, wrap). When an
-   *  order line is fulfilled by borrowing from Store stock, only the
-   *  steps with isFinishingStep=true are scheduled — the full production
-   *  cycle runs on the replenishment order instead. */
-  isFinishingStep?: boolean;
+  /** Packing-into-boxes task for a specific customer order (load gift
+   *  boxes, tie ribbons, apply order-specific labels). Store pralines
+   *  are already fully finished — polished, painted, decorated — so when
+   *  an order line is fulfilled by borrowing from Store stock, only the
+   *  steps with isPackingStep=true are scheduled. The full production
+   *  cycle (everything else) runs on the replenishment order instead.
+   *  Per-packaging-item time lives on packaging.packingTimePerUnit;
+   *  this flag is for workshop-level packing tasks that don't map
+   *  cleanly to one packaging SKU. */
+  isPackingStep?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }

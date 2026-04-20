@@ -1846,9 +1846,9 @@ function ProductionStepRow({ step, knownStepNames, index, total, onMoveUp, onMov
             <p className="text-sm font-medium truncate">
               <span className="text-muted-foreground mr-1.5">{index + 1}.</span>
               {step.name}
-              {step.isFinishingStep && (
+              {step.isPackingStep && (
                 <span className="ml-2 text-[10px] uppercase tracking-wide text-primary bg-primary/10 rounded px-1.5 py-0.5 align-middle">
-                  Finishing
+                  Packing
                 </span>
               )}
             </p>
@@ -1905,7 +1905,7 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
   const [name, setName] = useState(step?.name ?? "");
   const [activeMinutes, setActiveMinutes] = useState(step?.activeMinutes != null ? String(step.activeMinutes) : "");
   const [waitingMinutes, setWaitingMinutes] = useState(step?.waitingMinutes != null ? String(step.waitingMinutes) : "");
-  const [isFinishingStep, setIsFinishingStep] = useState(!!step?.isFinishingStep);
+  const [isPackingStep, setIsPackingStep] = useState(!!step?.isPackingStep);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -1924,13 +1924,13 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
         activeMinutes: active,
         waitingMinutes: waiting,
         sortOrder: step?.sortOrder ?? nextSortOrder ?? 0,
-        isFinishingStep,
+        isPackingStep,
       });
       if (isNew) {
         setName("");
         setActiveMinutes("");
         setWaitingMinutes("");
-        setIsFinishingStep(false);
+        setIsPackingStep(false);
       }
       onSaved();
     } catch (err) {
@@ -2016,16 +2016,18 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
       <label className="flex items-start gap-2 text-sm cursor-pointer">
         <input
           type="checkbox"
-          checked={isFinishingStep}
-          onChange={(e) => setIsFinishingStep(e.target.checked)}
+          checked={isPackingStep}
+          onChange={(e) => setIsPackingStep(e.target.checked)}
           className="w-4 h-4 mt-0.5"
         />
         <span>
-          <span className="font-medium">Finishing step</span>
+          <span className="font-medium">Packing step</span>
           <span className="block text-xs text-muted-foreground">
-            Post-storage tasks (polish, pack, wrap). Only these run when a line
-            is fulfilled by borrowing from Store stock — the full production
-            cycle runs on the replenishment order instead.
+            Order-specific packing (load gift box, tie ribbon, apply label).
+            When a line is borrowed from Store stock, only these steps are
+            scheduled — Store pralines are already polished / painted /
+            decorated; the full production cycle runs on the replenishment
+            order instead.
           </span>
         </span>
       </label>
