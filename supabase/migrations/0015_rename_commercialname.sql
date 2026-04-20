@@ -23,23 +23,13 @@
 -- idempotently so re-runs are harmless.
 
 do $$
-declare
-  exists_cc boolean := false;
-  exists_lc boolean := false;
 begin
-  select true into exists_cc
-  from information_schema.columns
-  where table_schema = 'public'
-    and table_name = 'ingredients'
-    and column_name = 'commercialName';
-
-  select true into exists_lc
-  from information_schema.columns
-  where table_schema = 'public'
-    and table_name = 'ingredients'
-    and column_name = 'commercialname';
-
-  if exists_lc and not exists_cc then
-    execute 'alter table public.ingredients rename column commercialname to "commercialName"';
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'ingredients'
+      and column_name = 'commercialname'
+  ) then
+    alter table public.ingredients rename column commercialname to "commercialName";
   end if;
-end$$;
+end $$;
