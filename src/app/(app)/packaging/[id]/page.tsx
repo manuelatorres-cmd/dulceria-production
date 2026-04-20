@@ -50,6 +50,9 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
   const [orderPrice, setOrderPrice] = useState("");
   const [orderSupplier, setOrderSupplier] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
+  const [orderVatRate, setOrderVatRate] = useState("");
+  const [orderInvoice, setOrderInvoice] = useState("");
+  const [orderUpdateDefault, setOrderUpdateDefault] = useState(true);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -130,6 +133,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
     const qty = parseInt(orderQty);
     const price = parseFloat(orderPrice);
     if (!qty || !price || !orderDate) return;
+    const vatN = parseFloat(orderVatRate);
     await savePackagingOrder({
       packagingId,
       quantity: qty,
@@ -137,12 +141,18 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
       supplier: orderSupplier.trim() || undefined,
       orderedAt: new Date(orderDate),
       notes: orderNotes.trim() || undefined,
+      vatRatePercent: Number.isFinite(vatN) && vatN >= 0 ? vatN : undefined,
+      invoiceNumber: orderInvoice.trim() || undefined,
+      updatedDefault: orderUpdateDefault,
     });
     setOrderQty("");
     setOrderPrice("");
     setOrderSupplier("");
     setOrderNotes("");
     setOrderDate(todayISO());
+    setOrderVatRate("");
+    setOrderInvoice("");
+    setOrderUpdateDefault(true);
     setShowOrderForm(false);
   }
 
@@ -350,9 +360,38 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                   )}
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">VAT % (this purchase)</label>
+                  <input
+                    type="number" min={0} max={100} step={0.5}
+                    value={orderVatRate}
+                    onChange={(e) => setOrderVatRate(e.target.value)}
+                    placeholder={pkg?.defaultVatRate != null ? String(pkg.defaultVatRate) : "10"}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Invoice #</label>
+                  <input
+                    type="text"
+                    value={orderInvoice}
+                    onChange={(e) => setOrderInvoice(e.target.value)}
+                    placeholder="optional"
+                    className="input"
+                  />
+                </div>
+              </div>
               {orderQty && orderPrice && !isNaN(parseInt(orderQty)) && !isNaN(parseFloat(orderPrice)) && (
                 <p className="text-xs text-muted-foreground">
-                  Total: {sym}{(parseInt(orderQty) * parseFloat(orderPrice)).toFixed(2)}
+                  Net total: {sym}{(parseInt(orderQty) * parseFloat(orderPrice)).toFixed(2)}
+                  {parseFloat(orderVatRate) > 0 && (
+                    <>
+                      {" · Gross: "}
+                      {sym}
+                      {(parseInt(orderQty) * parseFloat(orderPrice) * (1 + parseFloat(orderVatRate) / 100)).toFixed(2)}
+                    </>
+                  )}
                 </p>
               )}
               <div>
@@ -365,6 +404,17 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                   className="input"
                 />
               </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={orderUpdateDefault}
+                  onChange={(e) => setOrderUpdateDefault(e.target.checked)}
+                  className="rounded border-border"
+                />
+                <span className="text-xs text-muted-foreground">
+                  Treat as the new default unit cost (cost calculations use the latest purchase).
+                </span>
+              </label>
               <div className="flex gap-2">
                 <button
                   type="submit"

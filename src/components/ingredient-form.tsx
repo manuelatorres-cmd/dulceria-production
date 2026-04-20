@@ -68,6 +68,12 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
   const [gramsPerUnit, setGramsPerUnit] = useState(() => (ingredient?.gramsPerUnit != null ? String(ingredient.gramsPerUnit) : "1000"));
   // Track whether the user has manually edited gramsPerUnit — if so, don't auto-fill on unit change
   const [gramsPerUnitTouched, setGramsPerUnitTouched] = useState(() => ingredient?.gramsPerUnit != null);
+  // Purchase-log extras (Phase 8)
+  const [defaultVatRate, setDefaultVatRate] = useState("");
+  const [purchaseSupplier, setPurchaseSupplier] = useState("");
+  const [purchaseVatRate, setPurchaseVatRate] = useState("");
+  const [purchaseInvoice, setPurchaseInvoice] = useState("");
+  const [updateDefault, setUpdateDefault] = useState(true);
 
   // Nutrition — local string state per field for editing
   const [nutritionStr, setNutritionStr] = useState<Record<string, string>>({});
@@ -102,6 +108,13 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
       setPurchaseUnit(ingredient.purchaseUnit ?? "g");
       setGramsPerUnit(ingredient.gramsPerUnit != null ? String(ingredient.gramsPerUnit) : "");
       setGramsPerUnitTouched(ingredient.gramsPerUnit != null);
+      setDefaultVatRate(ingredient.defaultVatRate != null ? String(ingredient.defaultVatRate) : "");
+      // Purchase extras are per-purchase — default VAT seeds the line, supplier prefills from the
+      // ingredient's vendor (last purchased-from).
+      setPurchaseSupplier(ingredient.vendor ?? "");
+      setPurchaseVatRate(ingredient.defaultVatRate != null ? String(ingredient.defaultVatRate) : "");
+      setPurchaseInvoice("");
+      setUpdateDefault(true);
       // Nutrition
       const nStr: Record<string, string> = {};
       if (ingredient.nutrition) {
@@ -175,13 +188,20 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
       }
       const filledNutrition = hasAnyNutrition ? fillDerivedNutrition(nutritionData) : undefined;
 
+      const defaultVatNum = parseFloat(defaultVatRate);
+      const purchaseVatNum = parseFloat(purchaseVatRate);
       await saveIngredient({
         ...(ingredient?.id ? { id: ingredient.id } : {}),
         name: name.trim(),
         commercialName: commercialName.trim() || undefined,
         manufacturer: manufacturer.trim(),
         brand: brand.trim() || undefined,
-        vendor: vendor.trim() || undefined,
+        // When the user types a new supplier into the per-purchase field,
+        // promote it to the ingredient's default vendor as long as
+        // "update default" is on. Otherwise keep the existing vendor.
+        vendor: updateDefault
+          ? (purchaseSupplier.trim() || vendor.trim() || undefined)
+          : (vendor.trim() || undefined),
         source: source.trim(),
         category: category || undefined,
         cost: 0, // legacy field kept for compatibility
@@ -202,6 +222,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
         purchaseQty: parseFloat(purchaseQty) || undefined,
         purchaseUnit: purchaseUnit || undefined,
         gramsPerUnit: parseFloat(gramsPerUnit) || undefined,
+        defaultVatRate: Number.isFinite(defaultVatNum) && defaultVatNum >= 0 ? defaultVatNum : undefined,
         cacaoFat: parseFloat(comp.cacaoFat) || 0,
         sugar: parseFloat(comp.sugar) || 0,
         milkFat: parseFloat(comp.milkFat) || 0,
@@ -211,6 +232,13 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
         alcohol: parseFloat(comp.alcohol) || 0,
         allergens,
         nutrition: filledNutrition,
+      }, {
+        updateDefault,
+        purchaseExtras: {
+          supplier: purchaseSupplier.trim() || undefined,
+          vatRatePercent: Number.isFinite(purchaseVatNum) && purchaseVatNum >= 0 ? purchaseVatNum : undefined,
+          invoiceNumber: purchaseInvoice.trim() || undefined,
+        },
       });
 
       onSaved();
@@ -660,6 +688,74 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
               )}
             </div>
           )}
+
+          {/* Purchase log extras (Phase 8) */}
+          <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border">
+            <div>
+              <label className="label">Supplier</label>
+              <input
+                value={purchaseSupplier}
+                onChange={(e) => setPurchaseSupplier(e.target.value)}
+                placeholder="Keylink, local, …"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">VAT % (this purchase)</label>
+              <input
+                type="number" min={0} max={100} step={0.5}
+                value={purchaseVatRate}
+                onChange={(e) => setPurchaseVatRate(e.target.value)}
+                placeholder="10"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">Invoice #</label>
+              <input
+                value={purchaseInvoice}
+                onChange={(e) => setPurchaseInvoice(e.target.value)}
+                placeholder="optional"
+                className="input"
+              />
+            </div>
+          </div>
+          {parseFloat(purchaseCost) > 0 && parseFloat(purchaseVatRate) > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              Gross ≈ {sym}
+              {(parseFloat(purchaseCost) * (1 + parseFloat(purchaseVatRate) / 100)).toFixed(2)}
+            </p>
+          )}
+
+          <div>
+            <label className="label">Default VAT rate (this ingredient)</label>
+            <input
+              type="number" min={0} max={100} step={0.5}
+              value={defaultVatRate}
+              onChange={(e) => setDefaultVatRate(e.target.value)}
+              placeholder="10"
+              className="input w-24"
+            />
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Pre-fills the VAT field on future purchases for this ingredient.
+            </p>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer pt-1 border-t border-border">
+            <input
+              type="checkbox"
+              checked={updateDefault}
+              onChange={(e) => setUpdateDefault(e.target.checked)}
+              className="rounded border-border"
+            />
+            <span className="text-xs">
+              <span className="font-medium">Update default price</span>
+              <span className="block text-muted-foreground">
+                When ticked, advances the pricing-tab defaults to this purchase. A purchase log
+                entry is always appended regardless — cost calculations track history.
+              </span>
+            </span>
+          </label>
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input

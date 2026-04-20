@@ -37,9 +37,32 @@ export function useIngredient(id: string | undefined): Ingredient | undefined {
   return data ?? undefined;
 }
 
-export async function saveIngredient(ingredient: Omit<Ingredient, "id"> & { id?: string }) {
+/** Optional extras the purchase form can pass to record a richer
+ *  purchase log (supplier, VAT, invoice #, and the "update default"
+ *  flag). Existing callers that don't care about the log stay on the
+ *  default — updateDefault is true so the ingredient row's purchase
+ *  fields advance with each save, matching the pre-Phase-8 behaviour. */
+export interface SaveIngredientOptions {
+  purchaseExtras?: {
+    supplier?: string;
+    vatRatePercent?: number;
+    invoiceNumber?: string;
+    note?: string;
+  };
+  /** When false, the ingredient's purchase-default fields are NOT
+   *  updated — we just append a history row. Use this when the user
+   *  wants to log a one-off purchase without changing the go-forward
+   *  default shown in the pricing tab. */
+  updateDefault?: boolean;
+}
+
+export async function saveIngredient(
+  ingredient: Omit<Ingredient, "id"> & { id?: string },
+  options?: SaveIngredientOptions,
+) {
   let savedId: string;
   let priceChanged = false;
+  const updateDefault = options?.updateDefault !== false; // default true
 
   // Drop any `undefined` values before the payload reaches Supabase.
   // The JS client serialises `undefined` as `null` on the wire, which
@@ -66,9 +89,23 @@ export async function saveIngredient(ingredient: Omit<Ingredient, "id"> & { id?:
         existing.purchaseUnit !== ingredient.purchaseUnit ||
         existing.gramsPerUnit !== ingredient.gramsPerUnit;
     }
+    // Build the update payload. If the user opted out of updating the
+    // go-forward default, strip the purchase fields so the Ingredient
+    // row's previous defaults stay in place.
+    const payload: Partial<Ingredient> & { updatedAt: Date } = {
+      ...ingredient,
+      updatedAt: new Date(),
+    };
+    if (!updateDefault) {
+      delete payload.purchaseCost;
+      delete payload.purchaseDate;
+      delete payload.purchaseQty;
+      delete payload.purchaseUnit;
+      delete payload.gramsPerUnit;
+    }
     const { error } = await supabase
       .from("ingredients")
-      .update(stripUndef({ ...ingredient, updatedAt: new Date() }))
+      .update(stripUndef(payload as Record<string, unknown>))
       .eq("id", ingredient.id);
     if (error) throw error;
     savedId = ingredient.id;
@@ -89,7 +126,10 @@ export async function saveIngredient(ingredient: Omit<Ingredient, "id"> & { id?:
 
   if (priceChanged) {
     const savedIngredient = ingredient.id ? ingredient as Ingredient : { ...ingredient, id: savedId } as Ingredient;
-    await saveIngredientPriceEntry(savedId, savedIngredient);
+    await saveIngredientPriceEntry(savedId, savedIngredient, {
+      ...options?.purchaseExtras,
+      updatedDefault: updateDefault,
+    });
     await computeSnapshotsForAffectedProducts(
       savedId,
       "ingredient_price",
@@ -2360,7 +2400,17 @@ export function useIngredientPriceHistory(ingredientId: string | undefined): Ing
   return data ?? [];
 }
 
-async function saveIngredientPriceEntry(ingredientId: string, ingredient: Ingredient): Promise<void> {
+async function saveIngredientPriceEntry(
+  ingredientId: string,
+  ingredient: Ingredient,
+  extras?: {
+    supplier?: string;
+    vatRatePercent?: number;
+    invoiceNumber?: string;
+    note?: string;
+    updatedDefault?: boolean;
+  },
+): Promise<void> {
   const cpg = deriveIngredientCostPerGram(ingredient);
   if (cpg === null) return;
   const { error } = await supabase.from("ingredientPriceHistory").insert({
@@ -2372,6 +2422,11 @@ async function saveIngredientPriceEntry(ingredientId: string, ingredient: Ingred
     purchaseQty: ingredient.purchaseQty,
     purchaseUnit: ingredient.purchaseUnit,
     gramsPerUnit: ingredient.gramsPerUnit,
+    supplier: extras?.supplier,
+    vatRatePercent: extras?.vatRatePercent,
+    invoiceNumber: extras?.invoiceNumber,
+    note: extras?.note,
+    updatedDefault: extras?.updatedDefault ?? true,
   });
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["ingredient-price-history", ingredientId] });
