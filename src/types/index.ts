@@ -87,6 +87,11 @@ export interface Ingredient {
    *  optional and not required to sum to 100 — when present they drive
    *  sort order on the ingredient-list display. */
   subIngredients?: SubIngredient[];
+  /** Default VAT rate (percent, e.g. 10) applied to this ingredient's
+   *  purchase cost. Used by the stock-entry form to prefill the VAT
+   *  field and by the purchase log to split net / gross. Null → the
+   *  app-level food default (10%) is used. */
+  defaultVatRate?: number;
 }
 
 /** One entry in an Ingredient's `subIngredients` breakdown — the label that
@@ -205,6 +210,10 @@ export interface Product {
    *  the next shop opening day is at least this many days away, so the
    *  replenishment batch can be produced in time. */
   leadTimeDays?: number;
+  /** Default VAT rate (percent, e.g. 10) applied when this product
+   *  appears on an order line and the line hasn't overridden it. Null →
+   *  app-level food default (10%). */
+  defaultVatRate?: number;
   archived?: boolean; // soft-delete: hidden from lists, preserved for production history
   createdAt: Date;
   updatedAt: Date;
@@ -508,6 +517,16 @@ export interface IngredientPriceHistory {
   purchaseUnit?: string;
   gramsPerUnit?: number;
   note?: string;
+  /** Who the ingredient was bought from — free text. */
+  supplier?: string;
+  /** VAT rate paid on this purchase (percent). Null → fall back to
+   *  the ingredient's defaultVatRate. */
+  vatRatePercent?: number;
+  /** Invoice / receipt reference from the supplier. */
+  invoiceNumber?: string;
+  /** True when the user ticked "update default price" at purchase
+   *  time. */
+  updatedDefault?: boolean;
 }
 
 /** Point-in-time cost per product (1 cavity) snapshot */
@@ -864,6 +883,8 @@ export interface Packaging {
   /** Minutes of hands-on packing time per unit of this packaging. Feeds
    *  directly into the labour-hours rollup on orders + quotes. */
   packingTimePerUnit?: number;
+  /** Default VAT rate (percent, e.g. 10). Null → app default. */
+  defaultVatRate?: number;
 }
 
 /** One consumption log entry from the Packing step. */
@@ -883,10 +904,19 @@ export interface PackagingOrder {
   id?: string;
   packagingId: string;
   quantity: number;       // units received in this order (e.g. 1500 boxes)
-  pricePerUnit: number;   // cost per unit (e.g. 1.99)
+  pricePerUnit: number;   // NET cost per unit (e.g. 1.99)
   supplier?: string;      // free-text, e.g. "Keylink"
   orderedAt: Date;        // date of order / receipt
   notes?: string;
+  /** VAT rate paid on this purchase (percent). Null → use the
+   *  packaging's defaultVatRate, then the app default. */
+  vatRatePercent?: number;
+  /** Invoice / receipt reference from the supplier. */
+  invoiceNumber?: string;
+  /** True when the user ticked "update default price" at purchase
+   *  time — means the catalogue's most-recent pricePerUnit now points
+   *  at this row. Preserved for audit. */
+  updatedDefault?: boolean;
 }
 
 // --- Shopping list ---
@@ -1016,12 +1046,17 @@ export interface Collection {
   updatedAt: Date;
 }
 
-/** Join table: which products belong to which collection, and in what order */
+/** Join table: which products belong to which collection, and in what order.
+ *  A Collection doubles as a price list — `unitPrice` is the NET price
+ *  to use for this product whenever a customer whose defaultPriceListId
+ *  points at this collection adds it to an order. Null = fall back to
+ *  the product's retail price. */
 export interface CollectionProduct {
   id?: string;
   collectionId: string;
   productId: string;
   sortOrder: number;
+  unitPrice?: number;
 }
 
 /** Links a collection to a packaging option with the retail sell price for that box */
@@ -1158,21 +1193,70 @@ export interface WasteLogEntry {
 
 // --- B2B CRM + quotes (Phase 7) ---
 
-/** One B2B customer profile. Analytics (lifetime value, avg order,
- *  frequency, last order) are derived in the app from `orders` + `orderItems`
- *  — not stored here. */
+export const CUSTOMER_TYPES = ["b2b", "private"] as const;
+export type CustomerType = (typeof CUSTOMER_TYPES)[number];
+
+export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
+  b2b: "B2B",
+  private: "Private",
+};
+
+/** One customer profile — B2B or Private. Analytics (lifetime value,
+ *  avg order, frequency, last order) are derived in the app from
+ *  `orders` + `orderItems` — not stored here. */
 export interface Customer {
   id?: string;
   companyName: string;
   contactName?: string;
   email?: string;
   phone?: string;
+  /** Default delivery / shop address. Separate from invoiceAddress so
+   *  the customer can have goods shipped to a different place than the
+   *  invoice goes. */
   address?: string;
+  /** UID / tax ID — e.g. Austrian ATU number, German USt-IdNr. */
   vatNumber?: string;
   /** Free-form tags for segmenting: "wholesale", "hotel", "pastry_shop", etc. */
   tags: string[];
   notes?: string;
   archived?: boolean;
+  /** B2B vs. private. Used by the order page to decide which fields
+   *  are required + how the invoice is labelled. */
+  type?: CustomerType;
+  /** Preferred fulfilment method — pre-populates on new orders. */
+  defaultDeliveryMethod?: DeliveryType;
+  /** Invoice-only address; defaults to `address` if null. */
+  invoiceAddress?: string;
+  /** Free text: "Net 30", "Vorkasse", "Abholung = bar", etc. */
+  paymentTerms?: string;
+  /** Allergen notes the kitchen should respect for every order from
+   *  this customer ("no nuts", "lactose-free only"). Free text. */
+  allergenNotes?: string;
+  /** Packaging preferences ("always with ribbon", "no plastic"). */
+  packagingPrefs?: string;
+  /** ISO-ish language code — 'de', 'en', 'it'. Used to pick the
+   *  quote / invoice language. */
+  language?: string;
+  /** Collection used as this customer's default price list. When a
+   *  line's product appears in the list, its unitPrice there wins
+   *  over the product default. */
+  defaultPriceListId?: string;
+  /** Blanket discount applied when no per-product / price-list
+   *  override exists. Percent 0..100. */
+  defaultDiscountPercent?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** Per-customer override for a specific product's unit price. Top of
+ *  the pricing hierarchy — checked before price lists and defaults. */
+export interface CustomerProductPrice {
+  id?: string;
+  customerId: string;
+  productId: string;
+  /** Net price in the workspace currency. */
+  unitPrice: number;
+  notes?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -1300,6 +1384,11 @@ export interface OrderBox {
   createdAt?: Date;
   updatedAt?: Date;
 }
+
+/** App-level default VAT rate (percent) for food items. Used whenever
+ *  a line doesn't override VAT and the item has no defaultVatRate of
+ *  its own. Matches the German / Austrian reduced-rate food VAT. */
+export const DEFAULT_FOOD_VAT_RATE = 10;
 
 export const DELIVERY_TYPES = ["pickup", "delivery", "ship"] as const;
 export type DeliveryType = (typeof DELIVERY_TYPES)[number];
@@ -1456,6 +1545,12 @@ export interface OrderPackagingLine {
   quantity: number;
   sortOrder: number;
   notes?: string;
+  /** Agreed NET unit price. Null → derive from latest PackagingOrder
+   *  cost (same hierarchy used by the quote flow). */
+  unitPrice?: number;
+  /** Per-line VAT rate (percent). Null → packaging.defaultVatRate,
+   *  then app default. */
+  vatRate?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -1468,8 +1563,10 @@ export interface OrderItem {
   orderId: string;
   productId: string;
   quantity: number;
-  /** Agreed unit price for this line. Nullable — when absent, customer
-   *  analytics fall back to the product's current retail price. */
+  /** Agreed NET unit price for this line. Nullable — when absent,
+   *  analytics fall back to the product's current retail price.
+   *  All line prices on orders are stored net; gross is derived via
+   *  `vatRate` or the product / app default. */
   unitPrice?: number;
   sortOrder: number;
   notes?: string;
@@ -1478,6 +1575,9 @@ export interface OrderItem {
    *  moves to Allocated at save time, and only finishing-steps are
    *  scheduled. Defaults to 'produce'. */
   fulfilmentMode?: FulfilmentMode;
+  /** Per-line VAT rate override (percent). Null → fall back to the
+   *  product's defaultVatRate, then the app default (10%). */
+  vatRate?: number;
 }
 
 /** One row on the production schedule — the scheduler's output. One per

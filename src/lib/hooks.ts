@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -6546,5 +6546,65 @@ export function useProductLeadTimeSuggestions(): Map<string, number> {
     }
     return out;
   }, [products, categories, steps, people]);
+}
+
+// =====================================================================
+// Customer-specific product pricing (top of the pricing hierarchy)
+// =====================================================================
+
+export function useCustomerProductPrices(customerId: string | undefined): CustomerProductPrice[] {
+  const { data } = useQuery({
+    queryKey: ["customer-product-prices", customerId],
+    enabled: !!customerId,
+    queryFn: async () =>
+      assertOk(
+        await supabase.from("customerProductPrices").select("*").eq("customerId", customerId!),
+      ) as CustomerProductPrice[],
+  });
+  return data ?? [];
+}
+
+/** All per-customer prices across every customer — useful when the UI
+ *  has already got the full customer + product list and we want a single
+ *  Map to look up from. */
+export function useAllCustomerProductPrices(): CustomerProductPrice[] {
+  const { data } = useQuery({
+    queryKey: ["customer-product-prices", "all"],
+    queryFn: async () =>
+      assertOk(await supabase.from("customerProductPrices").select("*")) as CustomerProductPrice[],
+  });
+  return data ?? [];
+}
+
+export async function saveCustomerProductPrice(
+  row: Omit<CustomerProductPrice, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const now = new Date();
+  if (row.id) {
+    const { error } = await supabase
+      .from("customerProductPrices")
+      .update({ ...row, updatedAt: now })
+      .eq("id", row.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["customer-product-prices"] });
+    return row.id;
+  }
+  // Upsert on (customerId, productId) — the unique constraint handles it.
+  const id = newId();
+  const { error } = await supabase
+    .from("customerProductPrices")
+    .upsert(
+      { ...row, id, createdAt: now, updatedAt: now },
+      { onConflict: "customerId,productId" },
+    );
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["customer-product-prices"] });
+  return id;
+}
+
+export async function deleteCustomerProductPrice(id: string): Promise<void> {
+  const { error } = await supabase.from("customerProductPrices").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["customer-product-prices"] });
 }
 
