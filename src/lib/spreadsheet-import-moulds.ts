@@ -6,7 +6,7 @@ import { supabase, newId } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import type { Mould } from "@/types";
 import type { ImportConfig, RowIssue } from "@/lib/spreadsheet-import";
-import { toNum, toNumOpt, toStrOpt } from "@/lib/spreadsheet-import";
+import { toNum, toNumOpt, toStrOpt, stripUndefined } from "@/lib/spreadsheet-import";
 
 export const MOULD_TEMPLATE_COLUMNS = [
   "name",
@@ -61,7 +61,7 @@ export const mouldImportConfig: ImportConfig<Omit<Mould, "id">> = {
   dedupKey: (data) => data.name.toLowerCase().trim(),
   commitBatch: async (items) => {
     if (items.length === 0) return 0;
-    const withIds = items.map((item) => ({ ...item, id: newId() }));
+    const withIds = items.map((item) => stripUndefined({ ...item, id: newId() }));
     const { error } = await supabase.from("moulds").insert(withIds);
     if (error) throw error;
     return items.length;

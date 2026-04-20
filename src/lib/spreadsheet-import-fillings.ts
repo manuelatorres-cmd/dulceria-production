@@ -14,7 +14,7 @@ import { supabase, newId } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import type { Filling, FillingIngredient, Ingredient } from "@/types";
 import type { ImportConfig, RowIssue } from "@/lib/spreadsheet-import";
-import { toStrOpt, toNumOpt, toList } from "@/lib/spreadsheet-import";
+import { toStrOpt, toNumOpt, toList, stripUndefined } from "@/lib/spreadsheet-import";
 
 export const FILLING_TEMPLATE_COLUMNS = [
   "name",
@@ -160,11 +160,15 @@ export function buildFillingImportConfig(ingredientLookup: Map<string, Ingredien
       }
     }
 
-    const { error: fErr } = await supabase.from("fillings").insert(fillingInserts);
+    const { error: fErr } = await supabase
+      .from("fillings")
+      .insert(fillingInserts.map((r) => stripUndefined(r)));
     if (fErr) throw fErr;
 
     if (ingredientInserts.length > 0) {
-      const { error: iErr } = await supabase.from("fillingIngredients").insert(ingredientInserts);
+      const { error: iErr } = await supabase
+        .from("fillingIngredients")
+        .insert(ingredientInserts.map((r) => stripUndefined(r)));
       if (iErr) {
         // Best-effort rollback so we don't leave orphan fillings
         await supabase.from("fillings").delete().in("id", insertedIds);

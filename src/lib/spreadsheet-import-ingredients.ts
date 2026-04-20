@@ -12,7 +12,7 @@ import type { Ingredient, SubIngredient } from "@/types";
 import { INGREDIENT_CATEGORIES } from "@/types";
 import type { NutrientKey, NutritionData } from "@/lib/nutrition";
 import type { ImportConfig, RowIssue } from "@/lib/spreadsheet-import";
-import { toNum, toNumOpt, toStrOpt, toBoolOpt, toList } from "@/lib/spreadsheet-import";
+import { toNum, toNumOpt, toStrOpt, toBoolOpt, toList, stripUndefined } from "@/lib/spreadsheet-import";
 
 // ---------------------------------------------------------------------------
 // Constants (shared with seed.ts — canonical source)
@@ -174,7 +174,7 @@ export const ingredientImportConfig: ImportConfig<Omit<Ingredient, "id">> = {
   dedupKey: (data) => `${data.name.toLowerCase().trim()}::${(data.manufacturer || "").toLowerCase().trim()}`,
   commitBatch: async (items) => {
     if (items.length === 0) return 0;
-    const withIds = items.map((item) => ({ ...item, id: newId() }));
+    const withIds = items.map((item) => stripUndefined({ ...item, id: newId() }));
     const { error } = await supabase.from("ingredients").insert(withIds);
     if (error) throw error;
     return items.length;

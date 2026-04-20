@@ -101,6 +101,24 @@ export function toList(val: string | undefined): string[] {
   return val.split("|").map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
+/**
+ * Drop any top-level keys whose value is `undefined`.
+ *
+ * Supabase's REST client serialises `undefined` fields as `null` on the
+ * wire instead of omitting them — which triggers NOT NULL violations on
+ * columns that have a server-side default (e.g. `pricingIrrelevant bool
+ * not null default false`). Every `commitBatch` funnels its rows through
+ * this helper so the DB default is the one that fires for blank cells.
+ */
+export function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const key in obj) {
+    const v = obj[key];
+    if (v !== undefined) out[key] = v;
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // xlsx I/O — lazy-loaded so ExcelJS doesn't land in the main bundle
 // ---------------------------------------------------------------------------

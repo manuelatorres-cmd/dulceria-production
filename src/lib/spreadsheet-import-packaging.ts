@@ -6,7 +6,7 @@ import { supabase, newId } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import type { Packaging } from "@/types";
 import type { ImportConfig, RowIssue } from "@/lib/spreadsheet-import";
-import { toNum, toStrOpt } from "@/lib/spreadsheet-import";
+import { toNum, toStrOpt, stripUndefined } from "@/lib/spreadsheet-import";
 
 export const PACKAGING_TEMPLATE_COLUMNS = [
   "name",
@@ -44,7 +44,7 @@ export const packagingImportConfig: ImportConfig<Omit<Packaging, "id" | "created
   commitBatch: async (items) => {
     if (items.length === 0) return 0;
     const now = new Date();
-    const withIds = items.map((item) => ({ ...item, id: newId(), createdAt: now, updatedAt: now }));
+    const withIds = items.map((item) => stripUndefined({ ...item, id: newId(), createdAt: now, updatedAt: now }));
     const { error } = await supabase.from("packaging").insert(withIds);
     if (error) throw error;
     return items.length;

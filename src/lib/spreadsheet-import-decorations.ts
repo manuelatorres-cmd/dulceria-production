@@ -7,7 +7,7 @@ import { assertOk } from "@/lib/supabase-query";
 import type { DecorationMaterial, DecorationMaterialType, CocoaButterType } from "@/types";
 import { DECORATION_MATERIAL_TYPES, COCOA_BUTTER_TYPES } from "@/types";
 import type { ImportConfig, RowIssue } from "@/lib/spreadsheet-import";
-import { toStrOpt } from "@/lib/spreadsheet-import";
+import { toStrOpt, stripUndefined } from "@/lib/spreadsheet-import";
 
 export const DECORATION_TEMPLATE_COLUMNS = [
   "name",
@@ -74,7 +74,7 @@ export const decorationImportConfig: ImportConfig<Omit<DecorationMaterial, "id">
   commitBatch: async (items) => {
     if (items.length === 0) return 0;
     const now = new Date();
-    const withIds = items.map((item) => ({ ...item, id: newId(), createdAt: now, updatedAt: now }));
+    const withIds = items.map((item) => stripUndefined({ ...item, id: newId(), createdAt: now, updatedAt: now }));
     const { error } = await supabase.from("decorationMaterials").insert(withIds);
     if (error) throw error;
     return items.length;

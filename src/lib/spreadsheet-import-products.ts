@@ -11,7 +11,7 @@ import { supabase, newId } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import type { Product, ProductFilling, Filling, Mould, Ingredient, ProductCategory, FillMode } from "@/types";
 import type { ImportConfig, RowIssue } from "@/lib/spreadsheet-import";
-import { toStrOpt, toNumOpt, toBoolOpt, toList } from "@/lib/spreadsheet-import";
+import { toStrOpt, toNumOpt, toBoolOpt, toList, stripUndefined } from "@/lib/spreadsheet-import";
 
 export const PRODUCT_TEMPLATE_COLUMNS = [
   "name",
@@ -269,11 +269,15 @@ export function buildProductImportConfig(lookups: ProductImportLookups): ImportC
       }
     }
 
-    const { error: pErr } = await supabase.from("products").insert(productInserts);
+    const { error: pErr } = await supabase
+      .from("products")
+      .insert(productInserts.map((r) => stripUndefined(r)));
     if (pErr) throw pErr;
 
     if (fillingInserts.length > 0) {
-      const { error: fErr } = await supabase.from("productFillings").insert(fillingInserts);
+      const { error: fErr } = await supabase
+        .from("productFillings")
+        .insert(fillingInserts.map((r) => stripUndefined(r)));
       if (fErr) {
         // Best-effort rollback so we don't leave orphan products
         await supabase.from("products").delete().in("id", insertedIds);
