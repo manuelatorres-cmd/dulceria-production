@@ -182,7 +182,13 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
         cost: 0, // legacy field kept for compatibility
         notes: notes.trim(),
         pricingIrrelevant: pricingIrrelevant || undefined,
-        shellCapable: (category === "Chocolate" && shellCapable) || undefined,
+        // Always persist the actual boolean — the UI already gates the
+        // checkbox's visibility to the Chocolate category via the "shell"
+        // tab, so there's no second-guessing needed here. Previously we
+        // collapsed `false` to `undefined`, which meant unchecking the
+        // box never reached the DB (Supabase strips undefined fields
+        // from update payloads).
+        shellCapable,
         subIngredients: subIngredients.length > 0
           ? subIngredients
               .map((s) => ({ name: s.name.trim(), percentage: s.percentage }))

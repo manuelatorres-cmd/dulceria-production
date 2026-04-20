@@ -1897,6 +1897,7 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
   const [activeMinutes, setActiveMinutes] = useState(step?.activeMinutes != null ? String(step.activeMinutes) : "");
   const [waitingMinutes, setWaitingMinutes] = useState(step?.waitingMinutes != null ? String(step.waitingMinutes) : "");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   async function handleSave() {
     if (!name.trim()) return;
@@ -1904,6 +1905,7 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
     const waiting = parseFloat(waitingMinutes);
     if (isNaN(active) || active < 0 || isNaN(waiting) || waiting < 0) return;
     setSaving(true);
+    setSaveError("");
     try {
       await saveProductionStep({
         id: step?.id,
@@ -1919,6 +1921,16 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
         setWaitingMinutes("");
       }
       onSaved();
+    } catch (err) {
+      // Surface the real reason inline. The production-steps table has a
+      // unique (productType, name) constraint that's easy to trip when
+      // re-adding a previously-used step name — without this message the
+      // save button looks like it's just ignoring the click.
+      const message = err instanceof Error ? err.message : "Save failed";
+      const pretty = /duplicate|unique/i.test(message)
+        ? `A step called "${name.trim()}" already exists for ${productType}.`
+        : message;
+      setSaveError(pretty);
     } finally {
       setSaving(false);
     }
@@ -1997,6 +2009,9 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
           </button>
         )}
       </div>
+      {saveError && (
+        <p className="text-xs text-status-alert pt-1">{saveError}</p>
+      )}
     </div>
   );
 }
