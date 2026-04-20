@@ -7,6 +7,7 @@ import {
   useMouldsList, useIngredients, saveProductionPlan, savePlanProduct, toggleStep,
   useDecorationMaterials, setDecorationMaterialLowStock,
   saveFillingStock, deductFillingStock, useShelfStableCategoryNames,
+  recordUnmouldIntake, checkDeadlineImpactForProduct,
 } from "@/lib/hooks";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
 import type { Filling, Mould, PlanProduct, Product, DecorationMaterial } from "@/types";
@@ -131,6 +132,11 @@ function PlanContent({
     mode: "single" | "batch"; // single = one unmould checkbox, batch = mark all done
     pendingStepKey?: string; // for single mode: the step key that triggered the modal
   } | null>(null);
+
+  // Deadline-impact banner after an unmould yield short-stocks an open order.
+  const [deadlineImpact, setDeadlineImpact] = useState<Array<{
+    orderId: string; orderName: string; deadline: Date; required: number; projected: number; shortfall: number;
+  }> | null>(null);
 
   // Leftover filling modal state
   const [leftoverModal, setLeftoverModal] = useState<{
@@ -468,13 +474,29 @@ function PlanContent({
   }
 
   async function handleYieldConfirm(entries: YieldEntry[]) {
-    // Save actual yield on each PlanProduct
+    // Save actual yield on each PlanProduct, record the intake into Production
+    // Storage, log waste for any shortfall, then check whether any open order
+    // for the affected products just became infeasible.
+    const affectedProductIds = new Set<string>();
     for (const entry of entries) {
       const pb = planProducts.find((b) => b.id === entry.planProductId);
       if (pb) {
         await savePlanProduct({ ...pb, actualYield: entry.yield });
+        await recordUnmouldIntake({
+          planProductId: entry.planProductId,
+          productId: pb.productId,
+          actualYield: entry.yield,
+          planned: entry.totalProducts,
+        });
+        affectedProductIds.add(pb.productId);
       }
     }
+    const issues: Array<{ orderId: string; orderName: string; deadline: Date; required: number; projected: number; shortfall: number }> = [];
+    for (const productId of affectedProductIds) {
+      const productIssues = await checkDeadlineImpactForProduct(productId);
+      issues.push(...productIssues);
+    }
+    if (issues.length > 0) setDeadlineImpact(issues);
 
     if (yieldModal?.mode === "single" && yieldModal.pendingStepKey) {
       // Complete the single unmould step
@@ -682,6 +704,34 @@ function PlanContent({
           >
             <StickyNote className="w-3 h-3" /> Add batch note
           </button>
+        )}
+
+        {/* Deadline impact warning after an unmould yield short-stocks open orders */}
+        {deadlineImpact && deadlineImpact.length > 0 && (
+          <div className="mt-3 rounded-lg border border-status-alert-edge bg-status-alert-bg px-3 py-2.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-status-alert">
+                  Yield short — {deadlineImpact.length === 1 ? "1 order" : `${deadlineImpact.length} orders`} at risk
+                </p>
+                <ul className="mt-1 space-y-0.5 text-[11px] text-foreground">
+                  {deadlineImpact.map((issue) => (
+                    <li key={issue.orderId}>
+                      <span className="font-medium">{issue.orderName}</span>
+                      {" · "}short {issue.shortfall}
+                      {" · "}needs {issue.required} by {new Date(issue.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={() => setDeadlineImpact(null)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Print labels (Niimbot) */}

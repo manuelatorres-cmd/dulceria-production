@@ -7,7 +7,18 @@ import {
   updateProductStockCount,
   freezePlanProduct, defrostPlanProduct,
   freezeFillingStock, defrostFillingStock,
+  useProductLocationTotals,
+  useAllStockLocations,
+  transferBatchStock,
+  useOrders,
+  useStockLocationMinimums,
+  DEFAULT_LOCATION_MINIMUM,
+  moveProductStockFifo,
+  intakeBatchStock,
 } from "@/lib/hooks";
+import { STOCK_LOCATION_SHORT_LABELS, STOCK_LOCATIONS, type StockLocation } from "@/types";
+import { TransferModal } from "@/components/transfer-modal";
+import { Move } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Search, SlidersHorizontal, X, Plus, ClipboardList, Snowflake } from "lucide-react";
 import type { PlanProduct, ProductionPlan, Product, Mould, FillingStock } from "@/types";
@@ -128,6 +139,38 @@ function ProductStockTab() {
   const allPlans = useProductionPlans();
   const products = useProductsList();
   const moulds = useMouldsList(true);
+  const locationTotals = useProductLocationTotals();
+  const allStockLocations = useAllStockLocations();
+  const locationMinimums = useStockLocationMinimums();
+  const allOrders = useOrders();
+  const openOrders = useMemo(
+    () => allOrders.filter((o) => o.status === "pending" || o.status === "in_production"),
+    [allOrders],
+  );
+  const [transferPbId, setTransferPbId] = useState<string | null>(null);
+  const [countingProductLocation, setCountingProductLocation] = useState<{ productId: string; location: StockLocation } | null>(null);
+  const [locationCountInput, setLocationCountInput] = useState("");
+
+  const minimumFor = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const m of locationMinimums) {
+      map.set(`${m.productId}:${m.location}`, m.minimumUnits);
+    }
+    return (productId: string, location: StockLocation): number =>
+      map.get(`${productId}:${location}`) ?? DEFAULT_LOCATION_MINIMUM;
+  }, [locationMinimums]);
+
+  const distributionByBatch = useMemo(() => {
+    const map = new Map<string, Record<StockLocation, number>>();
+    for (const row of allStockLocations) {
+      const existing =
+        map.get(row.planProductId) ??
+        ({ store: 0, production: 0, freezer: 0, allocated: 0 } as Record<StockLocation, number>);
+      existing[row.location] += row.quantity;
+      map.set(row.planProductId, existing);
+    }
+    return map;
+  }, [allStockLocations]);
   const [search, setSearch] = useState("");
   const [confirmGone, setConfirmGone] = useState<string | null>(null);
   const [countingProductId, setCountingProductId] = useState<string | null>(null);
@@ -438,6 +481,96 @@ function ProductStockTab() {
                       </span>
                     )}
                   </div>
+                  {(() => {
+                    const totals = locationTotals.get(group.productId);
+                    return (
+                      <div className="flex items-center gap-1 flex-wrap mt-1">
+                        {STOCK_LOCATIONS.map((loc) => {
+                          const qty = totals?.[loc] ?? 0;
+                          const minimum = minimumFor(group.productId, loc);
+                          const below = loc === "store" || loc === "production"
+                            ? qty < minimum
+                            : false;
+                          const empty = qty === 0;
+                          const editing = countingProductLocation?.productId === group.productId
+                            && countingProductLocation?.location === loc;
+                          let cls = "border-border bg-background text-foreground";
+                          if (editing) cls = "border-primary bg-primary/5 text-primary";
+                          else if (below) cls = "border-status-warn-edge bg-status-warn-bg text-status-warn";
+                          else if (empty) cls = "border-border/50 bg-muted/30 text-muted-foreground";
+                          if (editing) {
+                            return (
+                              <span key={loc} className={`rounded-full border px-1.5 py-0 text-[10px] font-medium inline-flex items-center gap-1 ${cls}`}>
+                                {STOCK_LOCATION_SHORT_LABELS[loc]}
+                                <input
+                                  autoFocus
+                                  type="number"
+                                  min={0}
+                                  value={locationCountInput}
+                                  onChange={(e) => setLocationCountInput(e.target.value)}
+                                  onKeyDown={async (e) => {
+                                    if (e.key === "Escape") {
+                                      setCountingProductLocation(null);
+                                      setLocationCountInput("");
+                                      return;
+                                    }
+                                    if (e.key !== "Enter") return;
+                                    const val = parseInt(locationCountInput, 10);
+                                    if (!Number.isFinite(val) || val < 0) return;
+                                    const delta = val - qty;
+                                    if (delta === 0) {
+                                      setCountingProductLocation(null);
+                                      setLocationCountInput("");
+                                      return;
+                                    }
+                                    // Shortfall: outake waste from FIFO oldest batch in this location.
+                                    // Excess: log an intake on the oldest batch for this product.
+                                    if (delta < 0) {
+                                      await moveProductStockFifo({
+                                        productId: group.productId,
+                                        fromLocation: loc,
+                                        toLocation: null,
+                                        quantity: Math.abs(delta),
+                                        reason: "recount",
+                                      });
+                                    } else {
+                                      const anyBatch = group.batches[0]?.pb;
+                                      if (anyBatch) {
+                                        await intakeBatchStock({
+                                          planProductId: anyBatch.id!,
+                                          productId: group.productId,
+                                          toLocation: loc,
+                                          quantity: delta,
+                                          reason: "recount",
+                                        });
+                                      }
+                                    }
+                                    setCountingProductLocation(null);
+                                    setLocationCountInput("");
+                                  }}
+                                  onBlur={() => { setCountingProductLocation(null); setLocationCountInput(""); }}
+                                  className="w-12 bg-transparent text-[10px] text-center tabular-nums focus:outline-none"
+                                />
+                              </span>
+                            );
+                          }
+                          return (
+                            <button
+                              key={loc}
+                              onClick={() => {
+                                setCountingProductLocation({ productId: group.productId, location: loc });
+                                setLocationCountInput(String(qty));
+                              }}
+                              className={`rounded-full border px-1.5 py-0 text-[10px] font-medium tabular-nums inline-flex items-center gap-0.5 hover:border-primary transition-colors ${cls}`}
+                              title={`${STOCK_LOCATION_SHORT_LABELS[loc]}: ${qty} pcs${below ? ` (below minimum ${minimum})` : ""}. Click to recount.`}
+                            >
+                              {STOCK_LOCATION_SHORT_LABELS[loc]} {qty}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
                 {countingProductId !== group.productId && (
                   <button
@@ -535,6 +668,13 @@ function ProductStockTab() {
                         {pb.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate">Note: {pb.notes}</p>}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                        <button
+                          onClick={() => setTransferPbId(pb.id!)}
+                          className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors inline-flex items-center gap-0.5"
+                          title="Move pieces between Store / Production / Freezer / Allocated"
+                        >
+                          <Move className="w-3 h-3" /> Move
+                        </button>
                         <button
                           onClick={() => setFreezingPbId(pb.id!)}
                           className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:border-sky-500 hover:bg-sky-50 transition-colors inline-flex items-center gap-0.5"
@@ -635,6 +775,48 @@ function ProductStockTab() {
               setDefrostingPbId(null);
             }}
             onCancel={() => setDefrostingPbId(null)}
+          />
+        );
+      })()}
+
+      {/* Transfer modal */}
+      {transferPbId && (() => {
+        const row = inStockRows.find((r) => r.pb.id === transferPbId);
+        if (!row) return null;
+        const { pb, plan, product } = row;
+        const distribution = distributionByBatch.get(pb.id!) ??
+          ({ store: 0, production: 0, freezer: 0, allocated: 0 } as Record<StockLocation, number>);
+        // If the batch has no stockLocations rows yet (e.g. migration hasn't
+        // run, or this batch pre-dates it), fall back to its legacy counters.
+        const hasAny = STOCK_LOCATIONS.some((l) => distribution[l] > 0);
+        const effective = hasAny
+          ? distribution
+          : ({
+              store: 0,
+              production: pb.currentStock ?? pb.actualYield ?? 0,
+              freezer: pb.frozenQty ?? 0,
+              allocated: 0,
+            } as Record<StockLocation, number>);
+        return (
+          <TransferModal
+            productName={product?.name ?? "Product"}
+            batchLabel={plan.batchNumber}
+            distribution={effective}
+            openOrders={openOrders}
+            onConfirm={async ({ from, to, quantity, orderId, notes }) => {
+              await transferBatchStock({
+                planProductId: pb.id!,
+                productId: pb.productId,
+                fromLocation: from,
+                toLocation: to,
+                quantity,
+                orderId,
+                reason: to === "allocated" ? "allocate" : from === "allocated" ? "unallocate" : "transfer",
+                notes,
+              });
+              setTransferPbId(null);
+            }}
+            onCancel={() => setTransferPbId(null)}
           />
         );
       })()}

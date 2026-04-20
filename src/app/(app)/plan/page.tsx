@@ -11,7 +11,7 @@ import {
 } from "@/lib/hooks";
 import { buildSchedule } from "@/lib/scheduler";
 import { capacityConfigStatus } from "@/lib/capacity";
-import { RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
+import { RefreshCw, AlertTriangle, CheckCircle, Flame } from "lucide-react";
 import type { ProductionScheduleEntry } from "@/types";
 
 const LEVEL_STYLE = {
@@ -113,7 +113,7 @@ export default function PlanPage() {
         )}
 
         {/* Controls */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm">
             <p className="text-muted-foreground">
               {preview.entries.length} task{preview.entries.length !== 1 ? "s" : ""} would be scheduled from{" "}
@@ -125,14 +125,22 @@ export default function PlanPage() {
               </p>
             )}
           </div>
-          <button
-            onClick={handleRegenerate}
-            disabled={regenerating || !configStatus.isComplete}
-            className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
-            {regenerating ? "Regenerating…" : "Regenerate plan"}
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/plan/fillings"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary hover:text-primary transition-colors"
+            >
+              <Flame className="w-3.5 h-3.5" /> Filling cooking list
+            </Link>
+            <button
+              onClick={handleRegenerate}
+              disabled={regenerating || !configStatus.isComplete}
+              className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
+              {regenerating ? "Regenerating…" : "Regenerate plan"}
+            </button>
+          </div>
         </div>
 
         {lastResult && (

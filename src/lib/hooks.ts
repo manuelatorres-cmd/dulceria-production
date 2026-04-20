@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -1405,7 +1405,9 @@ export async function setPlanProductStockStatus(id: string, status: "low" | "gon
 }
 
 /** Move pieces from `currentStock` to `frozenQty`. Captures the user-confirmed
- *  shelf-life (in days) to apply once the batch is defrosted. */
+ *  shelf-life (in days) to apply once the batch is defrosted. Also mirrors the
+ *  move into `stockLocations` (production → freezer) so the 4-location view
+ *  stays consistent. */
 export async function freezePlanProduct(
   id: string,
   qty: number,
@@ -1434,11 +1436,20 @@ export async function freezePlanProduct(
     })
     .eq("id", id);
   if (error) throw error;
+  await transferBatchStock({
+    planProductId: id,
+    productId: pb.productId,
+    fromLocation: "production",
+    toLocation: "freezer",
+    quantity: moving,
+    reason: "freeze",
+  });
   queryClient.invalidateQueries({ queryKey: ["plan-products"] });
 }
 
 /** Move pieces from `frozenQty` back to `currentStock` and stamp `defrostedAt`.
- *  Sell-by for the defrosted stock becomes `defrostedAt + preservedShelfLifeDays`. */
+ *  Sell-by for the defrosted stock becomes `defrostedAt + preservedShelfLifeDays`.
+ *  Also mirrors the move into `stockLocations` (freezer → production). */
 export async function defrostPlanProduct(id: string): Promise<void> {
   const pb = assertOkMaybe(
     await supabase.from("planProducts").select("*").eq("id", id).maybeSingle(),
@@ -1457,6 +1468,14 @@ export async function defrostPlanProduct(id: string): Promise<void> {
     })
     .eq("id", id);
   if (error) throw error;
+  await transferBatchStock({
+    planProductId: id,
+    productId: pb.productId,
+    fromLocation: "freezer",
+    toLocation: "production",
+    quantity: moving,
+    reason: "defrost",
+  });
   queryClient.invalidateQueries({ queryKey: ["plan-products"] });
 }
 
@@ -3801,6 +3820,7 @@ export async function saveCapacityConfig(partial: Partial<CapacityConfig>): Prom
       criticalThresholdPercent: partial.criticalThresholdPercent ?? null,
       capacityBufferPercent: partial.capacityBufferPercent ?? null,
       fillingBufferPercent: partial.fillingBufferPercent ?? null,
+      stockExpiryWarnDays: partial.stockExpiryWarnDays ?? null,
       updatedAt: new Date(),
     }, { onConflict: "id" });
   if (error) throw error;
@@ -4230,4 +4250,566 @@ export async function deleteEventCalendarEntry(id: string): Promise<void> {
   const { error } = await supabase.from("eventCalendar").delete().eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["event-calendar"] });
+}
+
+// ---------------------------------------------------------------
+// Stock locations (4-location model — §6 of the handover)
+// ---------------------------------------------------------------
+//
+// Source of truth for "how many pieces of this batch are in which
+// location". The single-counter currentStock/frozenQty fields on
+// planProducts stay around for this migration — freeze/defrost dual-
+// writes into both — but reads for the new stock UI go through here.
+//
+// Allocated rows carry an orderId (enforced at the DB layer via a
+// CHECK constraint). All other locations must not set orderId.
+
+export function useAllStockLocations(): StockLocationRow[] {
+  const { data } = useQuery({
+    queryKey: ["stock-locations", "all"],
+    queryFn: async () =>
+      assertOk(await supabase.from("stockLocations").select("*")) as StockLocationRow[],
+  });
+  return data ?? [];
+}
+
+export function useStockLocationsForBatch(planProductId: string | undefined): StockLocationRow[] {
+  const { data } = useQuery({
+    queryKey: ["stock-locations", "batch", planProductId],
+    enabled: !!planProductId,
+    queryFn: async () =>
+      assertOk(
+        await supabase.from("stockLocations").select("*").eq("planProductId", planProductId!),
+      ) as StockLocationRow[],
+  });
+  return data ?? [];
+}
+
+/** Movements newest-first. Optionally scoped to a specific batch. */
+export function useStockMovements(planProductId?: string): StockMovement[] {
+  const { data } = useQuery({
+    queryKey: ["stock-movements", planProductId ?? "all"],
+    queryFn: async () => {
+      const q = supabase.from("stockMovements").select("*").order("movedAt", { ascending: false });
+      const rows = assertOk(
+        await (planProductId ? q.eq("planProductId", planProductId) : q),
+      ) as StockMovement[];
+      return rows;
+    },
+  });
+  return data ?? [];
+}
+
+/** productId → (location → total quantity across all batches). Useful for the
+ *  4-location dashboard breakdown. Excludes 'allocated' per-order detail — the
+ *  allocated total is the sum of all allocated rows for the product. */
+export function useProductLocationTotals(): Map<string, Record<StockLocation, number>> {
+  const { data } = useQuery({
+    queryKey: ["stock-locations", "product-totals"],
+    queryFn: async () => {
+      const [locations, batches] = await Promise.all([
+        supabase.from("stockLocations").select("*").then((r) => assertOk(r) as StockLocationRow[]),
+        supabase.from("planProducts").select("id, productId").then((r) =>
+          assertOk(r) as Array<{ id: string; productId: string }>,
+        ),
+      ]);
+      const productByBatch = new Map(batches.map((b) => [b.id, b.productId] as const));
+      const result = new Map<string, Record<StockLocation, number>>();
+      for (const row of locations) {
+        const productId = productByBatch.get(row.planProductId);
+        if (!productId) continue;
+        const existing =
+          result.get(productId) ??
+          ({ store: 0, production: 0, freezer: 0, allocated: 0 } as Record<StockLocation, number>);
+        existing[row.location] += row.quantity;
+        result.set(productId, existing);
+      }
+      return result;
+    },
+  });
+  return data ?? new Map<string, Record<StockLocation, number>>();
+}
+
+// ---------------------------------------------------------------
+// Stock location minimums
+// ---------------------------------------------------------------
+
+/** Default minimum applied when no row is set — 10 units per product per
+ *  location (handover §1). Real values are per-product per-location, written
+ *  from the Settings UI. */
+export const DEFAULT_LOCATION_MINIMUM = 10;
+
+export function useStockLocationMinimums(): StockLocationMinimum[] {
+  const { data } = useQuery({
+    queryKey: ["stock-location-minimums"],
+    queryFn: async () =>
+      assertOk(await supabase.from("stockLocationMinimums").select("*")) as StockLocationMinimum[],
+  });
+  return data ?? [];
+}
+
+export async function saveStockLocationMinimum(
+  row: Omit<StockLocationMinimum, "id" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const now = new Date();
+  if (row.id) {
+    const { error } = await supabase
+      .from("stockLocationMinimums")
+      .update({ ...row, updatedAt: now })
+      .eq("id", row.id);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ["stock-location-minimums"] });
+    return row.id;
+  }
+  const id = newId();
+  const { error } = await supabase
+    .from("stockLocationMinimums")
+    .insert({ ...row, id, updatedAt: now });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["stock-location-minimums"] });
+  return id;
+}
+
+export async function deleteStockLocationMinimum(id: string): Promise<void> {
+  const { error } = await supabase.from("stockLocationMinimums").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["stock-location-minimums"] });
+}
+
+// ---------------------------------------------------------------
+// Stock movement helpers
+// ---------------------------------------------------------------
+//
+// Core primitives for changing where pieces live. Every mutation
+//   1. Upserts the affected stockLocations rows (creating the row if
+//      missing, deleting when it drops to 0), and
+//   2. Appends a stockMovements audit entry.
+//
+// Callers should ensure fromLocation has enough stock — the helpers
+// clamp to available rather than throwing (matches the forgiving UI
+// style already used by freeze/defrost). A clamp to 0 is a no-op.
+
+async function upsertStockLocationRow(
+  planProductId: string,
+  location: StockLocation,
+  orderId: string | null,
+  delta: number,
+): Promise<void> {
+  if (delta === 0) return;
+  const q = supabase
+    .from("stockLocations")
+    .select("*")
+    .eq("planProductId", planProductId)
+    .eq("location", location);
+  const existing = assertOk(
+    await (orderId == null ? q.is("orderId", null) : q.eq("orderId", orderId)),
+  ) as StockLocationRow[];
+  const current = existing[0];
+  const next = Math.max(0, (current?.quantity ?? 0) + delta);
+  if (current) {
+    if (next === 0) {
+      const { error } = await supabase.from("stockLocations").delete().eq("id", current.id!);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from("stockLocations")
+        .update({ quantity: next, updatedAt: new Date() })
+        .eq("id", current.id!);
+      if (error) throw error;
+    }
+    return;
+  }
+  // No existing row — only insert when we're adding positive quantity.
+  if (next <= 0) return;
+  const { error } = await supabase.from("stockLocations").insert({
+    id: newId(),
+    planProductId,
+    location,
+    orderId: orderId ?? null,
+    quantity: next,
+    updatedAt: new Date(),
+  });
+  if (error) throw error;
+}
+
+async function logStockMovement(m: Omit<StockMovement, "id" | "movedAt"> & { movedAt?: Date }): Promise<void> {
+  const { error } = await supabase.from("stockMovements").insert({
+    id: newId(),
+    ...m,
+    movedAt: m.movedAt ?? new Date(),
+  });
+  if (error) throw error;
+}
+
+export interface TransferBatchStockArgs {
+  planProductId: string;
+  productId: string;
+  fromLocation: StockLocation;
+  toLocation: StockLocation;
+  quantity: number;
+  /** Only required when `fromLocation` or `toLocation` is 'allocated'. */
+  orderId?: string;
+  reason?: StockMovementReason | string;
+  movedBy?: string;
+  notes?: string;
+}
+
+/** Move `quantity` pieces of a single batch from one location to another. */
+export async function transferBatchStock(args: TransferBatchStockArgs): Promise<void> {
+  const qty = Math.max(0, Math.round(args.quantity));
+  if (qty === 0) return;
+  const fromOrderId = args.fromLocation === "allocated" ? args.orderId ?? null : null;
+  const toOrderId = args.toLocation === "allocated" ? args.orderId ?? null : null;
+  await upsertStockLocationRow(args.planProductId, args.fromLocation, fromOrderId, -qty);
+  await upsertStockLocationRow(args.planProductId, args.toLocation, toOrderId, qty);
+  await logStockMovement({
+    planProductId: args.planProductId,
+    productId: args.productId,
+    fromLocation: args.fromLocation,
+    toLocation: args.toLocation,
+    quantity: qty,
+    orderId: args.orderId,
+    reason: args.reason ?? "transfer",
+    movedBy: args.movedBy,
+    notes: args.notes,
+  });
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+}
+
+export interface IntakeBatchStockArgs {
+  planProductId: string;
+  productId: string;
+  toLocation: StockLocation;
+  quantity: number;
+  orderId?: string;
+  reason?: StockMovementReason | string;
+  movedBy?: string;
+  notes?: string;
+}
+
+/** Record an intake (external source → location). Use this at unmould to
+ *  land the produced pieces into Production Storage. */
+export async function intakeBatchStock(args: IntakeBatchStockArgs): Promise<void> {
+  const qty = Math.max(0, Math.round(args.quantity));
+  if (qty === 0) return;
+  const toOrderId = args.toLocation === "allocated" ? args.orderId ?? null : null;
+  await upsertStockLocationRow(args.planProductId, args.toLocation, toOrderId, qty);
+  await logStockMovement({
+    planProductId: args.planProductId,
+    productId: args.productId,
+    fromLocation: undefined,
+    toLocation: args.toLocation,
+    quantity: qty,
+    orderId: args.orderId,
+    reason: args.reason ?? "unmould",
+    movedBy: args.movedBy,
+    notes: args.notes,
+  });
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+}
+
+export interface OutakeBatchStockArgs {
+  planProductId: string;
+  productId: string;
+  fromLocation: StockLocation;
+  quantity: number;
+  orderId?: string;
+  reason: StockMovementReason | string;
+  movedBy?: string;
+  notes?: string;
+}
+
+/** Record an exit (location → external). Use for sales, waste, breakage,
+ *  or discarding stock. `reason` is required — it's the classification the
+ *  variance report groups by. */
+export async function outakeBatchStock(args: OutakeBatchStockArgs): Promise<void> {
+  const qty = Math.max(0, Math.round(args.quantity));
+  if (qty === 0) return;
+  const fromOrderId = args.fromLocation === "allocated" ? args.orderId ?? null : null;
+  await upsertStockLocationRow(args.planProductId, args.fromLocation, fromOrderId, -qty);
+  await logStockMovement({
+    planProductId: args.planProductId,
+    productId: args.productId,
+    fromLocation: args.fromLocation,
+    toLocation: undefined,
+    quantity: qty,
+    orderId: args.orderId,
+    reason: args.reason,
+    movedBy: args.movedBy,
+    notes: args.notes,
+  });
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+}
+
+// ---------------------------------------------------------------
+// FIFO allocation across batches
+// ---------------------------------------------------------------
+//
+// Moving stock for a PRODUCT (not a specific batch) — pull oldest sell-by
+// first. Used by sale fulfilment, store replenishment, and anywhere the
+// UI says "deduct N pieces of this product" without picking a batch.
+
+export interface FifoMoveResult {
+  planProductId: string;
+  quantity: number;
+}
+
+export interface FifoMoveArgs {
+  productId: string;
+  fromLocation: StockLocation;
+  toLocation: StockLocation | null; // null = outake (sale/waste)
+  quantity: number;
+  orderId?: string;
+  reason?: StockMovementReason | string;
+  movedBy?: string;
+  notes?: string;
+}
+
+/** Move up to `quantity` pieces of `productId` from `fromLocation`, FIFO by
+ *  batch sell-by (oldest first). Returns which batches were drained and by
+ *  how much. Short-stocks silently (returns less than requested) — callers
+ *  are expected to check the sum for shortfall handling. */
+export async function moveProductStockFifo(args: FifoMoveArgs): Promise<FifoMoveResult[]> {
+  const wanted = Math.max(0, Math.round(args.quantity));
+  if (wanted === 0) return [];
+
+  // Candidate batches in `fromLocation` for this product.
+  const batches = assertOk(
+    await supabase.from("planProducts").select("*").eq("productId", args.productId),
+  ) as PlanProduct[];
+  if (batches.length === 0) return [];
+  const batchIds = batches.map((b) => b.id!);
+  const plans = assertOk(
+    await supabase.from("productionPlans").select("id, completedAt").in("id", batches.map((b) => b.planId)),
+  ) as Array<{ id: string; completedAt?: string | Date | null }>;
+  const planById = new Map(plans.map((p) => [p.id, p] as const));
+  const fromOrderId = args.fromLocation === "allocated" ? args.orderId ?? null : null;
+  const locsQ = supabase
+    .from("stockLocations")
+    .select("*")
+    .eq("location", args.fromLocation)
+    .in("planProductId", batchIds);
+  const locs = assertOk(
+    await (fromOrderId == null ? locsQ.is("orderId", null) : locsQ.eq("orderId", fromOrderId)),
+  ) as StockLocationRow[];
+
+  // Sort by production-plan completedAt ASC (oldest first). Batches without
+  // a completedAt sort last — they're not yet in stock anyway.
+  const product = assertOkMaybe(
+    await supabase.from("products").select("shelfLifeWeeks").eq("id", args.productId).maybeSingle(),
+  ) as { shelfLifeWeeks?: string } | null;
+  const shelfWeeks = product?.shelfLifeWeeks ? parseFloat(product.shelfLifeWeeks) : NaN;
+  const WEEK = 7 * 24 * 60 * 60 * 1000;
+  const batchById = new Map(batches.map((b) => [b.id!, b] as const));
+  const sellByFor = (planProductId: string): number => {
+    const b = batchById.get(planProductId);
+    if (!b) return Infinity;
+    const plan = planById.get(b.planId);
+    if (!plan?.completedAt) return Infinity;
+    const completed = new Date(plan.completedAt).getTime();
+    if (b.defrostedAt && b.preservedShelfLifeDays != null) {
+      return b.defrostedAt + b.preservedShelfLifeDays * 24 * 60 * 60 * 1000;
+    }
+    return !isNaN(shelfWeeks) && shelfWeeks > 0 ? completed + shelfWeeks * WEEK : completed;
+  };
+  const sorted = [...locs].sort(
+    (a, b) => sellByFor(a.planProductId) - sellByFor(b.planProductId),
+  );
+
+  const results: FifoMoveResult[] = [];
+  let remaining = wanted;
+  for (const row of sorted) {
+    if (remaining <= 0) break;
+    const take = Math.min(row.quantity, remaining);
+    if (take <= 0) continue;
+    const batch = batchById.get(row.planProductId)!;
+    if (args.toLocation) {
+      await transferBatchStock({
+        planProductId: row.planProductId,
+        productId: batch.productId,
+        fromLocation: args.fromLocation,
+        toLocation: args.toLocation,
+        quantity: take,
+        orderId: args.orderId,
+        reason: args.reason,
+        movedBy: args.movedBy,
+        notes: args.notes,
+      });
+    } else {
+      await outakeBatchStock({
+        planProductId: row.planProductId,
+        productId: batch.productId,
+        fromLocation: args.fromLocation,
+        quantity: take,
+        orderId: args.orderId,
+        reason: args.reason ?? "sold",
+        movedBy: args.movedBy,
+        notes: args.notes,
+      });
+    }
+    results.push({ planProductId: row.planProductId, quantity: take });
+    remaining -= take;
+  }
+  return results;
+}
+
+// ---------------------------------------------------------------
+// Waste log
+// ---------------------------------------------------------------
+
+export function useWasteLog(productId?: string): WasteLogEntry[] {
+  const { data } = useQuery({
+    queryKey: ["waste-log", productId ?? "all"],
+    queryFn: async () => {
+      const q = supabase.from("wasteLog").select("*").order("loggedAt", { ascending: false });
+      return assertOk(
+        await (productId ? q.eq("productId", productId) : q),
+      ) as WasteLogEntry[];
+    },
+  });
+  return data ?? [];
+}
+
+export async function logBatchWaste(entry: Omit<WasteLogEntry, "id" | "loggedAt"> & { loggedAt?: Date }): Promise<string> {
+  const id = newId();
+  const { error } = await supabase.from("wasteLog").insert({
+    id,
+    ...entry,
+    loggedAt: entry.loggedAt ?? new Date(),
+  });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["waste-log"] });
+  return id;
+}
+
+// ---------------------------------------------------------------
+// Unmould intake + waste
+// ---------------------------------------------------------------
+
+export interface UnmouldIntakeArgs {
+  planProductId: string;
+  productId: string;
+  /** Pieces that came out of the mould and are now in Production Storage. */
+  actualYield: number;
+  /** Pieces that were planned (moulds × cavities). The difference goes to waste. */
+  planned: number;
+  reason?: string;
+  movedBy?: string;
+}
+
+/** Single entry-point for unmould completion. Lands `actualYield` pieces in
+ *  Production Storage via a stockLocations row + movement, and logs any
+ *  yield shortfall in wasteLog. Idempotent on re-run for the same
+ *  planProductId by checking for an existing `reason='unmould'` movement. */
+export async function recordUnmouldIntake(args: UnmouldIntakeArgs): Promise<void> {
+  const yielded = Math.max(0, Math.round(args.actualYield));
+  const planned = Math.max(0, Math.round(args.planned));
+
+  const existing = assertOk(
+    await supabase
+      .from("stockMovements")
+      .select("id")
+      .eq("planProductId", args.planProductId)
+      .eq("reason", "unmould")
+      .limit(1),
+  ) as Array<{ id: string }>;
+  if (existing.length > 0) return;
+
+  if (yielded > 0) {
+    await intakeBatchStock({
+      planProductId: args.planProductId,
+      productId: args.productId,
+      toLocation: "production",
+      quantity: yielded,
+      reason: "unmould",
+      movedBy: args.movedBy,
+      notes: args.reason,
+    });
+  }
+  const waste = Math.max(0, planned - yielded);
+  if (waste > 0) {
+    await logBatchWaste({
+      planProductId: args.planProductId,
+      productId: args.productId,
+      quantity: waste,
+      reason: args.reason,
+      loggedBy: args.movedBy,
+    });
+  }
+}
+
+/** After an unmould yield is recorded, warn if any open order for the same
+ *  product has a deadline so close that the remaining planned production
+ *  (across all not-yet-done plans for this product) plus current stock in
+ *  Production Storage may not cover it. Pure computation — no DB writes. */
+export async function checkDeadlineImpactForProduct(productId: string): Promise<Array<{
+  orderId: string;
+  orderName: string;
+  deadline: Date;
+  required: number;
+  projected: number;
+  shortfall: number;
+}>> {
+  const [openOrders, orderItems, batches, donePlans, stockLocations] = await Promise.all([
+    supabase.from("orders").select("*").in("status", ["pending", "in_production"]).then((r) => assertOk(r) as Order[]),
+    supabase.from("orderItems").select("*").eq("productId", productId).then((r) => assertOk(r) as OrderItem[]),
+    supabase.from("planProducts").select("*").eq("productId", productId).then((r) => assertOk(r) as PlanProduct[]),
+    supabase.from("productionPlans").select("id, status, completedAt").then((r) => assertOk(r) as Array<Pick<ProductionPlan, "id" | "status" | "completedAt">>),
+    supabase.from("stockLocations").select("*").eq("location", "production").then((r) => assertOk(r) as StockLocationRow[]),
+  ]);
+
+  const planById = new Map(donePlans.map((p) => [p.id, p] as const));
+  const mouldIds = Array.from(new Set(batches.map((b) => b.mouldId).filter(Boolean)));
+  const moulds = mouldIds.length > 0
+    ? (assertOk(await supabase.from("moulds").select("*").in("id", mouldIds)) as Mould[])
+    : [];
+  const mouldById = new Map(moulds.map((m) => [m.id!, m] as const));
+
+  // Total stock currently in Production Storage for this product.
+  const batchIds = new Set(batches.map((b) => b.id!));
+  const stockOnHand = stockLocations
+    .filter((r) => batchIds.has(r.planProductId))
+    .reduce((acc, r) => acc + r.quantity, 0);
+
+  // Planned capacity from every not-yet-done plan batch for this product,
+  // minus the yield the batch has already produced.
+  const remainingPlanned = batches.reduce((acc, pb) => {
+    const plan = planById.get(pb.planId);
+    if (plan?.status === "done") return acc;
+    const mould = mouldById.get(pb.mouldId);
+    if (!mould) return acc;
+    const expected = mould.numberOfCavities * pb.quantity;
+    const yielded = pb.actualYield ?? 0;
+    return acc + Math.max(0, expected - yielded);
+  }, 0);
+
+  const projected = stockOnHand + remainingPlanned;
+
+  const ordersById = new Map(openOrders.map((o) => [o.id!, o] as const));
+  const ordersWithItem = orderItems
+    .map((oi) => ({ order: ordersById.get(oi.orderId), quantity: oi.quantity }))
+    .filter((x): x is { order: Order; quantity: number } => !!x.order);
+
+  let running = projected;
+  const issues: Array<{ orderId: string; orderName: string; deadline: Date; required: number; projected: number; shortfall: number }> = [];
+  // Walk orders in deadline order — earliest first consumes projected first.
+  ordersWithItem.sort((a, b) => new Date(a.order.deadline).getTime() - new Date(b.order.deadline).getTime());
+  for (const { order, quantity } of ordersWithItem) {
+    const shortfall = Math.max(0, quantity - running);
+    if (shortfall > 0) {
+      issues.push({
+        orderId: order.id!,
+        orderName: order.customerName || order.eventName || "Order",
+        deadline: new Date(order.deadline),
+        required: quantity,
+        projected: Math.max(0, running),
+        shortfall,
+      });
+    }
+    running = Math.max(0, running - quantity);
+  }
+  return issues;
 }

@@ -538,6 +538,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
   const [fillingBuffer, setFillingBuffer] = useState<string>("");
   const [warnThreshold, setWarnThreshold] = useState<string>("");
   const [criticalThreshold, setCriticalThreshold] = useState<string>("");
+  const [expiryWarnDays, setExpiryWarnDays] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
 
@@ -548,6 +549,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
     setFillingBuffer(config?.fillingBufferPercent != null ? String(config.fillingBufferPercent) : "");
     setWarnThreshold(config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "");
     setCriticalThreshold(config?.criticalThresholdPercent != null ? String(config.criticalThresholdPercent) : "");
+    setExpiryWarnDays(config?.stockExpiryWarnDays != null ? String(config.stockExpiryWarnDays) : "");
     setSyncedAt(configKey);
     onDirtyChange(false);
   }
@@ -556,7 +558,8 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
     capacityBuffer !== (config?.capacityBufferPercent != null ? String(config.capacityBufferPercent) : "") ||
     fillingBuffer !== (config?.fillingBufferPercent != null ? String(config.fillingBufferPercent) : "") ||
     warnThreshold !== (config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "") ||
-    criticalThreshold !== (config?.criticalThresholdPercent != null ? String(config.criticalThresholdPercent) : "")
+    criticalThreshold !== (config?.criticalThresholdPercent != null ? String(config.criticalThresholdPercent) : "") ||
+    expiryWarnDays !== (config?.stockExpiryWarnDays != null ? String(config.stockExpiryWarnDays) : "")
   );
 
   useEffect(() => { onDirtyChange(isDirty); }, [isDirty]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -569,6 +572,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
         fillingBufferPercent: parsePercent(fillingBuffer),
         warnThresholdPercent: parsePercent(warnThreshold),
         criticalThresholdPercent: parsePercent(criticalThreshold),
+        stockExpiryWarnDays: parseNonNegativeInt(expiryWarnDays),
       });
     } finally {
       setSaving(false);
@@ -580,6 +584,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
     fillingBufferPercent: parsePercent(fillingBuffer),
     warnThresholdPercent: parsePercent(warnThreshold),
     criticalThresholdPercent: parsePercent(criticalThreshold),
+    stockExpiryWarnDays: parseNonNegativeInt(expiryWarnDays),
   };
   const status = capacityConfigStatus(previewConfig, people);
   const knownRoles = collectRoles(people);
@@ -694,6 +699,22 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
                 Dashboard shows a critical alert at this % — the day is effectively full.
               </p>
             </div>
+          </div>
+          <div>
+            <label className="label">Stock expiry warn window (days)</label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={expiryWarnDays}
+              onChange={(e) => setExpiryWarnDays(e.target.value)}
+              placeholder="e.g. 7"
+              className="input"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Batches with this many days or fewer until their sell-by date appear
+              in the dashboard expiry widget.
+            </p>
           </div>
         </div>
       </section>
@@ -2073,6 +2094,12 @@ function parsePositiveInt(s: string): number | undefined {
 function parsePercent(s: string): number | undefined {
   const n = parseFloat(s);
   if (isNaN(n) || n < 0 || n > 100) return undefined;
+  return n;
+}
+
+function parseNonNegativeInt(s: string): number | undefined {
+  const n = parseInt(s, 10);
+  if (isNaN(n) || n < 0) return undefined;
   return n;
 }
 

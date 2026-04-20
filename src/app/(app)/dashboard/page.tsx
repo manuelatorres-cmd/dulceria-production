@@ -8,16 +8,20 @@ import {
   useProductionSteps, useCapacityConfig, usePeople, usePersonUnavailability,
   useBlockedDays, useProductCategories, useMouldsList, useIngredients,
   updateScheduleStatus, useEquipment,
+  useProductLocationTotals, useStockLocationMinimums, useAllPlanProducts,
+  useProductionPlans, DEFAULT_LOCATION_MINIMUM,
+  useFillings, useFillingCategories, useFillingStockItems,
 } from "@/lib/hooks";
 import { buildSchedule } from "@/lib/scheduler";
 import { capacityConfigStatus } from "@/lib/capacity";
 import { equipmentReadiness } from "@/lib/equipment";
 import { computeShoppingNeeds } from "@/lib/shopping-needs";
-import { ORDER_CHANNEL_LABELS, ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS, type ProductFilling, type FillingIngredient, type ProductionScheduleEntry } from "@/types";
+import { computeWeeklyFillingNeeds } from "@/lib/weeklyFilling";
+import { ORDER_CHANNEL_LABELS, ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS, STOCK_LOCATION_SHORT_LABELS, type ProductFilling, type FillingIngredient, type ProductionScheduleEntry, type StockLocation } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import { AlertTriangle, Clock, CheckCircle, Calendar, ShoppingCart } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle, Calendar, ShoppingCart, Flame } from "lucide-react";
 
 const LEVEL_STYLE: Record<string, string> = {
   ok: "bg-status-ok-bg text-status-ok border-status-ok-edge",
@@ -121,6 +125,93 @@ export default function DashboardPage() {
   );
   const shortages = shopping.rows.filter((r) => r.shortageG > 0);
 
+  // Stock — below minimum by (product, location)
+  const locationTotals = useProductLocationTotals();
+  const locationMinimums = useStockLocationMinimums();
+  const lowStock = useMemo(() => {
+    const minByKey = new Map<string, number>();
+    for (const m of locationMinimums) {
+      minByKey.set(`${m.productId}:${m.location}`, m.minimumUnits);
+    }
+    const relevant: StockLocation[] = ["store", "production"];
+    const rows: Array<{ productId: string; productName: string; location: StockLocation; quantity: number; minimum: number }> = [];
+    for (const [productId, totals] of locationTotals) {
+      const product = productMap.get(productId);
+      if (!product) continue;
+      for (const loc of relevant) {
+        const minimum = minByKey.get(`${productId}:${loc}`) ?? DEFAULT_LOCATION_MINIMUM;
+        const qty = totals[loc] ?? 0;
+        if (qty < minimum) {
+          rows.push({ productId, productName: product.name, location: loc, quantity: qty, minimum });
+        }
+      }
+    }
+    return rows.sort((a, b) => (a.quantity / Math.max(1, a.minimum)) - (b.quantity / Math.max(1, b.minimum)));
+  }, [locationTotals, locationMinimums, productMap]);
+
+  // Filling cooking list — next 7 days
+  const fillingsList = useFillings(true);
+  const fillingCategoriesList = useFillingCategories(true);
+  const fillingStockItems = useFillingStockItems();
+  const weeklyFilling = useMemo(() => {
+    const windowEnd = new Date();
+    windowEnd.setDate(windowEnd.getDate() + 7);
+    return computeWeeklyFillingNeeds({
+      orders,
+      orderItems,
+      products,
+      productFillings,
+      fillingIngredients,
+      fillings: fillingsList,
+      fillingCategories: fillingCategoriesList,
+      moulds,
+      fillingStock: fillingStockItems,
+      fillingBufferPercent: config?.fillingBufferPercent,
+      windowEnd,
+    });
+  }, [orders, orderItems, products, productFillings, fillingIngredients, fillingsList, fillingCategoriesList, moulds, fillingStockItems, config?.fillingBufferPercent]);
+  const fillingsToCook = weeklyFilling.needs.filter((n) => n.toCookBufferedG > 0);
+
+  // Expiry — batches whose sell-by falls within the configured warn window.
+  const allPlanProducts = useAllPlanProducts();
+  const allPlans = useProductionPlans();
+  const planById = useMemo(() => new Map(allPlans.map((p) => [p.id!, p])), [allPlans]);
+  const expiryWarn = useMemo(() => {
+    const days = config?.stockExpiryWarnDays;
+    if (days == null || days < 0) return [];
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+    const WEEK = 7 * DAY;
+    const rows: Array<{ planProductId: string; productName: string; batchNumber?: string; sellBy: Date; remainingDays: number; pieces: number }> = [];
+    for (const pb of allPlanProducts) {
+      if (pb.stockStatus === "gone") continue;
+      const pieces = (pb.currentStock ?? pb.actualYield ?? 0) + (pb.frozenQty ?? 0);
+      if (pieces <= 0) continue;
+      const product = productMap.get(pb.productId);
+      if (!product?.shelfLifeWeeks) continue;
+      const plan = planById.get(pb.planId);
+      if (!plan?.completedAt) continue;
+      const completed = new Date(plan.completedAt).getTime();
+      const shelfWeeks = parseFloat(product.shelfLifeWeeks);
+      if (!Number.isFinite(shelfWeeks) || shelfWeeks <= 0) continue;
+      const sellByMs = pb.defrostedAt && pb.preservedShelfLifeDays != null
+        ? pb.defrostedAt + pb.preservedShelfLifeDays * DAY
+        : completed + shelfWeeks * WEEK;
+      const remainingDays = Math.round((sellByMs - now) / DAY);
+      if (remainingDays <= days) {
+        rows.push({
+          planProductId: pb.id!,
+          productName: product.name,
+          batchNumber: plan.batchNumber,
+          sellBy: new Date(sellByMs),
+          remainingDays,
+          pieces,
+        });
+      }
+    }
+    return rows.sort((a, b) => a.remainingDays - b.remainingDays);
+  }, [allPlanProducts, productMap, planById, config?.stockExpiryWarnDays]);
+
   // Alert list (top banner)
   const alerts: { level: "warn" | "critical"; text: string; href: string }[] = [];
   if (!configStatus.isComplete) alerts.push({ level: "warn", text: `Capacity config incomplete (${configStatus.missing.length} missing)`, href: "/settings" });
@@ -129,6 +220,8 @@ export default function DashboardPage() {
   if (overdue.length > 0) alerts.push({ level: "critical", text: `${overdue.length} order${overdue.length > 1 ? "s" : ""} past deadline`, href: "/orders" });
   if (warnOrCritical.length > 0) alerts.push({ level: warnOrCritical.some((d) => d.level !== "warn") ? "critical" : "warn", text: `${warnOrCritical.length} day${warnOrCritical.length > 1 ? "s" : ""} over capacity threshold in the next week`, href: "/plan" });
   if (shortages.length > 0) alerts.push({ level: "warn", text: `${shortages.length} ingredient${shortages.length > 1 ? "s" : ""} short for open orders`, href: "/shopping" });
+  if (lowStock.length > 0) alerts.push({ level: "warn", text: `${lowStock.length} product/location below minimum`, href: "/stock" });
+  if (expiryWarn.length > 0) alerts.push({ level: expiryWarn.some((r) => r.remainingDays <= 0) ? "critical" : "warn", text: `${expiryWarn.length} batch${expiryWarn.length > 1 ? "es" : ""} approaching sell-by`, href: "/stock" });
 
   return (
     <div>
@@ -273,6 +366,109 @@ export default function DashboardPage() {
             </ul>
           )}
         </section>
+
+        {/* Filling cooking list — next 7 days */}
+        {fillingsToCook.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
+                <Flame className="w-4 h-4" /> Fillings to cook — next 7 days
+              </h2>
+              <Link href="/plan/fillings" className="text-xs text-primary hover:underline">Full list →</Link>
+            </div>
+            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              {fillingsToCook.slice(0, 5).map((need) => {
+                const daysToCook = Math.round((need.cookByDate.getTime() - Date.now()) / 86_400_000);
+                const cls = daysToCook <= 0 ? "text-status-alert" : daysToCook <= 2 ? "text-status-warn" : "text-muted-foreground";
+                return (
+                  <li key={need.fillingId} className="flex items-center px-3 py-2 text-sm gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate">
+                        <span className="font-medium">{need.fillingName}</span>
+                        {need.shared && (
+                          <span className="ml-1.5 text-[10px] text-primary">· shared</span>
+                        )}
+                      </p>
+                      <p className={`text-[11px] ${cls}`}>
+                        cook by {need.cookByDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                      </p>
+                    </div>
+                    <span className="text-xs font-medium tabular-nums shrink-0">
+                      {need.toCookBufferedG >= 1000 ? `${(need.toCookBufferedG / 1000).toFixed(1)} kg` : `${need.toCookBufferedG} g`}
+                    </span>
+                  </li>
+                );
+              })}
+              {fillingsToCook.length > 5 && (
+                <li className="px-3 py-2 text-xs text-muted-foreground text-center">
+                  +{fillingsToCook.length - 5} more
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+
+        {/* Stock below minimum */}
+        {lowStock.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4" /> Stock below minimum
+              </h2>
+              <Link href="/stock" className="text-xs text-primary hover:underline">Stock page →</Link>
+            </div>
+            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              {lowStock.slice(0, 6).map((row) => (
+                <li key={`${row.productId}:${row.location}`} className="flex items-center px-3 py-2 text-sm">
+                  <span className="flex-1 truncate">{row.productName}</span>
+                  <span className="text-xs text-muted-foreground mr-3">{STOCK_LOCATION_SHORT_LABELS[row.location]}</span>
+                  <span className="text-xs font-medium text-status-warn tabular-nums">{row.quantity} / {row.minimum} pcs</span>
+                </li>
+              ))}
+              {lowStock.length > 6 && (
+                <li className="px-3 py-2 text-xs text-muted-foreground text-center">
+                  +{lowStock.length - 6} more
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+
+        {/* Expiry warnings */}
+        {expiryWarn.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
+                <Clock className="w-4 h-4" /> Approaching sell-by
+              </h2>
+              <Link href="/stock" className="text-xs text-primary hover:underline">Stock page →</Link>
+            </div>
+            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              {expiryWarn.slice(0, 6).map((row) => {
+                const expired = row.remainingDays <= 0;
+                return (
+                  <li key={row.planProductId} className="flex items-center px-3 py-2 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate">{row.productName}</p>
+                      {row.batchNumber && (
+                        <p className="font-mono text-[10px] text-muted-foreground">{row.batchNumber}</p>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground mr-3 tabular-nums">{row.pieces} pcs</span>
+                    <span className={`text-xs font-medium tabular-nums ${expired ? "text-status-alert" : "text-status-warn"}`}>
+                      {expired ? "expired" : `${row.remainingDays}d left`}
+                    </span>
+                  </li>
+                );
+              })}
+              {expiryWarn.length > 6 && (
+                <li className="px-3 py-2 text-xs text-muted-foreground text-center">
+                  +{expiryWarn.length - 6} more
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
 
         {/* Shopping shortages */}
         {shortages.length > 0 && (

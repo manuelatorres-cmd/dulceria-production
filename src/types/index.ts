@@ -1057,7 +1057,22 @@ export interface CapacityConfig {
   /** Filling-specific overproduction buffer (0–100). Filling batches
    *  scale up by this factor to cover yield loss during production. */
   fillingBufferPercent?: number;
+  /** Days before sell-by that a stock batch starts appearing on the
+   *  dashboard expiry warning list. */
+  stockExpiryWarnDays?: number;
   updatedAt?: Date;
+}
+
+/** One waste entry, typically created at unmould when actual yield falls
+ *  short of the planned (moulds × cavities) count. */
+export interface WasteLogEntry {
+  id?: string;
+  planProductId?: string;
+  productId: string;
+  quantity: number;
+  reason?: string;
+  loggedBy?: string;
+  loggedAt: Date;
 }
 
 /**
@@ -1271,4 +1286,78 @@ export interface EventCalendarEntry {
   notes?: string;
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+// --- Stock locations (4-location model — §6 of the handover) ---
+
+export const STOCK_LOCATIONS = ["store", "production", "freezer", "allocated"] as const;
+export type StockLocation = (typeof STOCK_LOCATIONS)[number];
+
+export const STOCK_LOCATION_LABELS: Record<StockLocation, string> = {
+  store: "Physical Store",
+  production: "Production Storage",
+  freezer: "Freezer",
+  allocated: "Allocated",
+};
+
+export const STOCK_LOCATION_SHORT_LABELS: Record<StockLocation, string> = {
+  store: "Store",
+  production: "Production",
+  freezer: "Freezer",
+  allocated: "Allocated",
+};
+
+/** Movement reason classifications written by the app. Free-text on the
+ *  server — this list is the one the UI uses consistently. */
+export type StockMovementReason =
+  | "unmould"
+  | "freeze"
+  | "defrost"
+  | "transfer"
+  | "allocate"
+  | "unallocate"
+  | "sold"
+  | "waste"
+  | "breakage"
+  | "recount"
+  | "initial_backfill";
+
+/** Per-batch, per-location quantity. Batch count = SUM(quantity) across
+ *  a planProductId. `orderId` is set iff location === 'allocated'. */
+export interface StockLocationRow {
+  id?: string;
+  planProductId: string;
+  location: StockLocation;
+  /** Only set when location === 'allocated'. */
+  orderId?: string;
+  quantity: number;
+  updatedAt: Date;
+}
+
+/** Append-only audit log. `fromLocation`/`toLocation` null when the
+ *  movement crosses a system boundary (intake from unmould, sale, waste). */
+export interface StockMovement {
+  id?: string;
+  planProductId: string;
+  productId: string;
+  fromLocation?: StockLocation;
+  toLocation?: StockLocation;
+  quantity: number;
+  orderId?: string;
+  reason?: StockMovementReason | string;
+  movedBy?: string;
+  notes?: string;
+  movedAt: Date;
+}
+
+/** Per-product, per-location minimum stock level. Supersedes the
+ *  channel-based `stockMinimums` from migration 0002 for new UI. */
+export interface StockLocationMinimum {
+  id?: string;
+  productId: string;
+  location: StockLocation;
+  minimumUnits: number;
+  reorderPoint?: number;
+  notes?: string;
+  updatedAt: Date;
 }
