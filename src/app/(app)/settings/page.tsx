@@ -1516,7 +1516,7 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className={kind === "cooling_system" ? "grid grid-cols-1 gap-3" : "grid grid-cols-3 gap-3"}>
         <div>
           <label className="label">Type</label>
           <select
@@ -1529,36 +1529,40 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
             ))}
           </select>
         </div>
-        <div>
-          <label className="label">Quantity</label>
-          <input
-            type="number"
-            min="1"
-            step="1"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            placeholder="e.g. 2"
-            className="input"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            How many identical units.
-          </p>
-        </div>
-        <div>
-          <label className="label">Throughput (kg/hour)</label>
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            value={kgPerHour}
-            onChange={(e) => setKgPerHour(e.target.value)}
-            placeholder="e.g. 5"
-            className="input"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Per unit.
-          </p>
-        </div>
+        {kind !== "cooling_system" && (
+          <>
+            <div>
+              <label className="label">Quantity</label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="e.g. 2"
+                className="input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                How many identical units.
+              </p>
+            </div>
+            <div>
+              <label className="label">Throughput (kg/hour)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={kgPerHour}
+                onChange={(e) => setKgPerHour(e.target.value)}
+                placeholder="e.g. 5"
+                className="input"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Per unit.
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -229,7 +229,29 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
   }
 
   return (
-    <form onSubmit={handleSubmit} onChange={() => onDirtyChange?.(true)} className="space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      onChange={() => onDirtyChange?.(true)}
+      onKeyDown={(e) => {
+        // Pressing Enter in any single-line input shouldn't save the form —
+        // it should just move focus to the next field (the normal tab flow).
+        // Textareas keep their default Enter-for-newline behaviour; the
+        // explicit Update button still works as the way to save.
+        if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
+          e.preventDefault();
+          const form = e.currentTarget;
+          const fields = Array.from(
+            form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+              "input, textarea, select",
+            ),
+          ).filter((el) => !el.disabled && el.type !== "hidden");
+          const i = fields.indexOf(e.target);
+          const next = fields[i + 1];
+          if (next) next.focus();
+        }
+      }}
+      className="space-y-4"
+    >
       {sec === "details" && (
         <>
           <div>

@@ -1296,15 +1296,26 @@ export interface PersonUnavailability {
 
 // --- Equipment ---------------------------------------------------------
 
-export const EQUIPMENT_KINDS = ["tempering", "melting_pot", "coating_belt", "other"] as const;
+export const EQUIPMENT_KINDS = ["tempering", "melting_pot", "coating_belt", "cooling_system", "other"] as const;
 export type EquipmentKind = (typeof EQUIPMENT_KINDS)[number];
 
 export const EQUIPMENT_KIND_LABELS: Record<EquipmentKind, string> = {
   tempering: "Tempering machine",
   melting_pot: "Melting pot",
   coating_belt: "Coating belt",
+  cooling_system: "Cooling system",
   other: "Other",
 };
+
+/** Equipment kinds that participate in throughput scheduling and therefore
+ *  require quantity + kgPerHour fields. Cooling systems (fridges / freezers)
+ *  are tracked for HACCP temperature logs only and don't need them. */
+export const THROUGHPUT_EQUIPMENT_KINDS: ReadonlySet<EquipmentKind> = new Set([
+  "tempering",
+  "melting_pot",
+  "coating_belt",
+  "other",
+]);
 
 /** Derived availability status shown on the Equipment list. The stored
  *  columns `currentPlanId`/`currentScheduleId`/`occupiedSince` drive it;

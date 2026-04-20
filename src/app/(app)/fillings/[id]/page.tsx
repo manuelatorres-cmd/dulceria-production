@@ -324,20 +324,6 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                 placeholder="Describe this step…"
               />
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleSave}
-                className="btn-primary px-3 py-1.5"
-              >
-                Save
-              </button>
-              <button
-                onClick={handleCancel}
-                className="btn-secondary px-3 py-1.5"
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         ) : (
           /* ── Read-only view ── */
@@ -473,6 +459,24 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
           {editing && (
             <div className="mt-2">
               <AddFillingIngredient fillingId={fillingId} onAdded={handleIngredientChanged} />
+            </div>
+          )}
+          {/* Save / Cancel live at the bottom, below the ingredients, so they
+              stay visible after scrolling through a long ingredient list. */}
+          {editing && (
+            <div className="mt-6 pt-4 border-t border-border flex gap-2">
+              <button
+                onClick={handleSave}
+                className="btn-primary px-4 py-2"
+              >
+                Save
+              </button>
+              <button
+                onClick={handleCancel}
+                className="btn-secondary px-4 py-2"
+              >
+                Cancel
+              </button>
             </div>
           )}
         </div>

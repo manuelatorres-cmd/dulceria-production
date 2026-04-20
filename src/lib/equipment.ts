@@ -7,6 +7,7 @@
  */
 
 import type { Equipment, EquipmentAvailability } from "@/types";
+import { THROUGHPUT_EQUIPMENT_KINDS } from "@/types";
 
 export function equipmentAvailability(eq: Equipment): EquipmentAvailability {
   if (eq.archived) return "archived";
@@ -27,16 +28,21 @@ export interface EquipmentReadiness {
   incompleteCount: number;
 }
 
-/** Summary used by the Settings UI banner + (later) the scheduler gate. */
+/** Summary used by the Settings UI banner + (later) the scheduler gate.
+ *  Only throughput-bearing kinds (tempering, melting_pot, coating_belt,
+ *  other) need quantity + kgPerHour. Cooling systems are HACCP-only and
+ *  always count as complete. */
 export function equipmentReadiness(all: Equipment[]): EquipmentReadiness {
   const active = all.filter((e) => !e.archived);
-  const incomplete = active.filter(
-    (e) =>
+  const incomplete = active.filter((e) => {
+    if (!THROUGHPUT_EQUIPMENT_KINDS.has(e.kind)) return false;
+    return (
       typeof e.quantity !== "number" ||
       e.quantity <= 0 ||
       typeof e.kgPerHour !== "number" ||
-      e.kgPerHour <= 0,
-  );
+      e.kgPerHour <= 0
+    );
+  });
   return {
     isComplete: active.length > 0 && incomplete.length === 0,
     incompleteCount: incomplete.length,

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductFillingHistory, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, setPlanProductStockStatus, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels } from "@/lib/hooks";
+import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductFillingHistory, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, setPlanProductStockStatus, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList } from "@/lib/hooks";
 import { SHELL_TECHNIQUES, DECORATION_MATERIAL_TYPE_LABELS, DECORATION_APPLY_AT_OPTIONS, normalizeApplyAt, type ShellDesignStep, type ShellDesignApplyAt, type ProductCostSnapshot, type BreakdownEntry, type ProductFilling, costPerGram, type DecorationMaterial, allergenLabel, type FillMode } from "@/types";
 import { colorToCSS } from "@/lib/colors";
 import { deserializeBreakdown, enrichBreakdownLabels, formatCost, costDelta, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -33,6 +33,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const productCategories = useProductCategories();
   const productCategory = useProductCategory(product?.productCategoryId);
   const shellCapableIngredients = useShellCapableIngredients();
+  // All products (incl. archived) so the tag autocomplete picks up every
+  // tag ever used across the catalogue, not just the active subset.
+  const allProducts = useProductsList(true);
+  const knownTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of allProducts) for (const t of p.tags ?? []) set.add(t);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allProducts]);
   const coatings = useCoatings();
   const sym = useCurrencySymbol();
 
@@ -161,6 +169,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     }
     return min !== null ? { weeks: min, fillingName: limitingFilling! } : null;
   }, [productFillings, allFillings]);
+
+  // Auto-populate shelf life from the fillings' recommendation whenever
+  // the product doesn't have one set. Once the user types a custom value,
+  // we leave it alone — even if fillings change. They can still click the
+  // "Suggested: X weeks" link below to overwrite with the new recommendation.
+  useEffect(() => {
+    if (!product) return;
+    if (localShelfLife.trim() !== "") return;
+    if (!recommendedShelfLife) return;
+    setLocalShelfLife(String(recommendedShelfLife.weeks));
+  }, [product?.id, recommendedShelfLife]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -648,12 +667,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <div className="flex gap-2">
             <input
               type="text"
+              list="product-tag-suggestions"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddTag(tagInput); } }}
               placeholder="Add tag (e.g. christmas)"
               className="input"
             />
+            {knownTags.length > 0 && (
+              <datalist id="product-tag-suggestions">
+                {knownTags.filter((t) => !localTags.includes(t)).map((t) => (
+                  <option key={t} value={t} />
+                ))}
+              </datalist>
+            )}
             <button
               onClick={() => handleAddTag(tagInput)}
               disabled={!tagInput.trim()}
