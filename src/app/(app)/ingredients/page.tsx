@@ -546,7 +546,7 @@ function IngredientsTab() {
                                 {ing.allergens.filter((a) => VALID_TAGS.has(a)).length > 0 && (
                                   <div className="flex flex-wrap gap-1 mt-1">
                                     {ing.allergens.filter((a) => VALID_TAGS.has(a)).map((a) => (
-                                      <span key={a} className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px]">
+                                      <span key={a} className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold">
                                         {allergenLabel(a)}
                                       </span>
                                     ))}

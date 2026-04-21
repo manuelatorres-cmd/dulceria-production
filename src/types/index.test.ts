@@ -159,10 +159,14 @@ describe("getAllergensByRegion", () => {
     expect(getAllergensByRegion("US")).toBe(US_ALLERGENS);
   });
 
-  it("EU list contains 14 allergen entries (gluten-containing cereals counts as one)", () => {
-    // 13 non-nut entries + shared TREE_NUTS (9 subtypes incl. pine for Canada)
-    expect(EU_ALLERGENS.filter(a => !a.group)).toHaveLength(13); // 14 declared allergens minus nuts (expanded)
+  it("EU list contains 14 allergen entries + an alcohol advisory flag (gluten-containing cereals counts as one)", () => {
+    // 14 non-nut entries (13 EU-14 allergens minus nuts + the custom
+    // 'alcohol' advisory tag) + shared TREE_NUTS (9 subtypes incl.
+    // pine for Canada). Alcohol is not an EU FIC allergen but rides
+    // on the same UI for customer advisory use.
+    expect(EU_ALLERGENS.filter(a => !a.group)).toHaveLength(14);
     expect(EU_ALLERGENS.filter(a => a.group === "nuts")).toHaveLength(9);
+    expect(EU_ALLERGENS.some(a => a.id === "alcohol")).toBe(true);
   });
 
   it("EU list includes allergens absent from US list (celery, mustard, lupin, molluscs, sulphites)", () => {

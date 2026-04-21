@@ -4332,9 +4332,54 @@ export async function deleteOrder(id: string): Promise<void> {
 
 export async function saveOrderItem(item: Omit<OrderItem, "id"> & { id?: string }): Promise<string> {
   if (item.id) {
+    // Pre-read the existing row so we can reconcile allocations when
+    // either the fulfilmentMode or the borrowed quantity changes.
+    // Without this, flipping a line produce→borrow (or the reverse) or
+    // bumping a borrow-line's quantity would leave stockLocations out
+    // of sync with the saved line.
+    const existing = assertOkMaybe(
+      await supabase.from("orderItems").select("*").eq("id", item.id).maybeSingle(),
+    ) as OrderItem | null;
+
     const { error } = await supabase.from("orderItems").update(item).eq("id", item.id);
     if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ["order-items"] });
+
+    if (existing) {
+      const wasBorrow = existing.fulfilmentMode === "borrow";
+      const isBorrow = (item.fulfilmentMode ?? existing.fulfilmentMode) === "borrow";
+      if (wasBorrow && !isBorrow) {
+        // borrow → produce: release the whole allocation.
+        await deallocateLineToStore({ orderId: item.orderId, productId: item.productId });
+      } else if (!wasBorrow && isBorrow) {
+        // produce → borrow: pull the new quantity from Store.
+        await allocateLineFromStore({
+          orderId: item.orderId,
+          productId: item.productId,
+          quantity: item.quantity,
+        });
+      } else if (wasBorrow && isBorrow && existing.quantity !== item.quantity) {
+        // borrow → borrow with qty change: adjust the allocation delta.
+        const delta = item.quantity - existing.quantity;
+        if (delta > 0) {
+          await allocateLineFromStore({
+            orderId: item.orderId,
+            productId: item.productId,
+            quantity: delta,
+          });
+        } else if (delta < 0) {
+          // Return the over-allocated portion. deallocateLineToStore
+          // currently releases the whole line — fall back to a direct
+          // FIFO move for partial returns.
+          await partialDeallocateFromStore({
+            orderId: item.orderId,
+            productId: item.productId,
+            quantity: -delta,
+          });
+        }
+      }
+    }
+
     await onOrderItemChanged(item.orderId);
     return item.id;
   }
@@ -4509,23 +4554,73 @@ async function deallocateLineToStore(args: {
   }
 }
 
+/** Return only part of an order+product's allocation back to Store.
+ *  Used when a borrow line's quantity is reduced (e.g. customer trims
+ *  the order from 20 → 12 — we must release 8 pieces, not all 20).
+ *  Walks allocated rows LIFO by quantity and peels pieces off until
+ *  the target is met. Caller guarantees `quantity` ≤ total allocated. */
+async function partialDeallocateFromStore(args: {
+  orderId: string; productId: string; quantity: number;
+}): Promise<void> {
+  if (args.quantity <= 0) return;
+  const batches = assertOk(
+    await supabase.from("planProducts").select("id").eq("productId", args.productId),
+  ) as Array<{ id: string }>;
+  if (batches.length === 0) return;
+  const allocated = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("*")
+      .eq("orderId", args.orderId)
+      .eq("location", "allocated")
+      .in("planProductId", batches.map((b) => b.id)),
+  ) as StockLocationRow[];
+
+  let remaining = args.quantity;
+  for (const row of allocated) {
+    if (remaining <= 0) break;
+    const take = Math.min(row.quantity, remaining);
+    await transferBatchStock({
+      planProductId: row.planProductId,
+      productId: args.productId,
+      fromLocation: "allocated",
+      toLocation: "store",
+      quantity: take,
+      orderId: args.orderId,
+      reason: "allocate",
+    });
+    remaining -= take;
+  }
+}
+
 /** Hook called after any orderItem change. Keeps the linked Shop
  *  Replenishment order (channel='shop' + sourceOrderId=parent) in sync
  *  with the current set of borrowed lines. No-op for parent orders
- *  that have no borrowed items. */
+ *  that have no borrowed items.
+ *
+ *  NOTE: production batches are NOT auto-created from orders anymore
+ *  (owner request). A batch is a physical production run and lives on
+ *  the /production page; orders instead link into an existing batch
+ *  via `orderItems.linkedBatchId`. The syncProductionBatchForOrder
+ *  helper is kept for manual callers but nothing triggers it on
+ *  order-item changes. */
 async function onOrderItemChanged(orderId: string): Promise<void> {
   const order = assertOkMaybe(
     await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
   ) as Order | null;
   if (!order) return;
-  // Every order (parent or replenishment) with produce-fresh lines gets
-  // an auto-batch on the production board. Keeps /production in sync
-  // without the user clicking + every time.
-  await syncProductionBatchForOrder(orderId);
   // A replenishment order is itself a 'shop' order with sourceOrderId set —
   // we never recursively generate children for children.
   if (order.channel === "shop" && order.sourceOrderId) return;
   await syncReplenishmentOrder(orderId);
+}
+
+/** Short day+month label for fallback names — "05 Mar", "21 Apr".
+ *  Used when an order has no customer / event / sourceRef to anchor a
+ *  name on. Locale-stable across browsers because we pin en-GB. */
+function formatOrderDate(iso: string | Date): string {
+  const d = iso instanceof Date ? iso : new Date(iso);
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
 
 /** Keep a single auto-batch in sync with an order's produce-fresh lines.
@@ -4601,9 +4696,19 @@ export async function syncProductionBatchForOrder(orderId: string): Promise<void
   const mouldById = new Map(moulds.map((m) => [m.id, m]));
 
   const now = new Date();
-  // Create the batch if missing.
+  // Create the batch if missing. Batch name inherits the order's
+  // human-facing label — customer name, event, or the external source
+  // ref if the order came from an import. Falls back to the creation
+  // date, never the raw UUID (was "Order: abc12345…" — useless in
+  // Active batches). Replenishment orders already carry "Shop
+  // Replenishment — …" as customerName; that flows through unchanged.
   let planId = existing?.id;
-  const batchName = `Order: ${order.customerName || order.eventName || orderId.slice(0, 8)}`;
+  const orderLabel = order.customerName?.trim()
+    || order.eventName?.trim()
+    || order.sourceRef?.trim()
+    || null;
+  const batchName = orderLabel
+    ?? `Order — ${formatOrderDate(order.createdAt ?? now.toISOString())}`;
   if (!planId) {
     planId = newId();
     const { error } = await supabase.from("productionPlans").insert({
@@ -4704,27 +4809,44 @@ export async function syncReplenishmentOrder(parentOrderId: string): Promise<voi
   // before. Set the deadline to 08:00 of the opening day.
   deadline.setHours(8, 0, 0, 0);
 
+  // Name anchors on whatever's most distinctive about the parent:
+  // its external ref (imported orders), its customer name, or the
+  // deadline date. Never the raw UUID — the name shows up in Active
+  // batches and the Orders list, so it has to be human-readable.
+  const parentRef = parent.sourceRef?.trim()
+    || parent.customerName?.trim()
+    || parent.eventName?.trim()
+    || formatOrderDate(parent.deadline);
+  const replenishmentName = `Shop Replenishment — ${parentRef}`;
+
   let childId = existing?.id;
   if (!childId) {
     childId = newId();
     const { error } = await supabase.from("orders").insert({
       id: childId,
       channel: "shop",
-      customerName: "Shop Replenishment",
+      customerName: replenishmentName,
       deadline: deadline.toISOString(),
       priority: parent.priority,
       status: "pending",
-      notes: `Auto-created to restock Store after borrowing for order ${parentOrderId.slice(0, 8)}.`,
+      notes: `Auto-created to restock Store after borrowing for ${parentRef}.`,
       sourceOrderId: parentOrderId,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
     if (error) throw error;
   } else {
-    // Keep deadline + priority fresh in case the parent changed.
+    // Keep deadline + priority + name fresh in case the parent changed.
+    // The name anchors on parent.sourceRef/customerName, so a late
+    // rename propagates to the replenishment order automatically.
     await supabase
       .from("orders")
-      .update({ deadline: deadline.toISOString(), priority: parent.priority, updatedAt: new Date() })
+      .update({
+        customerName: replenishmentName,
+        deadline: deadline.toISOString(),
+        priority: parent.priority,
+        updatedAt: new Date(),
+      })
       .eq("id", childId);
   }
 

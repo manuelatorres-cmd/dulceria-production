@@ -13,6 +13,7 @@ import {
   useProductLocationTotals,
   useReplenishmentOrderFor,
   useCustomerProductPrices,
+  useProductionPlans, useAllPlanProducts,
 } from "@/lib/hooks";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
@@ -39,6 +40,7 @@ import {
   type Packaging, type OrderPackagingLine,
   type ProductCostSnapshot, type PackagingOrder,
   type OrderItem, type Customer, type CustomerType,
+  type ProductionPlan,
 } from "@/types";
 import { ArrowLeft, Plus, Trash2, X, Pencil, AlertTriangle, Calendar, Package, UserPlus, User } from "lucide-react";
 
@@ -66,6 +68,32 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const unavailability = usePersonUnavailability();
   const blocked = useBlockedDays();
   const productLocationTotals = useProductLocationTotals();
+  const allPlans = useProductionPlans();
+  const allPlanProducts = useAllPlanProducts();
+
+  // For the "Batch" picker per line: which active batches contain this
+  // product? An active batch is anything not marked done; users can
+  // pick one as the fulfilment source. Empty list → "No batch linked"
+  // flag with a CTA to create one on /production.
+  const activeBatchesByProduct = useMemo(() => {
+    const byPlan = new Map<string, Set<string>>();
+    for (const pp of allPlanProducts) {
+      const set = byPlan.get(pp.planId) ?? new Set<string>();
+      set.add(pp.productId);
+      byPlan.set(pp.planId, set);
+    }
+    const out = new Map<string, ProductionPlan[]>();
+    for (const plan of allPlans) {
+      if (plan.status === "done") continue;
+      const prods = byPlan.get(plan.id!) ?? new Set<string>();
+      for (const pid of prods) {
+        const arr = out.get(pid) ?? [];
+        arr.push(plan);
+        out.set(pid, arr);
+      }
+    }
+    return out;
+  }, [allPlans, allPlanProducts]);
 
   // Latest product unit cost + packaging unit cost, shared with the quote flow.
   const { data: costSnapshots = [] } = useQuery({
@@ -513,6 +541,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   product={productMap.get(item.productId)}
                   short={shortProductIds.has(item.productId)}
                   resolveProductPrice={resolveProductPrice}
+                  availableBatches={activeBatchesByProduct.get(item.productId) ?? []}
                 />
               ))}
             </ul>
@@ -747,11 +776,27 @@ function OrderEditForm({ order, onSaved, onCancel }: {
                 })}
                 <button
                   type="button"
-                  onClick={() => { setAddingCustomer(true); setCustomerListOpen(false); }}
+                  onClick={async () => {
+                    const name = customerQuery.trim();
+                    // Quick-add path: if the user has typed a name that
+                    // doesn't match any existing customer, create one
+                    // right now with just companyName — the remaining
+                    // fields (type, contacts, address) can be filled in
+                    // later from /customers. Keeps the order entry fast
+                    // and matches the "type → save" reflex.
+                    if (name) {
+                      const id = await saveCustomer({ companyName: name, tags: [] });
+                      pickCustomer({ id, companyName: name, tags: [] } as Customer);
+                      setCustomerListOpen(false);
+                    } else {
+                      setAddingCustomer(true);
+                      setCustomerListOpen(false);
+                    }
+                  }}
                   className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm border-t border-border bg-muted/40 hover:bg-muted text-primary font-medium"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  {customerQuery.trim() ? `+ New customer "${customerQuery.trim()}"` : "+ New customer"}
+                  {customerQuery.trim() ? `+ Add "${customerQuery.trim()}" as customer` : "+ New customer with details…"}
                 </button>
               </div>
             )}
@@ -857,7 +902,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   );
 }
 
-function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, onCancel }: {
+function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, onSaved, onCancel }: {
   orderId: string;
   nextSortOrder: number;
   products: { id?: string; name: string; archived?: boolean }[];
@@ -873,11 +918,13 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, o
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [addedCount, setAddedCount] = useState(0);
   const productInputRef = useRef<HTMLInputElement>(null);
 
   const qty = parseInt(quantity, 10);
   const canSave = !!productId && !isNaN(qty) && qty > 0 && !saving;
+  // `productInputRef` is kept so the field autofocuses on mount but is
+  // no longer re-focused post-save (the panel closes instead).
+  void productInputRef;
 
   const matches = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
@@ -909,18 +956,15 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, o
         orderId,
         productId,
         quantity: qty,
-        sortOrder: nextSortOrder + addedCount,
+        sortOrder: nextSortOrder,
         notes: notes.trim() || undefined,
         unitPrice: Number.isFinite(priceNum) && priceNum >= 0 ? priceNum : undefined,
       });
-      setProductId("");
-      setProductQuery("");
-      setPickerOpen(true);
-      setQuantity("1");
-      setUnitPriceInput("");
-      setNotes("");
-      setAddedCount((n) => n + 1);
-      productInputRef.current?.focus();
+      // One-shot add: close the panel after a successful save instead
+      // of re-opening the picker and looping. The user clicks + again
+      // when they want another line — fewer "how do I get out of this?"
+      // moments. The AddOrderLine panel dismounts here.
+      onSaved();
     } catch (err) {
       const raw: { message?: string; code?: string; details?: string } =
         err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
@@ -1010,13 +1054,8 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, o
           {saving ? "Adding…" : "Add"}
         </button>
         <button onClick={onCancel} className="rounded-full border border-border px-3 py-1 text-xs">
-          Done
+          Cancel
         </button>
-        {addedCount > 0 && (
-          <span className="text-[11px] text-muted-foreground">
-            {addedCount} line{addedCount === 1 ? "" : "s"} added
-          </span>
-        )}
       </div>
       {saveError && (
         <p className="text-xs text-status-alert">{saveError}</p>
@@ -1025,11 +1064,12 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, o
   );
 }
 
-function OrderLineRow({ item, product, short, resolveProductPrice }: {
+function OrderLineRow({ item, product, short, resolveProductPrice, availableBatches }: {
   item: OrderItem;
   product?: { id?: string; name: string; defaultVatRate?: number };
   short: boolean;
   resolveProductPrice: (productId: string) => ReturnType<typeof resolveUnitPrice>;
+  availableBatches: ProductionPlan[];
 }) {
   const productName = product?.name ?? item.productId;
   const [pendingRemove, setPendingRemove] = useState(false);
@@ -1071,6 +1111,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice }: {
         fulfilmentMode: item.fulfilmentMode,
         unitPrice: item.unitPrice,
         vatRate: item.vatRate,
+        linkedBatchId: item.linkedBatchId,
         ...patch,
       });
     } catch (err) {
@@ -1293,6 +1334,38 @@ function OrderLineRow({ item, product, short, resolveProductPrice }: {
         )}
       </div>
       {saveError && <p className="text-[11px] text-status-alert mt-1">{saveError}</p>}
+
+      {/* Batch link — borrow lines don't need one (Store stock is their
+          batch). Produce lines either link to an existing active batch
+          or flag a missing-batch CTA so the user creates one on the
+          Production page and returns here to pick it. */}
+      {!isBorrow && (
+        <div className="mt-2 flex items-center gap-2 text-[11px]">
+          <span className="text-muted-foreground shrink-0">Batch:</span>
+          {availableBatches.length > 0 ? (
+            <select
+              value={item.linkedBatchId ?? ""}
+              onChange={(e) => persistLine({ linkedBatchId: e.target.value || undefined })}
+              className="input !w-auto !text-xs !py-0.5 flex-1 min-w-0"
+            >
+              <option value="">— No batch —</option>
+              {availableBatches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-status-warn">No active batch for this product.</span>
+              <Link href="/production/new" className="text-primary hover:underline shrink-0">
+                Create batch →
+              </Link>
+            </span>
+          )}
+          {!item.linkedBatchId && availableBatches.length > 0 && (
+            <span className="text-status-warn shrink-0">Unlinked — will not schedule</span>
+          )}
+        </div>
+      )}
     </li>
   );
 }

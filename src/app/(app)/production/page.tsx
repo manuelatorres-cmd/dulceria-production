@@ -3,10 +3,11 @@
 import {
   useProductionPlans, useProductsList, useMouldsList,
   useAllPlanProducts, useAllPlanStepStatuses, deleteProductionPlan,
-  useProductionSchedule, useOrders,
+  useProductionSchedule, useOrders, useAllOrderItems,
   useCapacityConfig, usePeople, usePersonUnavailability, useBlockedDays,
 } from "@/lib/hooks";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
+import { timeBandFor, TIME_BAND_LABEL } from "@/lib/scheduler";
 import { PageHeader } from "@/components/page-header";
 import { Plus, Trash2, ChevronRight, ChevronDown, BookOpen, Search, StickyNote, Copy, Calendar } from "lucide-react";
 import { CollapseControls } from "@/components/pantry";
@@ -32,6 +33,7 @@ export default function ProductionPage() {
   const moulds = useMouldsList(true);
   const allPlanProducts = useAllPlanProducts();
   const allStepStatuses = useAllPlanStepStatuses();
+  const allOrderItems = useAllOrderItems();
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [view, setView] = useState<"active" | "scheduled" | "history">("active");
@@ -41,6 +43,20 @@ export default function ProductionPage() {
 
   const productMap = useMemo(() => new Map(products.map((r) => [r.id!, r])), [products]);
   const mouldMap = useMemo(() => new Map(moulds.map((m) => [m.id!, m])), [moulds]);
+
+  // Ordered-quantity lookup for auto-batches so the Production page can
+  // show "N pcs ordered · M pcs produced" without each PlanRow doing its
+  // own fetch. Indexed by orderId → productId → summed quantity.
+  const orderedByOrderProduct = useMemo(() => {
+    const m = new Map<string, Map<string, number>>();
+    for (const oi of allOrderItems) {
+      if ((oi.fulfilmentMode ?? "produce") !== "produce") continue;
+      const byProd = m.get(oi.orderId) ?? new Map<string, number>();
+      byProd.set(oi.productId, (byProd.get(oi.productId) ?? 0) + oi.quantity);
+      m.set(oi.orderId, byProd);
+    }
+    return m;
+  }, [allOrderItems]);
 
   // One pass over all PlanProduct rows → Map<planId, PlanProduct[]>
   const planProductsByPlan = useMemo(() => {
@@ -273,6 +289,7 @@ export default function ProductionPage() {
                           doneKeys={doneKeysByPlan.get(plan.id!) ?? EMPTY_SET}
                           productMap={productMap}
                           mouldMap={mouldMap}
+                          orderedForPlan={plan.sourceOrderId ? orderedByOrderProduct.get(plan.sourceOrderId) : undefined}
                           confirmDeleteId={confirmDeleteId}
                           onConfirmDelete={setConfirmDeleteId}
                           onDelete={async (id) => { await deleteProductionPlan(id); setConfirmDeleteId(null); }}
@@ -294,6 +311,7 @@ export default function ProductionPage() {
                 doneKeys={doneKeysByPlan.get(plan.id!) ?? EMPTY_SET}
                 productMap={productMap}
                 mouldMap={mouldMap}
+                orderedForPlan={plan.sourceOrderId ? orderedByOrderProduct.get(plan.sourceOrderId) : undefined}
                 confirmDeleteId={confirmDeleteId}
                 onConfirmDelete={setConfirmDeleteId}
                 onDelete={async (id) => { await deleteProductionPlan(id); setConfirmDeleteId(null); }}
@@ -307,6 +325,27 @@ export default function ProductionPage() {
 }
 
 const EMPTY_SET: Set<string> = new Set();
+
+interface BatchTotals {
+  ordered: number;
+  produced: number;
+  totalMoulds: number;
+  cavitiesLabel: string | null;
+}
+
+/** Render the batch header's quantity line. When the plan is linked
+ *  to an order, both sides are shown so the user sees ordered vs the
+ *  mould-wave yield (waves overshoot because cavities don't
+ *  fractionalise). Manual batches have no order — skip ordered. */
+function formatBatchTotals(t: BatchTotals): string {
+  const mouldPart = t.totalMoulds > 0
+    ? ` (${t.totalMoulds} mould${t.totalMoulds === 1 ? "" : "s"}${t.cavitiesLabel ? ` × ${t.cavitiesLabel}` : ""})`
+    : "";
+  if (t.ordered > 0) {
+    return `${t.ordered} pcs ordered · ${t.produced} pcs produced${mouldPart}`;
+  }
+  return `${t.produced} pcs produced${mouldPart}`;
+}
 
 // Key formats (must stay in sync with production.ts generateSteps):
 //   colour:  color-{planProductId}  or  color-{planProductId}-{i}
@@ -332,7 +371,7 @@ function lastActivityForProduct(planProductId: string, doneKeys: Set<string>): s
 }
 
 function PlanRow({
-  plan, planProducts, doneKeys, productMap, mouldMap,
+  plan, planProducts, doneKeys, productMap, mouldMap, orderedForPlan,
   confirmDeleteId, onConfirmDelete, onDelete,
 }: {
   plan: ProductionPlan;
@@ -340,18 +379,44 @@ function PlanRow({
   doneKeys: Set<string>;
   productMap: Map<string, Product>;
   mouldMap: Map<string, Mould>;
+  /** productId → ordered pieces, from the plan's linked order. Undefined
+   *  when the plan isn't order-backed (manual batches). */
+  orderedForPlan: Map<string, number> | undefined;
   confirmDeleteId: string | null;
   onConfirmDelete: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const totalProducts = useMemo(
-    () => planProducts.reduce((sum, pb) => {
-      if (pb.actualYield != null) return sum + pb.actualYield;
+  // Totals for the batch header. We show "N ordered · M produced
+  // (moulds × cavities)" so the user sees both sides of the mould-wave
+  // at a glance: what the customer asked for vs what the wave yields.
+  // When all planProducts share one mould, cavities is a single number;
+  // mixed-mould batches collapse to "mixed" to keep the header terse.
+  const totals = useMemo(() => {
+    let produced = 0;
+    let totalMoulds = 0;
+    const cavitiesSeen = new Set<number>();
+    for (const pb of planProducts) {
       const mould = mouldMap.get(pb.mouldId);
-      return sum + (mould ? mould.numberOfCavities * pb.quantity : 0);
-    }, 0),
-    [planProducts, mouldMap]
-  );
+      const cav = mould?.numberOfCavities ?? 0;
+      if (cav > 0) cavitiesSeen.add(cav);
+      totalMoulds += pb.quantity;
+      if (pb.actualYield != null) produced += pb.actualYield;
+      else produced += cav * pb.quantity;
+    }
+    let ordered = 0;
+    if (orderedForPlan) {
+      for (const pb of planProducts) {
+        ordered += orderedForPlan.get(pb.productId) ?? 0;
+      }
+    }
+    const cavitiesLabel = cavitiesSeen.size === 1
+      ? `${[...cavitiesSeen][0]} cavities`
+      : cavitiesSeen.size > 1
+        ? "mixed cavities"
+        : null;
+    return { ordered, produced, totalMoulds, cavitiesLabel };
+  }, [planProducts, mouldMap, orderedForPlan]);
+  const totalProducts = totals.produced;
 
   const daysSinceCreated = Math.floor((Date.now() - new Date(plan.createdAt).getTime()) / 86_400_000);
   const ageLabel = plan.status === "done"
@@ -396,7 +461,7 @@ function PlanRow({
                 {planProducts.length > 0 && (
                   <>
                     {totalProducts > 0 && (
-                      <p className="text-xs font-medium mt-0.5">{totalProducts} products total</p>
+                      <p className="text-xs font-medium mt-0.5">{formatBatchTotals(totals)}</p>
                     )}
                     <ul className="mt-1 space-y-0.5">
                       {planProducts.map((pb) => {
@@ -429,7 +494,7 @@ function PlanRow({
             {plan.status !== "done" && planProducts.length > 0 && (
               <>
                 {totalProducts > 0 && (
-                  <p className="text-xs font-medium mt-1.5">{totalProducts} products total</p>
+                  <p className="text-xs font-medium mt-1.5">{formatBatchTotals(totals)}</p>
                 )}
                 <ul className="mt-1 space-y-0.5">
                   {planProducts.map((pb) => {
@@ -665,9 +730,7 @@ function ScheduleStepRow({ group, productMap, order }: {
   }[statusForChip];
   const allDone = group.every((e) => e.status === "done");
 
-  const timeStr = new Date(head.startAt).toLocaleTimeString([], {
-    hour: "2-digit", minute: "2-digit", hour12: false,
-  });
+  const band = TIME_BAND_LABEL[timeBandFor(head.startAt)];
   const totalMinutes = group.reduce((s, e) => s + e.durationMinutes, 0);
   const productNames = Array.from(new Set(group.map((e) => productMap.get(e.productId)?.name ?? e.productId)));
   const productLabel = productNames.length === 1
@@ -677,7 +740,9 @@ function ScheduleStepRow({ group, productMap, order }: {
 
   return (
     <li className={`flex items-center gap-3 px-3 py-2 text-sm ${allDone ? "opacity-60" : ""}`}>
-      <span className="tabular-nums text-muted-foreground w-11 shrink-0">{timeStr}</span>
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
+        {band}
+      </span>
       <div className="flex-1 min-w-0">
         <p className={`truncate ${allDone ? "line-through" : ""}`}>
           <span className="font-medium">{head.phase}</span>

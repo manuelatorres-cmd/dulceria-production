@@ -652,6 +652,11 @@ export const EU_ALLERGENS: AllergenInfo[] = [
   { id: "sulphites",    label: "Sulphur dioxide & sulphites", hint: ">10 mg/kg or 10 mg/litre expressed as SO₂" },
   { id: "lupin",        label: "Lupin",                     hint: "including lupin flour and seeds" },
   { id: "molluscs",     label: "Molluscs",                  hint: "clams, mussels, oysters, scallops, snails, squid" },
+  // Advisory ingredient flag — not part of the EU FIC 14 allergens but
+  // surfaced on the same UI so the user can tag alcohol-containing
+  // ingredients (rum, Grand Marnier, kirsch…) for customers who need
+  // to know (children, pregnancy, religious diets).
+  { id: "alcohol",      label: "Alcohol",                   hint: "rum, liqueurs, wine, beer — flag any ethanol-containing ingredient" },
 ];
 
 /** UK — same 14 EU allergens (Assimilated FIC + Natasha's Law 2021).
@@ -1419,8 +1424,16 @@ export interface Person {
   name: string;
   /** Free-text role labels, e.g. ["chocolatier", "owner"]. */
   roles?: string[];
-  /** Typical availability per working day (hours, ≤ 24). */
+  /** Typical availability per working day (hours, ≤ 24).
+   *  Legacy field; `startTimeOfDay` / `endTimeOfDay` take precedence
+   *  when both are set, for a precise work window. */
   defaultHoursPerDay?: number;
+  /** Daily work window start (24h "HH:MM" or "HH:MM:SS"). When set
+   *  together with `endTimeOfDay`, the scheduler uses (end-start) as
+   *  this person's contribution to daily capacity. Range 07:00–23:00. */
+  startTimeOfDay?: string;
+  /** Daily work window end. Must be later than `startTimeOfDay`. */
+  endTimeOfDay?: string;
   /** Days this person works, independent of the workshop. */
   workingDays?: Weekday[];
   /** Soft-delete — archived people are excluded from scheduling
@@ -1583,6 +1596,10 @@ export interface OrderItem {
   /** Per-line VAT rate override (percent). Null → fall back to the
    *  product's defaultVatRate, then the app default (10%). */
   vatRate?: number;
+  /** References the productionPlan this line is fulfilled from.
+   *  Nullable — unlinked lines surface as "No batch" on the order UI
+   *  and the user is prompted to create / pick a batch. */
+  linkedBatchId?: string;
 }
 
 /** One row on the production schedule — the scheduler's output. One per

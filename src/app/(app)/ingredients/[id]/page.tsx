@@ -282,7 +282,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
                     {tags.map((a) => (
                       <span
                         key={a}
-                        className="rounded-full bg-status-warn-bg text-status-warn border border-status-warn-edge px-3 py-1 text-sm font-medium"
+                        className="rounded-full bg-status-warn-bg text-status-warn border border-status-warn-edge px-3 py-1 text-sm font-bold"
                       >
                         {allergenLabel(a)}
                       </span>

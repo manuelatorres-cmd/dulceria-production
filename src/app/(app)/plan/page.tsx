@@ -6,10 +6,10 @@ import { PageHeader } from "@/components/page-header";
 import {
   useOrders, useAllOrderItems, useProductsList, useProductionSteps,
   useCapacityConfig, usePeople, usePersonUnavailability, useBlockedDays,
-  useProductCategories, useMouldsList,
+  useProductCategories, useMouldsList, useProductionPlans, useAllPlanProducts,
   useProductionSchedule, replaceProductionSchedule, updateScheduleStatus,
 } from "@/lib/hooks";
-import { buildSchedule } from "@/lib/scheduler";
+import { buildSchedule, timeBandFor, TIME_BAND_LABEL } from "@/lib/scheduler";
 import { capacityConfigStatus } from "@/lib/capacity";
 import { RefreshCw, AlertTriangle, CheckCircle, Flame } from "lucide-react";
 import type { ProductionScheduleEntry } from "@/types";
@@ -32,18 +32,47 @@ export default function PlanPage() {
   const blockedDays = useBlockedDays();
   const categories = useProductCategories(true);
   const moulds = useMouldsList(true);
+  const plans = useProductionPlans();
+  const planProducts = useAllPlanProducts();
   const stored = useProductionSchedule();
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
   const mouldMap = useMemo(() => new Map(moulds.map((m) => [m.id!, m])), [moulds]);
   const orderMap = useMemo(() => new Map(orders.map((o) => [o.id!, o])), [orders]);
+  const planMap = useMemo(() => new Map(plans.map((p) => [p.id!, p])), [plans]);
+  const planProductsByPlan = useMemo(() => {
+    const m = new Map<string, typeof planProducts>();
+    for (const pp of planProducts) {
+      const arr = m.get(pp.planId) ?? [];
+      arr.push(pp);
+      m.set(pp.planId, arr);
+    }
+    return m;
+  }, [planProducts]);
+  // Earliest-linked-order label per batch — powers "[N moulds] — [Order ref]".
+  const batchOrderRef = useMemo(() => {
+    const best = new Map<string, { ref: string; deadline: string }>();
+    for (const oi of orderItems) {
+      if (!oi.linkedBatchId) continue;
+      const order = orderMap.get(oi.orderId);
+      if (!order) continue;
+      const cur = best.get(oi.linkedBatchId);
+      if (!cur || order.deadline < cur.deadline) {
+        best.set(oi.linkedBatchId, {
+          ref: order.customerName || order.eventName || order.sourceRef || "order",
+          deadline: order.deadline,
+        });
+      }
+    }
+    return best;
+  }, [orderItems, orderMap]);
   const categoryNameById = useMemo(
     () => new Map(categories.map((c) => [c.id!, c.name])),
     [categories],
   );
 
   const [regenerating, setRegenerating] = useState(false);
-  const [lastResult, setLastResult] = useState<{ warnings: string[]; unscheduledOrderIds: string[]; count: number } | null>(null);
+  const [lastResult, setLastResult] = useState<{ warnings: string[]; unscheduledPlanIds: string[]; count: number } | null>(null);
   const [regenerateError, setRegenerateError] = useState("");
 
   const configStatus = capacityConfigStatus(config, people);
@@ -51,20 +80,27 @@ export default function PlanPage() {
   // Preview the schedule that WOULD result from current inputs (without writing)
   const preview = useMemo(
     () => buildSchedule({
-      orders, orderItems, products, productionSteps, moulds,
+      plans, planProducts, orders, orderItems, products, productionSteps, moulds,
       config, people, unavailability, blockedDays, categoryNameById,
     }),
-    [orders, orderItems, products, productionSteps, moulds, config, people, unavailability, blockedDays, categoryNameById],
+    [plans, planProducts, orders, orderItems, products, productionSteps, moulds, config, people, unavailability, blockedDays, categoryNameById],
   );
 
-  // Group stored schedule rows by date
-  const storedByDate = useMemo(() => {
-    const m = new Map<string, ProductionScheduleEntry[]>();
+  // Group stored schedule rows into (date → planId → entries). Each
+  // resulting (date, planId) pair renders as ONE row on the plan view:
+  // "[Product] — [N] moulds — [Order ref]", with the band derived
+  // from the earliest entry's startAt.
+  const batchesByDate = useMemo(() => {
+    // date → planId → entries
+    const m = new Map<string, Map<string, ProductionScheduleEntry[]>>();
     for (const row of stored) {
       const date = row.startAt.slice(0, 10);
-      const arr = m.get(date) ?? [];
+      const planId = row.planId ?? row.orderId ?? "__unassigned";
+      const byPlan = m.get(date) ?? new Map<string, ProductionScheduleEntry[]>();
+      const arr = byPlan.get(planId) ?? [];
       arr.push(row);
-      m.set(date, arr);
+      byPlan.set(planId, arr);
+      m.set(date, byPlan);
     }
     return m;
   }, [stored]);
@@ -76,7 +112,7 @@ export default function PlanPage() {
       await replaceProductionSchedule(preview.entries);
       setLastResult({
         warnings: preview.warnings,
-        unscheduledOrderIds: preview.unscheduledOrderIds,
+        unscheduledPlanIds: preview.unscheduledPlanIds,
         count: preview.entries.length,
       });
     } catch (err) {
@@ -129,11 +165,11 @@ export default function PlanPage() {
           <div className="text-sm">
             <p className="text-muted-foreground">
               {preview.entries.length} task{preview.entries.length !== 1 ? "s" : ""} would be scheduled from{" "}
-              {orders.filter((o) => o.status === "pending" || o.status === "in_production").length} open order{orders.filter((o) => o.status === "pending" || o.status === "in_production").length !== 1 ? "s" : ""}.
+              {plans.filter((p) => p.status !== "done").length} active batch{plans.filter((p) => p.status !== "done").length !== 1 ? "es" : ""}.
             </p>
             {hasStored && (
               <p className="text-xs text-muted-foreground">
-                Saved plan: {stored.length} task{stored.length !== 1 ? "s" : ""} across {storedByDate.size} day{storedByDate.size !== 1 ? "s" : ""}.
+                Saved plan: {stored.length} task{stored.length !== 1 ? "s" : ""} across {batchesByDate.size} day{batchesByDate.size !== 1 ? "s" : ""}.
               </p>
             )}
           </div>
@@ -224,45 +260,80 @@ export default function PlanPage() {
           </section>
         )}
 
-        {/* Saved daily tasks */}
+        {/* Saved plan — one row per active batch per day, labelled
+            "[Product] — [N] moulds — [Order ref]". The time band comes
+            from the batch's earliest phase that day; subsequent phases
+            are rolled into a "Phase → Phase → …" trail. */}
         {hasStored ? (
           <section>
-            <h2 className="text-sm font-semibold text-primary mb-2">Saved tasks</h2>
+            <h2 className="text-sm font-semibold text-primary mb-2">Saved plan</h2>
             <div className="space-y-3">
-              {[...storedByDate.keys()].sort().map((date) => {
-                const rows = storedByDate.get(date)!;
-                const uniqueMoulds = new Set(rows.map((r) => r.mouldId).filter(Boolean) as string[]);
+              {[...batchesByDate.keys()].sort().map((date) => {
+                const byPlan = batchesByDate.get(date)!;
+                // Sort batches within the day by earliest phase startAt.
+                const batchRows = [...byPlan.entries()]
+                  .map(([planId, entries]) => {
+                    entries.sort((a, b) => a.startAt.localeCompare(b.startAt));
+                    return { planId, entries };
+                  })
+                  .sort((a, b) => a.entries[0].startAt.localeCompare(b.entries[0].startAt));
                 return (
                   <div key={date} className="rounded-lg border border-border bg-card overflow-hidden">
                     <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border">
                       <span className="text-sm font-medium">{formatDayLabel(date)}</span>
                       <span className="text-xs text-muted-foreground">
-                        {rows.length} task{rows.length !== 1 ? "s" : ""}
-                        {uniqueMoulds.size > 0 && ` · ${uniqueMoulds.size} mould${uniqueMoulds.size !== 1 ? "s" : ""}`}
+                        {batchRows.length} batch{batchRows.length !== 1 ? "es" : ""}
                       </span>
                     </div>
                     <ul className="divide-y divide-border">
-                      {rows.map((row) => {
-                        const product = productMap.get(row.productId);
-                        const mould = row.mouldId ? mouldMap.get(row.mouldId) : undefined;
-                        const order = row.orderId ? orderMap.get(row.orderId) : undefined;
+                      {batchRows.map(({ planId, entries }) => {
+                        const plan = planMap.get(planId);
+                        const pps = plan ? (planProductsByPlan.get(planId) ?? []) : [];
+                        const productNames = Array.from(new Set(
+                          pps.length > 0
+                            ? pps.map((pp) => productMap.get(pp.productId)?.name ?? pp.productId)
+                            : entries.map((e) => productMap.get(e.productId)?.name ?? e.productId),
+                        ));
+                        const totalMoulds = pps.reduce((s, pp) => s + pp.quantity, 0);
+                        const firstEntry = entries[0];
+                        const band = TIME_BAND_LABEL[timeBandFor(firstEntry.startAt)];
+                        const phaseSeq = Array.from(new Set(entries.map((e) => e.phase)));
+                        const orderRef = batchOrderRef.get(planId)?.ref
+                          ?? (firstEntry.orderId ? orderMap.get(firstEntry.orderId)?.customerName : undefined)
+                          ?? null;
+                        const batchLabel = [
+                          productNames.length === 1
+                            ? productNames[0]
+                            : `${productNames.length} products`,
+                          totalMoulds > 0 ? `${totalMoulds} mould${totalMoulds === 1 ? "" : "s"}` : null,
+                          orderRef,
+                        ].filter(Boolean).join(" — ");
                         return (
-                          <li key={row.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                          <li key={planId} className="flex items-center gap-2 px-3 py-2 text-sm">
+                            <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
+                              {band}
+                            </span>
                             <div className="flex-1 min-w-0">
                               <p className="truncate">
-                                <span className="font-medium">{row.phase}</span>
-                                <span className="text-muted-foreground"> · {product?.name ?? row.productId}</span>
+                                <Link
+                                  href={plan ? `/production/${encodeURIComponent(plan.id!)}` : "/production"}
+                                  className="font-medium hover:underline"
+                                >
+                                  {plan?.name ?? batchLabel}
+                                </Link>
+                                {plan && productNames.length > 0 && (
+                                  <span className="text-muted-foreground"> — {batchLabel}</span>
+                                )}
                               </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {row.durationMinutes} min
-                                {mould && ` · ${mould.name}`}
-                                {order && ` · ${order.customerName || order.eventName || "order"}`}
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                {phaseSeq.join(" → ")}
+                                {productNames.length > 1 && ` · ${productNames.join(", ")}`}
                               </p>
                             </div>
                             <select
-                              value={row.status}
+                              value={firstEntry.status}
                               onChange={async (e) => {
-                                if (row.id) await updateScheduleStatus(row.id, e.target.value as ProductionScheduleEntry["status"]);
+                                if (firstEntry.id) await updateScheduleStatus(firstEntry.id, e.target.value as ProductionScheduleEntry["status"]);
                               }}
                               className="input !w-auto text-xs !py-1"
                             >
@@ -283,7 +354,7 @@ export default function PlanPage() {
           </section>
         ) : (
           <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-lg">
-            No plan saved yet. Click Regenerate to compute one from your open orders.
+            No plan saved yet. Click Regenerate to compute one from your active batches.
           </p>
         )}
       </div>

@@ -42,8 +42,7 @@ export function capacityConfigStatus(
     missing.push("At least one person");
   } else {
     const anyConfigured = activePeople.some(
-      (p) =>
-        typeof p.defaultHoursPerDay === "number" && p.defaultHoursPerDay > 0 &&
+      (p) => personHoursPerDay(p) > 0 &&
         Array.isArray(p.workingDays) && p.workingDays.length > 0,
     );
     if (!anyConfigured) {
@@ -61,6 +60,11 @@ export function capacityConfigStatus(
  *   - person.archived
  *   - per-person unavailability ranges (inclusive, by ISO date)
  *   - workshop-wide eventCalendar(kind='blocked') entries
+ *
+ * When a person has both `startTimeOfDay` and `endTimeOfDay` set, the
+ * window duration (end−start) is used. Otherwise we fall back to
+ * `defaultHoursPerDay`. This lets users configure precise 07:00–23:00
+ * windows per employee without breaking legacy rows.
  */
 export function availableHoursOnDate(
   date: Date,
@@ -77,12 +81,45 @@ export function availableHoursOnDate(
   for (const person of people) {
     if (person.archived) continue;
     if (!person.workingDays?.includes(weekday)) continue;
-    if (typeof person.defaultHoursPerDay !== "number" || person.defaultHoursPerDay <= 0) continue;
     if (isUnavailable(iso, person.id, unavailability)) continue;
-    total += person.defaultHoursPerDay;
+    const hours = personHoursPerDay(person);
+    if (hours <= 0) continue;
+    total += hours;
   }
 
   return total;
+}
+
+/** Daily hours contributed by one person, respecting their configured
+ *  time-of-day window when both start + end are set. Exported so the
+ *  Settings UI can show the same number as the scheduler reads. */
+export function personHoursPerDay(p: Person): number {
+  const windowHours = timeWindowHours(p.startTimeOfDay, p.endTimeOfDay);
+  if (windowHours != null) return windowHours;
+  return typeof p.defaultHoursPerDay === "number" && p.defaultHoursPerDay > 0
+    ? p.defaultHoursPerDay
+    : 0;
+}
+
+/** Parse an "HH:MM" or "HH:MM:SS" time-of-day string to minutes since
+ *  midnight. Returns null on bad input so callers can decide how to
+ *  fall back. */
+function timeOfDayToMinutes(s: string | undefined): number | null {
+  if (!s) return null;
+  const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(s);
+  if (!match) return null;
+  const h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  if (h < 0 || h > 24 || m < 0 || m > 59) return null;
+  return h * 60 + m;
+}
+
+function timeWindowHours(start: string | undefined, end: string | undefined): number | null {
+  const s = timeOfDayToMinutes(start);
+  const e = timeOfDayToMinutes(end);
+  if (s == null || e == null) return null;
+  if (e <= s) return null;
+  return (e - s) / 60;
 }
 
 /** Effective per-day active-minutes budget after applying the capacity buffer. */

@@ -945,8 +945,21 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
   const [roles, setRoles] = useState<string[]>(person?.roles ?? []);
   const [roleDraft, setRoleDraft] = useState("");
   const [defaultHours, setDefaultHours] = useState(person?.defaultHoursPerDay != null ? String(person.defaultHoursPerDay) : "");
+  const [startTime, setStartTime] = useState(normaliseTimeInput(person?.startTimeOfDay));
+  const [endTime, setEndTime] = useState(normaliseTimeInput(person?.endTimeOfDay));
   const [workingDays, setWorkingDays] = useState<Set<Weekday>>(new Set(person?.workingDays ?? []));
   const [saving, setSaving] = useState(false);
+
+  // Derived preview of the window duration — keeps the user honest
+  // when the end time lands before the start. Shows the hours the
+  // scheduler will actually credit this person with.
+  const windowHours = (() => {
+    if (!startTime || !endTime) return null;
+    const s = hhmmToMinutes(startTime);
+    const e = hhmmToMinutes(endTime);
+    if (s == null || e == null || e <= s) return null;
+    return (e - s) / 60;
+  })();
 
   function addRole(value: string) {
     const v = value.trim();
@@ -981,6 +994,8 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         name: name.trim(),
         roles: roles.length > 0 ? roles : undefined,
         defaultHoursPerDay: parsePositiveNum(defaultHours),
+        startTimeOfDay: startTime || undefined,
+        endTimeOfDay: endTime || undefined,
         workingDays: workingDays.size > 0 ? sortWeekdays([...workingDays]) : undefined,
         archived: person?.archived,
       });
@@ -988,6 +1003,8 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         setName("");
         setRoles([]);
         setDefaultHours("");
+        setStartTime("");
+        setEndTime("");
         setWorkingDays(new Set());
       }
       onSaved();
@@ -1063,6 +1080,34 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
       </div>
 
       <div>
+        <label className="label">Working hours</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="time"
+            min="07:00"
+            max="23:00"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="input w-32"
+          />
+          <span className="text-muted-foreground text-sm">to</span>
+          <input
+            type="time"
+            min="07:00"
+            max="23:00"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            className="input w-32"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          {windowHours != null
+            ? `${windowHours.toFixed(windowHours % 1 ? 1 : 0)}h/day — the scheduler uses this window.`
+            : "Leave blank to fall back to the legacy hours/day field."}
+        </p>
+      </div>
+
+      <div>
         <label className="label">Default hours per day</label>
         <input
           type="number"
@@ -1075,7 +1120,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
           className="input w-32"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Active production hours on a typical working day.
+          Fallback for when no start/end times are set above.
         </p>
       </div>
 
@@ -1121,6 +1166,24 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
       </div>
     </div>
   );
+}
+
+// Strip optional seconds ("07:00:00" → "07:00") so <input type="time">
+// accepts the stored value without the browser rejecting it.
+function normaliseTimeInput(t: string | undefined): string {
+  if (!t) return "";
+  const match = /^(\d{1,2}):(\d{2})/.exec(t);
+  if (!match) return "";
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+function hhmmToMinutes(s: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})/.exec(s);
+  if (!match) return null;
+  const h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 60 + m;
 }
 
 function PersonUnavailabilityEditor({ personId, unavailability }: {
@@ -1853,7 +1916,7 @@ function ProductionStepRow({ step, knownStepNames, index, total, onMoveUp, onMov
               )}
               {step.perBatch && (
                 <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground bg-muted rounded px-1.5 py-0.5 align-middle">
-                  Per batch
+                  Fixed total
                 </span>
               )}
             </p>
@@ -2010,13 +2073,13 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
           {(() => {
             const v = parseFloat(activeMinutes);
             if (!Number.isFinite(v) || v <= 240 || perBatch) return null;
-            // Per-mould only — a per-batch step legitimately runs hours.
+            // Per-mould only — a fixed-total step legitimately runs hours.
             return (
               <p className="text-xs text-status-warn mt-1">
                 ⚠ {v} min per mould is unusually high. If this is the
-                total for a whole batch, tick &ldquo;Fixed per batch&rdquo;
-                below — otherwise the scheduler multiplies by every
-                mould in the wave.
+                total for a whole batch, tick &ldquo;Fixed total (not
+                per mould)&rdquo; below — otherwise the scheduler
+                multiplies by every mould in the wave.
               </p>
             );
           })()}
@@ -2033,7 +2096,7 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
             className="input"
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Drying / resting. Affects timeline but not capacity.
+            Per batch — always flat, never multiplied by mould count.
           </p>
         </div>
       </div>
@@ -2046,12 +2109,11 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
           className="w-4 h-4 mt-0.5"
         />
         <span>
-          <span className="font-medium">Fixed per batch</span>
+          <span className="font-medium">Fixed total (not per mould)</span>
           <span className="block text-xs text-muted-foreground">
-            Active time is independent of mould count. Use for batch-prep
-            tasks like cooking a filling, tempering a vat — the pot takes
-            the same hour whether it serves one mould or twenty. With this
-            off (default), active time is multiplied by mouldsNeeded.
+            Tick for steps like Cooking or Tempering where time doesn&rsquo;t
+            grow with more moulds. Leave unticked for hands-on steps like
+            Painting or Shelling.
           </span>
         </span>
       </label>

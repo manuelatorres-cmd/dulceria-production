@@ -7,9 +7,9 @@ import {
   useOrders, useAllOrderItems, useProductsList, useProductionSchedule,
   useProductionSteps, useCapacityConfig, usePeople, usePersonUnavailability,
   useBlockedDays, useProductCategories, useMouldsList, useIngredients,
-  updateScheduleStatus, useEquipment,
+  useEquipment,
   useProductLocationTotals, useStockLocationMinimums, useAllPlanProducts,
-  useProductionPlans, DEFAULT_LOCATION_MINIMUM,
+  useProductionPlans, useAllPlanStepStatuses, DEFAULT_LOCATION_MINIMUM,
   useFillings, useFillingCategories, useFillingStockItems,
   useCustomerFollowups, useCustomers, completeCustomerFollowup,
   useTodayProductionDay, openProductionDay, closeProductionDay,
@@ -17,12 +17,12 @@ import {
   type CloseProductionSummary,
 } from "@/lib/hooks";
 import { TemperatureLogModal } from "@/components/temperature-log-modal";
-import { buildSchedule } from "@/lib/scheduler";
+import { buildSchedule, timeBandFor, TIME_BAND_LABEL } from "@/lib/scheduler";
 import { capacityConfigStatus } from "@/lib/capacity";
 import { equipmentReadiness } from "@/lib/equipment";
 import { computeShoppingNeeds } from "@/lib/shopping-needs";
 import { computeWeeklyFillingNeeds } from "@/lib/weeklyFilling";
-import { ORDER_CHANNEL_LABELS, ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS, STOCK_LOCATION_SHORT_LABELS, type ProductFilling, type FillingIngredient, type ProductionScheduleEntry, type StockLocation } from "@/types";
+import { ORDER_CHANNEL_LABELS, ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS, STOCK_LOCATION_SHORT_LABELS, type ProductFilling, type FillingIngredient, type ProductionScheduleEntry, type StockLocation, type ProductionPlan, type PlanStepStatus } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
@@ -50,6 +50,8 @@ export default function DashboardPage() {
   const blockedDays = useBlockedDays();
   const categories = useProductCategories(true);
   const schedule = useProductionSchedule();
+  const allPlans = useProductionPlans();
+  const allPlanProducts = useAllPlanProducts();
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
   const mouldMap = useMemo(() => new Map(moulds.map((m) => [m.id!, m])), [moulds]);
@@ -81,10 +83,6 @@ export default function DashboardPage() {
 
   // Today + upcoming
   const todayIso = toIsoDate(new Date());
-  const todayTasks = useMemo(
-    () => schedule.filter((s) => s.startAt.slice(0, 10) === todayIso),
-    [schedule, todayIso],
-  );
 
   // Upcoming deadlines (next 14 days, open orders only)
   const in14 = useMemo(() => {
@@ -107,6 +105,7 @@ export default function DashboardPage() {
   // Capacity preview for next 7 working days
   const capacityPreview = useMemo(() => {
     const preview = buildSchedule({
+      plans: allPlans, planProducts: allPlanProducts,
       orders, orderItems, products, productionSteps: steps, moulds,
       config, people, unavailability, blockedDays, categoryNameById,
     });
@@ -115,7 +114,7 @@ export default function DashboardPage() {
     cutoff.setDate(cutoff.getDate() + 7);
     const cutoffIso = toIsoDate(cutoff);
     return preview.dailySummary.filter((d) => d.date >= todayIso && d.date <= cutoffIso);
-  }, [orders, orderItems, products, steps, moulds, config, people, unavailability, blockedDays, categoryNameById, todayIso]);
+  }, [allPlans, allPlanProducts, orders, orderItems, products, steps, moulds, config, people, unavailability, blockedDays, categoryNameById, todayIso]);
 
   // Production day — Open + Close Production actions and HACCP temperature log
   const todayDay = useTodayProductionDay();
@@ -246,8 +245,6 @@ export default function DashboardPage() {
   const fillingsToCook = weeklyFilling.needs.filter((n) => n.toCookBufferedG > 0);
 
   // Expiry — batches whose sell-by falls within the configured warn window.
-  const allPlanProducts = useAllPlanProducts();
-  const allPlans = useProductionPlans();
   const planById = useMemo(() => new Map(allPlans.map((p) => [p.id!, p])), [allPlans]);
   const expiryWarn = useMemo(() => {
     const days = config?.stockExpiryWarnDays;
@@ -377,8 +374,17 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Today's production steps — scheduled runs for today */}
-        <TodaysProductionSection schedule={schedule} productMap={productMap} orders={orders} />
+        {/* Today's production — unified widget: shows scheduled phases for
+            today joined to their productionPlan + live step-status so the
+            user sees exactly what's pending, in progress, or done without
+            having to visit the batch page. Replaces the old split
+            "Today's tasks" + "Today's production" lists which drew from
+            different sources and drifted out of sync. */}
+        <TodaysProductionSection
+          schedule={schedule}
+          productMap={productMap}
+          orders={orders}
+        />
 
         {/* Close Production summary */}
         {closeSummary && (
@@ -438,55 +444,6 @@ export default function DashboardPage() {
             </div>
           </section>
         )}
-
-        {/* Today's tasks */}
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
-              <Clock className="w-4 h-4" /> Today's tasks
-            </h2>
-            <Link href="/plan" className="text-xs text-primary hover:underline">View plan →</Link>
-          </div>
-          {todayTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
-              No tasks scheduled for today.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-              {todayTasks.map((row) => {
-                const product = productMap.get(row.productId);
-                const mould = row.mouldId ? mouldMap.get(row.mouldId) : undefined;
-                return (
-                  <li key={row.id} className="flex items-center gap-2 px-3 py-2">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${row.status === "done" ? "bg-status-ok" : row.status === "in_progress" ? "bg-status-warn" : row.status === "blocked" ? "bg-destructive" : "bg-muted-foreground"}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">
-                        <span className="font-medium">{row.phase}</span>
-                        <span className="text-muted-foreground"> · {product?.name ?? row.productId}</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {row.durationMinutes} min{mould && ` · ${mould.name}`}
-                      </p>
-                    </div>
-                    <select
-                      value={row.status}
-                      onChange={async (e) => {
-                        if (row.id) await updateScheduleStatus(row.id, e.target.value as ProductionScheduleEntry["status"]);
-                      }}
-                      className="input !w-auto text-xs !py-1"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="in_progress">In progress</option>
-                      <option value="done">Done</option>
-                      <option value="skipped">Skipped</option>
-                      <option value="blocked">Blocked</option>
-                    </select>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
 
         {/* Capacity — next 7 days */}
         <section>
@@ -771,6 +728,65 @@ function toIsoDate(d: Date): string {
 
 // ─── Today's production ─────────────────────────────────────────
 
+/** Map a scheduler phase label (ProductionStep.name — user-defined
+ *  per category) to the planStepStatus key prefix used in the batch
+ *  checklist. The batch checklist is generated by production.ts
+ *  generateSteps() and uses fixed group prefixes — the scheduler
+ *  works off arbitrary step names, so we match on keywords. When a
+ *  phase doesn't map cleanly (e.g. a custom "Cooling" step), status
+ *  falls back to "not started" and the user opens the batch to see
+ *  detail — still better than a misleading green tick. */
+function phaseToCheckListPrefix(phase: string): string | null {
+  const p = phase.toLowerCase();
+  if (p.includes("colour") || p.includes("color") || p.includes("paint")) return "color";
+  if (p.includes("shell") || p.includes("temper")) return "shell";
+  if (p.includes("filling") && !/\bfill\b/.test(p)) return "filling";
+  if (p.includes("fill")) return "fill";
+  if (p.includes("cap")) return "cap";
+  if (p.includes("unmould") || p.includes("unmold") || p.includes("polish")) return "unmould";
+  if (p.includes("pack")) return "packing";
+  return null;
+}
+
+type PhaseStatus = "not_started" | "in_progress" | "done";
+
+function phaseStatusForPlan(
+  phase: string,
+  planId: string,
+  planProductIdsByPlan: Map<string, string[]>,
+  doneKeysByPlan: Map<string, Set<string>>,
+): PhaseStatus {
+  const prefix = phaseToCheckListPrefix(phase);
+  const ppids = planProductIdsByPlan.get(planId) ?? [];
+  const doneSet = doneKeysByPlan.get(planId) ?? new Set<string>();
+  if (!prefix || ppids.length === 0) return "not_started";
+  // Count planProducts that have at least one done key under this phase's
+  // prefix. "Done" across the wave means every planProduct has marked
+  // something under this phase — partial = in progress.
+  let touched = 0;
+  for (const id of ppids) {
+    const matched = [...doneSet].some(
+      (k) => k === `${prefix}-${id}` || k.startsWith(`${prefix}-${id}-`),
+    );
+    if (matched) touched++;
+  }
+  if (touched === 0) return "not_started";
+  if (touched >= ppids.length) return "done";
+  return "in_progress";
+}
+
+const PHASE_STATUS_LABEL: Record<PhaseStatus, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  done: "Done",
+};
+
+const PHASE_STATUS_STYLE: Record<PhaseStatus, string> = {
+  not_started: "bg-muted text-muted-foreground",
+  in_progress: "bg-primary/10 text-primary",
+  done: "bg-status-ok/15 text-status-ok",
+};
+
 function TodaysProductionSection({
   schedule, productMap, orders,
 }: {
@@ -778,7 +794,11 @@ function TodaysProductionSection({
   productMap: Map<string, import("@/types").Product>;
   orders: ReturnType<typeof useOrders>;
 }) {
-  // "Today" must be the local-time day, not the UTC day. Reading
+  const plans = useProductionPlans();
+  const allPlanProducts = useAllPlanProducts();
+  const allStepStatuses = useAllPlanStepStatuses();
+
+  // "Today" is the local-time day, not the UTC day. Reading
   // startAt.slice(0,10) on an ISO string gives UTC; we'd silently miss
   // entries whose local day differs from UTC (e.g., late-evening CEST).
   const todays = useMemo(() => {
@@ -790,25 +810,72 @@ function TodaysProductionSection({
 
   const orderById = useMemo(() => new Map(orders.map((o) => [o.id!, o])), [orders]);
 
-  // Collapse rows that share the same start-time + step name into one
-  // line. The mould-wave scheduler emits one row per (product, slot)
-  // running concurrently — without grouping the user sees four
-  // identical "06:00 Praline X · Cap" lines instead of one
-  // "08:00 Cap · 4 products · 60m".
-  const groups = useMemo(() => {
-    const m = new Map<string, ProductionScheduleEntry[]>();
-    for (const e of todays) {
-      const key = `${e.startAt}|${e.phase}|${e.orderId ?? ""}`;
-      const arr = m.get(key) ?? [];
-      arr.push(e);
-      m.set(key, arr);
+  // Every scheduled row now carries planId directly (from the batch-
+  // based scheduler). Older rows — written before the rewrite — only
+  // carry orderId, so we keep a secondary orderId→plan lookup as a
+  // fallback for legacy entries still sitting in the table.
+  const planById = useMemo(
+    () => new Map(plans.map((p) => [p.id!, p])),
+    [plans],
+  );
+  const planByOrderId = useMemo(() => {
+    const m = new Map<string, ProductionPlan>();
+    for (const p of plans) if (p.sourceOrderId) m.set(p.sourceOrderId, p);
+    return m;
+  }, [plans]);
+  function planForEntry(e: ProductionScheduleEntry): ProductionPlan | undefined {
+    if (e.planId) return planById.get(e.planId);
+    if (e.orderId) return planByOrderId.get(e.orderId);
+    return undefined;
+  }
+
+  const planProductIdsByPlan = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const pp of allPlanProducts) {
+      const arr = m.get(pp.planId) ?? [];
+      arr.push(pp.id!);
+      m.set(pp.planId, arr);
     }
-    return [...m.values()].sort((a, b) => a[0].startAt.localeCompare(b[0].startAt));
-  }, [todays]);
+    return m;
+  }, [allPlanProducts]);
 
-  if (todays.length === 0) return null;
+  const doneKeysByPlan = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const s of allStepStatuses as PlanStepStatus[]) {
+      if (!s.done) continue;
+      const set = m.get(s.planId) ?? new Set<string>();
+      set.add(s.stepKey);
+      m.set(s.planId, set);
+    }
+    return m;
+  }, [allStepStatuses]);
 
-  const totalMin = todays.filter((e) => e.isActive).reduce((a, e) => a + e.durationMinutes, 0);
+  // One row per (batch, phase) scheduled today — the scheduler emits
+  // one entry per product per slot, but the checklist lives at the
+  // batch/phase level. Collapse on that granularity.
+  const rows = useMemo(() => {
+    const m = new Map<string, { plan: ProductionPlan; head: ProductionScheduleEntry; items: ProductionScheduleEntry[] }>();
+    for (const e of todays) {
+      const plan = planForEntry(e);
+      if (!plan) continue;
+      const key = `${plan.id}|${e.phase}`;
+      const entry = m.get(key);
+      if (entry) entry.items.push(e);
+      else m.set(key, { plan, head: e, items: [e] });
+    }
+    return [...m.values()].sort(
+      (a, b) => a.head.startAt.localeCompare(b.head.startAt),
+    );
+  // planForEntry closes over planById/planByOrderId via `planById` which
+  // is memoed; including both sources keeps the memo reactive.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todays, planById, planByOrderId]);
+
+  if (rows.length === 0) return null;
+
+  const doneCount = rows.filter(({ plan, head }) =>
+    phaseStatusForPlan(head.phase, plan.id!, planProductIdsByPlan, doneKeysByPlan) === "done",
+  ).length;
 
   return (
     <section className="rounded-lg border border-border bg-card p-3 space-y-2">
@@ -817,47 +884,44 @@ function TodaysProductionSection({
           <Clock className="w-4 h-4" /> Today&apos;s production
         </h2>
         <span className="text-[11px] text-muted-foreground tabular-nums">
-          {groups.length} step{groups.length === 1 ? "" : "s"} · {Math.round(totalMin / 6) / 10}h active
+          {doneCount}/{rows.length} done
         </span>
       </div>
       <ul className="divide-y divide-border">
-        {groups.map((group, i) => {
-          const head = group[0];
+        {rows.map(({ plan, head, items }) => {
           const order = head.orderId ? orderById.get(head.orderId) : undefined;
-          const doneStyle = group.every((e) => e.status === "done") ? "opacity-60 line-through" : "";
-          const productNames = group
-            .map((e) => productMap.get(e.productId)?.name ?? e.productId)
-            .filter((n, idx, arr) => arr.indexOf(n) === idx);
-          const groupMinutes = group.reduce((s, e) => s + e.durationMinutes, 0);
+          const status = phaseStatusForPlan(
+            head.phase, plan.id!, planProductIdsByPlan, doneKeysByPlan,
+          );
+          const band = TIME_BAND_LABEL[timeBandFor(head.startAt)];
+          const minutes = items.reduce((s, e) => s + e.durationMinutes, 0);
+          const productNames = Array.from(new Set(
+            items.map((e) => productMap.get(e.productId)?.name ?? e.productId),
+          ));
           const productLabel = productNames.length === 1
             ? productNames[0]
             : `${productNames.length} products`;
+          const batchLabel = plan.name || order?.customerName || order?.eventName || "Batch";
           return (
-            <li key={i} className="flex items-center gap-3 px-1 py-1.5 text-sm">
-              <span className="tabular-nums text-muted-foreground w-11 shrink-0">
-                {formatLocalTime(head.startAt)}
+            <li key={`${plan.id}|${head.phase}`} className="flex items-center gap-3 px-1 py-1.5 text-sm">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
+                {band}
               </span>
               <div className="flex-1 min-w-0">
-                <p className={`truncate ${doneStyle}`}>
+                <Link
+                  href={`/production/${encodeURIComponent(plan.id!)}`}
+                  className="block truncate hover:underline"
+                >
                   <span className="font-medium">{head.phase}</span>
-                  <span className="text-muted-foreground"> · {productLabel}</span>
+                  <span className="text-muted-foreground"> — {batchLabel}</span>
+                </Link>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {productLabel} · {minutes}m
+                  {productNames.length > 1 && ` · ${productNames.join(", ")}`}
                 </p>
-                {productNames.length > 1 && (
-                  <p className="text-[11px] text-muted-foreground truncate">
-                    {productNames.join(", ")}
-                  </p>
-                )}
-                {order && (
-                  <Link
-                    href={`/orders/${encodeURIComponent(order.id!)}`}
-                    className="text-[11px] text-primary hover:underline truncate inline-block max-w-full"
-                  >
-                    {order.customerName || order.eventName || "Order"}
-                  </Link>
-                )}
               </div>
-              <span className="tabular-nums text-xs text-muted-foreground shrink-0">
-                {groupMinutes}m
+              <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${PHASE_STATUS_STYLE[status]}`}>
+                {PHASE_STATUS_LABEL[status]}
               </span>
             </li>
           );
@@ -877,8 +941,4 @@ function localIsoDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function formatLocalTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }

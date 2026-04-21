@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { buildSchedule, type SchedulerInput } from "./scheduler";
+import { buildSchedule, timeBandFor, type SchedulerInput } from "./scheduler";
 import type {
   Order, OrderItem, Product, ProductionStep, Person, Mould, CapacityConfig,
+  ProductionPlan, PlanProduct,
 } from "@/types";
 
-// Build an input scaffold with sensible defaults. Tests tweak only
-// what they care about. Every person works every day so day-of-week
-// doesn't leak into test expectations.
+// Scaffold with sensible defaults. Tests override only what they care
+// about. Every person works every day so day-of-week doesn't leak into
+// expectations.
 function makeInput(overrides: Partial<SchedulerInput> = {}): SchedulerInput {
   const everyDay = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as Person["workingDays"];
   const people: Person[] = overrides.people ?? [
@@ -14,6 +15,8 @@ function makeInput(overrides: Partial<SchedulerInput> = {}): SchedulerInput {
   ];
   const config: CapacityConfig = overrides.config ?? { capacityBufferPercent: 0 };
   return {
+    plans: [],
+    planProducts: [],
     orders: [],
     orderItems: [],
     products: [],
@@ -28,209 +31,300 @@ function makeInput(overrides: Partial<SchedulerInput> = {}): SchedulerInput {
   };
 }
 
+function toIsoLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function mkStep(
-  partial: Pick<ProductionStep, "name" | "productType" | "activeMinutes" | "waitingMinutes" | "sortOrder">,
+  partial: Pick<ProductionStep, "name" | "productType" | "activeMinutes" | "waitingMinutes" | "sortOrder"> & { perBatch?: boolean },
 ): ProductionStep {
   return { id: `step-${partial.name}`, ...partial };
 }
 
-describe("mould-wave scheduler", () => {
+// A convenience scenario: one batch (plan) with `products` planProducts,
+// optionally linked to a parent order for the deadline comparison.
+function makeBatchScenario(args: {
+  planId?: string;
+  products: Array<{ id: string; quantity: number; cavities?: number }>;
+  steps: ProductionStep[];
+  deadline?: string;
+}): {
+  plans: ProductionPlan[];
+  planProducts: PlanProduct[];
+  orders: Order[];
+  orderItems: OrderItem[];
+  products: Product[];
+  moulds: Mould[];
+  productionSteps: ProductionStep[];
+  categoryNameById: Map<string, string>;
+} {
   const catId = "cat-moulded";
   const categoryNameById = new Map([[catId, "Moulded"]]);
-  const baseDeadline = new Date("2026-05-15T18:00:00").toISOString();
+  const mouldId = "m-default";
+  const defaultCavities = args.products[0]?.cavities ?? 10;
+  const moulds: Mould[] = [{
+    id: mouldId, name: "M", cavityWeightG: 10, numberOfCavities: defaultCavities,
+  }];
+  const products: Product[] = args.products.map((p) => ({
+    id: p.id, name: p.id, productCategoryId: catId,
+    defaultMouldId: mouldId, defaultBatchQty: 1,
+  })) as unknown as Product[];
+  const planId = args.planId ?? "plan-1";
+  const plans: ProductionPlan[] = [{
+    id: planId, name: "Test batch", status: "draft",
+    createdAt: new Date("2024-01-01T00:00:00Z"),
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+  } as ProductionPlan];
+  const planProducts: PlanProduct[] = args.products.map((p, i) => ({
+    id: `pp-${p.id}`,
+    planId,
+    productId: p.id,
+    mouldId,
+    quantity: p.quantity,
+    sortOrder: i,
+  } as PlanProduct));
+
+  const orders: Order[] = args.deadline ? [{
+    id: "o1", channel: "b2b", customerName: "X",
+    deadline: args.deadline, priority: "normal", status: "pending",
+  } as Order] : [];
+  const orderItems: OrderItem[] = args.deadline ? args.products.map((p, i) => ({
+    id: `oi-${p.id}`,
+    orderId: "o1",
+    productId: p.id,
+    quantity: p.quantity,
+    sortOrder: i,
+    linkedBatchId: planId,
+  } as OrderItem)) : [];
+
+  return {
+    plans,
+    planProducts,
+    orders,
+    orderItems,
+    products,
+    moulds,
+    productionSteps: args.steps,
+    categoryNameById,
+  };
+}
+
+describe("batch-based scheduler", () => {
+  const deadline = new Date("2026-05-15T18:00:00").toISOString();
 
   it("consolidates four products into one wave per step, fitting in a single working day", () => {
-    // 4 products × 20 pieces each = 80 pieces total, 20-cavity mould
-    // → 1 mould per product, 4 moulds in the wave.
-    // 2 steps at 10 min active per mould, 0 waiting.
-    // Total wave active time = 2 steps × 4 moulds × 10 min = 80 min.
-    // With 8h (480 min) daily capacity, the whole order fits in ONE day.
-    const moulds: Mould[] = [
-      { id: "m", name: "20-cavity", cavityWeightG: 10, numberOfCavities: 20 },
-    ];
-    const products = ["A", "B", "C", "D"].map((l) => ({
-      id: `p${l}`,
-      name: `Praline ${l}`,
-      productCategoryId: catId,
-      defaultMouldId: "m",
-      defaultBatchQty: 1,
-    })) as unknown as Product[];
-    const order: Order = {
-      id: "o1", channel: "b2b", customerName: "Test",
-      deadline: baseDeadline, priority: "normal", status: "pending",
-    } as Order;
-    const orderItems: OrderItem[] = products.map((p, i) => ({
-      id: `oi${i}`, orderId: "o1", productId: p.id!, quantity: 20, sortOrder: i,
-    })) as OrderItem[];
-    const steps = [
-      mkStep({ name: "Temper", productType: "Moulded", activeMinutes: 10, waitingMinutes: 0, sortOrder: 0 }),
-      mkStep({ name: "Shell",  productType: "Moulded", activeMinutes: 10, waitingMinutes: 0, sortOrder: 1 }),
-    ];
-    const result = buildSchedule(makeInput({
-      orders: [order], orderItems, products, moulds,
-      productionSteps: steps, categoryNameById,
-    }));
+    // 4 products × 20 pieces / 20-cavity mould = 1 mould each → 4 moulds total.
+    // 2 steps × 10min active per mould → 80min total. Fits in 480min day.
+    const scenario = makeBatchScenario({
+      products: ["A", "B", "C", "D"].map((id) => ({ id: `p${id}`, quantity: 1, cavities: 20 })),
+      steps: [
+        mkStep({ name: "Temper", productType: "Moulded", activeMinutes: 10, waitingMinutes: 0, sortOrder: 0 }),
+        mkStep({ name: "Shell",  productType: "Moulded", activeMinutes: 10, waitingMinutes: 0, sortOrder: 1 }),
+      ],
+      deadline,
+    });
+    const result = buildSchedule(makeInput(scenario));
 
     const days = new Set(result.entries.map((e) => e.startAt.slice(0, 10)));
     expect(days.size).toBe(1);
-    // Sanity: we emit one row per (step × product) — 2 steps × 4 products.
-    expect(result.entries.length).toBe(8);
-    // Sum of durations = total active minutes consumed.
+    expect(result.entries.length).toBe(8); // 2 steps × 4 products
     const totalDur = result.entries.reduce((s, e) => s + e.durationMinutes, 0);
     expect(totalDur).toBe(80);
+    // Every entry carries the planId.
+    for (const e of result.entries) expect(e.planId).toBe("plan-1");
   });
 
-  it("long waiting window forces the preceding step onto an earlier day", () => {
-    // Step 1: short active, LONG wait (overnight) → step 2 on deadline day,
-    // step 1 must land on the day before.
-    const moulds: Mould[] = [{ id: "m", name: "M", cavityWeightG: 10, numberOfCavities: 10 }];
-    const products: Product[] = [{
-      id: "p1", name: "P", productCategoryId: catId,
-      defaultMouldId: "m", defaultBatchQty: 1,
-    }] as unknown as Product[];
-    const order: Order = {
-      id: "o2", channel: "b2b", customerName: "X",
-      deadline: baseDeadline, priority: "normal", status: "pending",
-    } as Order;
-    const orderItems: OrderItem[] = [{
-      id: "oi", orderId: "o2", productId: "p1", quantity: 10, sortOrder: 0,
-    }] as OrderItem[];
-    const steps = [
-      mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 10, waitingMinutes: 720, sortOrder: 0 }),
-      mkStep({ name: "Cap",   productType: "Moulded", activeMinutes: 10, waitingMinutes: 0,   sortOrder: 1 }),
-    ];
-    const result = buildSchedule(makeInput({
-      orders: [order], orderItems, products, moulds,
-      productionSteps: steps, categoryNameById,
-    }));
-
+  it("a long waiting window pushes the next step onto the next working day", () => {
+    // 720min wait after Shell can't fit same-day → Cap next day.
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 10, waitingMinutes: 720, sortOrder: 0 }),
+        mkStep({ name: "Cap",   productType: "Moulded", activeMinutes: 10, waitingMinutes: 0,   sortOrder: 1 }),
+      ],
+      deadline,
+    });
+    const result = buildSchedule(makeInput(scenario));
     const byStep = new Map(result.entries.map((e) => [e.phase, e.startAt.slice(0, 10)] as const));
-    expect(byStep.get("Shell")).toBeDefined();
-    expect(byStep.get("Cap")).toBeDefined();
     expect(byStep.get("Shell")).not.toBe(byStep.get("Cap"));
   });
 
-  it("perBatch step's total active is the fixed activeMinutes regardless of mould count", () => {
-    // 4 products × 1 mould each = 4 moulds. A per-mould step at 60min
-    // would charge 240min total. The same step flagged perBatch should
-    // charge a fixed 60min — cooking the filling once covers the wave.
-    const moulds: Mould[] = [
-      { id: "m", name: "M", cavityWeightG: 10, numberOfCavities: 20 },
-    ];
-    const products = ["A", "B", "C", "D"].map((l) => ({
-      id: `p${l}`,
-      name: `P ${l}`,
-      productCategoryId: catId,
-      defaultMouldId: "m",
-      defaultBatchQty: 1,
-    })) as unknown as Product[];
-    const order: Order = {
-      id: "obatch", channel: "b2b", customerName: "X",
-      deadline: baseDeadline, priority: "normal", status: "pending",
-    } as Order;
-    const orderItems: OrderItem[] = products.map((p, i) => ({
-      id: `oi${i}`, orderId: "obatch", productId: p.id!, quantity: 20, sortOrder: i,
-    })) as OrderItem[];
-    const steps = [
-      mkStep({ name: "Cooking", productType: "Moulded", activeMinutes: 60, waitingMinutes: 0, sortOrder: 0 }),
-    ];
-    steps[0].perBatch = true;
-
-    const result = buildSchedule(makeInput({
-      orders: [order], orderItems, products, moulds,
-      productionSteps: steps, categoryNameById,
-    }));
-
+  it("perBatch step's total active is flat, regardless of mould count", () => {
+    const scenario = makeBatchScenario({
+      products: ["A", "B", "C", "D"].map((id) => ({ id: `p${id}`, quantity: 1, cavities: 20 })),
+      steps: [
+        (() => {
+          const s = mkStep({ name: "Cooking", productType: "Moulded", activeMinutes: 60, waitingMinutes: 0, sortOrder: 0 });
+          s.perBatch = true;
+          return s;
+        })(),
+      ],
+      deadline,
+    });
+    const result = buildSchedule(makeInput(scenario));
     const totalDur = result.entries.reduce((s, e) => s + e.durationMinutes, 0);
     expect(totalDur).toBe(60);
-    // Still emits one row per product so the wave's traceability stays.
     expect(result.entries.length).toBe(4);
   });
 
-  it("borrow lines skip the wave entirely", () => {
-    const moulds: Mould[] = [{ id: "m", name: "M", cavityWeightG: 10, numberOfCavities: 10 }];
-    const products: Product[] = [{
-      id: "p1", name: "P", productCategoryId: catId,
-      defaultMouldId: "m", defaultBatchQty: 1,
-    }] as unknown as Product[];
-    const order: Order = {
-      id: "o3", channel: "b2b", customerName: "X",
-      deadline: baseDeadline, priority: "normal", status: "pending",
-    } as Order;
-    const orderItems: OrderItem[] = [{
-      id: "oi", orderId: "o3", productId: "p1", quantity: 10, sortOrder: 0,
-      fulfilmentMode: "borrow",
-    }] as OrderItem[];
-    const steps = [
-      mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 10, waitingMinutes: 0, sortOrder: 0 }),
-    ];
-    const result = buildSchedule(makeInput({
-      orders: [order], orderItems, products, moulds,
-      productionSteps: steps, categoryNameById,
-    }));
-    expect(result.entries).toHaveLength(0);
-  });
-
-  it("sequences steps within the same day — earlier steps end where later steps start", () => {
-    // Two steps, both small enough to fit on the deadline day. Reverse
-    // pack: step 2 (Cap) lands at end-of-day; step 1 (Shell) ends where
-    // step 2 starts. Distinct startAt times.
-    const moulds: Mould[] = [{ id: "m", name: "M", cavityWeightG: 10, numberOfCavities: 10 }];
-    const products = [{
-      id: "p1", name: "P", productCategoryId: catId,
-      defaultMouldId: "m", defaultBatchQty: 1,
-    }] as unknown as Product[];
-    const order: Order = {
-      id: "oseq", channel: "b2b", customerName: "X",
-      deadline: baseDeadline, priority: "normal", status: "pending",
-    } as Order;
-    const orderItems: OrderItem[] = [{
-      id: "oi", orderId: "oseq", productId: "p1", quantity: 10, sortOrder: 0,
-    }] as OrderItem[];
-    const steps = [
-      mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 30, waitingMinutes: 0, sortOrder: 0 }),
-      mkStep({ name: "Cap",   productType: "Moulded", activeMinutes: 60, waitingMinutes: 0, sortOrder: 1 }),
-    ];
-    const result = buildSchedule(makeInput({
-      orders: [order], orderItems, products, moulds,
-      productionSteps: steps, categoryNameById,
-    }));
-
+  it("sequences steps within the same day — earlier ends where later starts", () => {
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 30, waitingMinutes: 0, sortOrder: 0 }),
+        mkStep({ name: "Cap",   productType: "Moulded", activeMinutes: 60, waitingMinutes: 0, sortOrder: 1 }),
+      ],
+      deadline,
+    });
+    const result = buildSchedule(makeInput(scenario));
     const shell = result.entries.find((e) => e.phase === "Shell")!;
     const cap = result.entries.find((e) => e.phase === "Cap")!;
     expect(shell.startAt.slice(0, 10)).toBe(cap.startAt.slice(0, 10));
-    // Shell ends at Cap's start (within a tolerance of seconds).
     expect(new Date(shell.endAt).getTime()).toBe(new Date(cap.startAt).getTime());
     expect(shell.startAt).not.toBe(cap.startAt);
   });
 
-  it("spills a step across days when its active minutes exceed daily capacity", () => {
-    // Wave needs 600 min active for step 1. Capacity 480 min/day (8h × 1 person).
-    // Should split across two days — 480 on day N, 120 on day N-1.
-    const moulds: Mould[] = [{ id: "m", name: "M", cavityWeightG: 10, numberOfCavities: 5 }];
-    const products: Product[] = [{
-      id: "p1", name: "P", productCategoryId: catId,
-      defaultMouldId: "m", defaultBatchQty: 1,
-    }] as unknown as Product[];
-    const order: Order = {
-      id: "o4", channel: "b2b", customerName: "X",
-      deadline: baseDeadline, priority: "normal", status: "pending",
-    } as Order;
-    // 60 moulds (300 pieces / 5 cavities). 10 min per mould × 60 = 600 min.
-    const orderItems: OrderItem[] = [{
-      id: "oi", orderId: "o4", productId: "p1", quantity: 300, sortOrder: 0,
-    }] as OrderItem[];
-    const steps = [
-      mkStep({ name: "Temper", productType: "Moulded", activeMinutes: 10, waitingMinutes: 0, sortOrder: 0 }),
-    ];
-    const result = buildSchedule(makeInput({
-      orders: [order], orderItems, products, moulds,
-      productionSteps: steps, categoryNameById,
-    }));
+  it("emits steps in ascending sortOrder — A earliest, C latest", () => {
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "A", productType: "Moulded", activeMinutes: 20, waitingMinutes: 0, sortOrder: 0 }),
+        mkStep({ name: "B", productType: "Moulded", activeMinutes: 20, waitingMinutes: 0, sortOrder: 1 }),
+        mkStep({ name: "C", productType: "Moulded", activeMinutes: 20, waitingMinutes: 0, sortOrder: 2 }),
+      ],
+      deadline,
+    });
+    const result = buildSchedule(makeInput(scenario));
+    const byPhase = Object.fromEntries(result.entries.map((e) => [e.phase, e]));
+    expect(byPhase.A.startAt < byPhase.B.startAt).toBe(true);
+    expect(byPhase.B.startAt < byPhase.C.startAt).toBe(true);
+  });
 
+  it("small steps never split across days regardless of long waits", () => {
+    // The defensive no-split rule (bug-2 fix): a step whose total
+    // active duration is ≤ daily capacity lands on exactly ONE day.
+    // 5min steps with huge waits should roll to new days ONLY between
+    // steps, never within a step.
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "A", productType: "Moulded", activeMinutes: 5, waitingMinutes: 720, sortOrder: 0 }),
+        mkStep({ name: "B", productType: "Moulded", activeMinutes: 5, waitingMinutes: 720, sortOrder: 1 }),
+        mkStep({ name: "C", productType: "Moulded", activeMinutes: 5, waitingMinutes: 0,   sortOrder: 2 }),
+      ],
+      deadline,
+    });
+    const result = buildSchedule(makeInput(scenario));
+    // Each phase shows up on exactly one day.
+    const daysByPhase = new Map<string, Set<string>>();
+    for (const e of result.entries) {
+      const set = daysByPhase.get(e.phase) ?? new Set<string>();
+      set.add(e.startAt.slice(0, 10));
+      daysByPhase.set(e.phase, set);
+    }
+    for (const [phase, days] of daysByPhase) {
+      expect(days.size, `phase ${phase} spans ${days.size} days`).toBe(1);
+    }
+  });
+
+  it("last step stays on the current day when it fits remaining capacity", () => {
+    // Short waits between steps absorb same-day; the final Pack step
+    // should land on the same day as the prior step.
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "Prep",   productType: "Moulded", activeMinutes: 30, waitingMinutes: 30, sortOrder: 0 }),
+        mkStep({ name: "Middle", productType: "Moulded", activeMinutes: 30, waitingMinutes: 30, sortOrder: 1 }),
+        mkStep({ name: "Pack",   productType: "Moulded", activeMinutes: 10, waitingMinutes: 0,  sortOrder: 2 }),
+      ],
+      deadline,
+    });
+    const result = buildSchedule(makeInput(scenario));
+    const byPhase = Object.fromEntries(result.entries.map((e) => [e.phase, e]));
+    expect(byPhase.Prep.startAt.slice(0, 10)).toBe(byPhase.Pack.startAt.slice(0, 10));
+  });
+
+  it("forward-fill: short wave lands on today when there's no deadline pressure", () => {
+    const farDeadline = new Date();
+    farDeadline.setMonth(farDeadline.getMonth() + 1);
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "Temper", productType: "Moulded", activeMinutes: 20, waitingMinutes: 0, sortOrder: 0 }),
+        mkStep({ name: "Shell",  productType: "Moulded", activeMinutes: 20, waitingMinutes: 0, sortOrder: 1 }),
+      ],
+      deadline: farDeadline.toISOString(),
+    });
+    const result = buildSchedule(makeInput(scenario));
     const days = new Set(result.entries.map((e) => e.startAt.slice(0, 10)));
-    expect(days.size).toBe(2);
-    const totalDur = result.entries.reduce((s, e) => s + e.durationMinutes, 0);
-    expect(totalDur).toBe(600);
+    expect(days.size).toBe(1);
+    expect([...days][0]).toBe(toIsoLocal(new Date()));
+  });
+
+  it("skips plans that have no planProducts", () => {
+    const scenario = makeBatchScenario({
+      products: [],
+      steps: [],
+    });
+    const result = buildSchedule(makeInput(scenario));
+    expect(result.entries).toHaveLength(0);
+  });
+
+  it("skips plans whose product has no category (warns)", () => {
+    const planId = "plan-nocat";
+    const plans: ProductionPlan[] = [{ id: planId, name: "Stray", status: "draft" } as ProductionPlan];
+    const planProducts: PlanProduct[] = [{
+      id: "pp-1", planId, productId: "p1", mouldId: "m", quantity: 1, sortOrder: 0,
+    } as PlanProduct];
+    const products: Product[] = [{
+      id: "p1", name: "P", defaultMouldId: "m", defaultBatchQty: 1,
+    } as unknown as Product];
+    const moulds: Mould[] = [{ id: "m", name: "M", cavityWeightG: 10, numberOfCavities: 10 }];
+    const result = buildSchedule(makeInput({
+      plans, planProducts, products, moulds,
+    }));
+    expect(result.entries).toHaveLength(0);
+    expect(result.unscheduledPlanIds).toContain(planId);
+  });
+
+  it("populates planId + planProductId + stepId on every emitted row", () => {
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 10, waitingMinutes: 0, sortOrder: 0 }),
+      ],
+      deadline,
+    });
+    const result = buildSchedule(makeInput(scenario));
+    expect(result.entries.length).toBeGreaterThan(0);
+    for (const e of result.entries) {
+      expect(e.planId).toBe("plan-1");
+      expect(e.planProductId).toBe("pp-p1");
+      expect(e.stepId).toBe("step-Shell");
+    }
+  });
+});
+
+describe("timeBandFor", () => {
+  const isoAt = (hour: number, minute: number): string => {
+    const d = new Date();
+    d.setHours(hour, minute, 0, 0);
+    return d.toISOString();
+  };
+
+  it("before 11:00 → morning", () => {
+    expect(timeBandFor(isoAt(8, 0))).toBe("morning");
+    expect(timeBandFor(isoAt(10, 59))).toBe("morning");
+  });
+  it("11:00 to 13:59 → midday", () => {
+    expect(timeBandFor(isoAt(11, 0))).toBe("midday");
+    expect(timeBandFor(isoAt(13, 30))).toBe("midday");
+  });
+  it("14:00 onward → afternoon", () => {
+    expect(timeBandFor(isoAt(14, 0))).toBe("afternoon");
+    expect(timeBandFor(isoAt(17, 30))).toBe("afternoon");
   });
 });
