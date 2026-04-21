@@ -4116,22 +4116,34 @@ export async function saveProductionStep(
   const now = new Date();
   if (step.id) {
     const fullPayload = { ...step, updatedAt: now };
-    let { error } = await supabase
+    // .select() forces Supabase to return the row(s) that matched —
+    // lets us detect silent zero-row updates (e.g., wrong id, RLS
+    // denial) instead of pretending the save worked.
+    let resp = await supabase
       .from("productionSteps")
       .update(fullPayload)
-      .eq("id", step.id);
-    if (isMissingColumnError(error)) {
+      .eq("id", step.id)
+      .select();
+    if (isMissingColumnError(resp.error)) {
       console.warn(
         "saveProductionStep: schema is missing one of " + PRODUCTION_STEP_OPTIONAL_COLUMNS.join(", ")
         + " — retrying without them. Apply migrations 0033/0037 to enable per-step flags. Error:",
-        error,
+        resp.error,
       );
-      ({ error } = await supabase
+      resp = await supabase
         .from("productionSteps")
         .update(stripOptionalProductionStepCols(fullPayload))
-        .eq("id", step.id));
+        .eq("id", step.id)
+        .select();
     }
-    if (error) throw error;
+    if (resp.error) throw resp.error;
+    if (!resp.data || resp.data.length === 0) {
+      throw new Error(
+        `Update affected 0 rows — id ${step.id} did not match any productionSteps row, `
+        + "or row-level security blocked the update. Check that the step exists and that "
+        + "you're signed in.",
+      );
+    }
     queryClient.invalidateQueries({ queryKey: ["production-steps"] });
     return step.id;
   }
