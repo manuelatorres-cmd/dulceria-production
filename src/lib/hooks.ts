@@ -4089,23 +4089,65 @@ export function useProductionSteps(): ProductionStep[] {
   return data ?? [];
 }
 
+// Columns that arrived in later migrations (0033 / 0037). When the DB
+// hasn't run those yet, PostgREST refuses any insert / update that
+// references them with code PGRST204. Save is retried without them so
+// the user can still edit existing fields; a console warning surfaces
+// the actual cause.
+const PRODUCTION_STEP_OPTIONAL_COLUMNS = ["isPackingStep", "perBatch"] as const;
+
+function stripOptionalProductionStepCols(payload: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...payload };
+  for (const col of PRODUCTION_STEP_OPTIONAL_COLUMNS) delete out[col];
+  return out;
+}
+
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  // PGRST204 = "column not found in schema cache"; 42703 = Postgres
+  // "undefined column" if the request bypassed the cache. Either
+  // points at a missing migration.
+  return error.code === "PGRST204" || error.code === "42703";
+}
+
 export async function saveProductionStep(
   step: Omit<ProductionStep, "createdAt" | "updatedAt">,
 ): Promise<string> {
   const now = new Date();
   if (step.id) {
-    const { error } = await supabase
+    const fullPayload = { ...step, updatedAt: now };
+    let { error } = await supabase
       .from("productionSteps")
-      .update({ ...step, updatedAt: now })
+      .update(fullPayload)
       .eq("id", step.id);
+    if (isMissingColumnError(error)) {
+      console.warn(
+        "saveProductionStep: schema is missing one of " + PRODUCTION_STEP_OPTIONAL_COLUMNS.join(", ")
+        + " — retrying without them. Apply migrations 0033/0037 to enable per-step flags. Error:",
+        error,
+      );
+      ({ error } = await supabase
+        .from("productionSteps")
+        .update(stripOptionalProductionStepCols(fullPayload))
+        .eq("id", step.id));
+    }
     if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ["production-steps"] });
     return step.id;
   }
   const id = newId();
-  const { error } = await supabase
-    .from("productionSteps")
-    .insert({ ...step, id, createdAt: now, updatedAt: now });
+  const fullPayload = { ...step, id, createdAt: now, updatedAt: now };
+  let { error } = await supabase.from("productionSteps").insert(fullPayload);
+  if (isMissingColumnError(error)) {
+    console.warn(
+      "saveProductionStep: schema is missing one of " + PRODUCTION_STEP_OPTIONAL_COLUMNS.join(", ")
+      + " — retrying without them. Apply migrations 0033/0037 to enable per-step flags. Error:",
+      error,
+    );
+    ({ error } = await supabase
+      .from("productionSteps")
+      .insert(stripOptionalProductionStepCols(fullPayload)));
+  }
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["production-steps"] });
   return id;
