@@ -4502,6 +4502,310 @@ export function useAllocatedForOrder(orderId: string | undefined): OrderAllocate
   return data ?? [];
 }
 
+// ── Undo last stock action ─────────────────────────────────────
+//
+// Narrow-scoped undo: reverses the most recent ingredientStockMovement
+// within a short window (10 minutes). Covers the common "oh, wrong
+// step ticked — give me back my shell chocolate" case. Product-stock
+// movements and filling stock are out of scope for this pass.
+
+const UNDO_WINDOW_MS = 10 * 60 * 1000;
+
+/** The last still-undo-able ingredient stock movement, or null. */
+export function useLastUndoableIngredientMovement(): IngredientStockMovement | null {
+  const { data } = useQuery({
+    queryKey: ["ingredient-stock-movements", "last-undoable"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - UNDO_WINDOW_MS).toISOString();
+      const rows = assertOk(
+        await supabase
+          .from("ingredientStockMovements")
+          .select("*")
+          .gte("movedAt", since)
+          .order("movedAt", { ascending: false })
+          .limit(20),
+      ) as IngredientStockMovement[];
+      if (rows.length === 0) return null;
+      // Filter out reason='undo' rows and rows that have been undone
+      // (a later row's notes references their id).
+      const undoneIds = new Set<string>();
+      for (const r of rows) {
+        if (r.reason !== "undo") continue;
+        const m = (r.notes ?? "").match(/undid mvt:([a-f0-9-]+)/i);
+        if (m) undoneIds.add(m[1]);
+      }
+      for (const r of rows) {
+        if (r.reason === "undo") continue;
+        if (r.id && undoneIds.has(r.id)) continue;
+        return r;
+      }
+      return null;
+    },
+    refetchInterval: 30_000, // every 30s — affordance fades as time runs out
+  });
+  return data ?? null;
+}
+
+/** Reverse an ingredient stock movement. Logs a new movement with
+ *  reason='undo' and notes referencing the original, so subsequent
+ *  lookups know not to offer undo on the same row again. Adjusts
+ *  the ingredientStock balance by the opposite delta. */
+export async function undoIngredientStockMovement(
+  movementId: string,
+): Promise<{ balanceAfter: number }> {
+  const original = assertOkMaybe(
+    await supabase
+      .from("ingredientStockMovements")
+      .select("*")
+      .eq("id", movementId)
+      .maybeSingle(),
+  ) as IngredientStockMovement | null;
+  if (!original) throw new Error("Movement not found.");
+  if (original.reason === "undo") throw new Error("Can't undo an undo.");
+
+  // Check this hasn't already been undone.
+  const subsequent = assertOk(
+    await supabase
+      .from("ingredientStockMovements")
+      .select("id, notes")
+      .eq("ingredientId", original.ingredientId)
+      .eq("reason", "undo"),
+  ) as Array<{ id: string; notes?: string }>;
+  for (const s of subsequent) {
+    if ((s.notes ?? "").toLowerCase().includes(`undid mvt:${movementId.toLowerCase()}`)) {
+      throw new Error("Already undone.");
+    }
+  }
+
+  const reverseDelta = -Number(original.deltaG);
+  const result = await adjustIngredientStock({
+    ingredientId: original.ingredientId,
+    deltaG: reverseDelta,
+    reason: "recount", // stored reason below is overwritten for the audit row
+    planId: original.planId,
+    stepKey: original.stepKey,
+    notes: `Undid mvt:${movementId}. Original reason: ${original.reason}. ${original.notes ?? ""}`.trim(),
+  });
+
+  // Rewrite the reason on the movement row we just inserted from
+  // 'recount' to 'undo' so the list helper can filter it out next
+  // time. Easier than plumbing a custom reason through
+  // adjustIngredientStock.
+  const { data: latest } = await supabase
+    .from("ingredientStockMovements")
+    .select("id")
+    .eq("ingredientId", original.ingredientId)
+    .order("movedAt", { ascending: false })
+    .limit(1);
+  const latestId = (latest as Array<{ id: string }> | null)?.[0]?.id;
+  if (latestId) {
+    await supabase
+      .from("ingredientStockMovements")
+      .update({ reason: "undo" })
+      .eq("id", latestId);
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["ingredient-stock"] });
+  queryClient.invalidateQueries({ queryKey: ["ingredient-stock-movements"] });
+  return { balanceAfter: result.balanceAfter };
+}
+
+/** One reassignment proposal — "this batch has Shelling-or-later
+ *  progress, here are compatible orders that could absorb the
+ *  already-made quantity." Shown in the pre-delete / pre-cancel
+ *  modal so in-flight production doesn't get wasted silently. */
+export interface ReassignmentProposal {
+  planId: string;
+  planName: string;
+  batchNumber?: string;
+  productId: string;
+  productName: string;
+  allocatedQuantity: number;
+  orderPlanLinkId: string;
+  progressStepKey: string;
+  candidates: Array<{
+    orderId: string;
+    orderItemId: string;
+    orderLabel: string;
+    deadline: string;
+    itemQuantity: number;
+    itemRemainingDemand: number; // quantity minus already allocated
+  }>;
+}
+
+/**
+ * Find reassignment opportunities for an order about to be cancelled
+ * or deleted. Walks the order's linked batches and, for any batch
+ * whose progress has reached Shelling (step_sortOrder >= 3, by
+ * convention) or later, lists compatible open orders that could
+ * absorb the allocated quantity.
+ *
+ * "Compatible" = open order (pending or in_production) with a
+ * produce-fresh orderItem for the same product.
+ *
+ * Returns an empty array when nothing worth reassigning — caller
+ * proceeds straight to cancel/delete.
+ */
+export async function computeReassignmentProposals(
+  orderId: string,
+): Promise<ReassignmentProposal[]> {
+  const items = assertOk(
+    await supabase.from("orderItems").select("id, productId").eq("orderId", orderId),
+  ) as Array<{ id: string; productId: string }>;
+  if (items.length === 0) return [];
+  const itemIds = items.map((i) => i.id);
+  const links = assertOk(
+    await supabase.from("orderPlanLinks").select("*").in("orderItemId", itemIds),
+  ) as OrderPlanLink[];
+  if (links.length === 0) return [];
+
+  const planIds = [...new Set(links.map((l) => l.planId))];
+  const plans = assertOk(
+    await supabase.from("productionPlans").select("*").in("id", planIds),
+  ) as ProductionPlan[];
+  const planById = new Map(plans.map((p) => [p.id!, p]));
+
+  // Only draft / active batches matter — done / cancelled are either
+  // already complete or already abandoned.
+  const statuses = assertOk(
+    await supabase.from("planStepStatus").select("*").in("planId", planIds),
+  ) as PlanStepStatus[];
+  const doneByPlan = new Map<string, Set<string>>();
+  for (const s of statuses) {
+    if (!s.done) continue;
+    const set = doneByPlan.get(s.planId) ?? new Set<string>();
+    set.add(s.stepKey);
+    doneByPlan.set(s.planId, set);
+  }
+
+  const proposals: ReassignmentProposal[] = [];
+  const products = assertOk(
+    await supabase.from("products").select("id, name"),
+  ) as Array<{ id: string; name: string }>;
+  const productName = new Map(products.map((p) => [p.id, p.name]));
+
+  // For each link, detect Shelling+ progress. Step keys in the
+  // canonical 8-step list are prefixed "polishing", "colour",
+  // "shell", "filling", "fill", "cap", "unmould", "packing". A shell
+  // tick means Shelling is underway — the batch has ingredient cost
+  // sunk into it.
+  const progressPrefixes = ["shell", "filling", "fill", "cap", "unmould", "packing"];
+
+  for (const link of links) {
+    const plan = planById.get(link.planId);
+    if (!plan) continue;
+    if (plan.status !== "draft" && plan.status !== "active") continue;
+    const doneSet = doneByPlan.get(link.planId) ?? new Set<string>();
+    // Find the earliest Shelling+ step that's done.
+    let progressStepKey: string | null = null;
+    for (const key of doneSet) {
+      const prefix = key.split("-")[0];
+      if (progressPrefixes.includes(prefix)) {
+        progressStepKey = key;
+        break;
+      }
+    }
+    if (!progressStepKey) continue; // no meaningful sunk cost
+
+    const item = items.find((i) => i.id === link.orderItemId);
+    if (!item) continue;
+
+    // Find candidate open orders with a produce orderItem for the
+    // same product, excluding this order.
+    const openOrders = assertOk(
+      await supabase
+        .from("orders")
+        .select("id, customerName, eventName, deadline, status")
+        .in("status", ["pending", "in_production"])
+        .neq("id", orderId),
+    ) as Array<{ id: string; customerName?: string; eventName?: string; deadline: string; status: string }>;
+    if (openOrders.length === 0) {
+      proposals.push({
+        planId: link.planId,
+        planName: plan.name,
+        batchNumber: plan.batchNumber,
+        productId: item.productId,
+        productName: productName.get(item.productId) ?? item.productId,
+        allocatedQuantity: link.allocatedQuantity,
+        orderPlanLinkId: link.id!,
+        progressStepKey,
+        candidates: [],
+      });
+      continue;
+    }
+    const openOrderIds = openOrders.map((o) => o.id);
+    const candidateItems = assertOk(
+      await supabase
+        .from("orderItems")
+        .select("*")
+        .in("orderId", openOrderIds)
+        .eq("productId", item.productId),
+    ) as OrderItem[];
+    const produceCandidateItems = candidateItems.filter(
+      (ci) => (ci.fulfilmentMode ?? "produce") === "produce",
+    );
+
+    // For each candidate item, compute remaining demand = quantity
+    // minus already-allocated-elsewhere.
+    const candItemIds = produceCandidateItems.map((c) => c.id!);
+    const otherLinks = candItemIds.length > 0
+      ? (assertOk(
+          await supabase.from("orderPlanLinks").select("orderItemId, allocatedQuantity").in("orderItemId", candItemIds),
+        ) as Array<{ orderItemId: string; allocatedQuantity: number }>)
+      : [];
+    const allocByItem = new Map<string, number>();
+    for (const l of otherLinks) {
+      allocByItem.set(l.orderItemId, (allocByItem.get(l.orderItemId) ?? 0) + l.allocatedQuantity);
+    }
+
+    const candidates: ReassignmentProposal["candidates"] = produceCandidateItems.map((ci) => {
+      const o = openOrders.find((x) => x.id === ci.orderId);
+      const allocated = allocByItem.get(ci.id!) ?? 0;
+      return {
+        orderId: ci.orderId,
+        orderItemId: ci.id!,
+        orderLabel: o?.customerName || o?.eventName || "Order",
+        deadline: o?.deadline ?? "",
+        itemQuantity: ci.quantity,
+        itemRemainingDemand: Math.max(0, ci.quantity - allocated),
+      };
+    }).filter((c) => c.itemRemainingDemand > 0)
+      .sort((a, b) => a.deadline.localeCompare(b.deadline));
+
+    proposals.push({
+      planId: link.planId,
+      planName: plan.name,
+      batchNumber: plan.batchNumber,
+      productId: item.productId,
+      productName: productName.get(item.productId) ?? item.productId,
+      allocatedQuantity: link.allocatedQuantity,
+      orderPlanLinkId: link.id!,
+      progressStepKey,
+      candidates,
+    });
+  }
+
+  return proposals;
+}
+
+/** Reassign a single orderPlanLinks row to a different orderItem.
+ *  The batch keeps its progress and identity; only the demand it
+ *  fulfils changes. Caller is expected to have computed the target
+ *  via computeReassignmentProposals. */
+export async function reassignBatchLink(
+  orderPlanLinkId: string,
+  targetOrderItemId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("orderPlanLinks")
+    .update({ orderItemId: targetOrderItemId, updatedAt: new Date() })
+    .eq("id", orderPlanLinkId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+}
+
 /**
  * Order-level "Mark as packed" — used for borrow (take-from-stock)
  * orders. Drains the allocated stock tagged with this orderId and
@@ -8197,7 +8501,11 @@ async function ensureOpeningBalancePlanProductId(productId: string): Promise<str
 }
 
 async function applyProductAdjustment(args: StockAdjustmentInput): Promise<void> {
-  const location: StockLocation = args.location ?? "production";
+  // Default to Store when the caller doesn't specify. Matches the
+  // /stock/adjust UI preset — finished pieces added as opening
+  // balance or a recount belong on the shop floor, not in Production
+  // Storage (which is for pieces just unmoulded and awaiting move-out).
+  const location: StockLocation = args.location ?? "store";
   const planProductId = await ensureOpeningBalancePlanProductId(args.itemId);
   const qty = Math.abs(Math.round(args.deltaQty));
   if (qty === 0) return;
@@ -8300,7 +8608,7 @@ export async function applyStockAdjustment(args: StockAdjustmentInput): Promise<
     id: newId(),
     itemType: args.itemType,
     itemId: args.itemId,
-    location: args.itemType === "product" ? (args.location ?? "production") : null,
+    location: args.itemType === "product" ? (args.location ?? "store") : null,
     deltaQty: args.deltaQty,
     reason: args.reason,
     note: args.note ?? null,

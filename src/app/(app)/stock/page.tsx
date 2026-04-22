@@ -21,7 +21,7 @@ import { STOCK_LOCATION_SHORT_LABELS, STOCK_LOCATIONS, type StockLocation } from
 import { TransferModal } from "@/components/transfer-modal";
 import { Move } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Search, SlidersHorizontal, X, Plus, ClipboardList, Snowflake } from "lucide-react";
+import { Search, SlidersHorizontal, X, Plus, ClipboardList, Snowflake, ChevronDown, ChevronRight } from "lucide-react";
 import type { PlanProduct, ProductionPlan, Product, Mould, FillingStock } from "@/types";
 import { reconcileStockCount } from "@/lib/stockCount";
 import { remainingShelfLifeDays, defrostedSellBy, WEEK_MS } from "@/lib/freezer";
@@ -183,6 +183,18 @@ function ProductStockTab() {
   }, [allStockLocations]);
   const [search, setSearch] = useState("");
   const [confirmGone, setConfirmGone] = useState<string | null>(null);
+  // Per-product expand state — starts collapsed so the page reads as
+  // a compact overview (one row per product with aggregated location
+  // pills). Clicking the chevron reveals the per-batch breakdown.
+  const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set());
+  const toggleProductExpanded = (productId: string) => {
+    setExpandedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+  };
   const [countingProductId, setCountingProductId] = useState<string | null>(null);
   const [countInput, setCountInput] = useState("");
   const [pendingCountConfirm, setPendingCountConfirm] = useState<{
@@ -453,6 +465,16 @@ function ProductStockTab() {
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-sm truncate flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => toggleProductExpanded(group.productId)}
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                      aria-label={expandedProductIds.has(group.productId) ? "Collapse batches" : "Expand batches"}
+                      title={expandedProductIds.has(group.productId) ? "Hide batch detail" : "Show batch detail"}
+                    >
+                      {expandedProductIds.has(group.productId)
+                        ? <ChevronDown className="w-4 h-4" />
+                        : <ChevronRight className="w-4 h-4" />}
+                    </button>
                     {group.product?.name ?? "Unknown product"}
                     {(() => {
                       const belowThreshold =
@@ -634,7 +656,7 @@ function ProductStockTab() {
               )}
             </div>
 
-            {group.batches.map(({ pb, plan, productCount, frozenCount, originalCount, sellBefore }, i) => {
+            {expandedProductIds.has(group.productId) && group.batches.map(({ pb, plan, productCount, frozenCount, originalCount, sellBefore }, i) => {
               const { text: sellByText, cls: sellByCls } = sellByInfo(sellBefore);
               const completedDate = plan.completedAt
                 ? new Date(plan.completedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })

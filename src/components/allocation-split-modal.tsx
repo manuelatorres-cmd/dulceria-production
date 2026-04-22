@@ -99,6 +99,13 @@ export function AllocationSplitModal({
   const overDelivered = sumDelivered > totalYield;
   const needsDestination = surplus > 0 && !surplusDestination;
   const canConfirm = !overDelivered && !needsDestination;
+  // Overproduction vs. plain surplus: if the batch yielded MORE than
+  // the committed request (not just more than currently allocated),
+  // we surface a distinct warning at the top. Keeps the operator
+  // from silently absorbing 20 extras into default Store without a
+  // conscious decision.
+  const isOverproduction = totalYield > totalRequested;
+  const overproductionAmount = Math.max(0, totalYield - totalRequested);
 
   function setFor(linkId: string, value: number) {
     setDelivered((prev) => ({
@@ -138,6 +145,16 @@ export function AllocationSplitModal({
               Yield is {totalRequested - totalYield} short of the total committed ({totalRequested}).
               Decide which orders bear the shortfall.
             </p>
+          )}
+          {isOverproduction && (
+            <div className="mt-2 rounded-md border border-amber-400 bg-amber-100/80 px-2.5 py-1.5 flex items-start gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-900 leading-snug">
+                <span className="font-semibold">Overproduction:</span>{" "}
+                {overproductionAmount} extra piece{overproductionAmount === 1 ? "" : "s"} beyond what's committed
+                ({totalRequested}). Pick a destination for the surplus below — don't leave it silent.
+              </p>
+            </div>
           )}
         </div>
 
@@ -191,10 +208,18 @@ export function AllocationSplitModal({
           })}
         </ul>
 
-        <div className="px-5 py-3 border-t border-border space-y-2 bg-muted/20">
+        <div className={`px-5 py-3 border-t space-y-2 ${
+          needsDestination
+            ? "bg-amber-50 border-amber-300"
+            : "bg-muted/20 border-border"
+        }`}>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Surplus</span>
-            <span className="text-sm font-semibold tabular-nums">
+            <span className={`text-sm font-medium flex items-center gap-1.5 ${needsDestination ? "text-amber-900" : ""}`}>
+              {needsDestination && <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />}
+              Surplus
+              {needsDestination && <span className="text-[10px] uppercase tracking-wide text-amber-700">— decide</span>}
+            </span>
+            <span className={`text-sm font-semibold tabular-nums ${needsDestination ? "text-amber-900" : ""}`}>
               {surplus} piece{surplus === 1 ? "" : "s"}
             </span>
           </div>

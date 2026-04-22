@@ -34,7 +34,10 @@ function emptyRow(preset: Partial<DraftRow> = {}): DraftRow {
     key: nextKey(),
     itemType: preset.itemType ?? "ingredient",
     itemId: preset.itemId ?? "",
-    location: preset.location ?? "production",
+    // Default to Store — finished pieces the chocolatier adds to
+    // opening balance are front-of-shop ready. Production Storage is
+    // for pieces just unmoulded and waiting to move out.
+    location: preset.location ?? "store",
     deltaQty: preset.deltaQty ?? "",
     reason: preset.reason ?? "opening_balance",
     note: preset.note ?? "",

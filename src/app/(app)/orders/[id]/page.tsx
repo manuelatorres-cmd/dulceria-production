@@ -16,6 +16,8 @@ import {
   useProductionPlans, useOrderPlanLinks, useAllPlanStepStatuses,
   useAllProductionDayLineItems, useProductionDays, useProductionSteps,
   useAllocatedForOrder, markOrderAsPacked,
+  computeReassignmentProposals, reassignBatchLink,
+  type ReassignmentProposal,
 } from "@/lib/hooks";
 import { batchPhaseProgress } from "@/lib/batch-progress";
 import { supabase } from "@/lib/supabase";
@@ -168,6 +170,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addingLine, setAddingLine] = useState(false);
+  // Reassignment proposals — populated when the user confirms delete
+  // AND at least one linked batch has Shelling-or-later progress. The
+  // operator then either reassigns batches to other open orders or
+  // chooses "Delete anyway" to discard the sunk cost.
+  const [reassignProposals, setReassignProposals] = useState<ReassignmentProposal[] | null>(null);
+  const [reassignBusy, setReassignBusy] = useState<string | null>(null);
 
   if (order === undefined) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (order === null) return <div className="p-6 text-sm text-muted-foreground">Order not found.</div>;
@@ -178,12 +186,22 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   async function handleDelete() {
-    // Previously this had no try/catch — if any step inside
-    // deleteOrder (revertBorrows, cascade, orphan-plan cleanup) threw,
-    // the router.replace never ran and the user was stuck on the
-    // detail page with no visible error. The undeleted row looked
-    // like a silent soft-delete bug. Now failures surface as an
-    // alert so the user knows the delete didn't go through.
+    // Pre-delete reassignment check — if any linked batch has Shelling
+    // or later progress, surface candidates for reassignment before
+    // the sunk work is discarded.
+    try {
+      const proposals = await computeReassignmentProposals(orderId);
+      if (proposals.length > 0) {
+        setReassignProposals(proposals);
+        return; // Modal takes over; actual delete deferred.
+      }
+    } catch (err) {
+      console.warn("Reassignment lookup failed, proceeding with plain delete:", err);
+    }
+    await performDelete();
+  }
+
+  async function performDelete() {
     try {
       await deleteOrder(orderId);
       router.replace("/orders");
@@ -191,6 +209,21 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       const msg = err instanceof Error ? err.message : String(err);
       console.error("deleteOrder failed:", err);
       alert(`Delete failed: ${msg}\n\nThe order is still in the database. Check the browser console for details.`);
+    }
+  }
+
+  async function handleReassign(proposal: ReassignmentProposal, targetOrderItemId: string) {
+    setReassignBusy(proposal.orderPlanLinkId);
+    try {
+      await reassignBatchLink(proposal.orderPlanLinkId, targetOrderItemId);
+      // Recompute remaining proposals (the reassigned batch may still
+      // have other links, and other batches may still have progress).
+      const next = await computeReassignmentProposals(orderId);
+      setReassignProposals(next);
+    } catch (err) {
+      alert(`Reassign failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setReassignBusy(null);
     }
   }
 
@@ -707,6 +740,79 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           )}
         </section>
+
+        {/* Reassignment-proposal modal — fires when handleDelete detects
+            Shelling-or-later progress on a linked batch. Gives the
+            operator a chance to move the sunk work to another open
+            order instead of deleting it. */}
+        {reassignProposals && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setReassignProposals(null)} />
+            <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+              <div className="px-5 pt-5 pb-3 border-b border-border bg-amber-50">
+                <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> In-flight work — reassign or discard?
+                </h3>
+                <p className="text-xs text-amber-900/80 mt-1">
+                  One or more batches for this order already have production progress. Reassign
+                  them to another open order with the same product, or choose Delete anyway to
+                  discard the sunk work.
+                </p>
+              </div>
+              <ul className="px-5 py-3 space-y-3 max-h-80 overflow-y-auto">
+                {reassignProposals.map((p) => (
+                  <li key={p.orderPlanLinkId} className="rounded-lg border border-border p-3 space-y-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-sm font-semibold">{p.productName}</p>
+                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                        {p.allocatedQuantity} pcs · batch {p.batchNumber ?? p.planName}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Progress reached <span className="font-medium">{p.progressStepKey.split("-")[0]}</span>.
+                    </p>
+                    {p.candidates.length === 0 ? (
+                      <p className="text-[11px] text-muted-foreground italic">
+                        No open orders for this product — reassignment not possible.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.candidates.slice(0, 6).map((c) => (
+                          <button
+                            key={c.orderItemId}
+                            onClick={() => handleReassign(p, c.orderItemId)}
+                            disabled={reassignBusy === p.orderPlanLinkId}
+                            className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium disabled:opacity-50"
+                            title={`Needs ${c.itemRemainingDemand} pcs · deadline ${c.deadline.slice(0, 10)}`}
+                          >
+                            → {c.orderLabel} · {c.itemRemainingDemand} pcs needed
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="px-5 py-3 border-t border-border flex justify-end gap-2 bg-muted/20">
+                <button
+                  onClick={() => setReassignProposals(null)}
+                  className="rounded-full border border-border px-4 py-2 text-sm"
+                >
+                  Keep order
+                </button>
+                <button
+                  onClick={async () => {
+                    setReassignProposals(null);
+                    await performDelete();
+                  }}
+                  className="rounded-full bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
+                >
+                  Delete anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
