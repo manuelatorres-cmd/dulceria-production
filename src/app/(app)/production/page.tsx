@@ -105,11 +105,26 @@ export default function ProductionPage() {
     return `${y}-${m}-${dd}`;
   }, []);
 
-  // Filter: skip days that are in the past AND fully closed.
+  // Visible days = today + future. Past rows (HACCP-only days with no
+  // scheduled work, stale drafts, old closed days) are hidden from the
+  // forward-looking production view. If there's no row for today yet
+  // we synthesise a placeholder so today always appears at the top.
   const visibleDays = useMemo(() => {
-    return productionDays
-      .filter((d) => d.status !== "done" || d.date >= todayIso)
+    const rows = productionDays
+      .filter((d) => d.date >= todayIso)
       .sort((a, b) => a.date.localeCompare(b.date));
+    if (!rows.some((d) => d.date === todayIso)) {
+      // Synthesise today. No id means we skip DB-bound actions; the
+      // render just uses date for keying. Real row is created the
+      // moment Open Production or Regenerate runs.
+      rows.unshift({
+        date: todayIso,
+        status: "draft",
+        tempLogComplete: false,
+        cleaningComplete: false,
+      });
+    }
+    return rows;
   }, [productionDays, todayIso]);
 
   // Line items grouped per day (already sorted by sortOrder at hook).
@@ -158,7 +173,7 @@ export default function ProductionPage() {
         ) : (
           <div className="space-y-4">
             {visibleDays.map((day) => {
-              const items = (lineItemsByDay.get(day.id!) ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
+              const items = (day.id ? lineItemsByDay.get(day.id) ?? [] : []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
               const dayDate = new Date(day.date + "T12:00:00");
               const avail = effectiveDailyCapacityMinutes(dayDate, config, people, unavailability, blockedDays);
               const used = items.reduce((s, li) => s + li.plannedMinutes, 0);
@@ -172,7 +187,7 @@ export default function ProductionPage() {
               const isToday = day.date === todayIso;
               return (
                 <section
-                  key={day.id}
+                  key={day.id ?? day.date}
                   className={`rounded-lg border overflow-hidden ${
                     isToday ? "border-primary/40 bg-primary/5" : "border-border bg-card"
                   }`}

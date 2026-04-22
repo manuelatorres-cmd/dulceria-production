@@ -337,7 +337,14 @@ export function buildDailySchedule(input: DailyScheduleInput): DailyScheduleResu
     const mode: "forward" | "reverse" =
       daysToDeadline <= mergingWindowDays ? "forward" : "reverse";
 
-    // latestDay = deadline − bufferDays (working days).
+    // latestDay = deadline − bufferDays (working days). When the
+    // deadline is already in the past or would push the latest day
+    // before today, we don't block placement — we schedule ASAP and
+    // warn that the deadline is already unreachable. Blocking an
+    // overdue batch from being scheduled meant ALL batches sharing
+    // that batch (via the earliest-linked-deadline rule) went to
+    // "unscheduled", even when some of their other orders had lots
+    // of runway left.
     let latestDay: string | null = null;
     if (deadlineMs !== undefined) {
       const deadlineDate = new Date(deadlineMs);
@@ -359,13 +366,20 @@ export function buildDailySchedule(input: DailyScheduleInput): DailyScheduleResu
       }
       latestDay = found;
       if (!latestDay || latestDay < todayIso) {
-        unscheduled.add(plan.id!);
-        warnings.push(`Batch "${plan.name}" deadline leaves no room for scheduling.`);
-        continue;
+        // Overdue: soft-fail the deadline cap, schedule ASAP, warn.
+        warnings.push(
+          `Batch "${plan.name}" is past its earliest linked deadline — scheduling ASAP (will finish after deadline).`,
+        );
+        latestDay = null;
       }
     }
 
-    const placement = mode === "forward"
+    // Reverse mode needs a concrete anchor. If latestDay dropped to
+    // null (e.g. buffer couldn't find enough working days before
+    // today), fall back to forward-fill from today.
+    const effectiveMode: "forward" | "reverse" =
+      mode === "reverse" && latestDay ? "reverse" : "forward";
+    const placement = effectiveMode === "forward"
       ? placeForward(flat, mouldId, plan.id!, todayIso, latestDay, days, mouldSpans, capFor, lockedStepsByDate)
       : placeReverse(flat, mouldId, plan.id!, latestDay!, todayIso, days, mouldSpans, capFor, lockedStepsByDate);
 

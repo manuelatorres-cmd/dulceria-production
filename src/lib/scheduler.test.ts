@@ -381,6 +381,30 @@ describe("buildDailySchedule — batch ordering", () => {
   });
 });
 
+describe("buildDailySchedule — overdue deadline", () => {
+  it("schedules a batch with an overdue deadline forward from today and warns", () => {
+    const steps = [mkStep("Polishing", "Moulded", 1, 30)];
+    const batch = makeBatch({
+      planId: "plan-LATE", productId: "prod-1",
+      categoryId: "cat-Moulded", categoryName: "Moulded",
+      mouldId: "m-1", mouldCavities: 10, quantity: 1,
+      deadline: daysFromToday(-10), // 10 days in the past
+      steps,
+    });
+    const input = makeInput({
+      ...assemble([batch], steps),
+      productionSteps: steps,
+    } as Partial<DailyScheduleInput>);
+
+    const out = buildDailySchedule(input);
+    // Not unscheduled: we still place it, just with a warning.
+    expect(out.unscheduledPlanIds).toEqual([]);
+    expect(out.days.length).toBe(1);
+    expect(out.days[0].date).toBe(toIso(daysFromToday(0)));
+    expect(out.warnings.join(" ")).toMatch(/past its earliest linked deadline/i);
+  });
+});
+
 describe("buildDailySchedule — unscheduleable cases", () => {
   it("flags a batch whose single step exceeds any day's capacity", () => {
     const steps = [mkStep("Polishing", "Moulded", 1, 10_000)];
