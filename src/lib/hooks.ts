@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -3837,6 +3837,539 @@ export async function deleteShoppingItem(id: string): Promise<void> {
   const { error } = await supabase.from("shoppingItems").delete().eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["shopping-items"] });
+}
+
+// --- Ingredient Stock ---
+//
+// Grams-on-hand per ingredient. Receives on purchase intake,
+// drains on production step ticks (Shelling for shell chocolate,
+// Filling Prep for recipe ingredients). Audit log lives in
+// ingredientStockMovements. Migration 0044.
+
+/** All ingredient stock rows. One per ingredient (unique). */
+export function useAllIngredientStock(): IngredientStock[] {
+  const { data } = useQuery({
+    queryKey: ["ingredient-stock"],
+    queryFn: async () =>
+      assertOk(await supabase.from("ingredientStock").select("*")) as IngredientStock[],
+  });
+  return data ?? [];
+}
+
+/** Grams-on-hand for a single ingredient, or null if no row yet. */
+export function useIngredientStock(ingredientId: string | undefined): IngredientStock | null {
+  const { data } = useQuery({
+    queryKey: ["ingredient-stock", "one", ingredientId ?? ""],
+    enabled: !!ingredientId,
+    queryFn: async () =>
+      assertOkMaybe(
+        await supabase
+          .from("ingredientStock")
+          .select("*")
+          .eq("ingredientId", ingredientId!)
+          .maybeSingle(),
+      ) as IngredientStock | null,
+  });
+  return data ?? null;
+}
+
+export function useIngredientStockMovements(ingredientId?: string, limit = 100): IngredientStockMovement[] {
+  const { data } = useQuery({
+    queryKey: ["ingredient-stock-movements", ingredientId ?? "all", limit],
+    queryFn: async () => {
+      const q = supabase
+        .from("ingredientStockMovements")
+        .select("*")
+        .order("movedAt", { ascending: false })
+        .limit(limit);
+      return assertOk(
+        await (ingredientId ? q.eq("ingredientId", ingredientId) : q),
+      ) as IngredientStockMovement[];
+    },
+  });
+  return data ?? [];
+}
+
+/** Apply a signed delta (in grams) to an ingredient's stock row.
+ *  Creates the row lazily on first touch. Logs an audit movement so
+ *  /ingredients/<id> can render the history. Never lets the balance
+ *  drop below zero — returns the actual delta applied (may be less
+ *  than requested if stock was insufficient). */
+export async function adjustIngredientStock(args: {
+  ingredientId: string;
+  deltaG: number;
+  reason: "receive" | "shelling" | "filling_prep" | "recount" | "waste";
+  planId?: string;
+  stepKey?: string;
+  notes?: string;
+  movedBy?: string;
+}): Promise<{ applied: number; balanceAfter: number }> {
+  const { ingredientId, deltaG, reason } = args;
+  if (!ingredientId) throw new Error("adjustIngredientStock: ingredientId required");
+  const rounded = Math.round(deltaG * 1000) / 1000; // 3-dp grams
+  if (rounded === 0) return { applied: 0, balanceAfter: 0 };
+
+  const existing = assertOkMaybe(
+    await supabase
+      .from("ingredientStock")
+      .select("*")
+      .eq("ingredientId", ingredientId)
+      .maybeSingle(),
+  ) as IngredientStock | null;
+
+  const current = Number(existing?.quantityG ?? 0);
+  let applied = rounded;
+  let next = current + rounded;
+  if (next < 0) {
+    // Clamp to zero. Return the actually-applied negative delta so
+    // callers can report the shortfall if they need to.
+    applied = -current;
+    next = 0;
+  }
+
+  const now = new Date();
+  if (existing) {
+    const { error } = await supabase
+      .from("ingredientStock")
+      .update({ quantityG: next, updatedAt: now })
+      .eq("id", existing.id!);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("ingredientStock").insert({
+      id: newId(),
+      ingredientId,
+      quantityG: next,
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (error) throw error;
+  }
+
+  // Audit row — always log the ATTEMPTED delta (rounded), even when
+  // clamped, with a note so the history shows reality.
+  const { error: mvErr } = await supabase.from("ingredientStockMovements").insert({
+    id: newId(),
+    ingredientId,
+    deltaG: applied, // what actually happened to the balance
+    reason,
+    planId: args.planId ?? null,
+    stepKey: args.stepKey ?? null,
+    movedBy: args.movedBy ?? null,
+    notes: applied !== rounded
+      ? `${args.notes ? args.notes + ". " : ""}Clamped at zero; requested ${rounded}g, had ${current}g.`
+      : args.notes ?? null,
+    movedAt: now,
+  });
+  if (mvErr) throw mvErr;
+
+  queryClient.invalidateQueries({ queryKey: ["ingredient-stock"] });
+  queryClient.invalidateQueries({ queryKey: ["ingredient-stock-movements"] });
+  return { applied, balanceAfter: next };
+}
+
+export async function receiveIngredientStock(
+  ingredientId: string,
+  quantityG: number,
+  notes?: string,
+): Promise<number> {
+  if (quantityG <= 0) throw new Error("Receive quantity must be positive.");
+  const r = await adjustIngredientStock({
+    ingredientId,
+    deltaG: quantityG,
+    reason: "receive",
+    notes,
+  });
+  return r.balanceAfter;
+}
+
+export async function setIngredientLowStockThreshold(
+  ingredientId: string,
+  thresholdG: number | null,
+): Promise<void> {
+  const existing = assertOkMaybe(
+    await supabase
+      .from("ingredientStock")
+      .select("id")
+      .eq("ingredientId", ingredientId)
+      .maybeSingle(),
+  ) as { id?: string } | null;
+  if (existing?.id) {
+    const { error } = await supabase
+      .from("ingredientStock")
+      .update({ lowStockThresholdG: thresholdG, updatedAt: new Date() })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("ingredientStock").insert({
+      id: newId(),
+      ingredientId,
+      quantityG: 0,
+      lowStockThresholdG: thresholdG,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    if (error) throw error;
+  }
+  queryClient.invalidateQueries({ queryKey: ["ingredient-stock"] });
+}
+
+// ── Step-tick stock-flow helpers ──────────────────────────────────
+//
+// Each helper is triggered by ticking a production step on the batch
+// page. Deductions drain ingredientStock, intakes populate fillingStock
+// and productStockLocations. Every call logs a stockMovements audit
+// row so /ingredients/<id> history reflects reality.
+//
+// Idempotency: each helper checks for a prior movement with the same
+// (planId, stepKey) and bails if present. Unticking a step does NOT
+// auto-revert the deduction today — see TODO for stage-2 work.
+
+/** Shell chocolate deduction on Shelling tick.
+ *  grams = cavityWeightG × numberOfCavities × moulds × shell% */
+export async function deductShellForPlanProduct(
+  planProductId: string,
+  planId: string,
+): Promise<{ warnings: string[] }> {
+  const stepKey = `shell-${planProductId}`;
+  const warnings: string[] = [];
+
+  // Idempotency — have we already done this exact tick?
+  const existingMv = assertOkMaybe(
+    await supabase
+      .from("ingredientStockMovements")
+      .select("id")
+      .eq("planId", planId)
+      .eq("stepKey", stepKey)
+      .eq("reason", "shelling")
+      .maybeSingle(),
+  ) as { id?: string } | null;
+  if (existingMv?.id) return { warnings };
+
+  const pp = assertOkMaybe(
+    await supabase.from("planProducts").select("*").eq("id", planProductId).maybeSingle(),
+  ) as PlanProduct | null;
+  if (!pp) { warnings.push("planProduct not found"); return { warnings }; }
+
+  const product = assertOkMaybe(
+    await supabase.from("products").select("*").eq("id", pp.productId).maybeSingle(),
+  ) as Product | null;
+  if (!product) { warnings.push(`Product ${pp.productId} not found.`); return { warnings }; }
+  const shellIngredientId = product.shellIngredientId;
+  if (!shellIngredientId) {
+    warnings.push(`"${product.name}" has no shell chocolate set — can't deduct shell stock.`);
+    return { warnings };
+  }
+
+  const mould = pp.mouldId ? assertOkMaybe(
+    await supabase.from("moulds").select("*").eq("id", pp.mouldId).maybeSingle(),
+  ) as Mould | null : null;
+  if (!mould) { warnings.push(`Mould not found for "${product.name}".`); return { warnings }; }
+
+  const shellPct = product.shellPercentage ?? 37; // DEFAULT_SHELL_PERCENTAGE
+  const totalCavityG =
+    mould.cavityWeightG * mould.numberOfCavities * pp.quantity;
+  const shellG = Math.round(totalCavityG * (shellPct / 100) * 10) / 10;
+
+  if (shellG <= 0) return { warnings };
+
+  const result = await adjustIngredientStock({
+    ingredientId: shellIngredientId,
+    deltaG: -shellG,
+    reason: "shelling",
+    planId,
+    stepKey,
+    notes: `Shelling — ${product.name} — ${pp.quantity} mould${pp.quantity === 1 ? "" : "s"} × ${shellPct}%`,
+  });
+  if (Math.abs(result.applied) < shellG) {
+    warnings.push(
+      `Short ${(shellG + result.applied).toFixed(1)}g of shell chocolate for "${product.name}". Stock at zero.`,
+    );
+  }
+  return { warnings };
+}
+
+/** Filling Prep: for a given (planId, fillingId), sum the needed
+ *  filling grams across all planProducts in this batch that use this
+ *  filling. Apply buffer %. Deduct recipe ingredients. Create a
+ *  fillingStock row with the total made. Called when the consolidated
+ *  `filling-<fillingId>` step is ticked done. */
+export async function prepareFillingForBatch(
+  planId: string,
+  fillingId: string,
+  bufferPercent = 10,
+): Promise<{ warnings: string[] }> {
+  const stepKey = `filling-${fillingId}`;
+  const warnings: string[] = [];
+
+  // Idempotency check — any prior movement with reason=filling_prep
+  // for this (planId, stepKey)?
+  const existing = assertOkMaybe(
+    await supabase
+      .from("ingredientStockMovements")
+      .select("id")
+      .eq("planId", planId)
+      .eq("stepKey", stepKey)
+      .eq("reason", "filling_prep")
+      .maybeSingle(),
+  ) as { id?: string } | null;
+  if (existing?.id) return { warnings };
+
+  const pps = assertOk(
+    await supabase.from("planProducts").select("*").eq("planId", planId),
+  ) as PlanProduct[];
+  if (pps.length === 0) return { warnings };
+
+  // Filter to pps whose product uses this filling.
+  const productFillings = assertOk(
+    await supabase.from("productFillings").select("*").in("productId", pps.map((p) => p.productId)),
+  ) as ProductFilling[];
+  const relevantPps = pps.filter((pp) =>
+    productFillings.some((pf) => pf.productId === pp.productId && pf.fillingId === fillingId),
+  );
+  if (relevantPps.length === 0) return { warnings };
+
+  const moulds = assertOk(
+    await supabase.from("moulds").select("*").in("id", relevantPps.map((p) => p.mouldId).filter(Boolean) as string[]),
+  ) as Mould[];
+  const mouldById = new Map(moulds.map((m) => [m.id!, m]));
+  const products = assertOk(
+    await supabase.from("products").select("*").in("id", relevantPps.map((p) => p.productId)),
+  ) as Product[];
+  const productById = new Map(products.map((p) => [p.id!, p]));
+
+  // Compute total filling grams needed across all relevant planProducts.
+  // fillingWeightG = cavityWeightG × cavities × moulds × (100-shellPct)/100 × fillPct/100 × density
+  const DENSITY = 1.2;
+  let totalNeededG = 0;
+  for (const pp of relevantPps) {
+    const product = productById.get(pp.productId);
+    const mould = mouldById.get(pp.mouldId ?? "");
+    if (!product || !mould) continue;
+    const pf = productFillings.find((x) => x.productId === pp.productId && x.fillingId === fillingId);
+    if (!pf) continue;
+    const shellPct = product.shellPercentage ?? 37;
+    const totalCavityMl = mould.cavityWeightG * mould.numberOfCavities * pp.quantity;
+    const fillFactor = (100 - shellPct) / 100;
+    const totalFillG = totalCavityMl * fillFactor * DENSITY;
+    const fillingPct = (pf.fillPercentage ?? 100) / 100;
+    totalNeededG += totalFillG * fillingPct;
+  }
+  if (totalNeededG <= 0) return { warnings };
+
+  const totalToMakeG = Math.round(totalNeededG * (1 + bufferPercent / 100) * 10) / 10;
+
+  // Look up the filling and its recipe.
+  const filling = assertOkMaybe(
+    await supabase.from("fillings").select("*").eq("id", fillingId).maybeSingle(),
+  ) as Filling | null;
+  if (!filling) { warnings.push(`Filling ${fillingId} not found.`); return { warnings }; }
+
+  const recipe = assertOk(
+    await supabase.from("fillingIngredients").select("*").eq("fillingId", fillingId),
+  ) as FillingIngredient[];
+  const recipeBaseG = recipe.reduce((s, r) => s + Number(r.amount || 0), 0);
+  if (recipeBaseG <= 0) {
+    warnings.push(`Filling "${filling.name}" has no ingredient recipe. Skipping deduction.`);
+    // Still create the fillingStock row so Filling tick has something to draw from.
+    await supabase.from("fillingStock").insert({
+      id: newId(),
+      fillingId,
+      remainingG: totalToMakeG,
+      planId,
+      madeAt: new Date().toISOString(),
+      notes: `Auto-created on Filling Prep (no recipe to deduct from).`,
+      createdAt: Date.now(),
+    });
+    queryClient.invalidateQueries({ queryKey: ["filling-stock"] });
+    return { warnings };
+  }
+  const scale = totalToMakeG / recipeBaseG;
+
+  // Deduct each recipe ingredient.
+  for (const ri of recipe) {
+    const needG = Math.round(Number(ri.amount) * scale * 10) / 10;
+    if (needG <= 0) continue;
+    const r = await adjustIngredientStock({
+      ingredientId: ri.ingredientId,
+      deltaG: -needG,
+      reason: "filling_prep",
+      planId,
+      stepKey,
+      notes: `Filling Prep — ${filling.name} (${totalToMakeG}g, buffer ${bufferPercent}%)`,
+    });
+    if (Math.abs(r.applied) < needG) {
+      warnings.push(
+        `Short ${(needG + r.applied).toFixed(1)}g of ingredient ${ri.ingredientId} for "${filling.name}".`,
+      );
+    }
+  }
+
+  // Add to fillingStock.
+  const { error: fsErr } = await supabase.from("fillingStock").insert({
+    id: newId(),
+    fillingId,
+    remainingG: totalToMakeG,
+    planId,
+    madeAt: new Date().toISOString(),
+    notes: `Made on Filling Prep tick (${bufferPercent}% buffer).`,
+    createdAt: Date.now(),
+  });
+  if (fsErr) throw fsErr;
+  queryClient.invalidateQueries({ queryKey: ["filling-stock"] });
+
+  return { warnings };
+}
+
+/** Filling tick: consume fillingStock FIFO for a planProduct's
+ *  fillings. Prefer stock rows tagged with this same planId first,
+ *  fall back to older rows by createdAt ascending. */
+export async function consumeFillingStockForPlanProduct(
+  planProductId: string,
+  planId: string,
+): Promise<{ warnings: string[] }> {
+  const warnings: string[] = [];
+
+  const pp = assertOkMaybe(
+    await supabase.from("planProducts").select("*").eq("id", planProductId).maybeSingle(),
+  ) as PlanProduct | null;
+  if (!pp) return { warnings };
+
+  const product = assertOkMaybe(
+    await supabase.from("products").select("*").eq("id", pp.productId).maybeSingle(),
+  ) as Product | null;
+  if (!product) return { warnings };
+
+  const mould = pp.mouldId ? assertOkMaybe(
+    await supabase.from("moulds").select("*").eq("id", pp.mouldId).maybeSingle(),
+  ) as Mould | null : null;
+  if (!mould) return { warnings };
+
+  const pfs = assertOk(
+    await supabase.from("productFillings").select("*").eq("productId", pp.productId),
+  ) as ProductFilling[];
+
+  const shellPct = product.shellPercentage ?? 37;
+  const DENSITY = 1.2;
+  const totalCavityMl = mould.cavityWeightG * mould.numberOfCavities * pp.quantity;
+  const totalFillG = totalCavityMl * ((100 - shellPct) / 100) * DENSITY;
+
+  for (const pf of pfs) {
+    const fillingPct = (pf.fillPercentage ?? 100) / 100;
+    const neededG = Math.round(totalFillG * fillingPct * 10) / 10;
+    if (neededG <= 0) continue;
+
+    // Fetch filling stock rows for this filling, prefer same-plan first.
+    const stocks = assertOk(
+      await supabase
+        .from("fillingStock")
+        .select("*")
+        .eq("fillingId", pf.fillingId)
+        .gt("remainingG", 0),
+    ) as FillingStock[];
+    const sorted = [...stocks].sort((a, b) => {
+      if (a.planId === planId && b.planId !== planId) return -1;
+      if (b.planId === planId && a.planId !== planId) return 1;
+      return (a.createdAt ?? 0) - (b.createdAt ?? 0);
+    });
+
+    let remaining = neededG;
+    for (const row of sorted) {
+      if (remaining <= 0) break;
+      const take = Math.min(Number(row.remainingG), remaining);
+      const nextRem = Math.round((Number(row.remainingG) - take) * 10) / 10;
+      const { error } = await supabase
+        .from("fillingStock")
+        .update({ remainingG: nextRem })
+        .eq("id", row.id!);
+      if (error) throw error;
+      remaining -= take;
+    }
+    if (remaining > 0) {
+      const filling = assertOkMaybe(
+        await supabase.from("fillings").select("name").eq("id", pf.fillingId).maybeSingle(),
+      ) as { name?: string } | null;
+      warnings.push(
+        `Short ${remaining.toFixed(1)}g of "${filling?.name ?? pf.fillingId}". Prep more filling or increase buffer.`,
+      );
+    }
+  }
+  queryClient.invalidateQueries({ queryKey: ["filling-stock"] });
+  return { warnings };
+}
+
+/** Packing tick: move `quantity` pieces out of Production stock for
+ *  this planProduct (reason='sold'). Called by the Packing modal
+ *  confirm handler after packaging has been deducted. Idempotent via
+ *  a check for an existing 'sold' movement tagged with this step.
+ *
+ *  Packing-only batches (name suffix "— packing") are skipped — they
+ *  represent borrow-line packing work where the pieces are on a
+ *  different batch's stockLocations (the donor). A follow-up task
+ *  will wire borrow-line packing through allocated-→-null moves on
+ *  the donor batch. */
+export async function consumeProductStockForPacking(
+  planProductId: string,
+  planId: string,
+  quantity: number,
+  stepKey: string,
+): Promise<{ warnings: string[] }> {
+  const warnings: string[] = [];
+  const qty = Math.max(0, Math.round(quantity));
+  if (qty === 0) return { warnings };
+
+  // Packing-only batches bypass product stock deduction (no production
+  // pieces under this planProduct).
+  const plan = assertOkMaybe(
+    await supabase.from("productionPlans").select("name").eq("id", planId).maybeSingle(),
+  ) as { name?: string } | null;
+  if ((plan?.name ?? "").trim().endsWith("— packing")) return { warnings };
+
+  // Idempotency check.
+  const existing = assertOk(
+    await supabase
+      .from("stockMovements")
+      .select("id")
+      .eq("planProductId", planProductId)
+      .eq("reason", "sold")
+      .limit(1),
+  ) as Array<{ id: string }>;
+  if (existing.length > 0) return { warnings };
+
+  // Pull productId for the movement log.
+  const pp = assertOkMaybe(
+    await supabase.from("planProducts").select("productId").eq("id", planProductId).maybeSingle(),
+  ) as { productId?: string } | null;
+  if (!pp?.productId) { warnings.push("planProduct missing"); return { warnings }; }
+
+  // Find Production-location stockLocations for this planProduct.
+  const locs = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("*")
+      .eq("planProductId", planProductId)
+      .eq("location", "production"),
+  ) as StockLocationRow[];
+  const available = locs.reduce((s, r) => s + Number(r.quantity ?? 0), 0);
+  if (available <= 0) {
+    warnings.push(`No Production stock for this batch to deduct — did Unmould run?`);
+    return { warnings };
+  }
+
+  const toTake = Math.min(qty, available);
+  await outakeBatchStock({
+    planProductId,
+    productId: pp.productId,
+    fromLocation: "production",
+    quantity: toTake,
+    reason: "sold",
+    notes: `Packing step ${stepKey}`,
+  });
+  if (toTake < qty) {
+    warnings.push(
+      `Packing asked for ${qty} pcs but only ${toTake} were in Production. Shortfall ${qty - toTake} pcs — reconcile via /stock.`,
+    );
+  }
+  return { warnings };
 }
 
 // --- Filling Stock (leftover filling) ---

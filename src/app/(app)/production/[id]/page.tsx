@@ -12,6 +12,8 @@ import {
   useLinksForPlan, useOrders, useAllOrderItems,
   promoteOrdersForPlan, startProductionPlan,
   useAllProductionDayLineItems, useProductionDays, useProductionSteps,
+  deductShellForPlanProduct, prepareFillingForBatch, consumeFillingStockForPlanProduct,
+  consumeProductStockForPacking,
 } from "@/lib/hooks";
 import { PackingModal } from "@/components/packing-modal";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
@@ -446,6 +448,41 @@ function PlanContent({
     return entries;
   }
 
+  /** Run the stock-flow side-effect for a step that just transitioned
+   *  false → true. Shell ticks deduct shell chocolate; filling-prep
+   *  ticks deduct recipe ingredients and populate fillingStock; fill
+   *  ticks consume fillingStock per mould. Warnings (insufficient
+   *  stock) surface as an alert so the operator can decide whether to
+   *  carry on or top up. Failures don't block the tick itself. */
+  async function runStockFlowForStepTick(key: string, wasCurrent: boolean): Promise<void> {
+    if (wasCurrent) return; // only on false → true
+    const step = steps.find((s) => s.key === key);
+    if (!step || !plan.id) return;
+    const warnings: string[] = [];
+    try {
+      if (step.group === "shell" && step.planProductId) {
+        const r = await deductShellForPlanProduct(step.planProductId, plan.id);
+        warnings.push(...r.warnings);
+      } else if (step.group === "filling") {
+        const fillingId = key.replace(/^filling-/, "");
+        if (fillingId) {
+          const r = await prepareFillingForBatch(plan.id, fillingId);
+          warnings.push(...r.warnings);
+        }
+      } else if (step.group === "fill" && step.planProductId) {
+        const r = await consumeFillingStockForPlanProduct(step.planProductId, plan.id);
+        warnings.push(...r.warnings);
+      }
+    } catch (e) {
+      console.error("Stock flow error for step", key, e);
+      alert(`Stock flow error: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    if (warnings.length > 0) {
+      alert(`Stock warnings:\n\n${warnings.join("\n")}`);
+    }
+  }
+
   async function handleToggle(key: string) {
     const current = statusMap.get(key) ?? false;
 
@@ -472,6 +509,11 @@ function PlanContent({
 
         // Toggle the step first
         await toggleStep(planId, key, true);
+
+        // Consume filling stock for this planProduct's fill step BEFORE
+        // the leftover prompt runs — the leftover modal then shows the
+        // updated remaining so the user enters "what's actually left".
+        await runStockFlowForStepTick(key, current);
 
         const newDoneCount = doneCount + 1;
         const newStatus = newDoneCount >= steps.length ? "done" : newDoneCount > 0 ? "active" : "draft";
@@ -522,6 +564,9 @@ function PlanContent({
     }
 
     await toggleStep(planId, key, !current);
+    // Run stock-flow side-effects for shell / filling-prep ticks that
+    // don't have their own intercept block above.
+    await runStockFlowForStepTick(key, current);
     const newDoneCount = doneCount + (current ? -1 : 1);
     const newStatus = newDoneCount >= steps.length ? "done" : newDoneCount > 0 ? "active" : "draft";
     await applyPlanStatusTransition(newStatus);
@@ -1368,10 +1413,21 @@ function PlanContent({
               note,
             });
             await toggleStep(planId, packingTarget.stepKey, true);
+            // Deduct packed pieces from Production stock (reason='sold').
+            // Packing-only batches are skipped inside the helper.
+            const prodStock = await consumeProductStockForPacking(
+              packingTarget.planProductId,
+              planId,
+              packingTarget.totalPieces,
+              packingTarget.stepKey,
+            );
             setPackingTarget(null);
+            const warnings: string[] = [];
             if (actual < units) {
-              alert(`Only ${actual} of the ${units} requested units were on hand. The rest weren't deducted — add stock on the Packaging page before the next pack.`);
+              warnings.push(`Packaging: only ${actual} of ${units} units were on hand. Add stock on the Packaging page before the next pack.`);
             }
+            warnings.push(...prodStock.warnings);
+            if (warnings.length > 0) alert(warnings.join("\n"));
           }}
           onCancel={() => setPackingTarget(null)}
         />

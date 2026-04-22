@@ -3,7 +3,7 @@
 import { useState, useEffect, use, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
-import { useIngredient, useIngredients, useIngredientUsage, saveIngredient, deleteIngredient, archiveIngredient, unarchiveIngredient, checkIngredientBeforeDelete, useIngredientPriceHistory, deleteIngredientPriceHistoryEntry, setIngredientLowStock, setIngredientOutOfStock, markIngredientOrdered, useCurrencySymbol } from "@/lib/hooks";
+import { useIngredient, useIngredients, useIngredientUsage, saveIngredient, deleteIngredient, archiveIngredient, unarchiveIngredient, checkIngredientBeforeDelete, useIngredientPriceHistory, deleteIngredientPriceHistoryEntry, setIngredientLowStock, setIngredientOutOfStock, markIngredientOrdered, useCurrencySymbol, useIngredientStock, useIngredientStockMovements, receiveIngredientStock, adjustIngredientStock, setIngredientLowStockThreshold } from "@/lib/hooks";
 import type { IngredientDeleteCheck } from "@/lib/hooks";
 import { IngredientForm } from "@/components/ingredient-form";
 import { COMPOSITION_FIELDS, allergenLabel, type Ingredient } from "@/types";
@@ -39,7 +39,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
   const [formDirty, setFormDirty] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteCheck, setDeleteCheck] = useState<IngredientDeleteCheck | null>(null);
-  const [activeTab, setActiveTab] = useState<"details" | "composition" | "ingredients" | "allergens" | "pricing" | "nutrition" | "shell">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "composition" | "ingredients" | "allergens" | "pricing" | "nutrition" | "shell" | "stock">("details");
   const market = useMarketRegion();
 
   const [savedOnce, setSavedOnce] = useState(false);
@@ -177,8 +177,8 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
       <div className="flex border-b border-border mb-4 px-4 overflow-x-auto">
         {(
           (editing || ingredient.shellCapable)
-            ? ["details", "shell", "composition", "ingredients", "allergens", "pricing", "nutrition"] as const
-            : ["details", "composition", "ingredients", "allergens", "pricing", "nutrition"] as const
+            ? ["details", "shell", "composition", "ingredients", "allergens", "pricing", "nutrition", "stock"] as const
+            : ["details", "composition", "ingredients", "allergens", "pricing", "nutrition", "stock"] as const
         ).map((tab) => (
           <button
             key={tab}
@@ -205,7 +205,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
             onSaved={handleSaved}
             onCancel={handleCancel}
             onDirtyChange={setFormDirty}
-            activeSection={activeTab}
+            activeSection={activeTab === "stock" ? "details" : activeTab}
           />
         ) : (
           <>
@@ -411,6 +411,11 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
                 ingredient={ingredient}
                 onEdit={() => setEditing(true)}
               />
+            )}
+
+            {/* Stock tab — grams on hand, receive, history */}
+            {activeTab === "stock" && (
+              <IngredientStockPanel ingredientId={ingredientId} />
             )}
 
             <div className="mt-8 border-t border-border pt-4 space-y-4">
@@ -640,6 +645,225 @@ function IngredientNutritionReadView({ ingredient, market, onEdit }: { ingredien
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Ingredient Stock panel ────────────────────────────────────────
+//
+// Grams-on-hand view. Three things:
+//   - current balance (big number, low-stock warning if below
+//     threshold)
+//   - Receive stock form ("I bought 5kg of nougat")
+//   - Last 20 movements for audit
+//
+// Used by the Stock tab on /ingredients/[id].
+function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
+  const stock = useIngredientStock(ingredientId);
+  const movements = useIngredientStockMovements(ingredientId, 20);
+  const [receiveInput, setReceiveInput] = useState("");
+  const [receiveNotes, setReceiveNotes] = useState("");
+  const [adjustInput, setAdjustInput] = useState("");
+  const [thresholdInput, setThresholdInput] = useState(
+    stock?.lowStockThresholdG != null ? String(stock.lowStockThresholdG) : "",
+  );
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    setThresholdInput(stock?.lowStockThresholdG != null ? String(stock.lowStockThresholdG) : "");
+  }, [stock?.lowStockThresholdG]);
+
+  const currentG = Number(stock?.quantityG ?? 0);
+  const threshold = stock?.lowStockThresholdG != null ? Number(stock.lowStockThresholdG) : null;
+  const belowThreshold = threshold != null && currentG < threshold;
+
+  async function handleReceive() {
+    const qty = parseFloat(receiveInput);
+    if (!Number.isFinite(qty) || qty <= 0) { setErr("Enter a positive quantity in grams."); return; }
+    setBusy(true); setErr("");
+    try {
+      await receiveIngredientStock(ingredientId, qty, receiveNotes.trim() || undefined);
+      setReceiveInput(""); setReceiveNotes("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAdjust(sign: 1 | -1) {
+    const qty = parseFloat(adjustInput);
+    if (!Number.isFinite(qty) || qty <= 0) { setErr("Enter a positive quantity in grams."); return; }
+    setBusy(true); setErr("");
+    try {
+      await adjustIngredientStock({
+        ingredientId,
+        deltaG: sign * qty,
+        reason: "recount",
+        notes: sign < 0 ? "Manual recount (down)" : "Manual recount (up)",
+      });
+      setAdjustInput("");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleThreshold() {
+    const trimmed = thresholdInput.trim();
+    const val = trimmed === "" ? null : parseFloat(trimmed);
+    if (val != null && (!Number.isFinite(val) || val < 0)) {
+      setErr("Threshold must be 0 or a positive number of grams."); return;
+    }
+    setBusy(true); setErr("");
+    try {
+      await setIngredientLowStockThreshold(ingredientId, val);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Current balance */}
+      <div className={`rounded-lg border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-border bg-card"}`}>
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">On hand</p>
+        <p className={`text-3xl font-bold tabular-nums ${belowThreshold ? "text-status-warn" : "text-foreground"}`}>
+          {currentG.toLocaleString("en-GB", { maximumFractionDigits: 1 })} <span className="text-base font-normal text-muted-foreground">g</span>
+        </p>
+        {threshold != null && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Low-stock threshold: {threshold} g{belowThreshold ? " — restock soon" : ""}
+          </p>
+        )}
+      </div>
+
+      {err && (
+        <div className="rounded-md border border-status-alert-edge bg-status-alert-bg px-3 py-2 text-xs text-status-alert">
+          {err}
+        </div>
+      )}
+
+      {/* Receive stock */}
+      <section className="rounded-lg border border-border bg-card p-4 space-y-2">
+        <h3 className="text-sm font-semibold text-primary">Receive stock</h3>
+        <p className="text-xs text-muted-foreground">Just bought more of this ingredient? Enter grams here.</p>
+        <div className="flex gap-2 items-center">
+          <input
+            type="number" min="0" step="0.1"
+            value={receiveInput}
+            onChange={(e) => setReceiveInput(e.target.value)}
+            placeholder="e.g. 5000"
+            className="input flex-1"
+            disabled={busy}
+          />
+          <span className="text-sm text-muted-foreground">g</span>
+          <button
+            onClick={handleReceive}
+            disabled={busy || !receiveInput}
+            className="rounded-full bg-primary text-primary-foreground px-4 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            Receive
+          </button>
+        </div>
+        <input
+          type="text"
+          value={receiveNotes}
+          onChange={(e) => setReceiveNotes(e.target.value)}
+          placeholder="Optional note (supplier, batch, purchase ref…)"
+          className="input text-sm"
+          disabled={busy}
+        />
+      </section>
+
+      {/* Manual adjust (recount) */}
+      <section className="rounded-lg border border-border bg-card p-4 space-y-2">
+        <h3 className="text-sm font-semibold text-primary">Adjust (recount / waste)</h3>
+        <p className="text-xs text-muted-foreground">For corrections after a count, or writing off waste.</p>
+        <div className="flex gap-2 items-center">
+          <input
+            type="number" min="0" step="0.1"
+            value={adjustInput}
+            onChange={(e) => setAdjustInput(e.target.value)}
+            placeholder="grams"
+            className="input flex-1"
+            disabled={busy}
+          />
+          <button
+            onClick={() => handleAdjust(+1)}
+            disabled={busy || !adjustInput}
+            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          >
+            + Add
+          </button>
+          <button
+            onClick={() => handleAdjust(-1)}
+            disabled={busy || !adjustInput}
+            className="rounded-full border border-status-warn-edge bg-status-warn-bg text-status-warn px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          >
+            − Remove
+          </button>
+        </div>
+      </section>
+
+      {/* Low-stock threshold */}
+      <section className="rounded-lg border border-border bg-card p-4 space-y-2">
+        <h3 className="text-sm font-semibold text-primary">Low-stock alert threshold</h3>
+        <p className="text-xs text-muted-foreground">Empty to disable alerts for this ingredient.</p>
+        <div className="flex gap-2 items-center">
+          <input
+            type="number" min="0" step="0.1"
+            value={thresholdInput}
+            onChange={(e) => setThresholdInput(e.target.value)}
+            placeholder="e.g. 500"
+            className="input flex-1"
+            disabled={busy}
+          />
+          <span className="text-sm text-muted-foreground">g</span>
+          <button
+            onClick={handleThreshold}
+            disabled={busy}
+            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          >
+            Save
+          </button>
+        </div>
+      </section>
+
+      {/* Movement history */}
+      <section className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="px-4 py-2 border-b border-border bg-muted/40">
+          <h3 className="text-sm font-semibold text-primary">Recent movements</h3>
+        </div>
+        {movements.length === 0 ? (
+          <p className="px-4 py-3 text-xs text-muted-foreground">No movements yet.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {movements.map((m) => {
+              const sign = Number(m.deltaG) > 0 ? "+" : "";
+              const color = Number(m.deltaG) > 0 ? "text-status-ok" : "text-status-warn";
+              return (
+                <li key={m.id} className="px-4 py-2 flex items-center gap-3 text-xs">
+                  <span className={`tabular-nums font-medium w-20 ${color}`}>
+                    {sign}{Number(m.deltaG).toLocaleString("en-GB", { maximumFractionDigits: 1 })} g
+                  </span>
+                  <span className="text-muted-foreground uppercase text-[10px] tracking-wide w-24 shrink-0">
+                    {m.reason.replace(/_/g, " ")}
+                  </span>
+                  <span className="flex-1 truncate text-muted-foreground">{m.notes ?? ""}</span>
+                  <span className="text-muted-foreground tabular-nums shrink-0">
+                    {m.movedAt ? new Date(m.movedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

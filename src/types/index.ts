@@ -499,6 +499,44 @@ export interface PlanStepStatus {
   doneAt?: Date;
 }
 
+// --- Ingredient Stock ---
+
+/** Grams-on-hand for a single ingredient. One row per ingredient
+ *  (unique on ingredientId). Populated by "Receive stock" when the
+ *  user buys ingredients; drained automatically when production
+ *  steps tick done (shelling deducts shell chocolate, filling prep
+ *  deducts the filling's recipe ingredients).
+ *  Lives in migration 0044. */
+export interface IngredientStock {
+  id?: string;
+  ingredientId: string;
+  quantityG: number;
+  /** When non-null, drops below this trigger low-stock alerts +
+   *  shopping-list shortage lines. */
+  lowStockThresholdG?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** Append-only audit log for ingredientStock changes. Signed deltaG —
+ *  positive = intake (receive, recount-up), negative = outake
+ *  (step deduction, recount-down, waste). Lives in migration 0044. */
+export interface IngredientStockMovement {
+  id?: string;
+  ingredientId: string;
+  /** Positive = added, negative = removed. Grams. */
+  deltaG: number;
+  /** 'receive' | 'shelling' | 'filling_prep' | 'recount' | 'waste' */
+  reason: string;
+  planId?: string;
+  /** Links the movement to a specific step tick when known (e.g.
+   *  `"shell-<planProductId>"`) for traceability on the batch page. */
+  stepKey?: string;
+  movedBy?: string;
+  notes?: string;
+  movedAt?: Date;
+}
+
 // --- Filling Stock (leftover filling) ---
 
 export interface FillingStock {
