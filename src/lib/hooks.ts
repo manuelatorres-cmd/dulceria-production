@@ -4469,10 +4469,59 @@ export async function deleteOrder(id: string): Promise<void> {
   // borrowed pieces would stay locked in the allocated location with
   // a dangling orderId.
   await revertBorrowsForOrder(id);
+
+  // Collect plan IDs that this order's items point to BEFORE the
+  // cascade deletes them. We'll check each after the order goes, so
+  // ghost draft batches (no remaining links) can be cleaned up.
+  const items = assertOk(
+    await supabase.from("orderItems").select("id").eq("orderId", id),
+  ) as Array<{ id: string }>;
+  const itemIds = items.map((i) => i.id);
+  const impactedPlanIds = new Set<string>();
+  if (itemIds.length > 0) {
+    const links = assertOk(
+      await supabase.from("orderPlanLinks").select("planId").in("orderItemId", itemIds),
+    ) as Array<{ planId: string }>;
+    for (const l of links) impactedPlanIds.add(l.planId);
+  }
+
+  // Cascade-delete the order. orderItems go, and their orderPlanLinks
+  // go with them (FK on the links table cascades on orderItemId).
   const { error } = await supabase.from("orders").delete().eq("id", id);
   if (error) throw error;
+
+  // Now sweep the impacted plans. Draft plans with no remaining links
+  // are ghost batches pointing at a dead order — delete them outright.
+  // Active plans with no remaining links get marked 'orphaned' so the
+  // operator can decide (batch already started, physical work done).
+  // Done / cancelled plans are left alone (historical record).
+  for (const planId of impactedPlanIds) {
+    const remaining = assertOk(
+      await supabase.from("orderPlanLinks").select("id").eq("planId", planId),
+    ) as Array<{ id: string }>;
+    if (remaining.length > 0) continue; // still needed by another order
+    const plan = assertOkMaybe(
+      await supabase.from("productionPlans").select("id, status").eq("id", planId).maybeSingle(),
+    ) as { id: string; status: string } | null;
+    if (!plan) continue;
+    if (plan.status === "draft") {
+      const { error: delErr } = await supabase.from("productionPlans").delete().eq("id", planId);
+      if (delErr) throw delErr;
+    } else if (plan.status === "active") {
+      const { error: updErr } = await supabase
+        .from("productionPlans")
+        .update({ status: "orphaned", updatedAt: new Date() })
+        .eq("id", planId);
+      if (updErr) throw updErr;
+    }
+  }
+
   queryClient.invalidateQueries({ queryKey: ["orders"] });
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+  queryClient.invalidateQueries({ queryKey: ["plan-products"] });
+  queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
+  queryClient.invalidateQueries({ queryKey: ["production-day-line-items"] });
 }
 
 export async function saveOrderItem(item: Omit<OrderItem, "id"> & { id?: string }): Promise<string> {
@@ -4604,7 +4653,17 @@ async function computeStoreAvailableFor(productId: string): Promise<number> {
 async function allocateLineFromStore(args: {
   orderId: string; productId: string; quantity: number;
 }): Promise<void> {
-  const moved = await moveProductStockFifo({
+  // "Use from stock" means pull from any already-made pieces — Store
+  // first (front-of-shop), then Production Storage as fallback. Both
+  // count as "available" on the order-create form (see availableFor);
+  // allocation must match that promise or the user sees a silent
+  // failure where Save reports success but the order has stale
+  // unallocated stock.
+  //
+  // Mechanics: FIFO move from store → allocated first, then top up
+  // from production → allocated if still short. If combined still
+  // short, revert everything and throw.
+  const movedFromStore = await moveProductStockFifo({
     productId: args.productId,
     fromLocation: "store",
     toLocation: "allocated",
@@ -4612,16 +4671,27 @@ async function allocateLineFromStore(args: {
     orderId: args.orderId,
     reason: "allocate",
   });
-  const total = moved.reduce((s, m) => s + m.quantity, 0);
-  if (total < args.quantity) {
-    // Not enough stock to fulfil the borrow. Revert the partial move
-    // and throw — the caller decides what to do. Previously this
-    // flipped the line back to 'produce' silently, which surprised
-    // the operator by turning a borrow order into a produce batch on
-    // the next Regenerate (reported 2026-04-22). The new contract:
-    // if you ask for borrow and the stock isn't actually there, the
-    // save fails loudly.
-    for (const m of moved) {
+  const storeSum = movedFromStore.reduce((s, m) => s + m.quantity, 0);
+  let remaining = args.quantity - storeSum;
+
+  let movedFromProduction: FifoMoveResult[] = [];
+  if (remaining > 0) {
+    movedFromProduction = await moveProductStockFifo({
+      productId: args.productId,
+      fromLocation: "production",
+      toLocation: "allocated",
+      quantity: remaining,
+      orderId: args.orderId,
+      reason: "allocate",
+    });
+  }
+  const productionSum = movedFromProduction.reduce((s, m) => s + m.quantity, 0);
+  const totalMoved = storeSum + productionSum;
+
+  if (totalMoved < args.quantity) {
+    // Revert everything we just moved. Keep reverts paired with the
+    // location we pulled from so the ledger stays balanced.
+    for (const m of movedFromStore) {
       await transferBatchStock({
         planProductId: m.planProductId,
         productId: args.productId,
@@ -4632,8 +4702,19 @@ async function allocateLineFromStore(args: {
         reason: "allocate",
       });
     }
+    for (const m of movedFromProduction) {
+      await transferBatchStock({
+        planProductId: m.planProductId,
+        productId: args.productId,
+        fromLocation: "allocated",
+        toLocation: "production",
+        quantity: m.quantity,
+        orderId: args.orderId,
+        reason: "allocate",
+      });
+    }
     throw new Error(
-      `Not enough stock to borrow: only ${total} of ${args.quantity} available. Please re-check stock or switch this line to "Produce fresh".`,
+      `Not enough stock to borrow: only ${totalMoved} of ${args.quantity} available (Store + Production). Please re-check stock or switch this line to "Produce fresh".`,
     );
   }
 }
