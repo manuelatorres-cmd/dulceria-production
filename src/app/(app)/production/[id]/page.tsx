@@ -55,18 +55,33 @@ const PHASES = [
 type PhaseId = typeof PHASES[number]["id"];
 
 /** Map a user-facing step name to one of our 8 canonical phases.
- *  Case-insensitive keyword match — mirrors the phaseToCheckListPrefix
- *  helper on the dashboard. Returns null for unmappable names. */
+ *  Exact match first (handles "Filling Prep" vs "Filling" correctly);
+ *  keyword fallback for custom step names. Returns null for unmappable
+ *  names. */
 function stepNameToPhase(name: string): PhaseId | null {
-  const n = name.toLowerCase();
+  const n = name.toLowerCase().trim();
+  // Exact matches take precedence — "Filling Prep" must NOT collide
+  // with "Filling" just because both contain "filling".
+  if (n === "polishing") return "polishing";
+  if (n === "painting" || n === "colour" || n === "color") return "colour";
+  if (n === "shelling" || n === "tempering") return "shell";
+  if (n === "filling prep") return "filling";
+  if (n === "filling") return "fill";
+  if (n === "capping") return "cap";
+  if (n === "unmoulding" || n === "unmolding") return "unmould";
+  if (n === "packing") return "packing";
+  // Keyword fallback — order matters; more specific phases first so
+  // "Filling Prep" is caught by the "prep" keyword before the generic
+  // "fill" rule fires.
   if (n.includes("polish")) return "polishing";
-  if (n.includes("colour") || n.includes("color") || n.includes("paint")) return "colour";
-  if (n.includes("shell") || n.includes("temper")) return "shell";
-  if (n.includes("filling") && !/\bfill\b/.test(n)) return "filling";
-  if (n.includes("fill")) return "fill";
-  if (n.includes("cap")) return "cap";
-  if (n.includes("unmould") || n.includes("unmold")) return "unmould";
+  if (n.includes("paint") || n.includes("colour") || n.includes("color")) return "colour";
+  if (n.includes("temper")) return "shell";
+  if (n.includes("shell")) return "shell";
+  if (n.includes("prep")) return "filling";
   if (n.includes("pack")) return "packing";
+  if (n.includes("unmould") || n.includes("unmold")) return "unmould";
+  if (n.includes("cap")) return "cap";
+  if (n.includes("fill")) return "fill";
   return null;
 }
 

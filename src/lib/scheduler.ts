@@ -241,11 +241,32 @@ export function buildDailySchedule(input: DailyScheduleInput): DailyScheduleResu
       unscheduled.add(plan.id!);
       continue;
     }
-    const steps = (stepsByType.get(typeName) ?? [])
+    const allSteps = (stepsByType.get(typeName) ?? [])
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder);
-    if (steps.length === 0) {
+    if (allSteps.length === 0) {
       warnings.push(`No production steps defined for category "${typeName}".`);
+      unscheduled.add(plan.id!);
+      continue;
+    }
+
+    // Packing-only batches (created by the reconciler for borrow
+    // order lines) run only the steps flagged isPackingStep on
+    // productionSteps. Identified by the "— packing" suffix the
+    // reconciler writes to the plan name.
+    const isPackingOnly = (plan.name ?? "").trim().endsWith("— packing");
+    const steps = isPackingOnly
+      ? allSteps.filter((s) => s.isPackingStep)
+      : allSteps;
+    if (steps.length === 0) {
+      // Packing-only batch but no step is flagged isPackingStep — warn
+      // and skip so the user knows to tick the Packing step flag in
+      // Settings → Production Steps.
+      if (isPackingOnly) {
+        warnings.push(
+          `Batch "${plan.name}" has nothing to schedule — mark at least one step as "Packing step" in Settings to pack borrow-from-stock lines.`,
+        );
+      }
       unscheduled.add(plan.id!);
       continue;
     }
@@ -379,9 +400,29 @@ export function buildDailySchedule(input: DailyScheduleInput): DailyScheduleResu
     // today), fall back to forward-fill from today.
     const effectiveMode: "forward" | "reverse" =
       mode === "reverse" && latestDay ? "reverse" : "forward";
+    const mouldConflictLog: Array<{ date: string; blockedBy: string }> = [];
+    // Packing-only batches bypass the mould-availability check — they
+    // don't use the mould, they just pack pieces out of stock.
+    const packingOnly = (plan.name ?? "").trim().endsWith("— packing");
+    const effectiveMouldId = packingOnly ? "__packing_no_mould__" : mouldId;
     const placement = effectiveMode === "forward"
-      ? placeForward(flat, mouldId, plan.id!, todayIso, latestDay, days, mouldSpans, capFor, lockedStepsByDate)
-      : placeReverse(flat, mouldId, plan.id!, latestDay!, todayIso, days, mouldSpans, capFor, lockedStepsByDate);
+      ? placeForward(flat, effectiveMouldId, plan.id!, todayIso, latestDay, days, mouldSpans, capFor, lockedStepsByDate, packingOnly ? undefined : mouldConflictLog)
+      : placeReverse(flat, effectiveMouldId, plan.id!, latestDay!, todayIso, days, mouldSpans, capFor, lockedStepsByDate);
+    // Surface mould-sharing conflicts: if placement got bumped off
+    // earlier days because another batch was already using the mould,
+    // emit a warning with the other batch's name. This is why two
+    // batches on "different products" sometimes land on separate days:
+    // they share a default mould in /products.
+    if (mouldConflictLog.length > 0) {
+      const uniqueBlockers = [...new Set(mouldConflictLog.map((c) => c.blockedBy))];
+      const blockerNames = uniqueBlockers.map((pid) => {
+        const p = plans.find((x) => x.id === pid);
+        return p?.name ?? pid;
+      });
+      warnings.push(
+        `Batch "${plan.name}" shares a mould with ${blockerNames.join(", ")} — scheduled for the next mould-free day.`,
+      );
+    }
 
     if (!placement) {
       unscheduled.add(plan.id!);
@@ -412,22 +453,28 @@ export function buildDailySchedule(input: DailyScheduleInput): DailyScheduleResu
         if (!unmouldDay || p.date > unmouldDay) unmouldDay = p.date;
       }
     }
-    if (polishDay && unmouldDay && mouldId) {
-      mouldSpans.push({
-        mouldId,
-        from: polishDay,
-        to: unmouldDay,
-        planId: plan.id!,
-      });
-    } else if (placement.length > 0 && mouldId) {
-      // Fallback: lock the entire placed span even if we didn't detect
-      // polishing / unmoulding by name (custom step labels).
-      mouldSpans.push({
-        mouldId,
-        from: placement[0].date,
-        to: placement[placement.length - 1].date,
-        planId: plan.id!,
-      });
+    // Packing-only batches don't drive mould occupancy — they just
+    // box pre-made pieces. Skip recording a span so they don't push
+    // same-mould produce batches off their day.
+    const isPackingBatch = (plan.name ?? "").trim().endsWith("— packing");
+    if (!isPackingBatch) {
+      if (polishDay && unmouldDay && mouldId) {
+        mouldSpans.push({
+          mouldId,
+          from: polishDay,
+          to: unmouldDay,
+          planId: plan.id!,
+        });
+      } else if (placement.length > 0 && mouldId) {
+        // Fallback: lock the entire placed span even if we didn't detect
+        // polishing / unmoulding by name (custom step labels).
+        mouldSpans.push({
+          mouldId,
+          from: placement[0].date,
+          to: placement[placement.length - 1].date,
+          planId: plan.id!,
+        });
+      }
     }
   }
 
@@ -477,6 +524,10 @@ function placeForward(
   mouldSpans: MouldSpan[],
   capFor: (date: string) => number,
   lockedStepsByDate: Map<string, Set<string>>,
+  /** Out-param collecting mould-conflict hits per date, so the caller
+   *  can emit a warning explaining why a batch got bumped to a later
+   *  day than it "should" fit on. */
+  mouldConflictLog?: Array<{ date: string; blockedBy: string }>,
 ): Array<{ date: string; stepIds: string[]; minutes: number }> | null {
   const result: Array<{ date: string; stepIds: string[]; minutes: number }> = [];
   let stepIdx = 0;
@@ -489,7 +540,9 @@ function placeForward(
     if (latestDay && cursor > latestDay) return null;
 
     // Mould availability check for this date.
-    if (mouldConflicts(mouldId, cursor, cursor, planId, mouldSpans)) {
+    const conflictSpan = firstConflictingSpan(mouldId, cursor, cursor, planId, mouldSpans);
+    if (conflictSpan) {
+      if (mouldConflictLog) mouldConflictLog.push({ date: cursor, blockedBy: conflictSpan.planId });
       cursor = advanceDay(cursor);
       cursor = advanceToWorkingDay(cursor, capFor);
       continue;
@@ -606,14 +659,23 @@ function mouldConflicts(
   excludePlanId: string,
   spans: MouldSpan[],
 ): boolean {
+  return firstConflictingSpan(mouldId, from, to, excludePlanId, spans) !== null;
+}
+
+function firstConflictingSpan(
+  mouldId: string,
+  from: string,
+  to: string,
+  excludePlanId: string,
+  spans: MouldSpan[],
+): MouldSpan | null {
   for (const s of spans) {
     if (s.mouldId !== mouldId) continue;
     if (s.planId === excludePlanId) continue;
-    // Overlap if NOT (s.to < from OR s.from > to).
     if (s.to < from || s.from > to) continue;
-    return true;
+    return s;
   }
-  return false;
+  return null;
 }
 
 function advanceDay(iso: string): string {

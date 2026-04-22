@@ -5102,9 +5102,12 @@ export async function regenerateAllProductionPlans(): Promise<RegeneratePlansRes
   for (const b of decision.newBatches) {
     const planId = newId();
     const batchNumber = await generateBatchNumber(now);
+    // Packing-only batches get the "— packing" suffix so the scheduler
+    // (and later the UI) can distinguish them from produce batches.
+    const nameSuffix = b.kind === "packing" ? "— packing" : "— consolidated";
     const { error: planError } = await supabase.from("productionPlans").insert({
       id: planId,
-      name: `${b.productName} — consolidated`,
+      name: `${b.productName} ${nameSuffix}`,
       batchNumber,
       status: "draft",
       createdAt: now,

@@ -392,7 +392,11 @@ export default function PlanPage() {
 }
 
 function formatDayLabel(iso: string): string {
-  const d = new Date(iso + "T12:00:00");
+  // Both dates normalised to local midnight so the diff is an integer
+  // number of days. Previously mixed midnight (today) with noon (d),
+  // producing 0.5-day diffs that Math.round lifted to 1 — which
+  // labelled TODAY as "tomorrow".
+  const d = new Date(iso + "T00:00:00");
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const days = Math.round((d.getTime() - today.getTime()) / 86_400_000);
   const label = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });

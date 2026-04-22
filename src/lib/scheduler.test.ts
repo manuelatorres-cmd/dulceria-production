@@ -341,6 +341,51 @@ describe("buildDailySchedule — mould occupancy", () => {
     const today = toIso(daysFromToday(0));
     expect(out.lineItems.filter((li) => li.dateRef === today).length).toBe(2);
   });
+
+  it("consolidates two tiny batches with different moulds onto one day", () => {
+    // Reproduces user report: Crunchy Nougat 22m and Double Caramel
+    // 22m on different moulds landed on separate days even though
+    // they fit together trivially. With 7 small steps per batch the
+    // scheduler shouldn't spread them.
+    const steps = [
+      mkStep("Polishing",    "Moulded", 1, 3),
+      mkStep("Painting",     "Moulded", 2, 3),
+      mkStep("Shelling",     "Moulded", 3, 3),
+      mkStep("Filling Prep", "Moulded", 4, 3),
+      mkStep("Filling",      "Moulded", 5, 3),
+      mkStep("Capping",      "Moulded", 6, 3),
+      mkStep("Unmoulding",   "Moulded", 7, 4),
+    ];
+    const crunchy = makeBatch({
+      planId: "plan-CRUNCHY", productId: "prod-crunchy",
+      categoryId: "cat-Moulded", categoryName: "Moulded",
+      mouldId: "m-crunchy", mouldCavities: 30, quantity: 1,
+      deadline: daysFromToday(-14), // overdue
+      createdAt: new Date("2024-01-01T00:00:00Z"),
+      steps,
+    });
+    const caramel = makeBatch({
+      planId: "plan-CARAMEL", productId: "prod-caramel",
+      categoryId: "cat-Moulded", categoryName: "Moulded",
+      mouldId: "m-caramel", mouldCavities: 30, quantity: 1,
+      deadline: daysFromToday(13), // 5 May-ish
+      createdAt: new Date("2024-01-02T00:00:00Z"),
+      steps,
+    });
+    const input = makeInput({
+      ...assemble([crunchy, caramel], steps),
+      productionSteps: steps,
+    } as Partial<DailyScheduleInput>);
+
+    const out = buildDailySchedule(input);
+    const today = toIso(daysFromToday(0));
+    const itemsToday = out.lineItems.filter((li) => li.dateRef === today);
+    expect(itemsToday.map((li) => li.planId).sort()).toEqual(
+      ["plan-CARAMEL", "plan-CRUNCHY"],
+    );
+    // Nothing should spill to tomorrow.
+    expect(out.lineItems.filter((li) => li.dateRef !== today)).toEqual([]);
+  });
 });
 
 describe("buildDailySchedule — batch ordering", () => {
@@ -442,6 +487,93 @@ describe("buildDailySchedule — unscheduleable cases", () => {
     expect(out.days.length).toBe(0);
     expect(out.lineItems.length).toBe(0);
     expect(out.unscheduledPlanIds).toEqual([]);
+  });
+});
+
+describe("buildDailySchedule — packing-only batches", () => {
+  it("schedules only isPackingStep steps for a batch whose name ends '— packing'", () => {
+    const steps = [
+      mkStep("Polishing", "Moulded", 1, 30),
+      mkStep("Painting",  "Moulded", 2, 30),
+      { ...mkStep("Packing",   "Moulded", 3, 15), isPackingStep: true } as ProductionStep,
+    ];
+    const batch = makeBatch({
+      planId: "plan-BORROW", productId: "prod-1",
+      categoryId: "cat-Moulded", categoryName: "Moulded",
+      mouldId: "m-1", mouldCavities: 10, quantity: 1,
+      deadline: daysFromToday(5),
+      steps,
+    });
+    // Override the generated plan name to signal packing-only.
+    batch.plan.name = "Strawberry — packing";
+    const input = makeInput({
+      ...assemble([batch], steps),
+      productionSteps: steps,
+    } as Partial<DailyScheduleInput>);
+
+    const out = buildDailySchedule(input);
+    expect(out.unscheduledPlanIds).toEqual([]);
+    expect(out.lineItems.length).toBe(1);
+    // Only the Packing step should land in the scheduled stepIds.
+    expect(out.lineItems[0].stepIds).toEqual(["step-Moulded-Packing"]);
+    expect(out.lineItems[0].plannedMinutes).toBe(15);
+  });
+
+  it("warns when a packing-only batch has no isPackingStep steps to run", () => {
+    const steps = [
+      mkStep("Polishing", "Moulded", 1, 30),
+      mkStep("Painting",  "Moulded", 2, 30),
+    ];
+    const batch = makeBatch({
+      planId: "plan-BORROW2", productId: "prod-1",
+      categoryId: "cat-Moulded", categoryName: "Moulded",
+      mouldId: "m-1", mouldCavities: 10, quantity: 1,
+      deadline: daysFromToday(5),
+      steps,
+    });
+    batch.plan.name = "Strawberry — packing";
+    const input = makeInput({
+      ...assemble([batch], steps),
+      productionSteps: steps,
+    } as Partial<DailyScheduleInput>);
+
+    const out = buildDailySchedule(input);
+    expect(out.unscheduledPlanIds).toContain("plan-BORROW2");
+    expect(out.warnings.join(" ")).toMatch(/mark at least one step as "Packing step"/i);
+  });
+
+  it("packing-only batch does not block produce batch using the same mould", () => {
+    const steps = [
+      mkStep("Polishing",   "Moulded", 1, 30),
+      mkStep("Unmoulding",  "Moulded", 2, 30),
+      { ...mkStep("Packing", "Moulded", 3, 15), isPackingStep: true } as ProductionStep,
+    ];
+    const packingBatch = makeBatch({
+      planId: "plan-PACK", productId: "prod-1",
+      categoryId: "cat-Moulded", categoryName: "Moulded",
+      mouldId: "m-shared", mouldCavities: 10, quantity: 1,
+      deadline: daysFromToday(3),
+      createdAt: new Date("2024-01-01T00:00:00Z"),
+      steps,
+    });
+    packingBatch.plan.name = "Strawberry — packing";
+    const produceBatch = makeBatch({
+      planId: "plan-PROD", productId: "prod-2",
+      categoryId: "cat-Moulded", categoryName: "Moulded",
+      mouldId: "m-shared", mouldCavities: 10, quantity: 1,
+      deadline: daysFromToday(5),
+      createdAt: new Date("2024-01-02T00:00:00Z"),
+      steps,
+    });
+    const input = makeInput({
+      ...assemble([packingBatch, produceBatch], steps),
+      productionSteps: steps,
+    } as Partial<DailyScheduleInput>);
+
+    const out = buildDailySchedule(input);
+    const today = toIso(daysFromToday(0));
+    // Both should land on today: packing doesn't lock the mould.
+    expect(out.lineItems.filter((li) => li.dateRef === today).length).toBe(2);
   });
 });
 

@@ -780,10 +780,19 @@ function toIsoDate(d: Date): string {
  *  falls back to "not started" and the user opens the batch to see
  *  detail — still better than a misleading green tick. */
 function phaseToCheckListPrefix(phase: string): string | null {
-  const p = phase.toLowerCase();
+  const p = phase.toLowerCase().trim();
+  // Exact matches first to disambiguate "Filling Prep" from "Filling".
+  if (p === "polishing") return "polishing";
+  if (p === "painting" || p === "colour" || p === "color") return "color";
+  if (p === "shelling" || p === "tempering") return "shell";
+  if (p === "filling prep") return "filling";
+  if (p === "filling") return "fill";
+  if (p === "capping") return "cap";
+  if (p === "unmoulding" || p === "unmolding") return "unmould";
+  if (p === "packing") return "packing";
   if (p.includes("colour") || p.includes("color") || p.includes("paint")) return "color";
   if (p.includes("shell") || p.includes("temper")) return "shell";
-  if (p.includes("filling") && !/\bfill\b/.test(p)) return "filling";
+  if (p.includes("prep")) return "filling";
   if (p.includes("fill")) return "fill";
   if (p.includes("cap")) return "cap";
   if (p.includes("unmould") || p.includes("unmold") || p.includes("polish")) return "unmould";
