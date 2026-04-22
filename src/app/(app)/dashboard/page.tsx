@@ -375,12 +375,32 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Today's production — unified widget: shows scheduled phases for
-            today joined to their productionPlan + live step-status so the
-            user sees exactly what's pending, in progress, or done without
-            having to visit the batch page. Replaces the old split
-            "Today's tasks" + "Today's production" lists which drew from
-            different sources and drifted out of sync. */}
+        {/* Alerts banner — critical alerts are rendered as large cards at
+            the top so they can't be missed. Non-critical (warn) alerts
+            keep the compact link-row style below the today strip so the
+            dashboard doesn't turn into a wall of yellow when there are
+            many small issues pending. */}
+        {alerts.filter((a) => a.level === "critical").length > 0 && (
+          <section className="space-y-2">
+            {alerts.filter((a) => a.level === "critical").map((a, i) => (
+              <Link
+                key={`crit-${i}`}
+                href={a.href}
+                className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive hover:border-destructive/50"
+              >
+                <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                <span className="flex-1 font-medium">{a.text}</span>
+                <span className="text-xs opacity-70 mt-1">→</span>
+              </Link>
+            ))}
+          </section>
+        )}
+
+        {/* Today's production — horizontal timeline strip. Each card is
+            one scheduled (batch, phase) pair for today, ordered by start
+            time, scrollable when the day is full. Clicking a card opens
+            the batch detail at that phase. Replaces the old vertical list
+            so the operator can scan the whole day at a glance. */}
         <TodaysProductionSection
           schedule={schedule}
           productMap={productMap}
@@ -421,28 +441,28 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* Alerts */}
-        {alerts.length > 0 ? (
+        {/* Warn-level alerts. Critical ones were already rendered as a
+            banner above the today strip; here we only show the quieter
+            yellow ones so the user can triage them without drowning. */}
+        {alerts.length === 0 ? (
+          <section>
+            <div className="flex items-center gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2 text-xs text-status-ok">
+              <CheckCircle className="w-4 h-4" /> No active alerts — the workshop is on track.
+            </div>
+          </section>
+        ) : alerts.filter((a) => a.level === "warn").length > 0 && (
           <section className="space-y-2">
-            {alerts.map((a, i) => (
+            {alerts.filter((a) => a.level === "warn").map((a, i) => (
               <Link
-                key={i}
+                key={`warn-${i}`}
                 href={a.href}
-                className={`flex items-start gap-2 rounded-md border px-3 py-2 text-xs ${
-                  a.level === "critical" ? "bg-destructive/10 border-destructive/20 text-destructive" : "bg-status-warn-bg border-status-warn-edge text-status-warn"
-                }`}
+                className="flex items-start gap-2 rounded-md border bg-status-warn-bg border-status-warn-edge text-status-warn px-3 py-2 text-xs"
               >
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span className="flex-1">{a.text}</span>
                 <span className="text-xs opacity-70">→</span>
               </Link>
             ))}
-          </section>
-        ) : (
-          <section>
-            <div className="flex items-center gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2 text-xs text-status-ok">
-              <CheckCircle className="w-4 h-4" /> No active alerts — the workshop is on track.
-            </div>
           </section>
         )}
 
@@ -884,54 +904,76 @@ function TodaysProductionSection({
         <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
           <Clock className="w-4 h-4" /> Today&apos;s production
         </h2>
-        <span className="text-[11px] text-muted-foreground tabular-nums">
-          {doneCount}/{rows.length} done
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {doneCount}/{rows.length} done
+          </span>
+          <Link href="/production" className="text-[11px] text-primary hover:underline">
+            Full schedule →
+          </Link>
+        </div>
       </div>
-      <ul className="divide-y divide-border">
-        {rows.map(({ plan, head, items }) => {
-          const order = head.orderId ? orderById.get(head.orderId) : undefined;
-          const status = phaseStatusForPlan(
-            head.phase, plan.id!, planProductIdsByPlan, doneKeysByPlan,
-          );
-          const band = TIME_BAND_LABEL[timeBandFor(head.startAt)];
-          const minutes = items.reduce((s, e) => s + e.durationMinutes, 0);
-          const productNames = Array.from(new Set(
-            items.map((e) => productMap.get(e.productId)?.name ?? e.productId),
-          ));
-          const productLabel = productNames.length === 1
-            ? productNames[0]
-            : `${productNames.length} products`;
-          const batchLabel = plan.name || order?.customerName || order?.eventName || "Batch";
-          return (
-            <li key={`${plan.id}|${head.phase}`} className="flex items-center gap-3 px-1 py-1.5 text-sm">
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
-                {band}
-              </span>
-              <div className="flex-1 min-w-0">
+      {/* Horizontal timeline strip. Fixed-width cards so they line up
+          visually; scroll horizontally when the day overflows. The
+          negative margins + px-1 on the inner scroller let cards touch
+          the card border on both sides without clipping focus rings. */}
+      <div className="-mx-1 overflow-x-auto">
+        <ol className="flex gap-2 px-1 pb-1 snap-x snap-mandatory">
+          {rows.map(({ plan, head, items }) => {
+            const order = head.orderId ? orderById.get(head.orderId) : undefined;
+            const status = phaseStatusForPlan(
+              head.phase, plan.id!, planProductIdsByPlan, doneKeysByPlan,
+            );
+            const startTime = new Date(head.startAt).toLocaleTimeString("en-GB", {
+              hour: "2-digit", minute: "2-digit",
+            });
+            const band = TIME_BAND_LABEL[timeBandFor(head.startAt)];
+            const minutes = items.reduce((s, e) => s + e.durationMinutes, 0);
+            const productNames = Array.from(new Set(
+              items.map((e) => productMap.get(e.productId)?.name ?? e.productId),
+            ));
+            const productLabel = productNames.length === 1
+              ? productNames[0]
+              : `${productNames.length} products`;
+            const batchLabel = plan.name || order?.customerName || order?.eventName || "Batch";
+            return (
+              <li
+                key={`${plan.id}|${head.phase}`}
+                className="shrink-0 snap-start w-48"
+              >
                 <Link
                   href={`/production/${encodeURIComponent(plan.id!)}`}
-                  className="block truncate hover:underline"
+                  className={`block h-full rounded-lg border p-2.5 space-y-1.5 transition-colors ${
+                    status === "done"
+                      ? "border-status-ok/30 bg-status-ok/5 hover:border-status-ok/50"
+                      : status === "in_progress"
+                        ? "border-primary/40 bg-primary/5 hover:border-primary/60"
+                        : "border-border bg-card hover:border-primary/40"
+                  }`}
                 >
-                  <span className="font-medium">{head.phase}</span>
-                  <span className="text-muted-foreground"> — {batchLabel}</span>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <span className="text-sm font-semibold tabular-nums">{startTime}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {band}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium truncate">{head.phase}</p>
+                    <p className="text-[11px] text-muted-foreground truncate" title={batchLabel}>
+                      {batchLabel}
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground truncate" title={productNames.join(", ")}>
+                    {productLabel} · {minutes}m
+                  </p>
+                  <span className={`inline-block text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full ${PHASE_STATUS_STYLE[status]}`}>
+                    {PHASE_STATUS_LABEL[status]}
+                  </span>
                 </Link>
-                <p className="text-[11px] text-muted-foreground truncate">
-                  {productLabel} · {minutes}m
-                  {productNames.length > 1 && ` · ${productNames.join(", ")}`}
-                </p>
-              </div>
-              <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${PHASE_STATUS_STYLE[status]}`}>
-                {PHASE_STATUS_LABEL[status]}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="pt-1 text-right">
-        <Link href="/production" className="text-[11px] text-primary hover:underline">
-          Full schedule →
-        </Link>
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </section>
   );
