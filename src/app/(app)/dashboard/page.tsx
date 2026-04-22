@@ -15,6 +15,7 @@ import {
   useCustomerFollowups, useCustomers, completeCustomerFollowup,
   useTodayProductionDay, openProductionDay, closeProductionDay,
   saveTemperatureReadings, yesterdayTemperatureReadings,
+  useAllIngredientStock,
   type CloseProductionSummary,
 } from "@/lib/hooks";
 import { TemperatureLogModal } from "@/components/temperature-log-modal";
@@ -204,6 +205,23 @@ export default function DashboardPage() {
   );
   const shortages = shopping.rows.filter((r) => r.shortageG > 0);
 
+  // Ingredient balances below their configured low-stock threshold.
+  // Only ingredients that have BOTH a threshold set AND current grams
+  // below it show up — no threshold means "no opinion, no alert".
+  const ingredientStock = useAllIngredientStock();
+  const ingredientMap = useMemo(() => new Map(ingredients.map((i) => [i.id!, i])), [ingredients]);
+  const lowIngredients = useMemo(() => {
+    return ingredientStock
+      .filter((s) => s.lowStockThresholdG != null && Number(s.quantityG) < Number(s.lowStockThresholdG))
+      .map((s) => ({
+        ingredientId: s.ingredientId,
+        name: ingredientMap.get(s.ingredientId)?.name ?? s.ingredientId,
+        quantityG: Number(s.quantityG),
+        thresholdG: Number(s.lowStockThresholdG ?? 0),
+      }))
+      .sort((a, b) => (a.quantityG / a.thresholdG) - (b.quantityG / b.thresholdG));
+  }, [ingredientStock, ingredientMap]);
+
   // Stock — below minimum by (product, location)
   const locationTotals = useProductLocationTotals();
   const locationMinimums = useStockLocationMinimums();
@@ -312,6 +330,7 @@ export default function DashboardPage() {
   if (overdue.length > 0) alerts.push({ level: "critical", text: `${overdue.length} order${overdue.length > 1 ? "s" : ""} past deadline`, href: "/orders" });
   if (warnOrCritical.length > 0) alerts.push({ level: warnOrCritical.some((d) => d.level !== "warn") ? "critical" : "warn", text: `${warnOrCritical.length} day${warnOrCritical.length > 1 ? "s" : ""} over capacity threshold in the next week`, href: "/plan" });
   if (shortages.length > 0) alerts.push({ level: "warn", text: `${shortages.length} ingredient${shortages.length > 1 ? "s" : ""} short for open orders`, href: "/shopping" });
+  if (lowIngredients.length > 0) alerts.push({ level: "warn", text: `${lowIngredients.length} ingredient${lowIngredients.length > 1 ? "s" : ""} below stock threshold`, href: "/shopping" });
   if (lowStock.length > 0) alerts.push({ level: "warn", text: `${lowStock.length} product/location below minimum`, href: "/stock" });
   if (expiryWarn.length > 0) alerts.push({ level: expiryWarn.some((r) => r.remainingDays <= 0) ? "critical" : "warn", text: `${expiryWarn.length} batch${expiryWarn.length > 1 ? "es" : ""} approaching sell-by`, href: "/stock" });
   if (overdueFollowups.length > 0) alerts.push({ level: "warn", text: `${overdueFollowups.length} overdue follow-up${overdueFollowups.length > 1 ? "s" : ""}`, href: "/customers" });

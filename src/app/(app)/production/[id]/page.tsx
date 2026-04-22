@@ -13,7 +13,7 @@ import {
   promoteOrdersForPlan, startProductionPlan,
   useAllProductionDayLineItems, useProductionDays, useProductionSteps,
   deductShellForPlanProduct, prepareFillingForBatch, consumeFillingStockForPlanProduct,
-  consumeProductStockForPacking,
+  consumeProductStockForPacking, commitAllocationSplit,
 } from "@/lib/hooks";
 import { PackingModal } from "@/components/packing-modal";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
@@ -1378,19 +1378,21 @@ function PlanContent({
       )}
 
       {/* Allocation split — distributes actual yield across the
-          batch's linked orders (+ surplus with destination). Only
-          captures intent; the stock move is deferred to the
-          stock-rewrite task. */}
+          batch's linked orders (+ surplus with destination). Now
+          commits both the intent (links + plan.surplusDestination)
+          AND the physical stock moves: Production → Allocated per
+          order, and Production → Store / Freezer / waste for surplus.
+          See commitAllocationSplit in hooks.ts. */}
       {splitModal && (
         <AllocationSplitModal
           totalYield={splitModal.totalYield}
           orders={buildSplitOrderRows(planLinks, allOrderItems, allOrders)}
           onConfirm={async (result: AllocationSplitResult) => {
-            await applyAllocationSplit({
+            await commitAllocationSplit({
               planId: plan.id!,
-              result,
-              saveProductionPlan,
-              plan,
+              perLink: result.perLink,
+              surplus: result.surplus,
+              surplusDestination: result.surplusDestination,
             });
             setSplitModal(null);
           }}
@@ -1551,33 +1553,5 @@ function buildSplitOrderRows(
     });
   }
   return rows;
-}
-
-/** Apply the operator's split: update each link's allocatedQuantity,
- *  then set productionPlans.surplusDestination if surplus > 0. Stock
- *  writes live in the upcoming stock-rewrite task — this function
- *  touches only the two link/plan tables. */
-async function applyAllocationSplit(args: {
-  planId: string;
-  result: AllocationSplitResult;
-  saveProductionPlan: typeof import("@/lib/hooks").saveProductionPlan;
-  plan: Parameters<typeof import("@/lib/hooks").saveProductionPlan>[0];
-}): Promise<void> {
-  const { supabase: sb } = await import("@/lib/supabase");
-  const now = new Date();
-  for (const perLink of args.result.perLink) {
-    const { error } = await sb
-      .from("orderPlanLinks")
-      .update({ allocatedQuantity: perLink.delivered, updatedAt: now })
-      .eq("id", perLink.orderPlanLinkId);
-    if (error) throw error;
-  }
-  if (args.result.surplusDestination) {
-    await args.saveProductionPlan({
-      ...args.plan,
-      id: args.planId,
-      surplusDestination: args.result.surplusDestination,
-    });
-  }
 }
 

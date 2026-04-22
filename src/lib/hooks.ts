@@ -4297,6 +4297,149 @@ export async function consumeFillingStockForPlanProduct(
   return { warnings };
 }
 
+/**
+ * Commit the AllocationSplitModal result:
+ *   1. Record intent — write per-link allocatedQuantity and
+ *      plan.surplusDestination (same as the old applyAllocationSplit).
+ *   2. Move stock physically — for each linked order, transfer the
+ *      delivered pieces Production → Allocated (orderId-tagged). For
+ *      surplus, transfer to the chosen destination (store/freezer) or
+ *      outake with reason='waste'.
+ *
+ * Idempotent: if an 'allocate' movement already exists for the
+ * (planProductId, orderId) pair, the transfer is skipped so
+ * re-confirming the modal doesn't double-move. Same for the surplus
+ * destination (checked by a 'transfer'/'waste' movement for this
+ * planProductId with from='production').
+ */
+export async function commitAllocationSplit(args: {
+  planId: string;
+  perLink: Array<{ orderPlanLinkId: string; delivered: number }>;
+  surplus: number;
+  surplusDestination?: "store" | "freezer" | "waste";
+}): Promise<void> {
+  const { planId } = args;
+  const now = new Date();
+
+  // 1. Fetch the data we need: plan, links, items, planProducts.
+  const plan = assertOkMaybe(
+    await supabase.from("productionPlans").select("*").eq("id", planId).maybeSingle(),
+  ) as ProductionPlan | null;
+  if (!plan) throw new Error(`commitAllocationSplit: plan ${planId} not found`);
+
+  const links = assertOk(
+    await supabase.from("orderPlanLinks").select("*").eq("planId", planId),
+  ) as OrderPlanLink[];
+  const itemIds = [...new Set(links.map((l) => l.orderItemId))];
+  const items = itemIds.length > 0
+    ? assertOk(
+        await supabase.from("orderItems").select("*").in("id", itemIds),
+      ) as OrderItem[]
+    : [];
+  const itemById = new Map(items.map((i) => [i.id!, i]));
+  const planProducts = assertOk(
+    await supabase.from("planProducts").select("*").eq("planId", planId),
+  ) as PlanProduct[];
+
+  // 2. Update each link's allocatedQuantity to match delivered.
+  for (const p of args.perLink) {
+    const { error } = await supabase
+      .from("orderPlanLinks")
+      .update({ allocatedQuantity: p.delivered, updatedAt: now })
+      .eq("id", p.orderPlanLinkId);
+    if (error) throw error;
+  }
+
+  // 3. Persist surplusDestination on the plan.
+  if (args.surplusDestination) {
+    const { error } = await supabase
+      .from("productionPlans")
+      .update({ surplusDestination: args.surplusDestination, updatedAt: now })
+      .eq("id", planId);
+    if (error) throw error;
+  }
+
+  // 4. Move stock per link: Production → Allocated, tagged with orderId.
+  for (const p of args.perLink) {
+    if (p.delivered <= 0) continue;
+    const link = links.find((l) => l.id === p.orderPlanLinkId);
+    if (!link) continue;
+    const item = itemById.get(link.orderItemId);
+    if (!item) continue;
+    const pp = planProducts.find((x) => x.productId === item.productId);
+    if (!pp) continue;
+
+    // Idempotency — look for an existing 'allocate' movement for
+    // this (planProductId, orderId) since unmould.
+    const existing = assertOk(
+      await supabase
+        .from("stockMovements")
+        .select("id")
+        .eq("planProductId", pp.id!)
+        .eq("orderId", item.orderId)
+        .eq("reason", "allocate")
+        .eq("fromLocation", "production")
+        .limit(1),
+    ) as Array<{ id: string }>;
+    if (existing.length > 0) continue;
+
+    await transferBatchStock({
+      planProductId: pp.id!,
+      productId: item.productId,
+      fromLocation: "production",
+      toLocation: "allocated",
+      quantity: p.delivered,
+      orderId: item.orderId,
+      reason: "allocate",
+      notes: "Post-unmould allocation to order",
+    });
+  }
+
+  // 5. Move surplus to its destination.
+  if (args.surplus > 0 && args.surplusDestination) {
+    const pp = planProducts[0];
+    if (pp) {
+      // Idempotency — skip if a surplus movement already exists for
+      // this plan's planProduct going from production.
+      const existing = assertOk(
+        await supabase
+          .from("stockMovements")
+          .select("id, notes")
+          .eq("planProductId", pp.id!)
+          .eq("fromLocation", "production"),
+      ) as Array<{ id: string; notes?: string }>;
+      const alreadyDone = existing.some((m) => (m.notes ?? "").includes("Surplus at unmould"));
+      if (!alreadyDone) {
+        if (args.surplusDestination === "waste") {
+          await outakeBatchStock({
+            planProductId: pp.id!,
+            productId: pp.productId,
+            fromLocation: "production",
+            quantity: args.surplus,
+            reason: "waste",
+            notes: `Surplus at unmould → waste (${args.surplus} pcs)`,
+          });
+        } else {
+          await transferBatchStock({
+            planProductId: pp.id!,
+            productId: pp.productId,
+            fromLocation: "production",
+            toLocation: args.surplusDestination,
+            quantity: args.surplus,
+            reason: "transfer",
+            notes: `Surplus at unmould → ${args.surplusDestination} (${args.surplus} pcs)`,
+          });
+        }
+      }
+    }
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+  queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+}
+
 /** Packing tick: move `quantity` pieces out of Production stock for
  *  this planProduct (reason='sold'). Called by the Packing modal
  *  confirm handler after packaging has been deducted. Idempotent via

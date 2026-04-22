@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useIngredients, usePackagingList, useShoppingItems, setIngredientLowStock, markIngredientOrdered, unorderIngredient, setPackagingLowStock, markPackagingOrdered, unorderPackaging, saveShoppingItem, markShoppingItemOrdered, deleteShoppingItem, useDecorationMaterials, setDecorationMaterialLowStock, markDecorationMaterialOrdered, unorderDecorationMaterial, useOrders, useAllOrderItems, useProductsList, useMouldsList, useCapacityConfig, saveIngredient } from "@/lib/hooks";
+import { useIngredients, usePackagingList, useShoppingItems, setIngredientLowStock, markIngredientOrdered, unorderIngredient, setPackagingLowStock, markPackagingOrdered, unorderPackaging, saveShoppingItem, markShoppingItemOrdered, deleteShoppingItem, useDecorationMaterials, setDecorationMaterialLowStock, markDecorationMaterialOrdered, unorderDecorationMaterial, useOrders, useAllOrderItems, useProductsList, useMouldsList, useCapacityConfig, saveIngredient, useAllIngredientStock } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
@@ -137,6 +137,8 @@ export default function ShoppingPage() {
     <div>
       <PageHeader title="Shopping List" description="Items to reorder for the workshop" />
       <div className="px-4 pb-8 space-y-4">
+
+        <IngredientStockBelowThresholdSection />
 
         <PlannedDemandSection />
 
@@ -763,4 +765,64 @@ function ShortageRow({ row, ingredients }: {
 function formatGrams(g: number): string {
   if (g >= 1000) return `${(g / 1000).toFixed(1)} kg`;
   return `${Math.round(g)} g`;
+}
+
+/** Ingredients whose live grams-on-hand balance is below their
+ *  configured lowStockThresholdG. Independent of open-order demand —
+ *  just "what's below the line." Clicking a row jumps to the Stock
+ *  tab of that ingredient, where the operator can hit Receive. */
+function IngredientStockBelowThresholdSection() {
+  const ingredients = useIngredients(false);
+  const stock = useAllIngredientStock();
+  const rows = useMemo(() => {
+    const byId = new Map(ingredients.map((i) => [i.id!, i]));
+    return stock
+      .filter((s) => s.lowStockThresholdG != null && Number(s.quantityG) < Number(s.lowStockThresholdG))
+      .map((s) => ({
+        ingredientId: s.ingredientId,
+        name: byId.get(s.ingredientId)?.name ?? s.ingredientId,
+        quantityG: Number(s.quantityG),
+        thresholdG: Number(s.lowStockThresholdG ?? 0),
+        shortageG: Math.max(0, Number(s.lowStockThresholdG ?? 0) - Number(s.quantityG)),
+      }))
+      .sort((a, b) => (a.quantityG / a.thresholdG) - (b.quantityG / b.thresholdG));
+  }, [stock, ingredients]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <section className="space-y-2">
+      <h2 className="text-sm font-semibold text-primary">Below stock threshold</h2>
+      <p className="text-xs text-muted-foreground">
+        Ingredients currently under the low-stock threshold you set on each ingredient's Stock tab.
+        Open the ingredient to Receive more.
+      </p>
+      <div className="rounded-lg border border-status-warn/40 bg-status-warn-bg/20 overflow-hidden">
+        <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
+          <span className="flex-1">Ingredient</span>
+          <span className="w-24 text-right">On hand</span>
+          <span className="w-28 text-right">Threshold</span>
+          <span className="w-24 text-right">Short by</span>
+        </div>
+        {rows.map((row) => (
+          <Link
+            key={row.ingredientId}
+            href={`/ingredients/${encodeURIComponent(row.ingredientId)}?tab=stock`}
+            className="flex items-center px-3 py-2 text-sm border-b border-border last:border-b-0 hover:bg-muted/20"
+          >
+            <span className="flex-1 truncate">{row.name}</span>
+            <span className="w-24 text-right tabular-nums text-status-warn font-medium">
+              {formatGrams(row.quantityG)}
+            </span>
+            <span className="w-28 text-right tabular-nums text-muted-foreground">
+              {formatGrams(row.thresholdG)}
+            </span>
+            <span className="w-24 text-right tabular-nums font-medium text-destructive">
+              {formatGrams(row.shortageG)}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
 }
