@@ -3,785 +3,383 @@
 import {
   useProductionPlans, useProductsList, useMouldsList,
   useAllPlanProducts, useAllPlanStepStatuses, deleteProductionPlan,
-  useProductionSchedule, useOrders, useAllOrderItems,
+  useAllProductionDayLineItems, useProductionDays, useProductionSteps,
   useCapacityConfig, usePeople, usePersonUnavailability, useBlockedDays,
-  useAllOrderPlanLinks,
+  useOrders, useAllOrderItems, useAllOrderPlanLinks,
 } from "@/lib/hooks";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
-import { timeBandFor, TIME_BAND_LABEL } from "@/lib/scheduler";
 import { PageHeader } from "@/components/page-header";
-import { Plus, Trash2, ChevronRight, ChevronDown, BookOpen, Search, StickyNote, Copy, Calendar } from "lucide-react";
-import { CollapseControls } from "@/components/pantry";
+import { Calendar, Clock, Play, CheckCircle, Trash2, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo } from "react";
-import type { ProductionPlan, Product, PlanProduct, Mould } from "@/types";
+import type { PlanProduct, PlanStepStatus, ProductionPlan } from "@/types";
 
-const STATUS_LABEL: Record<string, string> = { draft: "Not yet started", active: "In progress", done: "Done" };
-const STATUS_STYLE: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  active: "bg-warning-muted text-warning",
-  done: "bg-success-muted text-success",
+const LEVEL_STYLE: Record<"ok" | "warn" | "critical" | "over", string> = {
+  ok: "bg-status-ok-bg/40 text-status-ok",
+  warn: "bg-status-warn-bg/40 text-status-warn",
+  critical: "bg-destructive/10 text-destructive",
+  over: "bg-destructive/20 text-destructive",
 };
 
-type TimeRange = "7d" | "30d" | "90d" | "12mo" | "all";
-const RANGE_DAYS: Record<Exclude<TimeRange, "all">, number> = { "7d": 7, "30d": 30, "90d": 90, "12mo": 365 };
-const RANGE_LABEL: Record<TimeRange, string> = { "7d": "7 days", "30d": "30 days", "90d": "90 days", "12mo": "12 months", "all": "All time" };
-const RANGE_ORDER: TimeRange[] = ["7d", "30d", "90d", "12mo", "all"];
+const DAY_STATUS_LABEL: Record<"draft" | "active" | "done", string> = {
+  draft: "Planned",
+  active: "In progress",
+  done: "Closed",
+};
+
+const DAY_STATUS_STYLE: Record<"draft" | "active" | "done", string> = {
+  draft: "bg-muted text-muted-foreground",
+  active: "bg-primary/10 text-primary",
+  done: "bg-status-ok/10 text-status-ok",
+};
 
 export default function ProductionPage() {
   const plans = useProductionPlans();
-  const products = useProductsList();
+  const products = useProductsList(true);
   const moulds = useMouldsList(true);
   const allPlanProducts = useAllPlanProducts();
   const allStepStatuses = useAllPlanStepStatuses();
-  const allOrderItems = useAllOrderItems();
-  const allOrderPlanLinks = useAllOrderPlanLinks();
+  const lineItems = useAllProductionDayLineItems();
+  const productionDays = useProductionDays(60);
+  const productionSteps = useProductionSteps();
+  const config = useCapacityConfig();
+  const people = usePeople(false);
+  const unavailability = usePersonUnavailability();
+  const blockedDays = useBlockedDays();
+  const orders = useOrders();
+  const orderItems = useAllOrderItems();
+  const orderPlanLinks = useAllOrderPlanLinks();
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [view, setView] = useState<"active" | "scheduled" | "history">("active");
-  const [search, setSearch] = useState("");
-  const [range, setRange] = useState<TimeRange>("90d");
-  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
 
-  const productMap = useMemo(() => new Map(products.map((r) => [r.id!, r])), [products]);
+  const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
   const mouldMap = useMemo(() => new Map(moulds.map((m) => [m.id!, m])), [moulds]);
-
-  // Ordered-quantity lookup so the Production page can show
-  // "N pcs ordered · M pcs produced" without each PlanRow doing its
-  // own fetch. Sums orderPlanLinks.allocatedQuantity per (planId,
-  // productId via orderItem.productId). Covers consolidated batches
-  // (one plan serving multiple orders) and reconciler-made batches
-  // that don't set the deprecated plan.sourceOrderId.
-  const orderedByPlan = useMemo(() => {
-    const itemById = new Map(allOrderItems.map((oi) => [oi.id!, oi]));
-    const m = new Map<string, Map<string, number>>();
-    for (const link of allOrderPlanLinks) {
-      const item = itemById.get(link.orderItemId);
-      if (!item) continue;
-      const byProd = m.get(link.planId) ?? new Map<string, number>();
-      byProd.set(item.productId, (byProd.get(item.productId) ?? 0) + link.allocatedQuantity);
-      m.set(link.planId, byProd);
+  const planMap = useMemo(() => new Map(plans.map((p) => [p.id!, p])), [plans]);
+  const stepById = useMemo(() => new Map(productionSteps.map((s) => [s.id!, s])), [productionSteps]);
+  const orderMap = useMemo(() => new Map(orders.map((o) => [o.id!, o])), [orders]);
+  const orderItemById = useMemo(() => new Map(orderItems.map((oi) => [oi.id!, oi])), [orderItems]);
+  const planProductsByPlan = useMemo(() => {
+    const m = new Map<string, PlanProduct[]>();
+    for (const pp of allPlanProducts) {
+      const arr = m.get(pp.planId) ?? [];
+      arr.push(pp);
+      m.set(pp.planId, arr);
+    }
+    for (const arr of m.values()) arr.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    return m;
+  }, [allPlanProducts]);
+  const linksByPlan = useMemo(() => {
+    const m = new Map<string, typeof orderPlanLinks>();
+    for (const link of orderPlanLinks) {
+      const arr = m.get(link.planId) ?? [];
+      arr.push(link);
+      m.set(link.planId, arr);
     }
     return m;
-  }, [allOrderItems, allOrderPlanLinks]);
+  }, [orderPlanLinks]);
 
-  // One pass over all PlanProduct rows → Map<planId, PlanProduct[]>
-  const planProductsByPlan = useMemo(() => {
-    const map = new Map<string, PlanProduct[]>();
-    for (const pp of allPlanProducts) {
-      const arr = map.get(pp.planId);
-      if (arr) arr.push(pp);
-      else map.set(pp.planId, [pp]);
-    }
-    // stable sort within each plan by sortOrder
-    for (const arr of map.values()) arr.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-    return map;
-  }, [allPlanProducts]);
-
-  // One pass over all step statuses → Map<planId, Set<stepKey of done>>
   const doneKeysByPlan = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const s of allStepStatuses) {
+    const m = new Map<string, Set<string>>();
+    for (const s of allStepStatuses as PlanStepStatus[]) {
       if (!s.done) continue;
-      const set = map.get(s.planId) ?? new Set<string>();
+      const set = m.get(s.planId) ?? new Set<string>();
       set.add(s.stepKey);
-      map.set(s.planId, set);
+      m.set(s.planId, set);
     }
-    return map;
+    return m;
   }, [allStepStatuses]);
 
-  // Not yet started first, then in progress, then recent done; within each group newest first
-  const sorted = useMemo(() => {
-    const order = { draft: 0, active: 1, done: 2 };
-    return [...plans].sort((a, b) => {
-      const statusDiff = (order[a.status as keyof typeof order] ?? 3) - (order[b.status as keyof typeof order] ?? 3);
-      if (statusDiff !== 0) return statusDiff;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-  }, [plans]);
-
-  // Search predicate reused by the in-range filter and the out-of-range counter
-  const searchMatches = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return () => true;
-    return (plan: ProductionPlan) => {
-      if (plan.name.toLowerCase().includes(q)) return true;
-      if (plan.batchNumber?.toLowerCase().includes(q)) return true;
-      const dateStr = new Date(plan.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }).toLowerCase();
-      if (dateStr.includes(q)) return true;
-      const pps = planProductsByPlan.get(plan.id!) ?? [];
-      return pps.some((pp) => productMap.get(pp.productId)?.name.toLowerCase().includes(q));
-    };
-  }, [search, planProductsByPlan, productMap]);
-
-  const historyPlans = useMemo(() => sorted.filter((p) => p.status === "done"), [sorted]);
-  const activePlans = useMemo(() => sorted.filter((p) => p.status !== "done"), [sorted]);
-
-  const rangeCutoff = useMemo(() => {
-    if (view !== "history" || range === "all") return null;
-    return Date.now() - RANGE_DAYS[range] * 86_400_000;
-  }, [view, range]);
-
-  const filtered = useMemo(() => {
-    const base = view === "history" ? historyPlans : activePlans;
-    const inRange = rangeCutoff == null
-      ? base
-      : base.filter((p) => new Date(p.createdAt).getTime() >= rangeCutoff);
-    return inRange.filter(searchMatches);
-  }, [view, historyPlans, activePlans, rangeCutoff, searchMatches]);
-
-  // Out-of-range search hits — powers the "N more matches outside…" prompt
-  const outsideRangeCount = useMemo(() => {
-    if (view !== "history" || rangeCutoff == null || !search.trim()) return 0;
-    return historyPlans.filter((p) => new Date(p.createdAt).getTime() < rangeCutoff).filter(searchMatches).length;
-  }, [view, historyPlans, rangeCutoff, search, searchMatches]);
-
-  // Group history by "YYYY-MM" → { label, plans[] }. Active view is flat.
-  const historyGroups = useMemo(() => {
-    if (view !== "history") return null;
-    const groups = new Map<string, { label: string; plans: ProductionPlan[] }>();
-    for (const p of filtered) {
-      const d = new Date(p.createdAt);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-      const g = groups.get(key);
-      if (g) g.plans.push(p);
-      else groups.set(key, { label, plans: [p] });
+  function stepDoneFor(planId: string, stepId: string): boolean {
+    const done = doneKeysByPlan.get(planId);
+    if (!done) return false;
+    for (const k of done) {
+      if (k === stepId || k.startsWith(`${stepId}-`)) return true;
     }
-    // Map preserves insertion order; `filtered` is already newest-first, so keys land newest-first too
-    return [...groups.entries()].map(([key, v]) => ({ key, ...v }));
-  }, [view, filtered]);
-
-  function toggleMonth(key: string) {
-    setCollapsedMonths((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    return false;
   }
 
-  const isHistory = view === "history";
-  const isScheduled = view === "scheduled";
-  const totalHistory = historyPlans.length;
-  const showingStrip = isHistory && totalHistory > 0;
+  // Today's local ISO date.
+  const todayIso = useMemo(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }, []);
+
+  // Filter: skip days that are in the past AND fully closed.
+  const visibleDays = useMemo(() => {
+    return productionDays
+      .filter((d) => d.status !== "done" || d.date >= todayIso)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [productionDays, todayIso]);
+
+  // Line items grouped per day (already sorted by sortOrder at hook).
+  const lineItemsByDay = useMemo(() => {
+    const m = new Map<string, typeof lineItems>();
+    for (const li of lineItems) {
+      const arr = m.get(li.productionDayId) ?? [];
+      arr.push(li);
+      m.set(li.productionDayId, arr);
+    }
+    return m;
+  }, [lineItems]);
+
+  async function handleDelete(planId: string) {
+    try {
+      await deleteProductionPlan(planId);
+      setConfirmDeleteId(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to delete batch");
+    }
+  }
+
+  // Draft batches that exist but have no scheduled days (e.g. newly
+  // created by Regenerate but with warnings). Surfaced as a small list
+  // so they don't get lost.
+  const unscheduledDrafts = useMemo(() => {
+    const scheduledPlanIds = new Set(lineItems.map((li) => li.planId));
+    return plans.filter((p) => p.status === "draft" && !scheduledPlanIds.has(p.id!));
+  }, [plans, lineItems]);
 
   return (
     <div>
-      <PageHeader title="Production" description="Plan and track your batches" />
-      <div className="px-4 space-y-3 pb-6">
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-border overflow-hidden text-sm font-medium shrink-0">
-            <button
-              onClick={() => setView("active")}
-              className={`px-3 py-1.5 transition-colors ${view === "active" ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground"}`}
-            >
-              Active
-            </button>
-            <button
-              onClick={() => setView("scheduled")}
-              className={`px-3 py-1.5 transition-colors ${view === "scheduled" ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground"}`}
-              title="Upcoming schedule from the Plan page's Regenerate"
-            >
-              Scheduled
-            </button>
-            <button
-              onClick={() => setView("history")}
-              className={`px-3 py-1.5 transition-colors ${view === "history" ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground"}`}
-            >
-              History
-            </button>
-          </div>
+      <PageHeader
+        title="Production"
+        description="Daily view — today plus upcoming. Click a batch to check off steps."
+      />
 
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, batch no., date, or product…"
-              className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border bg-card placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-
-          <Link
-            href="/production/new"
-            className="rounded-full bg-accent text-accent-foreground p-2 inline-flex shrink-0"
-            aria-label="New plan"
-          >
-            <Plus className="w-5 h-5" />
-          </Link>
-        </div>
-
-        {isHistory && (
-          <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Time range">
-            {RANGE_ORDER.map((r) => (
-              <button
-                key={r}
-                role="radio"
-                aria-checked={range === r}
-                onClick={() => setRange(r)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  range === r
-                    ? "bg-accent text-accent-foreground border-accent"
-                    : "bg-card text-muted-foreground border-border hover:bg-muted"
-                }`}
-              >
-                {RANGE_LABEL[r]}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {showingStrip && (
-          <p className="text-xs text-muted-foreground">
-            Showing {filtered.length} of {totalHistory} completed {totalHistory === 1 ? "batch" : "batches"}
-            {range !== "all" && <> · last {RANGE_LABEL[range].toLowerCase()}</>}
-            {outsideRangeCount > 0 && (
-              <>
-                {" · "}
-                <button
-                  onClick={() => setRange("all")}
-                  className="underline hover:text-foreground"
-                >
-                  {outsideRangeCount} more {outsideRangeCount === 1 ? "match" : "matches"} outside range
-                </button>
-              </>
-            )}
-          </p>
-        )}
-
-        {isScheduled ? (
-          <ScheduledRunsSection productMap={productMap} search={search.trim()} />
-        ) : filtered.length === 0 ? (
-          <p className="text-muted-foreground text-sm py-8 text-center">
-            {search
-              ? isHistory && outsideRangeCount > 0
-                ? <>No matches in this range. <button onClick={() => setRange("all")} className="underline">Search all time</button>.</>
-                : "No batches match your search."
-              : isHistory
-                ? totalHistory === 0
-                  ? "No completed batches yet."
-                  : `No completed batches in the last ${RANGE_LABEL[range].toLowerCase()}.`
-                : "No active batches. Tap + to plan your first batch."}
-          </p>
-        ) : isHistory && historyGroups ? (
-          <div className="space-y-4">
-            {historyGroups.length > 1 && (
-              <CollapseControls
-                onCollapseAll={() => setCollapsedMonths(new Set(historyGroups.map((g) => g.key)))}
-                onExpandAll={() => setCollapsedMonths(new Set())}
-              />
-            )}
-            {historyGroups.map((group) => {
-              const isCollapsed = collapsedMonths.has(group.key);
-              return (
-                <div key={group.key}>
-                  <button
-                    onClick={() => toggleMonth(group.key)}
-                    aria-expanded={!isCollapsed}
-                    className="flex items-center gap-2 w-full text-left mb-2"
-                  >
-                    <ChevronDown aria-hidden="true" className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
-                    <h2 className="text-sm font-semibold text-primary">{group.label}</h2>
-                    <span className="text-xs text-muted-foreground">({group.plans.length})</span>
-                  </button>
-                  {!isCollapsed && (
-                    <ul className="space-y-2 ml-6">
-                      {group.plans.map((plan) => (
-                        <PlanRow
-                          key={plan.id}
-                          plan={plan}
-                          planProducts={planProductsByPlan.get(plan.id!) ?? []}
-                          doneKeys={doneKeysByPlan.get(plan.id!) ?? EMPTY_SET}
-                          productMap={productMap}
-                          mouldMap={mouldMap}
-                          orderedForPlan={orderedByPlan.get(plan.id!)}
-                          confirmDeleteId={confirmDeleteId}
-                          onConfirmDelete={setConfirmDeleteId}
-                          onDelete={async (id) => { await deleteProductionPlan(id); setConfirmDeleteId(null); }}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
+      <div className="px-4 pb-8 space-y-4">
+        {visibleDays.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border bg-card p-6 text-center">
+            <Calendar className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Nothing scheduled yet. Head to <Link href="/plan" className="text-primary hover:underline">/plan</Link> and click <span className="font-medium">Regenerate plan</span> once you have open orders.
+            </p>
           </div>
         ) : (
-          <ul className="space-y-2">
-            {filtered.map((plan) => (
-              <PlanRow
-                key={plan.id}
-                plan={plan}
-                planProducts={planProductsByPlan.get(plan.id!) ?? []}
-                doneKeys={doneKeysByPlan.get(plan.id!) ?? EMPTY_SET}
-                productMap={productMap}
-                mouldMap={mouldMap}
-                orderedForPlan={orderedByPlan.get(plan.id!)}
-                confirmDeleteId={confirmDeleteId}
-                onConfirmDelete={setConfirmDeleteId}
-                onDelete={async (id) => { await deleteProductionPlan(id); setConfirmDeleteId(null); }}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
+          <div className="space-y-4">
+            {visibleDays.map((day) => {
+              const items = (lineItemsByDay.get(day.id!) ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
+              const dayDate = new Date(day.date + "T12:00:00");
+              const avail = effectiveDailyCapacityMinutes(dayDate, config, people, unavailability, blockedDays);
+              const used = items.reduce((s, li) => s + li.plannedMinutes, 0);
+              const util = avail > 0 ? (used / avail) * 100 : 0;
+              const level: "ok" | "warn" | "critical" | "over" =
+                avail === 0 && used > 0 ? "over"
+                : used > avail ? "over"
+                : util >= (config?.criticalThresholdPercent ?? 100) ? "critical"
+                : util >= (config?.warnThresholdPercent ?? 100) ? "warn"
+                : "ok";
+              const isToday = day.date === todayIso;
+              return (
+                <section
+                  key={day.id}
+                  className={`rounded-lg border overflow-hidden ${
+                    isToday ? "border-primary/40 bg-primary/5" : "border-border bg-card"
+                  }`}
+                >
+                  <header className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h2 className="text-sm font-semibold">
+                        {formatDayLabel(day.date, todayIso)}
+                      </h2>
+                      <span className={`text-[10px] uppercase tracking-wide rounded-full px-2 py-0.5 ${DAY_STATUS_STYLE[day.status]}`}>
+                        {DAY_STATUS_LABEL[day.status]}
+                      </span>
+                      {isToday && (
+                        <span className="text-[10px] uppercase tracking-wide rounded-full bg-primary text-primary-foreground px-2 py-0.5">
+                          Today
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground tabular-nums">
+                        {items.length} batch{items.length === 1 ? "" : "es"}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 tabular-nums ${LEVEL_STYLE[level]}`}>
+                        {used}/{avail} min · {Math.round(util)}%
+                      </span>
+                    </div>
+                  </header>
 
-const EMPTY_SET: Set<string> = new Set();
+                  {items.length === 0 ? (
+                    <p className="px-4 py-3 text-xs text-muted-foreground">No batches on this day.</p>
+                  ) : (
+                    <ul className="divide-y divide-border">
+                      {items.map((li) => {
+                        const plan = planMap.get(li.planId);
+                        if (!plan) return null;
+                        const pps = planProductsByPlan.get(li.planId) ?? [];
+                        const productNames = [...new Set(pps.map((pp) => productMap.get(pp.productId)?.name ?? pp.productId))];
+                        const totalMoulds = pps.reduce((s, pp) => s + pp.quantity, 0);
+                        const mouldSummary = pps.map((pp) => mouldMap.get(pp.mouldId ?? "")?.name).filter(Boolean);
+                        const totalPieces = pps.reduce((s, pp) => {
+                          const cavities = mouldMap.get(pp.mouldId ?? "")?.numberOfCavities ?? 0;
+                          return s + cavities * pp.quantity;
+                        }, 0);
+                        const links = linksByPlan.get(li.planId) ?? [];
+                        const orderRefs = [...new Set(
+                          links.map((l) => {
+                            const item = orderItemById.get(l.orderItemId);
+                            const order = item ? orderMap.get(item.orderId) : undefined;
+                            return order?.customerName ?? order?.eventName ?? null;
+                          }).filter(Boolean) as string[],
+                        )];
+                        const orderedStepIds = [...li.stepIds].sort((a, b) => {
+                          const sa = stepById.get(a)?.sortOrder ?? 0;
+                          const sb = stepById.get(b)?.sortOrder ?? 0;
+                          return sa - sb;
+                        });
+                        const stepsDone = orderedStepIds.filter((sid) => stepDoneFor(li.planId, sid)).length;
 
-interface BatchTotals {
-  ordered: number;
-  produced: number;
-  totalMoulds: number;
-  cavitiesLabel: string | null;
-}
-
-/** Render the batch header's quantity line. When the plan is linked
- *  to an order, both sides are shown so the user sees ordered vs the
- *  mould-wave yield (waves overshoot because cavities don't
- *  fractionalise). Manual batches have no order — skip ordered. */
-function formatBatchTotals(t: BatchTotals): string {
-  const mouldPart = t.totalMoulds > 0
-    ? ` (${t.totalMoulds} mould${t.totalMoulds === 1 ? "" : "s"}${t.cavitiesLabel ? ` × ${t.cavitiesLabel}` : ""})`
-    : "";
-  if (t.ordered > 0) {
-    return `${t.ordered} pcs ordered · ${t.produced} pcs produced${mouldPart}`;
-  }
-  return `${t.produced} pcs produced${mouldPart}`;
-}
-
-// Key formats (must stay in sync with production.ts generateSteps):
-//   colour:  color-{planProductId}  or  color-{planProductId}-{i}
-//   shell:   shell-{coating}-{mouldId}
-//   filling: filling-{planProductId}-{fillingId}
-//   fill:    fill-{planProductId}
-//   cap:     cap-{coating}-{mouldId}
-//   unmould: unmould-{planProductId}
-function lastActivityForProduct(planProductId: string, doneKeys: Set<string>): string | null {
-  const checks: { rank: number; label: string; matched: boolean }[] = [
-    { rank: 1, label: "Mould coloured", matched: [...doneKeys].some((k) => k === `color-${planProductId}` || k.startsWith(`color-${planProductId}-`)) },
-    { rank: 2, label: "Shell done", matched: doneKeys.has(`shell-${planProductId}`) },
-    { rank: 3, label: "Fillings in progress", matched: [...doneKeys].some((k) => k.startsWith(`filling-${planProductId}-`)) },
-    { rank: 4, label: "Filled", matched: doneKeys.has(`fill-${planProductId}`) },
-    { rank: 5, label: "Capped", matched: doneKeys.has(`cap-${planProductId}`) },
-    { rank: 6, label: "Unmoulded", matched: doneKeys.has(`unmould-${planProductId}`) },
-  ];
-  let best: { rank: number; label: string } | null = null;
-  for (const check of checks) {
-    if (check.matched && (!best || check.rank > best.rank)) best = check;
-  }
-  return best?.label ?? null;
-}
-
-function PlanRow({
-  plan, planProducts, doneKeys, productMap, mouldMap, orderedForPlan,
-  confirmDeleteId, onConfirmDelete, onDelete,
-}: {
-  plan: ProductionPlan;
-  planProducts: PlanProduct[];
-  doneKeys: Set<string>;
-  productMap: Map<string, Product>;
-  mouldMap: Map<string, Mould>;
-  /** productId → ordered pieces, from the plan's linked order. Undefined
-   *  when the plan isn't order-backed (manual batches). */
-  orderedForPlan: Map<string, number> | undefined;
-  confirmDeleteId: string | null;
-  onConfirmDelete: (id: string) => void;
-  onDelete: (id: string) => void;
-}) {
-  // Totals for the batch header. We show "N ordered · M produced
-  // (moulds × cavities)" so the user sees both sides of the mould-wave
-  // at a glance: what the customer asked for vs what the wave yields.
-  // When all planProducts share one mould, cavities is a single number;
-  // mixed-mould batches collapse to "mixed" to keep the header terse.
-  const totals = useMemo(() => {
-    let produced = 0;
-    let totalMoulds = 0;
-    const cavitiesSeen = new Set<number>();
-    for (const pb of planProducts) {
-      const mould = mouldMap.get(pb.mouldId);
-      const cav = mould?.numberOfCavities ?? 0;
-      if (cav > 0) cavitiesSeen.add(cav);
-      totalMoulds += pb.quantity;
-      if (pb.actualYield != null) produced += pb.actualYield;
-      else produced += cav * pb.quantity;
-    }
-    let ordered = 0;
-    if (orderedForPlan) {
-      for (const pb of planProducts) {
-        ordered += orderedForPlan.get(pb.productId) ?? 0;
-      }
-    }
-    const cavitiesLabel = cavitiesSeen.size === 1
-      ? `${[...cavitiesSeen][0]} cavities`
-      : cavitiesSeen.size > 1
-        ? "mixed cavities"
-        : null;
-    return { ordered, produced, totalMoulds, cavitiesLabel };
-  }, [planProducts, mouldMap, orderedForPlan]);
-  const totalProducts = totals.produced;
-
-  const daysSinceCreated = Math.floor((Date.now() - new Date(plan.createdAt).getTime()) / 86_400_000);
-  const ageLabel = plan.status === "done"
-    ? null
-    : daysSinceCreated === 0
-      ? "Started today"
-      : daysSinceCreated === 1
-        ? "Started yesterday"
-        : `Started ${daysSinceCreated} days ago`;
-
-  return (
-    <li
-      className="rounded-lg border border-border bg-card overflow-hidden"
-      style={{ contentVisibility: "auto", containIntrinsicSize: "0 120px" }}
-    >
-      <div className="flex items-center">
-        <Link href={`/production/${encodeURIComponent(plan.id ?? '')}`} className="flex-1 flex items-center gap-3 p-3 min-w-0">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-medium text-sm truncate">{plan.name}</h3>
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0 ${STATUS_STYLE[plan.status]}`}>
-                {STATUS_LABEL[plan.status]}
-              </span>
-            </div>
-            {plan.batchNumber && (
-              <p className="font-mono text-[10px] text-muted-foreground mt-0.5">{plan.batchNumber}</p>
-            )}
-            {ageLabel && (
-              <p className="text-xs text-muted-foreground mt-0.5">{ageLabel}</p>
-            )}
-            {plan.notes && (
-              <p className="text-xs text-muted-foreground italic mt-0.5 flex items-start gap-1">
-                <StickyNote className="w-3 h-3 shrink-0 mt-0.5" />
-                <span className="line-clamp-2">{plan.notes}</span>
-              </p>
-            )}
-            {plan.status === "done" && (
-              <div className="mt-0.5 space-y-0.5">
-                <p className="text-xs text-muted-foreground">
-                  {new Date(plan.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                </p>
-                {planProducts.length > 0 && (
-                  <>
-                    {totalProducts > 0 && (
-                      <p className="text-xs font-medium mt-0.5">{formatBatchTotals(totals)}</p>
-                    )}
-                    <ul className="mt-1 space-y-0.5">
-                      {planProducts.map((pb) => {
-                        const product = productMap.get(pb.productId);
-                        const mould = mouldMap.get(pb.mouldId);
-                        const planned = mould ? mould.numberOfCavities * pb.quantity : null;
-                        const productCount = pb.actualYield ?? planned;
                         return (
-                          <li key={pb.id}>
-                            <div className="flex items-baseline gap-1 min-w-0 flex-wrap">
-                              <span className="text-xs text-foreground truncate">{product?.name ?? "Unknown"}</span>
-                              <span className="text-[10px] text-muted-foreground shrink-0">
-                                · {pb.quantity} mould{pb.quantity !== 1 ? "s" : ""}{productCount !== null ? ` · ${productCount} pcs` : ""}
-                              </span>
+                          <li key={li.id ?? `${li.productionDayId}-${li.planId}`} className="px-4 py-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <Link
+                                href={`/production/${encodeURIComponent(plan.id!)}`}
+                                className="flex-1 min-w-0 group"
+                              >
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <span className="text-sm font-medium truncate">
+                                    {productNames.length === 1 ? productNames[0] : `${productNames.length} products`}
+                                  </span>
+                                  {plan.batchNumber && (
+                                    <span className="font-mono text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                      {plan.batchNumber}
+                                    </span>
+                                  )}
+                                  {totalMoulds > 0 && (
+                                    <span className="text-[11px] text-muted-foreground">
+                                      {totalMoulds} mould{totalMoulds === 1 ? "" : "s"} · {totalPieces} pcs
+                                    </span>
+                                  )}
+                                  <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                                {orderRefs.length > 0 && (
+                                  <p className="text-[11px] text-muted-foreground truncate mb-1">
+                                    for {orderRefs.join(", ")}
+                                  </p>
+                                )}
+                                {mouldSummary.length > 0 && (
+                                  <p className="text-[11px] text-muted-foreground truncate mb-1">
+                                    Mould: {mouldSummary.join(", ")}
+                                  </p>
+                                )}
+                                <div className="flex flex-wrap gap-1 text-[10px]">
+                                  {orderedStepIds.map((stepId) => {
+                                    const step = stepById.get(stepId);
+                                    const done = stepDoneFor(li.planId, stepId);
+                                    return (
+                                      <span
+                                        key={stepId}
+                                        className={`rounded-full border px-1.5 py-0.5 flex items-center gap-1 ${
+                                          done
+                                            ? "border-status-ok/40 bg-status-ok/10 text-status-ok"
+                                            : "border-border bg-card text-muted-foreground"
+                                        }`}
+                                      >
+                                        {done && <CheckCircle className="w-2.5 h-2.5" />}
+                                        {step?.name ?? stepId}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+                                  {stepsDone}/{orderedStepIds.length} steps · {li.plannedMinutes}m
+                                </p>
+                              </Link>
+                              {plan.status === "draft" && (
+                                <button
+                                  onClick={(e) => { e.preventDefault(); setConfirmDeleteId(plan.id!); }}
+                                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                                  aria-label="Delete batch"
+                                  title="Delete batch"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
-                            {pb.notes && (
-                              <p className="text-[10px] text-muted-foreground italic mt-0.5 flex items-start gap-1">
-                                <StickyNote className="w-3 h-3 shrink-0 mt-px" />
-                                <span className="line-clamp-1">{pb.notes}</span>
-                              </p>
-                            )}
                           </li>
                         );
                       })}
                     </ul>
-                  </>
-                )}
-              </div>
-            )}
-            {plan.status !== "done" && planProducts.length > 0 && (
-              <>
-                {totalProducts > 0 && (
-                  <p className="text-xs font-medium mt-1.5">{formatBatchTotals(totals)}</p>
-                )}
-                <ul className="mt-1 space-y-0.5">
-                  {planProducts.map((pb) => {
-                    const product = productMap.get(pb.productId);
-                    const mould = mouldMap.get(pb.mouldId);
-                    const productCount = mould ? mould.numberOfCavities * pb.quantity : null;
-                    const lastActivity = lastActivityForProduct(pb.id!, doneKeys);
-                    return (
-                      <li key={pb.id}>
-                        <div className="flex items-center gap-1 min-w-0 flex-wrap">
-                          <span className="text-xs text-foreground truncate">{product?.name ?? "Unknown"}</span>
-                          <span className="text-[10px] text-muted-foreground shrink-0">
-                            · {pb.quantity} mould{pb.quantity !== 1 ? "s" : ""}{productCount !== null ? ` · ${productCount} pcs` : ""}
-                          </span>
-                          {lastActivity ? (
-                            <span className="text-[10px] text-primary/80 shrink-0">· {lastActivity}</span>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground shrink-0">· Not started</span>
-                          )}
-                        </div>
-                        {pb.notes && (
-                          <p className="text-[10px] text-muted-foreground italic mt-0.5 line-clamp-1">{pb.notes}</p>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            )}
+                  )}
+                </section>
+              );
+            })}
           </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-        </Link>
-        <div className="flex items-center gap-1 pr-2">
-          {planProducts.length > 0 && (
-            <Link
-              href={`/production/${encodeURIComponent(plan.id ?? '')}/products`}
-              className="p-1.5 rounded-full hover:bg-muted transition-colors"
-              aria-label="View scaled recipes"
-            >
-              <BookOpen className="w-4 h-4 text-muted-foreground" />
-            </Link>
-          )}
-          <Link
-            href={`/production/new?from=${encodeURIComponent(plan.id ?? '')}`}
-            className="p-1.5 rounded-full hover:bg-muted transition-colors"
-            aria-label="Duplicate batch"
-            title="Duplicate batch"
-          >
-            <Copy className="w-4 h-4 text-muted-foreground" />
-          </Link>
-          {confirmDeleteId === plan.id ? (
-            <button
-              onClick={() => onDelete(plan.id!)}
-              className="p-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-medium"
-            >
-              Confirm
-            </button>
-          ) : (
-            <button
-              onClick={() => onConfirmDelete(plan.id!)}
-              className="p-1.5 rounded-full hover:bg-muted transition-colors"
-              aria-label={`Delete ${plan.name}`}
-            >
-              <Trash2 className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-      </div>
-    </li>
-  );
-}
+        )}
 
-// ─── Scheduled runs (scheduler output from Plan → Regenerate) ────
-
-function ScheduledRunsSection({
-  productMap, search,
-}: {
-  productMap: Map<string, Product>;
-  search: string;
-}) {
-  const schedule = useProductionSchedule();
-  const orders = useOrders();
-  const config = useCapacityConfig();
-  const people = usePeople(false);
-  const unavailability = usePersonUnavailability();
-  const blocked = useBlockedDays();
-
-  const orderById = useMemo(() => new Map(orders.map((o) => [o.id!, o])), [orders]);
-
-  // Filter to future-or-today entries by default; only show completed
-  // if they're on today — old 'done' rows clutter the view. "Today"
-  // here is the LOCAL day, not the UTC day — slicing the ISO string
-  // would silently shift entries across the date line.
-  const todayIso = localIsoDate(new Date());
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return schedule.filter((s) => {
-      const dayIso = localIsoDate(new Date(s.startAt));
-      if (dayIso < todayIso && s.status === "done") return false;
-      if (!q) return true;
-      const pName = productMap.get(s.productId)?.name?.toLowerCase() ?? "";
-      const oName = s.orderId
-        ? (orderById.get(s.orderId)?.customerName ?? "").toLowerCase()
-        : "";
-      return s.phase.toLowerCase().includes(q)
-        || pName.includes(q)
-        || oName.includes(q)
-        || dayIso.includes(q);
-    });
-  }, [schedule, search, productMap, orderById, todayIso]);
-
-  const byDay = useMemo(() => {
-    const m = new Map<string, typeof filtered>();
-    for (const s of filtered) {
-      const k = localIsoDate(new Date(s.startAt));
-      const arr = m.get(k) ?? [];
-      arr.push(s);
-      m.set(k, arr);
-    }
-    for (const arr of m.values()) {
-      arr.sort((a, b) => a.startAt.localeCompare(b.startAt));
-    }
-    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
-
-  if (schedule.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm py-8 text-center">
-        No schedule yet. Open <Link href="/plan" className="text-primary hover:underline">Plan</Link>
-        {" "}and tap Regenerate to build one from pending orders.
-      </p>
-    );
-  }
-  if (filtered.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm py-8 text-center">
-        {search ? "No scheduled runs match your search." : "Nothing left on the schedule — all future work is done."}
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {byDay.map(([dayIso, entries]) => {
-        const dayDate = new Date(dayIso + "T12:00:00");
-        const capacityMinutes = effectiveDailyCapacityMinutes(
-          dayDate, config, people, unavailability, blocked,
-        );
-        const activeMinutes = entries.filter((e) => e.isActive)
-          .reduce((a, e) => a + e.durationMinutes, 0);
-        const util = capacityMinutes > 0
-          ? Math.round((activeMinutes / capacityMinutes) * 100)
-          : 0;
-        const barColor =
-          capacityMinutes > 0 && activeMinutes > capacityMinutes ? "bg-status-alert"
-            : util >= 90 ? "bg-status-warn"
-              : "bg-status-ok";
-        const isPast = dayIso < todayIso;
-
-        return (
-          <div key={dayIso} className="rounded-lg border border-border bg-card">
-            <div className={`flex items-center justify-between gap-3 px-3 py-2 border-b border-border ${isPast ? "bg-muted/30" : ""}`}>
-              <div className="flex items-center gap-2 min-w-0">
-                <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                <p className="text-sm font-medium">
-                  {dayDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-                  {isPast && <span className="ml-1.5 text-[10px] uppercase text-muted-foreground">past</span>}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className={`h-full ${barColor}`}
-                    style={{ width: capacityMinutes > 0 ? `${Math.min(100, util)}%` : "0%" }}
-                  />
-                </div>
-                <p className="text-[11px] text-muted-foreground tabular-nums">
-                  {Math.round(activeMinutes / 6) / 10}h
-                  {capacityMinutes > 0 && ` / ${Math.round(capacityMinutes / 60)}h`}
-                </p>
-              </div>
-            </div>
-            <ul className="divide-y divide-border">
-              {groupScheduleByStep(entries).map((group, gi) => (
-                <ScheduleStepRow
-                  key={gi}
-                  group={group}
-                  productMap={productMap}
-                  order={group[0].orderId ? orderById.get(group[0].orderId) : undefined}
-                />
+        {/* Draft batches with no scheduled days yet — usually because
+            the scheduler had warnings (no mould, missing steps, etc.). */}
+        {unscheduledDrafts.length > 0 && (
+          <section className="rounded-lg border border-status-warn/40 bg-status-warn-bg/20 p-3 space-y-2">
+            <h2 className="text-sm font-semibold text-status-warn flex items-center gap-1.5">
+              <Clock className="w-4 h-4" /> Drafts with nothing scheduled
+            </h2>
+            <ul className="space-y-1.5">
+              {unscheduledDrafts.map((plan) => (
+                <li key={plan.id} className="flex items-center justify-between text-xs">
+                  <Link href={`/production/${encodeURIComponent(plan.id!)}`} className="flex-1 hover:underline truncate">
+                    {plan.name}
+                    {plan.batchNumber && (
+                      <span className="ml-2 font-mono text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {plan.batchNumber}
+                      </span>
+                    )}
+                  </Link>
+                  <button
+                    onClick={() => setConfirmDeleteId(plan.id!)}
+                    className="text-muted-foreground hover:text-destructive ml-2"
+                    aria-label="Delete batch"
+                    title="Delete batch"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </li>
               ))}
             </ul>
+          </section>
+        )}
+
+        {/* Delete confirmation */}
+        {confirmDeleteId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDeleteId(null)} />
+            <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card shadow-xl p-5 space-y-3">
+              <h3 className="text-base font-bold">Delete batch?</h3>
+              <p className="text-sm text-muted-foreground">
+                This removes the batch and its scheduling. Step progress and stock movements remain. Deleting does NOT touch the orders it was serving.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="text-sm rounded-full border border-border px-3 py-1.5 hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(confirmDeleteId)}
+                  className="text-sm rounded-full bg-destructive text-destructive-foreground px-3 py-1.5 hover:opacity-90"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
-        );
-      })}
+        )}
+      </div>
     </div>
   );
 }
 
-/** Collapse rows that share start-time + step name + order — the
- *  mould-wave scheduler emits one per (product, slot) running
- *  concurrently. The user reads the wave as a single step ("Cap ·
- *  4 products · 60m"), not four individual rows. */
-function groupScheduleByStep(
-  entries: import("@/types").ProductionScheduleEntry[],
-): import("@/types").ProductionScheduleEntry[][] {
-  const m = new Map<string, import("@/types").ProductionScheduleEntry[]>();
-  for (const e of entries) {
-    const k = `${e.startAt}|${e.phase}|${e.orderId ?? ""}`;
-    const arr = m.get(k) ?? [];
-    arr.push(e);
-    m.set(k, arr);
-  }
-  return [...m.values()].sort((a, b) => a[0].startAt.localeCompare(b[0].startAt));
-}
-
-function ScheduleStepRow({ group, productMap, order }: {
-  group: import("@/types").ProductionScheduleEntry[];
-  productMap: Map<string, Product>;
-  order?: { id?: string; customerName?: string; eventName?: string };
-}) {
-  const head = group[0];
-  // A group can mix statuses if a partial run was logged; pick the
-  // earliest non-done as representative, fall back to the first.
-  const statusForChip = group.find((e) => e.status !== "done")?.status ?? head.status;
-  const statusColor = {
-    pending: "bg-muted text-muted-foreground",
-    in_progress: "bg-primary/10 text-primary",
-    done: "bg-status-ok/15 text-status-ok",
-    skipped: "bg-muted text-muted-foreground line-through",
-    blocked: "bg-status-alert/15 text-status-alert",
-  }[statusForChip];
-  const allDone = group.every((e) => e.status === "done");
-
-  const band = TIME_BAND_LABEL[timeBandFor(head.startAt)];
-  const totalMinutes = group.reduce((s, e) => s + e.durationMinutes, 0);
-  const productNames = Array.from(new Set(group.map((e) => productMap.get(e.productId)?.name ?? e.productId)));
-  const productLabel = productNames.length === 1
-    ? productNames[0]
-    : `${productNames.length} products`;
-  const orderLabel = order?.customerName || order?.eventName || "";
-
-  return (
-    <li className={`flex items-center gap-3 px-3 py-2 text-sm ${allDone ? "opacity-60" : ""}`}>
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
-        {band}
-      </span>
-      <div className="flex-1 min-w-0">
-        <p className={`truncate ${allDone ? "line-through" : ""}`}>
-          <span className="font-medium">{head.phase}</span>
-          <span className="text-muted-foreground"> · {productLabel}</span>
-        </p>
-        {productNames.length > 1 && (
-          <p className="text-[11px] text-muted-foreground truncate">
-            {productNames.join(", ")}
-          </p>
-        )}
-        {orderLabel && head.orderId && (
-          <Link
-            href={`/orders/${encodeURIComponent(head.orderId)}`}
-            className="text-[11px] text-primary hover:underline truncate inline-block max-w-full"
-          >
-            Order: {orderLabel}
-          </Link>
-        )}
-      </div>
-      <span className="tabular-nums text-xs text-muted-foreground shrink-0">
-        {totalMinutes}m
-      </span>
-      <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${statusColor}`}>
-        {statusForChip.replace("_", " ")}
-      </span>
-    </li>
-  );
-}
-
-function localIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+function formatDayLabel(iso: string, todayIso: string): string {
+  const d = new Date(iso + "T12:00:00");
+  const today = new Date(todayIso + "T12:00:00");
+  const days = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  const label = d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  if (days === 0) return `Today · ${label}`;
+  if (days === 1) return `Tomorrow · ${label}`;
+  if (days === -1) return `Yesterday · ${label}`;
+  if (days < 0) return `${-days} days ago · ${label}`;
+  return `In ${days}d · ${label}`;
 }

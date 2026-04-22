@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -1403,14 +1403,24 @@ export function useProductionPlan(id: string | undefined): ProductionPlan | unde
   return data ?? undefined;
 }
 
+/**
+ * Batch number format: DUL-YYYYMMDD-NN
+ *
+ * NN is the count of existing batches whose number starts with the
+ * same DUL-YYYYMMDD- prefix, plus one. Resets to 01 on a new calendar
+ * day. Two digits is enough for a workshop that doesn't run hundreds
+ * of batches per day; overflow to three if it ever becomes an issue.
+ */
 export async function generateBatchNumber(date: Date): Promise<string> {
   const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "");
+  const prefix = `DUL-${dateStr}-`;
   const { count, error } = await supabase
     .from("productionPlans")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .like("batchNumber", `${prefix}%`);
   if (error) throw error;
-  const seq = String((count ?? 0) + 1).padStart(3, "0");
-  return `${dateStr}-${seq}`;
+  const seq = String((count ?? 0) + 1).padStart(2, "0");
+  return `${prefix}${seq}`;
 }
 
 export async function saveProductionPlan(plan: Omit<ProductionPlan, "id"> & { id?: string }): Promise<string> {
@@ -5167,18 +5177,25 @@ export async function regenerateAllPlansAndSchedule(staticInputs: {
     supabase.from("moulds").select("*").then((r) => assertOk(r) as Mould[]),
   ]);
 
-  const { buildSchedule } = await import("@/lib/scheduler");
-  const preview = buildSchedule({
+  // planStepStatus is passed to the scheduler so day-level session
+  // locks can respect in-progress work. Empty after a wipe, so the
+  // scheduler treats every day as freely mergeable.
+  const planStepStatus = assertOk(
+    await supabase.from("planStepStatus").select("*"),
+  ) as PlanStepStatus[];
+
+  const { buildDailySchedule } = await import("@/lib/scheduler");
+  const preview = buildDailySchedule({
     plans, planProducts, orders, orderItems, orderPlanLinks,
-    products, moulds,
+    products, moulds, planStepStatus,
     ...staticInputs,
   });
 
-  await replaceProductionSchedule(preview.entries);
+  await replaceProductionPlanning(preview.days, preview.lineItems);
 
   return {
     reconcile: reconcileResult,
-    scheduleCount: preview.entries.length,
+    scheduleCount: preview.lineItems.length,
     warnings: [...reconcileResult.warnings, ...preview.warnings],
     unscheduledPlanIds: preview.unscheduledPlanIds,
   };
@@ -5427,82 +5444,175 @@ export async function revertBorrowsForOrder(orderId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Production schedule (scheduler output)
+// Production planning (scheduler output)
+//
+// Replaces the old productionSchedule model with a (day, batch) shape.
+// productionDays are rows in the existing table (shared with HACCP);
+// productionDayLineItems are one row per batch-on-day with a stepIds[]
+// array. Step progress continues to live on planStepStatus.
 // ---------------------------------------------------------------------------
 
-export function useProductionSchedule(): ProductionScheduleEntry[] {
+export function useAllProductionDayLineItems(): ProductionDayLineItem[] {
   const { data } = useQuery({
-    queryKey: ["production-schedule"],
+    queryKey: ["production-day-line-items", "all"],
     queryFn: async () => {
       const rows = assertOk(
-        await supabase.from("productionSchedule").select("*"),
-      ) as ProductionScheduleEntry[];
-      return rows.sort((a, b) => a.startAt.localeCompare(b.startAt));
+        await supabase.from("productionDayLineItems").select("*"),
+      ) as ProductionDayLineItem[];
+      return rows.sort((a, b) => a.sortOrder - b.sortOrder);
     },
   });
   return data ?? [];
 }
 
-/** Replace every scheduled row with the given entries, in one transaction-ish
- *  flow: delete all then bulk-insert. Triggered by the Plan page's Regenerate
- *  button. */
-/** Replace the production schedule atomically-enough that a failed
- *  INSERT doesn't wipe the existing plan.
- *
- *  The old version deleted first, then inserted — if the INSERT failed
- *  (e.g. the stepId column was missing from the schema cache) the user
- *  was left with an empty schedule and no way to recover. This variant:
- *
- *    1. Reads the IDs of every existing schedule row.
- *    2. Inserts the new rows (with fresh UUIDs). The table briefly
- *       holds both old + new.
- *    3. Deletes only the old rows by their ID list.
- *
- *  If step 2 throws, step 3 never runs and the existing plan stays
- *  intact. Any stale row from a prior failed attempt gets cleaned up
- *  on the next successful regenerate. Cleanup is bounded to the
- *  known-old ID set so we never accidentally delete the new rows.
- */
-export async function replaceProductionSchedule(
-  entries: Omit<ProductionScheduleEntry, "id" | "createdAt" | "updatedAt">[],
-): Promise<void> {
-  // Snapshot existing IDs before we write anything.
-  const existing = assertOk(
-    await supabase.from("productionSchedule").select("id"),
-  ) as Array<{ id: string }>;
-  const existingIds = existing.map((r) => r.id);
-
-  // Insert new rows first. If this throws (e.g. PGRST204 for a missing
-  // column, 23502 NOT-NULL, 23503 FK violation), the caller sees the
-  // error and the old schedule is still fully intact.
-  if (entries.length > 0) {
-    const withIds = entries.map((e) => ({ ...e, id: newId() }));
-    const { error: insErr } = await supabase.from("productionSchedule").insert(withIds);
-    if (insErr) throw insErr;
-  }
-
-  // Only once the insert has landed do we clean up the previous set.
-  if (existingIds.length > 0) {
-    const { error: delErr } = await supabase
-      .from("productionSchedule")
-      .delete()
-      .in("id", existingIds);
-    if (delErr) throw delErr;
-  }
-
-  queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+export function useProductionDayLineItems(
+  productionDayId: string | undefined,
+): ProductionDayLineItem[] {
+  const { data } = useQuery({
+    queryKey: ["production-day-line-items", productionDayId ?? ""],
+    enabled: !!productionDayId,
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase
+          .from("productionDayLineItems")
+          .select("*")
+          .eq("productionDayId", productionDayId!),
+      ) as ProductionDayLineItem[];
+      return rows.sort((a, b) => a.sortOrder - b.sortOrder);
+    },
+  });
+  return data ?? [];
 }
 
-export async function updateScheduleStatus(
-  id: string,
-  status: ProductionScheduleEntry["status"],
+/**
+ * Replace the scheduler output atomically-enough. Rather than wiping
+ * everything first and risking a partial failure leaving the plan in
+ * ruins, we:
+ *
+ *   1. Insert the fresh rows (days + lineItems) tagged with new UUIDs.
+ *   2. Delete the previous draft rows by id list.
+ *
+ * Active-day rows (status != 'draft') and their lineItems are never
+ * touched — physical work underway keeps its plan. Only draft days
+ * are rewritten.
+ *
+ * The dateRef → productionDayId resolution happens here: for each
+ * proposed day we either reuse an existing row (by date, if present
+ * with status='draft' or unopened) or insert a new one.
+ */
+export async function replaceProductionPlanning(
+  proposedDays: Array<{ date: string }>,
+  proposedLineItems: Array<{
+    dateRef: string; planId: string; stepIds: string[];
+    plannedMinutes: number; sortOrder: number;
+  }>,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("productionSchedule")
-    .update({ status, updatedAt: new Date() })
-    .eq("id", id);
-  if (error) throw error;
-  queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+  const now = new Date();
+
+  // Snapshot draft productionDays + their line items so we know what
+  // to clean up afterwards. Active / done days are protected.
+  const existingDays = assertOk(
+    await supabase.from("productionDays").select("id, date, status"),
+  ) as Array<{ id: string; date: string; status: string }>;
+  const draftDayIds = existingDays.filter((d) => d.status === "draft").map((d) => d.id);
+  const activeDaysByDate = new Map(
+    existingDays.filter((d) => d.status !== "draft").map((d) => [d.date, d]),
+  );
+  const draftDaysByDate = new Map(
+    existingDays.filter((d) => d.status === "draft").map((d) => [d.date, d]),
+  );
+
+  const existingLineItemIds = draftDayIds.length > 0
+    ? (assertOk(
+        await supabase
+          .from("productionDayLineItems")
+          .select("id")
+          .in("productionDayId", draftDayIds),
+      ) as Array<{ id: string }>).map((r) => r.id)
+    : [];
+
+  // 1. Ensure a productionDay row exists per proposed date, reusing
+  //    any existing one (draft → reuse its id, active/done → reuse
+  //    and attach new line items to it).
+  const dayIdByDate = new Map<string, string>();
+  const daysToInsert: Array<{
+    id: string; date: string; status: string;
+    tempLogComplete: boolean; cleaningComplete: boolean;
+    summaryJson: Record<string, unknown>;
+    createdAt: Date; updatedAt: Date;
+  }> = [];
+  for (const d of proposedDays) {
+    const active = activeDaysByDate.get(d.date);
+    if (active) {
+      dayIdByDate.set(d.date, active.id);
+      continue;
+    }
+    const draft = draftDaysByDate.get(d.date);
+    if (draft) {
+      dayIdByDate.set(d.date, draft.id);
+      continue;
+    }
+    const id = newId();
+    dayIdByDate.set(d.date, id);
+    daysToInsert.push({
+      id, date: d.date, status: "draft",
+      tempLogComplete: false, cleaningComplete: false, summaryJson: {},
+      createdAt: now, updatedAt: now,
+    });
+  }
+  if (daysToInsert.length > 0) {
+    const { error } = await supabase.from("productionDays").insert(daysToInsert);
+    if (error) throw error;
+  }
+
+  // 2. Insert new lineItems first. If this throws, the old draft
+  //    lineItems are still intact.
+  if (proposedLineItems.length > 0) {
+    const rows = proposedLineItems.map((li) => {
+      const dayId = dayIdByDate.get(li.dateRef);
+      if (!dayId) throw new Error(`Scheduler produced a line item for unknown date ${li.dateRef}`);
+      return {
+        id: newId(),
+        productionDayId: dayId,
+        planId: li.planId,
+        stepIds: li.stepIds,
+        plannedMinutes: li.plannedMinutes,
+        sortOrder: li.sortOrder,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
+    const { error } = await supabase.from("productionDayLineItems").insert(rows);
+    if (error) throw error;
+  }
+
+  // 3. Delete the previous draft lineItems by id — bounded to the
+  //    pre-regenerate snapshot so we don't nuke the rows we just wrote.
+  if (existingLineItemIds.length > 0) {
+    const { error } = await supabase
+      .from("productionDayLineItems")
+      .delete()
+      .in("id", existingLineItemIds);
+    if (error) throw error;
+  }
+
+  // 4. Delete any orphan draft productionDays that no longer have
+  //    line items (the regenerate may have dropped a date entirely).
+  //    Active days are preserved regardless.
+  if (draftDayIds.length > 0) {
+    const stillUsedDayIds = new Set(proposedLineItems.map((li) => dayIdByDate.get(li.dateRef)!));
+    const toDelete = draftDayIds.filter((id) => !stillUsedDayIds.has(id));
+    if (toDelete.length > 0) {
+      const { error } = await supabase
+        .from("productionDays")
+        .delete()
+        .in("id", toDelete);
+      if (error) throw error;
+    }
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["production-days"] });
+  queryClient.invalidateQueries({ queryKey: ["production-day-line-items"] });
 }
 
 export function useEventCalendar(): EventCalendarEntry[] {
@@ -6744,20 +6854,38 @@ export function useProductionDays(limit = 30): ProductionDay[] {
   return data ?? [];
 }
 
-/** Create — or return — today's productionDay row. Fires when the user
- *  clicks "Open Production" on the dashboard. Idempotent so clicking it
- *  twice is safe. */
+/** Create or promote today's productionDay. Idempotent.
+ *
+ *  Three cases:
+ *    - no row exists → insert with status='active', openedAt=now;
+ *    - row exists with status='draft' (the scheduler created it) →
+ *      promote to 'active', stamp openedAt;
+ *    - row already active / done → return as-is.
+ */
 export async function openProductionDay(openedBy?: string): Promise<ProductionDay> {
   const today = todayDateString();
   const existing = assertOkMaybe(
     await supabase.from("productionDays").select("*").eq("date", today).maybeSingle(),
   ) as ProductionDay | null;
-  if (existing) return existing;
-  const id = newId();
   const now = new Date();
+  if (existing) {
+    if (existing.status === "draft") {
+      const { error } = await supabase
+        .from("productionDays")
+        .update({ status: "active", openedAt: now, openedBy: openedBy ?? null, updatedAt: now })
+        .eq("id", existing.id!);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["production-day"] });
+      queryClient.invalidateQueries({ queryKey: ["production-days"] });
+      return { ...existing, status: "active", openedAt: now, openedBy, updatedAt: now };
+    }
+    return existing;
+  }
+  const id = newId();
   const { error } = await supabase.from("productionDays").insert({
     id,
     date: today,
+    status: "active",
     openedAt: now,
     openedBy: openedBy ?? null,
     tempLogComplete: false,
@@ -6770,7 +6898,7 @@ export async function openProductionDay(openedBy?: string): Promise<ProductionDa
   queryClient.invalidateQueries({ queryKey: ["production-day"] });
   queryClient.invalidateQueries({ queryKey: ["production-days"] });
   return {
-    id, date: today, openedAt: now, openedBy,
+    id, date: today, status: "active", openedAt: now, openedBy,
     tempLogComplete: false, cleaningComplete: false, summary: {},
     createdAt: now, updatedAt: now,
   };
@@ -6862,9 +6990,18 @@ export interface CloseProductionSummary {
   carriedDeadlineAffected: Array<{ orderId: string; orderName: string; deadline: string }>;
 }
 
-/** Close today's production day. Unfinished productionSchedule rows whose
- *  startAt falls today or earlier get pushed forward by one day, preserving
- *  their status + duration. Returns a summary for the UI to display. */
+/** Close today's production day.
+ *
+ *  In the daily-production model, productionDayLineItems stay on their
+ *  date — they're the record of what was planned. Step progress lives
+ *  on planStepStatus (per-batch). Close Production simply flips the
+ *  day to status='done' and records a summary.
+ *
+ *  "Unfinished" steps (stepIds listed on today's lineItems but not
+ *  done in planStepStatus) are NOT automatically reshuffled — the
+ *  next Regenerate picks them up. If a batch has incomplete steps
+ *  after its day closes, the operator runs Regenerate to replan the
+ *  remaining work forward. */
 export async function closeProductionDay(closedBy?: string): Promise<CloseProductionSummary> {
   const today = todayDateString();
   const dayRow = assertOkMaybe(
@@ -6877,36 +7014,49 @@ export async function closeProductionDay(closedBy?: string): Promise<CloseProduc
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
 
-  const schedule = assertOk(
-    await supabase.from("productionSchedule").select("*").lte("startAt", endOfToday.toISOString()),
-  ) as ProductionScheduleEntry[];
+  // Line items scheduled for today — we count how many steps are
+  // done vs still pending to feed the summary. Progress lives on
+  // planStepStatus, so "done" means a row with done=true exists for
+  // the (planId, stepKey) pair the lineItem listed.
+  const todaysLineItems = assertOk(
+    await supabase
+      .from("productionDayLineItems")
+      .select("*")
+      .eq("productionDayId", dayRow.id!),
+  ) as ProductionDayLineItem[];
+
+  const planIds = [...new Set(todaysLineItems.map((li) => li.planId))];
+  const statuses = planIds.length > 0
+    ? (assertOk(
+        await supabase
+          .from("planStepStatus")
+          .select("*")
+          .in("planId", planIds),
+      ) as PlanStepStatus[])
+    : [];
+  const doneKeysByPlan = new Map<string, Set<string>>();
+  for (const s of statuses) {
+    if (!s.done) continue;
+    const set = doneKeysByPlan.get(s.planId) ?? new Set<string>();
+    set.add(s.stepKey);
+    doneKeysByPlan.set(s.planId, set);
+  }
 
   let stepsCompleted = 0;
-  const toCarry: ProductionScheduleEntry[] = [];
-  for (const s of schedule) {
-    if (s.status === "done" || s.status === "skipped") stepsCompleted++;
-    else if (s.status === "pending" || s.status === "in_progress" || s.status === "blocked") toCarry.push(s);
+  let stepsCarriedForward = 0;
+  for (const li of todaysLineItems) {
+    const doneSet = doneKeysByPlan.get(li.planId) ?? new Set<string>();
+    for (const stepId of li.stepIds) {
+      // Match loosely — stepKey in planStepStatus may embed the planProduct
+      // id as a suffix (e.g. "polish-pp1"). Anything starting with the
+      // stepId token counts as "done".
+      const matched = [...doneSet].some((k) => k === stepId || k.startsWith(`${stepId}-`));
+      if (matched) stepsCompleted++;
+      else stepsCarriedForward++;
+    }
   }
 
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  if (toCarry.length > 0) {
-    await Promise.all(toCarry.map(async (s) => {
-      const newStart = new Date(new Date(s.startAt).getTime() + DAY_MS);
-      const newEnd = new Date(new Date(s.endAt).getTime() + DAY_MS);
-      const { error } = await supabase
-        .from("productionSchedule")
-        .update({
-          startAt: newStart.toISOString(),
-          endAt: newEnd.toISOString(),
-          updatedAt: new Date(),
-        })
-        .eq("id", s.id!);
-      if (error) throw error;
-    }));
-  }
-
-  // Pieces produced today — sum of unmould intake movements that landed
-  // between startOfToday and now.
+  // Pieces produced today — unchanged; read from stockMovements.
   const movements = assertOk(
     await supabase
       .from("stockMovements")
@@ -6918,28 +7068,65 @@ export async function closeProductionDay(closedBy?: string): Promise<CloseProduc
   const piecesProduced = movements.reduce((a, m) => a + m.quantity, 0);
 
   const batchesRun = new Set(
-    schedule.filter((s) => s.status === "done" && s.planId != null).map((s) => s.planId),
+    todaysLineItems
+      .filter((li) => {
+        const doneSet = doneKeysByPlan.get(li.planId) ?? new Set<string>();
+        return li.stepIds.every((sid) =>
+          [...doneSet].some((k) => k === sid || k.startsWith(`${sid}-`)),
+        );
+      })
+      .map((li) => li.planId),
   ).size;
 
-  const carriedOrderIds = Array.from(new Set(toCarry.map((s) => s.orderId).filter((x): x is string => !!x)));
+  // Deadline impact: orders linked to batches with carry-forward steps
+  // whose deadline falls today/tomorrow.
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const unfinishedPlanIds = [...new Set(
+    todaysLineItems
+      .filter((li) => {
+        const doneSet = doneKeysByPlan.get(li.planId) ?? new Set<string>();
+        return !li.stepIds.every((sid) =>
+          [...doneSet].some((k) => k === sid || k.startsWith(`${sid}-`)),
+        );
+      })
+      .map((li) => li.planId),
+  )];
   let carriedDeadlineAffected: CloseProductionSummary["carriedDeadlineAffected"] = [];
-  if (carriedOrderIds.length > 0) {
-    const orders = assertOk(
-      await supabase.from("orders").select("id, customerName, eventName, deadline").in("id", carriedOrderIds),
-    ) as Array<{ id: string; customerName?: string; eventName?: string; deadline: string }>;
-    carriedDeadlineAffected = orders
-      .filter((o) => new Date(o.deadline).getTime() <= endOfToday.getTime() + DAY_MS)
-      .map((o) => ({
-        orderId: o.id,
-        orderName: o.customerName ?? o.eventName ?? "Order",
-        deadline: o.deadline,
-      }));
+  if (unfinishedPlanIds.length > 0) {
+    const links = assertOk(
+      await supabase
+        .from("orderPlanLinks")
+        .select("orderItemId, planId")
+        .in("planId", unfinishedPlanIds),
+    ) as Array<{ orderItemId: string; planId: string }>;
+    const itemIds = [...new Set(links.map((l) => l.orderItemId))];
+    if (itemIds.length > 0) {
+      const items = assertOk(
+        await supabase.from("orderItems").select("id, orderId").in("id", itemIds),
+      ) as Array<{ id: string; orderId: string }>;
+      const orderIds = [...new Set(items.map((i) => i.orderId))];
+      const orders = orderIds.length > 0
+        ? (assertOk(
+            await supabase
+              .from("orders")
+              .select("id, customerName, eventName, deadline")
+              .in("id", orderIds),
+          ) as Array<{ id: string; customerName?: string; eventName?: string; deadline: string }>)
+        : [];
+      carriedDeadlineAffected = orders
+        .filter((o) => new Date(o.deadline).getTime() <= endOfToday.getTime() + DAY_MS)
+        .map((o) => ({
+          orderId: o.id,
+          orderName: o.customerName ?? o.eventName ?? "Order",
+          deadline: o.deadline,
+        }));
+    }
   }
 
   const summary: CloseProductionSummary = {
     productionDayId: dayRow.id!,
     stepsCompleted,
-    stepsCarriedForward: toCarry.length,
+    stepsCarriedForward,
     piecesProduced,
     batchesRun,
     carriedDeadlineAffected,
@@ -6949,13 +7136,14 @@ export async function closeProductionDay(closedBy?: string): Promise<CloseProduc
   const { error } = await supabase
     .from("productionDays")
     .update({
+      status: "done",
       closedAt: now,
       closedBy: closedBy ?? null,
       summaryJson: {
         batchesRun,
         piecesProduced,
         stepsCompleted,
-        stepsCarriedForward: toCarry.length,
+        stepsCarriedForward,
       },
       updatedAt: now,
     })
@@ -6964,7 +7152,7 @@ export async function closeProductionDay(closedBy?: string): Promise<CloseProduc
 
   queryClient.invalidateQueries({ queryKey: ["production-day"] });
   queryClient.invalidateQueries({ queryKey: ["production-days"] });
-  queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+  queryClient.invalidateQueries({ queryKey: ["production-day-line-items"] });
   return summary;
 }
 

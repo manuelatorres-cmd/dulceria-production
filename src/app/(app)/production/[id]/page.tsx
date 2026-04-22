@@ -11,6 +11,7 @@ import {
   usePackagingList, consumePackaging,
   useLinksForPlan, useOrders, useAllOrderItems,
   promoteOrdersForPlan, startProductionPlan,
+  useAllProductionDayLineItems, useProductionDays, useProductionSteps,
 } from "@/lib/hooks";
 import { PackingModal } from "@/components/packing-modal";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
@@ -52,6 +53,22 @@ const PHASES = [
 ] as const;
 
 type PhaseId = typeof PHASES[number]["id"];
+
+/** Map a user-facing step name to one of our 8 canonical phases.
+ *  Case-insensitive keyword match — mirrors the phaseToCheckListPrefix
+ *  helper on the dashboard. Returns null for unmappable names. */
+function stepNameToPhase(name: string): PhaseId | null {
+  const n = name.toLowerCase();
+  if (n.includes("polish")) return "polishing";
+  if (n.includes("colour") || n.includes("color") || n.includes("paint")) return "colour";
+  if (n.includes("shell") || n.includes("temper")) return "shell";
+  if (n.includes("filling") && !/\bfill\b/.test(n)) return "filling";
+  if (n.includes("fill")) return "fill";
+  if (n.includes("cap")) return "cap";
+  if (n.includes("unmould") || n.includes("unmold")) return "unmould";
+  if (n.includes("pack")) return "packing";
+  return null;
+}
 
 export default function ProductionPlanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);
@@ -316,6 +333,49 @@ function PlanContent({
   }, [planProducts, productsMap, materialsMap]);
 
   const doneCount = steps.filter((s) => statusMap.get(s.key)).length;
+  // Phase-level completion: a phase counts as done once every step in
+  // that group is checked. Drives the "X / 8 steps" header counter so
+  // it matches the 8 phase tabs instead of the granular sub-step count
+  // (which varies with mould/product fan-out).
+  const phaseDoneCount = useMemo(() => {
+    let count = 0;
+    for (const phase of PHASES) {
+      const phaseSteps = steps.filter((s) => s.group === phase.id);
+      if (phaseSteps.length > 0 && phaseSteps.every((s) => statusMap.get(s.key))) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [steps, statusMap]);
+
+  // ── Cross-day annotation for phase tabs ────────────────────────
+  // Each phase may land on a different day in the daily-production
+  // model. Build a map phaseId → [date] from productionDayLineItems
+  // for this batch, matching stepIds by their productionSteps.name.
+  const allLineItemsForBatch = useAllProductionDayLineItems();
+  const allProductionDays = useProductionDays(120);
+  const productionStepsAll = useProductionSteps();
+  const phaseDaysById = useMemo(() => {
+    const dayDateById = new Map(allProductionDays.map((d) => [d.id!, d.date]));
+    const stepById = new Map(productionStepsAll.map((s) => [s.id!, s]));
+    const out = new Map<string, string[]>();
+    for (const phase of PHASES) out.set(phase.id, []);
+    for (const li of allLineItemsForBatch) {
+      if (li.planId !== planId) continue;
+      const date = dayDateById.get(li.productionDayId);
+      if (!date) continue;
+      for (const stepId of li.stepIds) {
+        const step = stepById.get(stepId);
+        if (!step) continue;
+        const phaseId = stepNameToPhase(step.name);
+        if (!phaseId) continue;
+        const arr = out.get(phaseId)!;
+        if (!arr.includes(date)) arr.push(date);
+      }
+    }
+    for (const arr of out.values()) arr.sort();
+    return out;
+  }, [allLineItemsForBatch, allProductionDays, productionStepsAll, planId]);
 
   /** Deduct filling stock for all fillings marked as "use stock" (fillingPreviousBatches) */
   async function deductPreviousBatchStock() {
@@ -767,7 +827,7 @@ function PlanContent({
               )}
               <p className="text-xs text-muted-foreground">{ageLabel}</p>
               <span className="text-xs text-muted-foreground">·</span>
-              <p className="text-xs text-muted-foreground">{doneCount} / {steps.length} steps</p>
+              <p className="text-xs text-muted-foreground">{phaseDoneCount} / {PHASES.length} steps</p>
               {plan.batchSummary && (
                 <>
                   <span className="text-xs text-muted-foreground">·</span>
@@ -821,7 +881,7 @@ function PlanContent({
         <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
           <div
             className="h-full bg-accent rounded-full transition-all duration-300"
-            style={{ width: steps.length > 0 ? `${(doneCount / steps.length) * 100}%` : "0%" }}
+            style={{ width: `${(phaseDoneCount / PHASES.length) * 100}%` }}
           />
         </div>
 
@@ -911,13 +971,21 @@ function PlanContent({
         </p>
       ) : (
         <>
-          {/* Phase tab bar */}
+          {/* Phase tab bar — each tab also shows the day(s) this phase is
+              scheduled on, pulled from the daily-production line items
+              for this batch. A phase that spans two days shows both. */}
           <div className="flex gap-1.5 overflow-x-auto px-4 pb-1 mt-3" style={{ scrollbarWidth: "none" }}>
             {PHASES.map(({ id, label }) => {
               const phaseSteps = steps.filter((s) => s.group === id);
               const phaseDone = phaseSteps.filter((s) => statusMap.get(s.key)).length;
               const allPhaseDone = phaseSteps.length > 0 && phaseDone === phaseSteps.length;
               const active = activePhase === id;
+              const days = phaseDaysById.get(id) ?? [];
+              const daysLabel = days.length === 0
+                ? null
+                : days.length === 1
+                  ? new Date(days[0] + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+                  : `${new Date(days[0] + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })} +${days.length - 1}`;
               return (
                 <button
                   key={id}
@@ -929,11 +997,17 @@ function PlanContent({
                         ? "bg-status-ok-bg text-status-ok"
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
                   }`}
+                  title={days.length > 0 ? `Scheduled on ${days.map((d) => new Date(d + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })).join(", ")}` : undefined}
                 >
                   <span>{label}</span>
                   {phaseSteps.length > 0 && (
                     <span className={`text-[10px] font-normal mt-0.5 ${active ? "opacity-70" : ""}`}>
                       {phaseDone}/{phaseSteps.length}
+                    </span>
+                  )}
+                  {daysLabel && (
+                    <span className={`text-[9px] font-normal mt-0.5 tabular-nums ${active ? "opacity-80" : "opacity-60"}`}>
+                      {daysLabel}
                     </span>
                   )}
                 </button>

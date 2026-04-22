@@ -8,12 +8,13 @@ import {
   useOrder, useOrderItems, useProductsList, saveOrder, deleteOrder,
   saveOrderItem, deleteOrderItem, useCustomers, useCustomer, saveCustomer,
   usePackagingList, useOrderPackagingLines, saveOrderPackagingLine, deleteOrderPackagingLine,
-  useProductActiveMinutesMap, useProductionSchedule, useCapacityConfig,
+  useProductActiveMinutesMap, useCapacityConfig,
   usePeople, usePersonUnavailability, useBlockedDays,
   useProductLocationTotals,
   useReplenishmentOrderFor,
   useCustomerProductPrices,
   useProductionPlans, useOrderPlanLinks, useAllPlanStepStatuses,
+  useAllProductionDayLineItems, useProductionDays, useProductionSteps,
 } from "@/lib/hooks";
 import { batchPhaseProgress } from "@/lib/batch-progress";
 import { supabase } from "@/lib/supabase";
@@ -63,7 +64,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const packagingMap = useMemo(() => new Map(packaging.map((p) => [p.id!, p])), [packaging]);
 
   const activeMinutesMap = useProductActiveMinutesMap();
-  const schedule = useProductionSchedule();
+  const allLineItems = useAllProductionDayLineItems();
+  const productionDays = useProductionDays(120);
+  const productionSteps = useProductionSteps();
   const capacityConfig = useCapacityConfig();
   const people = usePeople(false);
   const unavailability = usePersonUnavailability();
@@ -230,14 +233,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     const to = new Date(u.endDate).getTime();
     return to >= nowRef.getTime() && from <= deadlineDate.getTime();
   }).length;
-  const committedMinutes = schedule
-    .filter((s) => s.isActive)
-    .filter((s) => s.orderId !== orderId)
-    .filter((s) => {
-      const t = new Date(s.startAt).getTime();
-      return t >= nowRef.getTime() && t <= deadlineDate.getTime();
-    })
-    .reduce((acc, s) => acc + s.durationMinutes, 0);
+  // Committed hours = minutes planned on days inside the deadline
+  // window, excluding this order's own plan line items so the
+  // feasibility check doesn't double-count what we're trying to place.
+  const dayDateById = new Map(productionDays.map((d) => [d.id!, d.date]));
+  const thisOrdersPlanIds = new Set(
+    orderPlanLinks.map((l) => l.planId).filter(Boolean) as string[],
+  );
+  const fromIsoWin = nowRef.toISOString().slice(0, 10);
+  const toIsoWin = deadlineDate.toISOString().slice(0, 10);
+  const committedMinutes = allLineItems
+    .map((li) => ({
+      date: dayDateById.get(li.productionDayId),
+      minutes: li.plannedMinutes,
+      planId: li.planId,
+    }))
+    .filter((x) => x.date && x.date >= fromIsoWin && x.date <= toIsoWin)
+    .filter((x) => !thisOrdersPlanIds.has(x.planId))
+    .reduce((acc, x) => acc + x.minutes, 0);
 
   const stockState: ProductStockState[] = items.map((i) => {
     const totals = productLocationTotals.get(i.productId);
@@ -287,16 +300,66 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const totalGross = Math.round((totalNet + totalVat) * 100) / 100;
   const marginResult = computeOrderMargin(totalNet, calculatedCost.totalCost);
 
-  // ── Schedule filtered to this order ────────────────────────────
-  const orderSchedule = schedule
-    .filter((s) => s.orderId === orderId)
-    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  const scheduleByDay = new Map<string, typeof orderSchedule>();
-  for (const s of orderSchedule) {
-    const key = s.startAt.slice(0, 10);
-    const arr = scheduleByDay.get(key) ?? [];
+  // ── Schedule rows for this order, derived from productionDayLineItems
+  // for every plan linked to this order. One row per (day × step).
+  // Done/not-started inferred from planStepStatus.
+  const stepById = new Map(productionSteps.map((s) => [s.id!, s]));
+  const doneKeysByPlan = new Map<string, Set<string>>();
+  for (const s of allPlanStepStatuses) {
+    if (!s.done) continue;
+    const set = doneKeysByPlan.get(s.planId) ?? new Set<string>();
+    set.add(s.stepKey);
+    doneKeysByPlan.set(s.planId, set);
+  }
+  interface OrderScheduleRow {
+    id: string;
+    date: string;
+    planId: string;
+    productId: string;
+    stepId: string;
+    phase: string;
+    durationMinutes: number;
+    status: "pending" | "in_progress" | "done";
+  }
+  const orderScheduleRows: OrderScheduleRow[] = [];
+  for (const li of allLineItems) {
+    if (!thisOrdersPlanIds.has(li.planId)) continue;
+    const date = dayDateById.get(li.productionDayId);
+    if (!date) continue;
+    const pp = items.find((oi) => (linksByItemId.get(oi.id!) ?? []).some((lk) => lk.planId === li.planId));
+    const productId = pp?.productId ?? "";
+    const orderedSteps = [...li.stepIds].sort((a, b) => {
+      const sa = stepById.get(a)?.sortOrder ?? 0;
+      const sb = stepById.get(b)?.sortOrder ?? 0;
+      return sa - sb;
+    });
+    const doneSet = doneKeysByPlan.get(li.planId) ?? new Set<string>();
+    // Minutes split evenly across the steps for display only.
+    const perStepMin = orderedSteps.length > 0
+      ? Math.max(1, Math.round(li.plannedMinutes / orderedSteps.length))
+      : 0;
+    for (const stepId of orderedSteps) {
+      const step = stepById.get(stepId);
+      const done = [...doneSet].some((k) => k === stepId || k.startsWith(`${stepId}-`));
+      orderScheduleRows.push({
+        id: `${li.id ?? li.planId}-${stepId}`,
+        date,
+        planId: li.planId,
+        productId,
+        stepId,
+        phase: step?.name ?? stepId,
+        durationMinutes: perStepMin,
+        status: done ? "done" : "pending",
+      });
+    }
+  }
+  orderScheduleRows.sort((a, b) => a.date.localeCompare(b.date));
+
+  const scheduleByDay = new Map<string, OrderScheduleRow[]>();
+  for (const s of orderScheduleRows) {
+    const arr = scheduleByDay.get(s.date) ?? [];
     arr.push(s);
-    scheduleByDay.set(key, arr);
+    scheduleByDay.set(s.date, arr);
   }
 
   return (
@@ -400,8 +463,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </Link>
         )}
 
-        {/* Status selector */}
-        <div className="flex items-center gap-2">
+        {/* Status selector + combined completion %. Completion is
+            averaged across every linked batch: phases done / 8 per
+            batch, mean across batches. Hidden when no batches link yet. */}
+        <div className="flex items-center gap-2 flex-wrap">
           {ORDER_STATUSES.map((s) => (
             <button
               key={s}
@@ -415,6 +480,25 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {ORDER_STATUS_LABELS[s]}
             </button>
           ))}
+          {(() => {
+            const planIds = [...new Set(orderPlanLinks.map((l) => l.planId))];
+            if (planIds.length === 0) return null;
+            let totalProgress = 0;
+            for (const pid of planIds) {
+              const p = batchPhaseProgress(pid, allPlanStepStatuses);
+              const done = p.done ? 8 : Math.max(0, p.index - 1);
+              totalProgress += done / 8;
+            }
+            const pct = Math.round((totalProgress / planIds.length) * 100);
+            return (
+              <span
+                className="ml-auto rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground tabular-nums"
+                title="Average phases completed across linked batches"
+              >
+                {pct}% complete
+              </span>
+            );
+          })()}
         </div>
 
         {/* Edit form */}
@@ -547,6 +631,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <ul className="space-y-2">
               {items.map((item) => (
                 <OrderLineRow
+                  lineItems={allLineItems}
+                  productionDays={productionDays}
+                  productionSteps={productionSteps}
                   key={item.id}
                   item={item}
                   product={productMap.get(item.productId)}
@@ -572,7 +659,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         <OrderScheduleSection
           scheduleByDay={scheduleByDay}
           productNameById={productMap}
-          hasAnySchedule={orderSchedule.length > 0}
+          hasAnySchedule={orderScheduleRows.length > 0}
         />
 
         {/* Delete */}
@@ -1126,7 +1213,10 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
   );
 }
 
-function OrderLineRow({ item, product, short, resolveProductPrice, links, plansById, allPlanStepStatuses }: {
+function OrderLineRow({ item, product, short, resolveProductPrice, links, plansById, allPlanStepStatuses, lineItems, productionDays, productionSteps }: {
+  lineItems: import("@/types").ProductionDayLineItem[];
+  productionDays: import("@/types").ProductionDay[];
+  productionSteps: import("@/types").ProductionStep[];
   item: OrderItem;
   product?: { id?: string; name: string; defaultVatRate?: number };
   short: boolean;
@@ -1399,11 +1489,12 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
       {saveError && <p className="text-[11px] text-status-alert mt-1">{saveError}</p>}
 
       {/* Linked batches — populated by Regenerate plan, NOT on order
-          save. Borrow lines don't get batches (they fulfil from
-          stock). Each row shows "N from <batch> (Step N/8 Label)"
-          where the step label is the batch's current phase. */}
+          save. Each row shows "N from <batch> (Step N/8 Label)" plus a
+          compact per-day step schedule ("Polish/Paint on 27 Apr ·
+          Shell/Fill on 28 Apr") so the user can see the batch's
+          lifecycle without opening it. */}
       {links.length > 0 && (
-        <ul className="mt-2 space-y-1 pl-3 border-l-2 border-border">
+        <ul className="mt-2 space-y-1.5 pl-3 border-l-2 border-border">
           {links.map((lk) => {
             const plan = plansById.get(lk.planId);
             const status = plan?.status ?? "draft";
@@ -1411,29 +1502,58 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
               ? batchPhaseProgress(plan.id!, allPlanStepStatuses)
               : null;
             const batchLabel = plan?.batchNumber || plan?.name || "batch";
+            // Per-day step breakdown for this plan.
+            const dayDateById = new Map(productionDays.map((d) => [d.id!, d.date]));
+            const stepById = new Map(productionSteps.map((s) => [s.id!, s]));
+            const planLineItems = lineItems
+              .filter((li) => li.planId === lk.planId)
+              .map((li) => ({
+                date: dayDateById.get(li.productionDayId),
+                stepIds: li.stepIds,
+              }))
+              .filter((x) => !!x.date) as Array<{ date: string; stepIds: string[] }>;
+            planLineItems.sort((a, b) => a.date.localeCompare(b.date));
+            const perDayLabels = planLineItems.map((x) => {
+              const ordered = [...x.stepIds].sort((a, b) => {
+                const sa = stepById.get(a)?.sortOrder ?? 0;
+                const sb = stepById.get(b)?.sortOrder ?? 0;
+                return sa - sb;
+              });
+              const stepLabel = ordered.map((sid) => stepById.get(sid)?.name ?? sid).join("/");
+              const dateLabel = new Date(x.date + "T12:00:00")
+                .toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+              return `${stepLabel} on ${dateLabel}`;
+            });
             return (
-              <li key={lk.id ?? lk.planId} className="flex items-center gap-2 text-[11px] flex-wrap">
-                <span className="text-muted-foreground shrink-0">└─</span>
-                <span className="tabular-nums font-medium">{lk.allocatedQuantity}</span>
-                <span className="text-muted-foreground">from</span>
-                {plan ? (
-                  <Link
-                    href={`/production/${encodeURIComponent(plan.id!)}`}
-                    className="font-medium hover:underline truncate max-w-[30ch]"
-                  >
-                    {batchLabel}
-                  </Link>
-                ) : (
-                  <span className="text-muted-foreground italic">Batch missing</span>
-                )}
-                {progress && (
-                  <span className="text-muted-foreground tabular-nums">
-                    (Step {progress.index}/{progress.total} {progress.label})
+              <li key={lk.id ?? lk.planId} className="text-[11px]">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-muted-foreground shrink-0">└─</span>
+                  <span className="tabular-nums font-medium">{lk.allocatedQuantity}</span>
+                  <span className="text-muted-foreground">from</span>
+                  {plan ? (
+                    <Link
+                      href={`/production/${encodeURIComponent(plan.id!)}`}
+                      className="font-medium hover:underline truncate max-w-[30ch]"
+                    >
+                      {batchLabel}
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground italic">Batch missing</span>
+                  )}
+                  {progress && (
+                    <span className="text-muted-foreground tabular-nums">
+                      (Step {progress.index}/{progress.total} {progress.label})
+                    </span>
+                  )}
+                  <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${PLAN_STATUS_STYLE[status]}`}>
+                    {PLAN_STATUS_LABEL[status]}
                   </span>
+                </div>
+                {perDayLabels.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5 pl-4 truncate" title={perDayLabels.join(" · ")}>
+                    {perDayLabels.join(" · ")}
+                  </p>
                 )}
-                <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${PLAN_STATUS_STYLE[status]}`}>
-                  {PLAN_STATUS_LABEL[status]}
-                </span>
               </li>
             );
           })}
@@ -2138,8 +2258,9 @@ function OrderScheduleSection({
   scheduleByDay, productNameById, hasAnySchedule,
 }: {
   scheduleByDay: Map<string, Array<{
-    id?: string; phase: string; startAt: string; endAt: string;
-    durationMinutes: number; isActive: boolean; productId: string; status: string;
+    id: string; date: string; phase: string;
+    durationMinutes: number; productId: string;
+    status: "pending" | "in_progress" | "done";
   }>>;
   productNameById: Map<string, { name: string }>;
   hasAnySchedule: boolean;
@@ -2156,25 +2277,22 @@ function OrderScheduleSection({
       ) : (
         <div className="space-y-3">
           {Array.from(scheduleByDay.entries()).map(([day, steps]) => {
-            const activeMin = steps.filter((s) => s.isActive).reduce((a, s) => a + s.durationMinutes, 0);
+            const totalMin = steps.reduce((a, s) => a + s.durationMinutes, 0);
             return (
               <div key={day} className="rounded-lg border border-border bg-card p-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium">
-                    {new Date(day).toLocaleDateString("en-GB", {
+                    {new Date(day + "T12:00:00").toLocaleDateString("en-GB", {
                       weekday: "short", day: "numeric", month: "short",
                     })}
                   </p>
                   <p className="text-xs text-muted-foreground tabular-nums">
-                    {Math.round(activeMin / 6) / 10}h active
+                    {Math.round(totalMin / 6) / 10}h planned
                   </p>
                 </div>
                 <ul className="space-y-1">
                   {steps.map((s) => (
                     <li key={s.id} className="flex items-center gap-2 text-xs">
-                      <span className="tabular-nums text-muted-foreground w-11 shrink-0">
-                        {s.startAt.slice(11, 16)}
-                      </span>
                       <span className={`flex-1 truncate ${s.status === "done" ? "line-through text-muted-foreground" : ""}`}>
                         {productNameById.get(s.productId)?.name ?? s.productId} · {s.phase}
                       </span>

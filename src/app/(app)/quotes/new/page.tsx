@@ -6,8 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import {
   useCustomers, useProductsList, usePackagingList, useCapacityConfig,
-  saveQuote, useProductionSchedule, usePeople, usePersonUnavailability,
-  useBlockedDays,
+  saveQuote, useAllProductionDayLineItems, useProductionDays,
+  usePeople, usePersonUnavailability, useBlockedDays,
 } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -37,7 +37,14 @@ function NewQuotePageInner() {
   const products = useProductsList(true);
   const packaging = usePackagingList(true);
   const config = useCapacityConfig();
-  const schedule = useProductionSchedule();
+  // Quote feasibility uses committed hours in the window; we derive
+  // that from productionDayLineItems by date.
+  const lineItems = useAllProductionDayLineItems();
+  const productionDays = useProductionDays(120);
+  const dayDateById = useMemo(
+    () => new Map(productionDays.map((d) => [d.id!, d.date])),
+    [productionDays],
+  );
   const people = usePeople(false);
   const unavailability = usePersonUnavailability();
   const blocked = useBlockedDays();
@@ -194,14 +201,14 @@ function NewQuotePageInner() {
       return days;
     })();
 
-    // Committed hours: sum of active schedule minutes within the window.
-    const committedMinutes = schedule
-      .filter((s) => s.isActive)
-      .filter((s) => {
-        const t = new Date(s.startAt).getTime();
-        return t >= now.getTime() && t <= deadlineDate.getTime();
-      })
-      .reduce((acc, s) => acc + s.durationMinutes, 0);
+    // Committed hours: sum of plannedMinutes on days that fall between
+    // now and the quote's deadline.
+    const fromIso = now.toISOString().slice(0, 10);
+    const toIso = deadlineDate.toISOString().slice(0, 10);
+    const committedMinutes = lineItems
+      .map((li) => ({ date: dayDateById.get(li.productionDayId), minutes: li.plannedMinutes }))
+      .filter((x) => x.date && x.date >= fromIso && x.date <= toIso)
+      .reduce((acc, x) => acc + x.minutes, 0);
 
     // Discount unavailability: roughly subtract days when someone is out.
     const unavailabilityAdj = unavailability.filter((u) => {
@@ -217,7 +224,7 @@ function NewQuotePageInner() {
       committedHoursToDeadline: committedMinutes / 60,
       bufferPercent: config?.capacityBufferPercent ?? 0,
     });
-  }, [deadline, labourHoursNum, people, blocked, schedule, unavailability, config?.capacityBufferPercent]);
+  }, [deadline, labourHoursNum, people, blocked, lineItems, dayDateById, unavailability, config?.capacityBufferPercent]);
 
   // ── Line editing ────────────────────────────────────────────────────────
 

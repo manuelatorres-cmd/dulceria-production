@@ -9,7 +9,8 @@ import {
   useOrders, saveOrder, saveOrderItem, deleteOrder,
   useProductsList, useAllOrderItems, useCustomers,
   useCustomer, useCustomerProductPrices, useProductLocationTotals,
-  useAllOrderPlanLinks, useProductionSchedule,
+  useAllOrderPlanLinks, useAllProductionDayLineItems, useProductionDays,
+  useAllPlanStepStatuses, useProductionSteps,
 } from "@/lib/hooks";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
@@ -46,7 +47,10 @@ export default function OrdersPage() {
   const products = useProductsList(true);
   const allItems = useAllOrderItems();
   const allLinks = useAllOrderPlanLinks();
-  const schedule = useProductionSchedule();
+  const lineItems = useAllProductionDayLineItems();
+  const productionDays = useProductionDays(120);
+  const planStepStatuses = useAllPlanStepStatuses();
+  const productionSteps = useProductionSteps();
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
 
@@ -60,13 +64,10 @@ export default function OrdersPage() {
     return m;
   }, [allItems]);
 
-  // orderId → earliest unfinished scheduled step across all its linked
-  // batches. Used to render a "Next: <step> · <when>" line per row so
-  // the operator can scan the list without opening each order.
-  //
-  // For a pending order with no links yet, we return the sentinel
-  // { label: "Awaiting plan regeneration" } so the user sees why there's
-  // no schedule info.
+  // orderId → earliest unfinished step across all linked batches in
+  // the daily-production model. Step progress lives on planStepStatus
+  // (keyed by stepKey, which embeds the planProductId). A step is
+  // "done" for a plan if any planStepStatus row matches its id prefix.
   const nextActionByOrder = useMemo(() => {
     const orderIdByItemId = new Map<string, string>();
     for (const item of allItems) {
@@ -80,13 +81,23 @@ export default function OrdersPage() {
       if (!s) { s = new Set(); planIdsByOrder.set(orderId, s); }
       s.add(link.planId);
     }
-    const scheduleByPlan = new Map<string, typeof schedule>();
-    for (const e of schedule) {
-      if (!e.planId) continue;
-      let arr = scheduleByPlan.get(e.planId);
-      if (!arr) { arr = []; scheduleByPlan.set(e.planId, arr); }
-      arr.push(e);
+    const dayDateById = new Map(productionDays.map((d) => [d.id!, d.date]));
+    const stepById = new Map(productionSteps.map((s) => [s.id!, s]));
+    const doneKeysByPlan = new Map<string, Set<string>>();
+    for (const s of planStepStatuses) {
+      if (!s.done) continue;
+      const set = doneKeysByPlan.get(s.planId) ?? new Set<string>();
+      set.add(s.stepKey);
+      doneKeysByPlan.set(s.planId, set);
     }
+    const stepDoneForPlan = (planId: string, stepId: string): boolean => {
+      const done = doneKeysByPlan.get(planId);
+      if (!done) return false;
+      for (const k of done) {
+        if (k === stepId || k.startsWith(`${stepId}-`)) return true;
+      }
+      return false;
+    };
 
     const result = new Map<string, { label: string; when: string } | null>();
     for (const order of orders) {
@@ -99,33 +110,53 @@ export default function OrdersPage() {
         result.set(order.id!, { label: "Awaiting plan regeneration", when: "" });
         continue;
       }
-      let earliest: (typeof schedule)[number] | undefined;
+
+      // Gather all (date, stepId) pairs from the linked plans'
+      // lineItems, skipping steps already done. Earliest date → first
+      // step in sortOrder wins.
+      let best: { date: string; stepId: string } | null = null;
       for (const planId of planIds) {
-        const arr = scheduleByPlan.get(planId);
-        if (!arr) continue;
-        for (const e of arr) {
-          if (e.status === "done" || e.status === "skipped") continue;
-          if (!earliest || e.startAt < earliest.startAt) earliest = e;
+        const planLineItems = lineItems
+          .filter((li) => li.planId === planId)
+          .map((li) => ({ li, date: dayDateById.get(li.productionDayId) }))
+          .filter((x) => !!x.date) as Array<{ li: typeof lineItems[number]; date: string }>;
+        planLineItems.sort((a, b) => a.date.localeCompare(b.date));
+        for (const { li, date } of planLineItems) {
+          const orderedSteps = [...li.stepIds].sort((a, b) => {
+            const sa = stepById.get(a)?.sortOrder ?? 0;
+            const sb = stepById.get(b)?.sortOrder ?? 0;
+            return sa - sb;
+          });
+          for (const stepId of orderedSteps) {
+            if (stepDoneForPlan(planId, stepId)) continue;
+            if (!best || date < best.date) best = { date, stepId };
+            break; // first unfinished step on earliest date is enough
+          }
         }
       }
-      if (!earliest) {
+      if (!best) {
         result.set(order.id!, { label: "Ready", when: "" });
         continue;
       }
-      const d = new Date(earliest.startAt);
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const startDay = new Date(d); startDay.setHours(0, 0, 0, 0);
-      const diffDays = Math.round((startDay.getTime() - today.getTime()) / 86_400_000);
-      const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      const step = stepById.get(best.stepId);
+      const label = step?.name ?? "Next step";
+      const todayIso = (() => {
+        const t = new Date(); t.setHours(0, 0, 0, 0);
+        const y = t.getFullYear(), m = String(t.getMonth() + 1).padStart(2, "0"), dd = String(t.getDate()).padStart(2, "0");
+        return `${y}-${m}-${dd}`;
+      })();
+      const dDate = new Date(best.date + "T00:00:00");
+      const diffDays = Math.round((dDate.getTime() - new Date(todayIso + "T00:00:00").getTime()) / 86_400_000);
+      const dateLabel = dDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
       const when =
-        diffDays < 0 ? `overdue — was ${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} ${time}` :
-        diffDays === 0 ? `today ${time}` :
-        diffDays === 1 ? `tomorrow ${time}` :
-        `${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} ${time}`;
-      result.set(order.id!, { label: earliest.phase, when });
+        diffDays < 0 ? `overdue — was ${dateLabel}` :
+        diffDays === 0 ? "today" :
+        diffDays === 1 ? "tomorrow" :
+        dateLabel;
+      result.set(order.id!, { label, when });
     }
     return result;
-  }, [orders, allItems, allLinks, schedule]);
+  }, [orders, allItems, allLinks, lineItems, productionDays, planStepStatuses, productionSteps]);
 
   const [adding, setAdding] = useState(false);
   const [search, setSearch] = useState("");

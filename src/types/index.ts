@@ -1169,6 +1169,10 @@ export interface CapacityConfig {
    *  order's deadline. The scheduler won't place work later than
    *  `deadline − productionBufferDays`. Default 2 when null. */
   productionBufferDays?: number;
+  /** How far ahead Regenerate tries to merge new demand into existing
+   *  forward-filled days before switching to reverse-scheduling. 1 / 2
+   *  / 4 weeks. Default 2. Migration 0043. */
+  mergingWindowWeeks?: 1 | 2 | 4;
   updatedAt?: Date;
 }
 
@@ -1628,29 +1632,19 @@ export interface OrderItem {
   linkedBatchId?: string;
 }
 
-/** One row on the production schedule — the scheduler's output. One per
- *  step per order item. `isActive=true` rows count toward the daily
- *  people-hours budget; `false` rows (dry/wait) don't. */
-export interface ProductionScheduleEntry {
+/**
+ * One batch's appearance on one production day. `stepIds` lists every
+ * productionStep.id that will be run today for this batch. Step
+ * progress itself lives on the batch (planStepStatus), not here — this
+ * table only says "which steps happen when". Lives in migration 0043.
+ */
+export interface ProductionDayLineItem {
   id?: string;
-  orderId?: string;
-  productId: string;
-  mouldId?: string;
-  fillingId?: string;
-  planId?: string;
-  planProductId?: string;
-  stepId?: string;
-  equipmentId?: string;
-  /** Step name at the time the row was scheduled (convenience label). */
-  phase: string;
-  startAt: string;
-  endAt: string;
-  durationMinutes: number;
-  isActive: boolean;
-  assignedTo?: string;
-  status: "pending" | "in_progress" | "done" | "skipped" | "blocked";
-  dependsOnId?: string;
-  notes?: string;
+  productionDayId: string;
+  planId: string;
+  stepIds: string[];
+  plannedMinutes: number;
+  sortOrder: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -1734,13 +1728,23 @@ export interface Equipment {
   updatedAt?: Date;
 }
 
-/** One row per calendar day the workshop is open. Created by the
- *  "Open Production" action on the dashboard. */
+/** One row per calendar day the workshop is open or has scheduled
+ *  work. Two creation paths share this row:
+ *    - the scheduler (migration 0043) inserts a row with status='draft'
+ *      when it places at least one batch's step on that date;
+ *    - the dashboard's "Open Production" action sets openedAt and
+ *      flips status to 'active'; "Close Production" sets closedAt and
+ *      status='done'.
+ *  openedAt is therefore optional (absent on scheduler-created rows
+ *  that haven't been physically opened yet). */
 export interface ProductionDay {
   id?: string;
   /** ISO-date string "YYYY-MM-DD". Unique per row. */
   date: string;
-  openedAt: Date;
+  /** Scheduling / HACCP lifecycle. draft = planned only; active = day
+   *  opened and work in progress; done = closed. */
+  status: "draft" | "active" | "done";
+  openedAt?: Date;
   openedBy?: string;
   closedAt?: Date;
   closedBy?: string;
