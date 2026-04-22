@@ -536,6 +536,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
 
   const [capacityBuffer, setCapacityBuffer] = useState<string>("");
   const [fillingBuffer, setFillingBuffer] = useState<string>("");
+  const [productionBufferDays, setProductionBufferDays] = useState<string>("");
   const [warnThreshold, setWarnThreshold] = useState<string>("");
   const [criticalThreshold, setCriticalThreshold] = useState<string>("");
   const [expiryWarnDays, setExpiryWarnDays] = useState<string>("");
@@ -548,6 +549,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
   if (configKey !== syncedAt) {
     setCapacityBuffer(config?.capacityBufferPercent != null ? String(config.capacityBufferPercent) : "");
     setFillingBuffer(config?.fillingBufferPercent != null ? String(config.fillingBufferPercent) : "");
+    setProductionBufferDays(config?.productionBufferDays != null ? String(config.productionBufferDays) : "");
     setWarnThreshold(config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "");
     setCriticalThreshold(config?.criticalThresholdPercent != null ? String(config.criticalThresholdPercent) : "");
     setExpiryWarnDays(config?.stockExpiryWarnDays != null ? String(config.stockExpiryWarnDays) : "");
@@ -559,6 +561,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
   const isDirty = syncedAt !== null && (
     capacityBuffer !== (config?.capacityBufferPercent != null ? String(config.capacityBufferPercent) : "") ||
     fillingBuffer !== (config?.fillingBufferPercent != null ? String(config.fillingBufferPercent) : "") ||
+    productionBufferDays !== (config?.productionBufferDays != null ? String(config.productionBufferDays) : "") ||
     warnThreshold !== (config?.warnThresholdPercent != null ? String(config.warnThresholdPercent) : "") ||
     criticalThreshold !== (config?.criticalThresholdPercent != null ? String(config.criticalThresholdPercent) : "") ||
     expiryWarnDays !== (config?.stockExpiryWarnDays != null ? String(config.stockExpiryWarnDays) : "") ||
@@ -573,6 +576,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
       await saveCapacityConfig({
         capacityBufferPercent: parsePercent(capacityBuffer),
         fillingBufferPercent: parsePercent(fillingBuffer),
+        productionBufferDays: parseBufferDays(productionBufferDays),
         warnThresholdPercent: parsePercent(warnThreshold),
         criticalThresholdPercent: parsePercent(criticalThreshold),
         stockExpiryWarnDays: parseNonNegativeInt(expiryWarnDays),
@@ -586,6 +590,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
   const previewConfig: CapacityConfig = {
     capacityBufferPercent: parsePercent(capacityBuffer),
     fillingBufferPercent: parsePercent(fillingBuffer),
+    productionBufferDays: parseBufferDays(productionBufferDays),
     warnThresholdPercent: parsePercent(warnThreshold),
     criticalThresholdPercent: parsePercent(criticalThreshold),
     stockExpiryWarnDays: parseNonNegativeInt(expiryWarnDays),
@@ -663,6 +668,23 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
                 a 220g batch when 200g is needed.
               </p>
             </div>
+          </div>
+          <div>
+            <label className="label">Production buffer (days)</label>
+            <input
+              type="number"
+              min="0"
+              max="14"
+              step="1"
+              value={productionBufferDays}
+              onChange={(e) => setProductionBufferDays(e.target.value)}
+              placeholder="e.g. 2"
+              className="input"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Safety days between the last scheduled active work and an order's deadline.
+              Work lands at latest on (deadline − N working days). Default 2.
+            </p>
           </div>
         </div>
       </section>
@@ -2352,6 +2374,12 @@ function parsePercent(s: string): number | undefined {
 function parseNonNegativeInt(s: string): number | undefined {
   const n = parseInt(s, 10);
   if (isNaN(n) || n < 0) return undefined;
+  return n;
+}
+
+function parseBufferDays(s: string): number | undefined {
+  const n = parseInt(s, 10);
+  if (isNaN(n) || n < 0 || n > 14) return undefined;
   return n;
 }
 

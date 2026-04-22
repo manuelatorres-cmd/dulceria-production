@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildSchedule, timeBandFor, type SchedulerInput } from "./scheduler";
 import type {
   Order, OrderItem, Product, ProductionStep, Person, Mould, CapacityConfig,
-  ProductionPlan, PlanProduct,
+  ProductionPlan, PlanProduct, OrderPlanLink,
 } from "@/types";
 
 // Scaffold with sensible defaults. Tests override only what they care
@@ -19,6 +19,7 @@ function makeInput(overrides: Partial<SchedulerInput> = {}): SchedulerInput {
     planProducts: [],
     orders: [],
     orderItems: [],
+    orderPlanLinks: [],
     products: [],
     productionSteps: [],
     moulds: [],
@@ -56,6 +57,7 @@ function makeBatchScenario(args: {
   planProducts: PlanProduct[];
   orders: Order[];
   orderItems: OrderItem[];
+  orderPlanLinks: OrderPlanLink[];
   products: Product[];
   moulds: Mould[];
   productionSteps: ProductionStep[];
@@ -97,14 +99,20 @@ function makeBatchScenario(args: {
     productId: p.id,
     quantity: p.quantity,
     sortOrder: i,
-    linkedBatchId: planId,
   } as OrderItem)) : [];
+  const orderPlanLinks: OrderPlanLink[] = args.deadline ? args.products.map((p) => ({
+    id: `lk-${p.id}`,
+    orderItemId: `oi-${p.id}`,
+    planId,
+    allocatedQuantity: p.quantity,
+  })) : [];
 
   return {
     plans,
     planProducts,
     orders,
     orderItems,
+    orderPlanLinks,
     products,
     moulds,
     productionSteps: args.steps,
@@ -305,6 +313,116 @@ describe("batch-based scheduler", () => {
       expect(e.planProductId).toBe("pp-p1");
       expect(e.stepId).toBe("step-Shell");
     }
+  });
+
+  it("batch exceeding one day's capacity splits across consecutive working days, step order preserved", () => {
+    // Day cap = 8h × 60 = 480min. Two steps of 400min each → second must
+    // roll to the next day (can't fit 800min in one day).
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "A", productType: "Moulded", activeMinutes: 400, waitingMinutes: 0, sortOrder: 0 }),
+        mkStep({ name: "B", productType: "Moulded", activeMinutes: 400, waitingMinutes: 0, sortOrder: 1 }),
+      ],
+      deadline,
+    });
+    const result = buildSchedule(makeInput(scenario));
+    const byPhase = Object.fromEntries(result.entries.map((e) => [e.phase, e]));
+    // Different days.
+    expect(byPhase.A.startAt.slice(0, 10)).not.toBe(byPhase.B.startAt.slice(0, 10));
+    // Step order preserved.
+    expect(byPhase.A.startAt < byPhase.B.startAt).toBe(true);
+  });
+
+  it("deadline within buffer window marks batch unscheduled", () => {
+    // Deadline today with a 2-day buffer leaves no room.
+    const todayIso = new Date().toISOString();
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 10, waitingMinutes: 0, sortOrder: 0 }),
+      ],
+      deadline: todayIso,
+    });
+    const result = buildSchedule(makeInput({
+      ...scenario,
+      config: { capacityBufferPercent: 0, productionBufferDays: 2 },
+    }));
+    expect(result.unscheduledPlanIds).toContain("plan-1");
+    expect(result.warnings.some((w) => /buffer|deadline/i.test(w))).toBe(true);
+  });
+
+  it("configurable productionBufferDays: with buffer=0 a same-day deadline still schedules", () => {
+    // Deadline end-of-today, buffer 0 → latestDay = today. Short batch
+    // fits and lands on today.
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 0, 0);
+    const scenario = makeBatchScenario({
+      products: [{ id: "p1", quantity: 1, cavities: 10 }],
+      steps: [
+        mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 10, waitingMinutes: 0, sortOrder: 0 }),
+      ],
+      deadline: endOfToday.toISOString(),
+    });
+    const result = buildSchedule(makeInput({
+      ...scenario,
+      config: { capacityBufferPercent: 0, productionBufferDays: 0 },
+    }));
+    expect(result.entries.length).toBeGreaterThan(0);
+    expect(result.entries[0].startAt.slice(0, 10)).toBe(toIsoLocal(new Date()));
+  });
+
+  it("soft same-step grouping: second batch with overlapping step type lands on the same day as the first", () => {
+    // Two separate batches, same category. Each ~40min active; both
+    // fit today. The scheduler should prefer placing batch-2 on the
+    // same day as batch-1 (the one batch-1 landed on) for grouping.
+    const farDeadline = new Date();
+    farDeadline.setMonth(farDeadline.getMonth() + 1);
+
+    const catId = "cat-moulded";
+    const categoryNameById = new Map([[catId, "Moulded"]]);
+    const mouldId = "m-default";
+    const moulds: Mould[] = [{ id: mouldId, name: "M", cavityWeightG: 10, numberOfCavities: 10 }];
+    const products: Product[] = ["p1", "p2"].map((id) => ({
+      id, name: id, productCategoryId: catId,
+      defaultMouldId: mouldId, defaultBatchQty: 1,
+    })) as unknown as Product[];
+    const plans: ProductionPlan[] = [
+      { id: "plan-A", name: "A", status: "draft", createdAt: new Date("2024-01-01T00:00:00Z") },
+      { id: "plan-B", name: "B", status: "draft", createdAt: new Date("2024-01-02T00:00:00Z") },
+    ] as ProductionPlan[];
+    const planProducts: PlanProduct[] = [
+      { id: "pp-A", planId: "plan-A", productId: "p1", mouldId, quantity: 1, sortOrder: 0 } as PlanProduct,
+      { id: "pp-B", planId: "plan-B", productId: "p2", mouldId, quantity: 1, sortOrder: 0 } as PlanProduct,
+    ];
+    const orders: Order[] = [
+      { id: "oA", channel: "b2b", customerName: "X", deadline: farDeadline.toISOString(), priority: "normal", status: "pending" } as Order,
+      { id: "oB", channel: "b2b", customerName: "Y", deadline: farDeadline.toISOString(), priority: "normal", status: "pending" } as Order,
+    ];
+    const orderItems: OrderItem[] = [
+      { id: "oi-A", orderId: "oA", productId: "p1", quantity: 1, sortOrder: 0 } as OrderItem,
+      { id: "oi-B", orderId: "oB", productId: "p2", quantity: 1, sortOrder: 0 } as OrderItem,
+    ];
+    const orderPlanLinks: OrderPlanLink[] = [
+      { id: "lk-A", orderItemId: "oi-A", planId: "plan-A", allocatedQuantity: 1 },
+      { id: "lk-B", orderItemId: "oi-B", planId: "plan-B", allocatedQuantity: 1 },
+    ];
+    const steps: ProductionStep[] = [
+      mkStep({ name: "Shell", productType: "Moulded", activeMinutes: 20, waitingMinutes: 0, sortOrder: 0 }),
+      mkStep({ name: "Cap",   productType: "Moulded", activeMinutes: 20, waitingMinutes: 0, sortOrder: 1 }),
+    ];
+
+    const result = buildSchedule(makeInput({
+      plans, planProducts, orders, orderItems, orderPlanLinks, products, moulds,
+      productionSteps: steps, categoryNameById,
+    }));
+
+    const daysA = new Set(result.entries.filter((e) => e.planId === "plan-A").map((e) => e.startAt.slice(0, 10)));
+    const daysB = new Set(result.entries.filter((e) => e.planId === "plan-B").map((e) => e.startAt.slice(0, 10)));
+    expect(daysA.size).toBe(1);
+    expect(daysB.size).toBe(1);
+    // Same-day grouping.
+    expect([...daysA][0]).toBe([...daysB][0]);
   });
 });
 

@@ -415,7 +415,7 @@ export interface ProductionPlan {
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
-  status: "draft" | "active" | "done";
+  status: "draft" | "active" | "done" | "cancelled" | "orphaned";
   notes?: string;
   // JSON-encoded Record<fillingId, multiplier> for shelf-stable fillings (Fruit & Acid, Nut-Based)
   fillingOverrides?: string;
@@ -423,11 +423,33 @@ export interface ProductionPlan {
   fillingPreviousBatches?: string;
   // Plain-text snapshot generated when the batch is marked done — used for recall tracing
   batchSummary?: string;
-  /** Source order whose produce-fresh lines drove the creation of this
-   *  batch. Null on manually-created batches; set on auto-created ones
-   *  so the sync layer can find and rebuild them. ON DELETE CASCADE
-   *  at the DB layer — when the order disappears, the batch does too. */
+  /** @deprecated Single-FK link to the source order. Kept for one
+   *  release during the orderPlanLinks rollout; new code should read
+   *  OrderPlanLink rows instead. */
   sourceOrderId?: string;
+  /** Operator's choice at unmould time when this batch overproduces
+   *  vs its allocated order demand. 'store' / 'freezer' / 'waste'.
+   *  Currently informational — the stock-rewrite task will read this
+   *  and issue the corresponding stockMovement. */
+  surplusDestination?: "store" | "freezer" | "waste";
+}
+
+/**
+ * Many-to-many link between an orderItem and a productionPlan.
+ *
+ * One order line can be fulfilled by multiple batches (a large
+ * shortfall split across days) and one batch can serve multiple
+ * order lines (consolidation). `allocatedQuantity` captures how many
+ * pieces of the batch are earmarked for this specific line; the
+ * batch's actualYield minus the sum of its allocations is surplus.
+ */
+export interface OrderPlanLink {
+  id?: string;
+  orderItemId: string;
+  planId: string;
+  allocatedQuantity: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 /** @deprecated Shelf-stability is now a per-category flag stored on `fillingCategories.shelfStable`.
@@ -1143,6 +1165,10 @@ export interface CapacityConfig {
   /** Labour hourly rate (currency units/hour) used in quote + margin
    *  calculations. Nullable until the user sets it in Settings. */
   labourHourlyRate?: number;
+  /** Working-day buffer between the last scheduled active work and an
+   *  order's deadline. The scheduler won't place work later than
+   *  `deadline − productionBufferDays`. Default 2 when null. */
+  productionBufferDays?: number;
   updatedAt?: Date;
 }
 

@@ -13,10 +13,56 @@ export const DEFAULT_SHELL_PERCENTAGE = 37;
 // Assumed density for filling calculations (g/ml). Ganache ≈ 1.1–1.3 g/ml.
 export const DENSITY_G_PER_ML = 1.2;
 
+/**
+ * Step group IDs. Kept as internal tokens — the UI renames them for
+ * display (see PHASES in /production/[id]/page.tsx and the
+ * PHASE_DISPLAY_LABEL map below). The renames are label-only so
+ * existing planStepStatus rows stay valid.
+ *
+ *   polishing  → "Polishing"     (new 8th group, pre-colour prep)
+ *   colour     → "Painting"
+ *   shell      → "Shelling"
+ *   filling    → "Filling Prep"
+ *   fill       → "Filling"
+ *   cap        → "Capping"
+ *   unmould    → "Unmoulding"
+ *   packing    → "Packing"
+ *
+ * "Transfer" is deliberately not in this set — transfer sheets are a
+ * decoration material applied during capping, never a standalone step.
+ * `assertNoTransferStep` guards against accidental regressions.
+ */
+export type StepGroup =
+  | "polishing"
+  | "colour"
+  | "shell"
+  | "filling"
+  | "fill"
+  | "cap"
+  | "unmould"
+  | "packing";
+
+export const STEP_GROUP_DISPLAY_LABEL: Record<StepGroup, string> = {
+  polishing: "Polishing",
+  colour:    "Painting",
+  shell:     "Shelling",
+  filling:   "Filling Prep",
+  fill:      "Filling",
+  cap:       "Capping",
+  unmould:   "Unmoulding",
+  packing:   "Packing",
+};
+
+/** Canonical order for the 8 phases. Drives the tab order on the
+ *  batch detail page and the ordering inside generateSteps. */
+export const STEP_GROUP_ORDER: StepGroup[] = [
+  "polishing", "colour", "shell", "filling", "fill", "cap", "unmould", "packing",
+];
+
 export type ProductionStep = {
   key: string;
   label: string;
-  group: "colour" | "shell" | "filling" | "fill" | "cap" | "unmould" | "packing";
+  group: StepGroup;
   detail?: string;
   colors?: string[];
   coating?: string;   // set on shell/cap steps for grouping by chocolate type
@@ -626,6 +672,25 @@ export function generateSteps(
     if (ca !== cb) return ca.localeCompare(cb);
     return a.sortOrder - b.sortOrder;
   });
+
+  // 0: Polishing — one checkbox per (product, mould) pair. Rubs the
+  // moulds clean before any decoration goes on. Always appears first.
+  for (const pb of planProducts) {
+    const mould = moulds.get(pb.mouldId);
+    const mouldName = mould?.name ?? "Unknown mould";
+    const bName = productNames.get(pb.productId) ?? "Unknown";
+    const mouldDetail = mould
+      ? `${pb.quantity} × ${mould.numberOfCavities} cavities`
+      : undefined;
+    steps.push({
+      key: `polishing-${pb.id}`,
+      label: `Polish ${mouldName} (${bName})`,
+      group: "polishing",
+      detail: mouldDetail,
+      mouldCount: pb.quantity,
+      planProductId: pb.id!,
+    });
+  }
 
   // 1: Collect all colour/decoration tasks across all products
   const colorTasks: ColorTask[] = [];

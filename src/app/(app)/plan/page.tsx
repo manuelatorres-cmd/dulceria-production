@@ -7,7 +7,7 @@ import {
   useOrders, useAllOrderItems, useProductsList, useProductionSteps,
   useCapacityConfig, usePeople, usePersonUnavailability, useBlockedDays,
   useProductCategories, useMouldsList, useProductionPlans, useAllPlanProducts,
-  useProductionSchedule, replaceProductionSchedule, updateScheduleStatus,
+  useProductionSchedule, useAllOrderPlanLinks, regenerateAllPlansAndSchedule, updateScheduleStatus,
 } from "@/lib/hooks";
 import { buildSchedule, timeBandFor, TIME_BAND_LABEL } from "@/lib/scheduler";
 import { capacityConfigStatus } from "@/lib/capacity";
@@ -34,6 +34,7 @@ export default function PlanPage() {
   const moulds = useMouldsList(true);
   const plans = useProductionPlans();
   const planProducts = useAllPlanProducts();
+  const orderPlanLinks = useAllOrderPlanLinks();
   const stored = useProductionSchedule();
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
@@ -50,22 +51,26 @@ export default function PlanPage() {
     return m;
   }, [planProducts]);
   // Earliest-linked-order label per batch — powers "[N moulds] — [Order ref]".
+  // Walks orderPlanLinks → orderItems → orders so a batch linked to
+  // multiple orders shows the most-urgent one.
   const batchOrderRef = useMemo(() => {
+    const itemById = new Map(orderItems.map((oi) => [oi.id!, oi]));
     const best = new Map<string, { ref: string; deadline: string }>();
-    for (const oi of orderItems) {
-      if (!oi.linkedBatchId) continue;
-      const order = orderMap.get(oi.orderId);
+    for (const link of orderPlanLinks) {
+      const item = itemById.get(link.orderItemId);
+      if (!item) continue;
+      const order = orderMap.get(item.orderId);
       if (!order) continue;
-      const cur = best.get(oi.linkedBatchId);
+      const cur = best.get(link.planId);
       if (!cur || order.deadline < cur.deadline) {
-        best.set(oi.linkedBatchId, {
+        best.set(link.planId, {
           ref: order.customerName || order.eventName || order.sourceRef || "order",
           deadline: order.deadline,
         });
       }
     }
     return best;
-  }, [orderItems, orderMap]);
+  }, [orderItems, orderMap, orderPlanLinks]);
   const categoryNameById = useMemo(
     () => new Map(categories.map((c) => [c.id!, c.name])),
     [categories],
@@ -80,10 +85,10 @@ export default function PlanPage() {
   // Preview the schedule that WOULD result from current inputs (without writing)
   const preview = useMemo(
     () => buildSchedule({
-      plans, planProducts, orders, orderItems, products, productionSteps, moulds,
+      plans, planProducts, orders, orderItems, orderPlanLinks, products, productionSteps, moulds,
       config, people, unavailability, blockedDays, categoryNameById,
     }),
-    [plans, planProducts, orders, orderItems, products, productionSteps, moulds, config, people, unavailability, blockedDays, categoryNameById],
+    [plans, planProducts, orders, orderItems, orderPlanLinks, products, productionSteps, moulds, config, people, unavailability, blockedDays, categoryNameById],
   );
 
   // Group stored schedule rows into (date → planId → entries). Each
@@ -109,22 +114,28 @@ export default function PlanPage() {
     setRegenerating(true);
     setRegenerateError("");
     try {
-      await replaceProductionSchedule(preview.entries);
+      // Regenerate now does TWO things in one click:
+      // 1. Rebuild draft batches from current produce-fresh demand,
+      //    consolidating across orders and preserving active batches.
+      // 2. Run the scheduler over the post-reconcile plan state.
+      // Both steps read fresh DB state server-side — no dependency on
+      // stale hook caches between the reconcile and the schedule.
+      const result = await regenerateAllPlansAndSchedule({
+        config, people, unavailability, blockedDays,
+        productionSteps, categoryNameById,
+      });
       setLastResult({
-        warnings: preview.warnings,
-        unscheduledPlanIds: preview.unscheduledPlanIds,
-        count: preview.entries.length,
+        warnings: result.warnings,
+        unscheduledPlanIds: result.unscheduledPlanIds,
+        count: result.scheduleCount,
       });
     } catch (err) {
-      // Surface the real Postgres error — previously this was a
-      // silent promise rejection. Supabase throws PostgrestError as a
-      // plain object, not an Error instance, so read the shape defensively.
       const raw: { message?: string; code?: string; details?: string; hint?: string } =
         err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
       const code = raw.code ? ` (code ${raw.code})` : "";
       const hint = raw.hint ? ` — ${raw.hint}` : "";
       setRegenerateError(`${raw.message || raw.details || "Regenerate failed"}${code}${hint}`);
-      console.error("replaceProductionSchedule failed:", err);
+      console.error("regenerate failed:", err);
     } finally {
       setRegenerating(false);
     }

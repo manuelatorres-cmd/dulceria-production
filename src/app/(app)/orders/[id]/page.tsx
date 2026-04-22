@@ -13,8 +13,9 @@ import {
   useProductLocationTotals,
   useReplenishmentOrderFor,
   useCustomerProductPrices,
-  useProductionPlans, useAllPlanProducts,
+  useProductionPlans, useOrderPlanLinks, useAllPlanStepStatuses,
 } from "@/lib/hooks";
+import { batchPhaseProgress } from "@/lib/batch-progress";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import { latestPackagingUnitCost } from "@/lib/collectionPricing";
@@ -40,9 +41,9 @@ import {
   type Packaging, type OrderPackagingLine,
   type ProductCostSnapshot, type PackagingOrder,
   type OrderItem, type Customer, type CustomerType,
-  type ProductionPlan,
+  type OrderPlanLink, type ProductionPlan,
 } from "@/types";
-import { ArrowLeft, Plus, Trash2, X, Pencil, AlertTriangle, Calendar, Package, UserPlus, User } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, X, Pencil, AlertTriangle, Check, Calendar, Package, UserPlus, User } from "lucide-react";
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);
@@ -68,32 +69,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const unavailability = usePersonUnavailability();
   const blocked = useBlockedDays();
   const productLocationTotals = useProductLocationTotals();
+  const orderPlanLinks = useOrderPlanLinks(orderId);
   const allPlans = useProductionPlans();
-  const allPlanProducts = useAllPlanProducts();
-
-  // For the "Batch" picker per line: which active batches contain this
-  // product? An active batch is anything not marked done; users can
-  // pick one as the fulfilment source. Empty list → "No batch linked"
-  // flag with a CTA to create one on /production.
-  const activeBatchesByProduct = useMemo(() => {
-    const byPlan = new Map<string, Set<string>>();
-    for (const pp of allPlanProducts) {
-      const set = byPlan.get(pp.planId) ?? new Set<string>();
-      set.add(pp.productId);
-      byPlan.set(pp.planId, set);
+  const allPlanStepStatuses = useAllPlanStepStatuses();
+  const plansById = useMemo(() => new Map(allPlans.map((p) => [p.id!, p])), [allPlans]);
+  const linksByItemId = useMemo(() => {
+    const m = new Map<string, OrderPlanLink[]>();
+    for (const lk of orderPlanLinks) {
+      const arr = m.get(lk.orderItemId) ?? [];
+      arr.push(lk);
+      m.set(lk.orderItemId, arr);
     }
-    const out = new Map<string, ProductionPlan[]>();
-    for (const plan of allPlans) {
-      if (plan.status === "done") continue;
-      const prods = byPlan.get(plan.id!) ?? new Set<string>();
-      for (const pid of prods) {
-        const arr = out.get(pid) ?? [];
-        arr.push(plan);
-        out.set(pid, arr);
-      }
-    }
-    return out;
-  }, [allPlans, allPlanProducts]);
+    return m;
+  }, [orderPlanLinks]);
 
   // Latest product unit cost + packaging unit cost, shared with the quote flow.
   const { data: costSnapshots = [] } = useQuery({
@@ -501,21 +489,40 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           />
         )}
 
-        {/* Line items */}
+        {/* Line items — "Add product" lives on the LEFT of the header
+            to match the new-order flow; the old right-side placement
+            hid below longer headers on narrow screens. */}
         <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-semibold text-primary">
-              Products ({items.length} · {totalQty} pcs)
-            </h2>
+          <div className="flex items-center gap-3 mb-2">
             {!addingLine && (
               <button
                 onClick={() => setAddingLine(true)}
-                className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
               >
                 <Plus className="w-3.5 h-3.5" /> Add product
               </button>
             )}
+            <h2 className="text-sm font-semibold text-primary">
+              Products ({items.length} · {totalQty} pcs)
+            </h2>
           </div>
+
+          {/* Scheduling hint: produce-fresh lines need Regenerate plan
+              to spawn batches. Shown only when at least one produce-fresh
+              line exists without any link yet. */}
+          {(() => {
+            const produceItems = items.filter((i) => (i.fulfilmentMode ?? "produce") === "produce");
+            const anyUnlinked = produceItems.some((i) => (linksByItemId.get(i.id!) ?? []).length === 0);
+            if (!anyUnlinked) return null;
+            if (order.status !== "pending" && order.status !== "in_production") return null;
+            return (
+              <div className="mb-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                Pending — not yet scheduled.{" "}
+                <Link href="/plan" className="text-primary hover:underline">Regenerate plan</Link>{" "}
+                to schedule the produce-fresh lines.
+              </div>
+            );
+          })()}
 
           {addingLine && (
             <AddOrderLine
@@ -523,6 +530,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               nextSortOrder={items.length}
               products={products}
               resolveProductPrice={resolveProductPrice}
+              availableFor={(id) => {
+                const t = productLocationTotals.get(id);
+                return t ? Math.max(0, (t.store ?? 0) + (t.production ?? 0)) : 0;
+              }}
               onSaved={() => setAddingLine(false)}
               onCancel={() => setAddingLine(false)}
             />
@@ -541,7 +552,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   product={productMap.get(item.productId)}
                   short={shortProductIds.has(item.productId)}
                   resolveProductPrice={resolveProductPrice}
-                  availableBatches={activeBatchesByProduct.get(item.productId) ?? []}
+                  links={linksByItemId.get(item.id!) ?? []}
+                  plansById={plansById}
+                  allPlanStepStatuses={allPlanStepStatuses}
                 />
               ))}
             </ul>
@@ -902,11 +915,12 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   );
 }
 
-function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, onSaved, onCancel }: {
+function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, availableFor, onSaved, onCancel }: {
   orderId: string;
   nextSortOrder: number;
   products: { id?: string; name: string; archived?: boolean }[];
   resolveProductPrice: (productId: string) => ReturnType<typeof resolveUnitPrice>;
+  availableFor: (productId: string) => number;
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -916,12 +930,14 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, o
   const [quantity, setQuantity] = useState("1");
   const [unitPriceInput, setUnitPriceInput] = useState("");
   const [notes, setNotes] = useState("");
+  const [fulfilmentMode, setFulfilmentMode] = useState<"produce" | "borrow" | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const productInputRef = useRef<HTMLInputElement>(null);
 
   const qty = parseInt(quantity, 10);
-  const canSave = !!productId && !isNaN(qty) && qty > 0 && !saving;
+  const available = productId ? availableFor(productId) : 0;
+  const canSave = !!productId && !isNaN(qty) && qty > 0 && !!fulfilmentMode && !saving;
   // `productInputRef` is kept so the field autofocuses on mount but is
   // no longer re-focused post-save (the panel closes instead).
   void productInputRef;
@@ -959,6 +975,8 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, o
         sortOrder: nextSortOrder,
         notes: notes.trim() || undefined,
         unitPrice: Number.isFinite(priceNum) && priceNum >= 0 ? priceNum : undefined,
+        // fulfilmentMode is required — saveOrderItem throws without it.
+        fulfilmentMode,
       });
       // One-shot add: close the panel after a successful save instead
       // of re-opening the picker and looping. The user clicks + again
@@ -1049,6 +1067,50 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, o
         placeholder="Line notes (optional)"
         className="input"
       />
+
+      {/* Stock source — must be an explicit choice. No silent
+          Take-from-Stock; the old auto-decide was the bug. */}
+      {productId && (
+        <div className="flex items-center gap-3 flex-wrap text-xs pt-1">
+          <span className="text-muted-foreground">
+            Stock available: <span className="font-medium tabular-nums text-foreground">{available}</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setFulfilmentMode("borrow")}
+              disabled={available === 0}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${
+                fulfilmentMode === "borrow"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+              }`}
+            >
+              Take from stock
+            </button>
+            <button
+              type="button"
+              onClick={() => setFulfilmentMode("produce")}
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${
+                fulfilmentMode === "produce"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+              }`}
+            >
+              Produce fresh
+            </button>
+          </div>
+          {!fulfilmentMode && (
+            <span className="text-status-warn">Pick one</span>
+          )}
+          {fulfilmentMode === "borrow" && !isNaN(qty) && qty > available && (
+            <span className="text-status-warn">
+              Only {available} available — rest rolls back to Produce on save.
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <button onClick={handleAdd} disabled={!canSave} className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
           {saving ? "Adding…" : "Add"}
@@ -1064,12 +1126,14 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, o
   );
 }
 
-function OrderLineRow({ item, product, short, resolveProductPrice, availableBatches }: {
+function OrderLineRow({ item, product, short, resolveProductPrice, links, plansById, allPlanStepStatuses }: {
   item: OrderItem;
   product?: { id?: string; name: string; defaultVatRate?: number };
   short: boolean;
   resolveProductPrice: (productId: string) => ReturnType<typeof resolveUnitPrice>;
-  availableBatches: ProductionPlan[];
+  links: OrderPlanLink[];
+  plansById: Map<string, ProductionPlan>;
+  allPlanStepStatuses: import("@/types").PlanStepStatus[];
 }) {
   const productName = product?.name ?? item.productId;
   const [pendingRemove, setPendingRemove] = useState(false);
@@ -1111,7 +1175,6 @@ function OrderLineRow({ item, product, short, resolveProductPrice, availableBatc
         fulfilmentMode: item.fulfilmentMode,
         unitPrice: item.unitPrice,
         vatRate: item.vatRate,
-        linkedBatchId: item.linkedBatchId,
         ...patch,
       });
     } catch (err) {
@@ -1335,40 +1398,66 @@ function OrderLineRow({ item, product, short, resolveProductPrice, availableBatc
       </div>
       {saveError && <p className="text-[11px] text-status-alert mt-1">{saveError}</p>}
 
-      {/* Batch link — borrow lines don't need one (Store stock is their
-          batch). Produce lines either link to an existing active batch
-          or flag a missing-batch CTA so the user creates one on the
-          Production page and returns here to pick it. */}
-      {!isBorrow && (
-        <div className="mt-2 flex items-center gap-2 text-[11px]">
-          <span className="text-muted-foreground shrink-0">Batch:</span>
-          {availableBatches.length > 0 ? (
-            <select
-              value={item.linkedBatchId ?? ""}
-              onChange={(e) => persistLine({ linkedBatchId: e.target.value || undefined })}
-              className="input !w-auto !text-xs !py-0.5 flex-1 min-w-0"
-            >
-              <option value="">— No batch —</option>
-              {availableBatches.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          ) : (
-            <span className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-status-warn">No active batch for this product.</span>
-              <Link href="/production/new" className="text-primary hover:underline shrink-0">
-                Create batch →
-              </Link>
-            </span>
-          )}
-          {!item.linkedBatchId && availableBatches.length > 0 && (
-            <span className="text-status-warn shrink-0">Unlinked — will not schedule</span>
-          )}
-        </div>
+      {/* Linked batches — populated by Regenerate plan, NOT on order
+          save. Borrow lines don't get batches (they fulfil from
+          stock). Each row shows "N from <batch> (Step N/8 Label)"
+          where the step label is the batch's current phase. */}
+      {links.length > 0 && (
+        <ul className="mt-2 space-y-1 pl-3 border-l-2 border-border">
+          {links.map((lk) => {
+            const plan = plansById.get(lk.planId);
+            const status = plan?.status ?? "draft";
+            const progress = plan
+              ? batchPhaseProgress(plan.id!, allPlanStepStatuses)
+              : null;
+            const batchLabel = plan?.batchNumber || plan?.name || "batch";
+            return (
+              <li key={lk.id ?? lk.planId} className="flex items-center gap-2 text-[11px] flex-wrap">
+                <span className="text-muted-foreground shrink-0">└─</span>
+                <span className="tabular-nums font-medium">{lk.allocatedQuantity}</span>
+                <span className="text-muted-foreground">from</span>
+                {plan ? (
+                  <Link
+                    href={`/production/${encodeURIComponent(plan.id!)}`}
+                    className="font-medium hover:underline truncate max-w-[30ch]"
+                  >
+                    {batchLabel}
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground italic">Batch missing</span>
+                )}
+                {progress && (
+                  <span className="text-muted-foreground tabular-nums">
+                    (Step {progress.index}/{progress.total} {progress.label})
+                  </span>
+                )}
+                <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${PLAN_STATUS_STYLE[status]}`}>
+                  {PLAN_STATUS_LABEL[status]}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </li>
   );
 }
+
+const PLAN_STATUS_LABEL: Record<ProductionPlan["status"], string> = {
+  draft: "Pending",
+  active: "In production",
+  done: "Done",
+  cancelled: "Cancelled",
+  orphaned: "Orphaned",
+};
+
+const PLAN_STATUS_STYLE: Record<ProductionPlan["status"], string> = {
+  draft: "bg-muted text-muted-foreground border-border",
+  active: "bg-status-warn-bg text-status-warn border-status-warn-edge",
+  done: "bg-status-ok-bg text-status-ok border-status-ok-edge",
+  cancelled: "bg-destructive/10 text-destructive border-destructive/20",
+  orphaned: "bg-status-alert-bg text-status-alert border-status-alert-edge",
+};
 
 // ─── Packaging section ──────────────────────────────────────────
 
@@ -1854,26 +1943,38 @@ function OrderSummaryCard({
         </div>
       </div>
 
-      {/* Feasibility */}
-      <div className={`rounded-md border px-3 py-2 flex items-start gap-2 ${sevColor}`}>
-        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">{feasibility.summary}</p>
-          {feasibility.shortfalls.length > 0 && (
-            <ul className="mt-1 space-y-0.5">
-              {feasibility.shortfalls.map((s) => (
-                <li key={s.productId} className="text-xs">
-                  {productNameById.get(s.productId)?.name ?? s.productId}: short by {s.shortPieces} pc
-                  {" "}(need {s.required}, have {s.available} on hand, can make {s.producible})
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="text-[11px] opacity-80 mt-1">
-            {feasibility.availableHours}h available · {feasibility.freeHours}h free · {labour.totalHours}h needed
-          </p>
+      {/* Feasibility. Green case is an informational single-line pill
+          (no alarm icon). Yellow / red keep the AlertTriangle and the
+          multi-line shortfall breakdown. */}
+      {feasibility.severity === "green" ? (
+        <div className={`rounded-md border px-3 py-1.5 flex items-center gap-2 text-xs ${sevColor}`}>
+          <Check className="w-3.5 h-3.5 shrink-0" />
+          <span className="font-medium">{feasibility.summary}</span>
+          <span className="opacity-70">
+            · {feasibility.availableHours}h available · {feasibility.freeHours}h free · {labour.totalHours}h needed
+          </span>
         </div>
-      </div>
+      ) : (
+        <div className={`rounded-md border px-3 py-2 flex items-start gap-2 ${sevColor}`}>
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">{feasibility.summary}</p>
+            {feasibility.shortfalls.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {feasibility.shortfalls.map((s) => (
+                  <li key={s.productId} className="text-xs">
+                    {productNameById.get(s.productId)?.name ?? s.productId}: short by {s.shortPieces} pc
+                    {" "}(need {s.required}, have {s.available} on hand, can make {s.producible})
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-[11px] opacity-80 mt-1">
+              {feasibility.availableHours}h available · {feasibility.freeHours}h free · {labour.totalHours}h needed
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, ProductionScheduleEntry, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -1731,6 +1731,136 @@ export function usePlanProducts(planId: string | undefined): PlanProduct[] {
     },
   });
   return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Order ↔ Plan links (many-to-many)
+//
+// Read hooks return the raw rows; higher-level derivations (per-line
+// batch lists, per-batch order lists) live on the pages that need them
+// so we don't bake a specific shape into the hook API too early.
+// ---------------------------------------------------------------------------
+
+/** All links across all orders. Cheap in practice — this table stays
+ *  small relative to orders/planProducts. */
+export function useAllOrderPlanLinks(): OrderPlanLink[] {
+  const { data } = useQuery({
+    queryKey: ["order-plan-links", "all"],
+    queryFn: async () => assertOk(
+      await supabase.from("orderPlanLinks").select("*"),
+    ) as OrderPlanLink[],
+  });
+  return data ?? [];
+}
+
+/** Links for a single order (joined via orderItems). Enabled only when
+ *  `orderId` is defined — we short-circuit on undefined to avoid a
+ *  wasted round-trip before the page has finished loading the order. */
+export function useOrderPlanLinks(orderId: string | undefined): OrderPlanLink[] {
+  const { data } = useQuery({
+    queryKey: ["order-plan-links", "for-order", orderId],
+    enabled: !!orderId,
+    queryFn: async () => {
+      const items = assertOk(
+        await supabase.from("orderItems").select("id").eq("orderId", orderId!),
+      ) as { id: string }[];
+      if (items.length === 0) return [] as OrderPlanLink[];
+      return assertOk(
+        await supabase.from("orderPlanLinks").select("*").in("orderItemId", items.map((i) => i.id)),
+      ) as OrderPlanLink[];
+    },
+  });
+  return data ?? [];
+}
+
+/** Links for a single batch — used on the production/batch detail page
+ *  to show which orders the batch is serving. */
+export function useLinksForPlan(planId: string | undefined): OrderPlanLink[] {
+  const { data } = useQuery({
+    queryKey: ["order-plan-links", "for-plan", planId],
+    enabled: !!planId,
+    queryFn: async () => assertOk(
+      await supabase.from("orderPlanLinks").select("*").eq("planId", planId!),
+    ) as OrderPlanLink[],
+  });
+  return data ?? [];
+}
+
+/**
+ * Upsert a single link. Used by the reconciler when it creates or
+ * updates an allocation. The unique (orderItemId, planId) constraint
+ * makes this idempotent — same pair updates allocatedQuantity.
+ */
+export async function saveOrderPlanLink(
+  link: Omit<OrderPlanLink, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const now = new Date();
+  if (link.id) {
+    const { error } = await supabase
+      .from("orderPlanLinks")
+      .update({
+        orderItemId: link.orderItemId,
+        planId: link.planId,
+        allocatedQuantity: link.allocatedQuantity,
+        updatedAt: now,
+      })
+      .eq("id", link.id);
+    if (error) throw error;
+    invalidateOrderPlanLinkQueries();
+    return link.id;
+  }
+  const createdId = newId();
+  const { error } = await supabase.from("orderPlanLinks").upsert({
+    id: createdId,
+    orderItemId: link.orderItemId,
+    planId: link.planId,
+    allocatedQuantity: link.allocatedQuantity,
+    createdAt: now,
+    updatedAt: now,
+  }, { onConflict: "orderItemId,planId" });
+  if (error) throw error;
+  invalidateOrderPlanLinkQueries();
+  return createdId;
+}
+
+export async function deleteOrderPlanLink(id: string): Promise<void> {
+  const { error } = await supabase.from("orderPlanLinks").delete().eq("id", id);
+  if (error) throw error;
+  invalidateOrderPlanLinkQueries();
+}
+
+/**
+ * Atomic-ish replacement: delete all existing links for an order line
+ * then insert the provided set. No supabase-js transaction, so a mid-
+ * operation failure can leave partial state — the reconciler handles
+ * that by being idempotent (next save re-sync).
+ */
+export async function replaceLinksForOrderItem(
+  orderItemId: string,
+  links: Array<Omit<OrderPlanLink, "id" | "orderItemId" | "createdAt" | "updatedAt">>,
+): Promise<void> {
+  const del = await supabase.from("orderPlanLinks").delete().eq("orderItemId", orderItemId);
+  if (del.error) throw del.error;
+  if (links.length === 0) {
+    invalidateOrderPlanLinkQueries();
+    return;
+  }
+  const now = new Date();
+  const rows = links.map((l) => ({
+    id: newId(),
+    orderItemId,
+    planId: l.planId,
+    allocatedQuantity: l.allocatedQuantity,
+    createdAt: now,
+    updatedAt: now,
+  }));
+  const ins = await supabase.from("orderPlanLinks").insert(rows);
+  if (ins.error) throw ins.error;
+  invalidateOrderPlanLinkQueries();
+}
+
+function invalidateOrderPlanLinkQueries(): void {
+  queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
 }
 
 /** Returns a map of productId → { lastProducedAt, inStock } for all products that have been in a completed plan. */
@@ -3906,6 +4036,7 @@ export async function saveCapacityConfig(partial: Partial<CapacityConfig>): Prom
       fillingBufferPercent: partial.fillingBufferPercent ?? null,
       stockExpiryWarnDays: partial.stockExpiryWarnDays ?? null,
       labourHourlyRate: partial.labourHourlyRate ?? null,
+      productionBufferDays: partial.productionBufferDays ?? null,
       updatedAt: new Date(),
     }, { onConflict: "id" });
   if (error) throw error;
@@ -4307,6 +4438,10 @@ export async function saveOrder(order: Omit<Order, "createdAt" | "updatedAt">): 
     if (order.status === "done" && prevStatus !== "done") {
       await drainAllocatedForOrder(order.id);
     }
+    // Batches are NOT created on order save. They're created only when
+    // the operator clicks Regenerate plan on /plan, which consolidates
+    // produce-fresh demand across all open orders into one batch per
+    // product. See src/lib/order-batch-global-reconciler.ts.
     return order.id;
   }
   const id = newId();
@@ -4383,11 +4518,13 @@ export async function saveOrderItem(item: Omit<OrderItem, "id"> & { id?: string 
     await onOrderItemChanged(item.orderId);
     return item.id;
   }
+  // Explicit fulfilmentMode is required on every new line. Every
+  // caller passes it; there's no silent default.
+  if (!item.fulfilmentMode) {
+    throw new Error("saveOrderItem: fulfilmentMode is required on new lines");
+  }
   const id = newId();
-  // Decide fulfilment for brand-new lines on B2B / online orders. Once a
-  // line exists and has a mode, the user has full control — we don't
-  // auto-flip it on subsequent edits.
-  const mode = item.fulfilmentMode ?? await decideAutoBorrowForNewLine(item);
+  const mode = item.fulfilmentMode;
   const { error } = await supabase
     .from("orderItems")
     .insert({ ...item, id, fulfilmentMode: mode });
@@ -4429,46 +4566,11 @@ export async function deleteOrderItem(id: string): Promise<void> {
 //   - syncReplenishmentOrder                         (keeps the child order
 //                                                     in sync with current
 //                                                     borrowed lines)
-//   - decideAutoBorrowForNewLine                     (used by saveOrderItem)
 //
-// The engine never silently re-evaluates an existing line's mode: once
-// a line is 'produce' or 'borrow', only the user (or revert) can change
-// it. This keeps saves predictable and stops the scheduler from
-// thrashing when the same order is edited repeatedly.
-
-async function decideAutoBorrowForNewLine(
-  item: Pick<OrderItem, "orderId" | "productId" | "quantity">,
-): Promise<"produce" | "borrow"> {
-  // Only auto-borrow for B2B / online parent orders. Replenishment
-  // orders (channel='shop' + sourceOrderId set) are skipped — we don't
-  // borrow against ourselves.
-  const order = assertOkMaybe(
-    await supabase.from("orders").select("*").eq("id", item.orderId).maybeSingle(),
-  ) as Order | null;
-  if (!order) return "produce";
-  if (order.channel !== "b2b" && order.channel !== "online") return "produce";
-
-  const [hours, closures, product, storeTotals] = await Promise.all([
-    supabase.from("shopOpeningHours").select("*"),
-    supabase.from("shopClosures").select("*"),
-    supabase.from("products").select("id, leadTimeDays").eq("id", item.productId).maybeSingle(),
-    computeStoreAvailableFor(item.productId),
-  ]);
-  const hoursRows = (hours.data ?? []) as ShopOpeningHours[];
-  const closureRows = (closures.data ?? []) as ShopClosure[];
-  const leadTimeDays = (product.data as { leadTimeDays?: number } | null)?.leadTimeDays ?? 1;
-
-  const { decideBorrowStrategy } = await import("@/lib/borrowDecision");
-  const decision = decideBorrowStrategy({
-    quantityRequested: item.quantity,
-    storeAvailable: storeTotals,
-    leadTimeDays,
-    now: new Date(),
-    hours: hoursRows,
-    closures: closureRows,
-  });
-  return decision.mode;
-}
+// The engine never silently picks a mode: saveOrderItem requires
+// fulfilmentMode on every new line. The pure helper decideBorrowStrategy
+// in src/lib/borrowDecision.ts can still be used to suggest a mode in
+// the UI, but it never fires automatically on save.
 
 /** Un-allocated store pieces available *right now* for this product —
  *  sum of all store stockLocations rows, minus any already-allocated
@@ -4595,15 +4697,8 @@ async function partialDeallocateFromStore(args: {
 
 /** Hook called after any orderItem change. Keeps the linked Shop
  *  Replenishment order (channel='shop' + sourceOrderId=parent) in sync
- *  with the current set of borrowed lines. No-op for parent orders
- *  that have no borrowed items.
- *
- *  NOTE: production batches are NOT auto-created from orders anymore
- *  (owner request). A batch is a physical production run and lives on
- *  the /production page; orders instead link into an existing batch
- *  via `orderItems.linkedBatchId`. The syncProductionBatchForOrder
- *  helper is kept for manual callers but nothing triggers it on
- *  order-item changes. */
+ *  with the current set of borrowed lines. Batches are NOT touched
+ *  here — they rebuild only on Regenerate plan. */
 async function onOrderItemChanged(orderId: string): Promise<void> {
   const order = assertOkMaybe(
     await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
@@ -4615,155 +4710,486 @@ async function onOrderItemChanged(orderId: string): Promise<void> {
   await syncReplenishmentOrder(orderId);
 }
 
+// =====================================================================
+// Per-order reconciler (LEGACY — not called automatically).
+//
+// Was wired into saveOrder + onOrderItemChanged to auto-create batches
+// on order save. That behaviour was replaced: batches are now only
+// built on Regenerate plan via the global consolidator in
+// src/lib/order-batch-global-reconciler.ts, which sums produce-fresh
+// demand across every open order into one batch per product.
+//
+// Kept as an exported helper for manual callers / one-off use; nothing
+// in the normal flow invokes it anymore. Safe to delete in a later
+// cleanup once no callers remain.
+// =====================================================================
+
+export async function reconcileOrderNow(orderId: string): Promise<void> {
+  const { reconcileOrderBatches } = await import("@/lib/order-batch-reconciler");
+
+  const order = assertOkMaybe(
+    await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
+  ) as Order | null;
+  if (!order) return;
+
+  const allItems = assertOk(
+    await supabase.from("orderItems").select("*").eq("orderId", orderId),
+  ) as OrderItem[];
+  // Reconciler operates on produce lines only; borrow lines are
+  // stock-allocated, not produced.
+  const produceItems = allItems.filter((i) => (i.fulfilmentMode ?? "produce") === "produce");
+
+  // Existing links attached to any of this order's lines.
+  const itemIds = allItems.map((i) => i.id!).filter(Boolean);
+  const existingLinks = itemIds.length > 0
+    ? assertOk(
+        await supabase.from("orderPlanLinks").select("*").in("orderItemId", itemIds),
+      ) as OrderPlanLink[]
+    : [];
+
+  const existingPlanIds = [...new Set(existingLinks.map((l) => l.planId))];
+  const existingPlans = existingPlanIds.length > 0
+    ? assertOk(
+        await supabase.from("productionPlans").select("*").in("id", existingPlanIds),
+      ) as ProductionPlan[]
+    : [];
+  const existingPlanProducts = existingPlanIds.length > 0
+    ? assertOk(
+        await supabase.from("planProducts").select("*").in("planId", existingPlanIds),
+      ) as PlanProduct[]
+    : [];
+
+  // Links from other orders that touch the same plans — tells the
+  // reconciler whether a plan is shared and must not be cancelled /
+  // orphaned when this order drops its links.
+  const otherLinks = existingPlanIds.length > 0
+    ? (assertOk(
+        await supabase.from("orderPlanLinks").select("*").in("planId", existingPlanIds),
+      ) as OrderPlanLink[]).filter((l) => !itemIds.includes(l.orderItemId))
+    : [];
+
+  // Products + moulds for every produce line (needed for sizing).
+  const productIds = [...new Set(produceItems.map((i) => i.productId))];
+  const products = productIds.length > 0
+    ? assertOk(
+        await supabase.from("products").select("*").in("id", productIds),
+      ) as Product[]
+    : [];
+  const mouldIds = products.map((p) => p.defaultMouldId).filter((x): x is string => !!x);
+  const moulds = mouldIds.length > 0
+    ? assertOk(
+        await supabase.from("moulds").select("*").in("id", mouldIds),
+      ) as Mould[]
+    : [];
+
+  const availableByProductId = await computeAvailableByProductId(productIds);
+
+  const decision = reconcileOrderBatches({
+    order,
+    orderItems: produceItems,
+    products, moulds,
+    existingLinks, existingPlans, existingPlanProducts,
+    availableByProductId,
+    otherLinks,
+  });
+
+  await applyReconcileDecision(decision);
+}
+
+/** On-hand pieces for each product, summed across store + production
+ *  locations. 'allocated' pieces have already left store (handled by
+ *  the borrow engine's move), so no extra subtraction is needed.
+ *  'freezer' is excluded — it's preserved stock, not shippable. */
+async function computeAvailableByProductId(
+  productIds: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (productIds.length === 0) return out;
+  const pps = assertOk(
+    await supabase.from("planProducts").select("id, productId").in("productId", productIds),
+  ) as Array<{ id: string; productId: string }>;
+  if (pps.length === 0) return out;
+  const productByPlanProduct = new Map(pps.map((p) => [p.id, p.productId]));
+
+  const rows = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("planProductId, location, quantity")
+      .in("planProductId", pps.map((p) => p.id))
+      .in("location", ["store", "production"]),
+  ) as Array<{ planProductId: string; location: string; quantity: number }>;
+
+  for (const r of rows) {
+    if (!r.quantity || r.quantity <= 0) continue;
+    const productId = productByPlanProduct.get(r.planProductId);
+    if (!productId) continue;
+    out.set(productId, (out.get(productId) ?? 0) + r.quantity);
+  }
+  return out;
+}
+
+async function applyReconcileDecision(
+  decision: Awaited<ReturnType<typeof import("@/lib/order-batch-reconciler").reconcileOrderBatches>>,
+): Promise<void> {
+  const now = new Date();
+  let didMutate = false;
+
+  // 1) Insert new plans + planProducts + links (sequential — no
+  //    client transaction; order matters because later inserts
+  //    depend on earlier IDs).
+  for (const newBatch of decision.newBatches) {
+    const planId = newId();
+    const batchNumber = await generateBatchNumber(now);
+    const { error: planError } = await supabase.from("productionPlans").insert({
+      id: planId,
+      name: newBatch.planName,
+      batchNumber,
+      status: "draft",
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (planError) throw planError;
+
+    const ppRows = newBatch.planProducts.map((pp, i) => ({
+      id: newId(),
+      planId,
+      productId: pp.productId,
+      mouldId: pp.mouldId,
+      quantity: pp.quantity,
+      sortOrder: i,
+    }));
+    if (ppRows.length > 0) {
+      const { error: ppError } = await supabase.from("planProducts").insert(ppRows);
+      if (ppError) throw ppError;
+    }
+
+    const linkRows = newBatch.allocations.map((a) => ({
+      id: newId(),
+      orderItemId: a.orderItemId,
+      planId,
+      allocatedQuantity: a.allocatedQuantity,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    if (linkRows.length > 0) {
+      const { error: lkError } = await supabase.from("orderPlanLinks").insert(linkRows);
+      if (lkError) throw lkError;
+    }
+    didMutate = true;
+  }
+
+  // 2) Update allocations on existing links.
+  for (const upd of decision.linksToUpdate) {
+    const { error } = await supabase
+      .from("orderPlanLinks")
+      .update({ allocatedQuantity: upd.allocatedQuantity, updatedAt: now })
+      .eq("id", upd.linkId);
+    if (error) throw error;
+    didMutate = true;
+  }
+
+  // 3) Delete links.
+  if (decision.linksToDelete.length > 0) {
+    const { error } = await supabase
+      .from("orderPlanLinks")
+      .delete()
+      .in("id", decision.linksToDelete);
+    if (error) throw error;
+    didMutate = true;
+  }
+
+  // 4) Cancel + orphan plans.
+  for (const planId of decision.plansToCancel) {
+    const { error } = await supabase
+      .from("productionPlans")
+      .update({ status: "cancelled", updatedAt: now })
+      .eq("id", planId);
+    if (error) throw error;
+    didMutate = true;
+  }
+  for (const planId of decision.plansToOrphan) {
+    const { error } = await supabase
+      .from("productionPlans")
+      .update({ status: "orphaned", updatedAt: now })
+      .eq("id", planId);
+    if (error) throw error;
+    didMutate = true;
+  }
+
+  if (didMutate) {
+    queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+    queryClient.invalidateQueries({ queryKey: ["plan-products"] });
+    queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
+  }
+}
+
+// =====================================================================
+// Global produce-fresh consolidator — the ONLY path that creates
+// batches in the new flow. Called from /plan's Regenerate button.
+//
+// Walks every open order, skips lines already covered by an active
+// batch, consolidates the remaining demand per product into one draft
+// batch per product, then applies the diff (insert / update / cancel).
+// =====================================================================
+
+export interface RegeneratePlansResult {
+  /** Batches created from scratch. */
+  createdPlanIds: string[];
+  /** Draft batches resized or re-linked. */
+  updatedPlanIds: string[];
+  /** Draft batches cancelled because their product no longer had demand. */
+  cancelledPlanIds: string[];
+  warnings: string[];
+}
+
+/**
+ * Flip every pending order linked to `planId` (via orderItems ↔
+ * orderPlanLinks) to 'in_production'. Idempotent — orders that are
+ * already in_production / done / cancelled are filtered out by the
+ * `status='pending'` clause, so re-calling is harmless.
+ *
+ * Called when a draft batch first transitions to 'active' — either
+ * via the Start production button or by ticking the first step on the
+ * batch page. Regenerate itself does NOT call this; scheduling and
+ * starting work are separate user actions.
+ */
+export async function promoteOrdersForPlan(planId: string): Promise<void> {
+  const links = assertOk(
+    await supabase
+      .from("orderPlanLinks")
+      .select("orderItemId")
+      .eq("planId", planId),
+  ) as Array<{ orderItemId: string }>;
+  if (links.length === 0) return;
+  const itemIds = [...new Set(links.map((l) => l.orderItemId))];
+  const items = assertOk(
+    await supabase
+      .from("orderItems")
+      .select("orderId")
+      .in("id", itemIds),
+  ) as Array<{ orderId: string }>;
+  const orderIds = [...new Set(items.map((i) => i.orderId))];
+  if (orderIds.length === 0) return;
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: "in_production", updatedAt: new Date() })
+    .in("id", orderIds)
+    .eq("status", "pending");
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+}
+
+/**
+ * Start production on a draft batch without ticking any step. Flips
+ * the plan from 'draft' → 'active' and promotes every pending order
+ * linked to it. No-op if the plan is already active/done/cancelled.
+ *
+ * Used by the "Start production" button on the batch page for when the
+ * operator wants to lock in that the batch is the one that'll fulfil
+ * the order (so consolidating Regenerate runs stop touching it) even
+ * before any physical work has begun.
+ */
+export async function startProductionPlan(planId: string): Promise<void> {
+  const { error } = await supabase
+    .from("productionPlans")
+    .update({ status: "active", updatedAt: new Date() })
+    .eq("id", planId)
+    .eq("status", "draft");
+  if (error) throw error;
+  await promoteOrdersForPlan(planId);
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+}
+
+export async function regenerateAllProductionPlans(): Promise<RegeneratePlansResult> {
+  const { reconcileGlobalProduceDemand } = await import("@/lib/order-batch-global-reconciler");
+
+  // 1) Read current state.
+  const openOrders = (assertOk(
+    await supabase.from("orders").select("*").in("status", ["pending", "in_production"]),
+  ) as Order[]);
+  const openOrderIds = openOrders.map((o) => o.id!);
+  const openItems = openOrderIds.length > 0
+    ? assertOk(
+        await supabase.from("orderItems").select("*").in("orderId", openOrderIds),
+      ) as OrderItem[]
+    : [];
+  const plans = assertOk(
+    await supabase.from("productionPlans").select("*"),
+  ) as ProductionPlan[];
+  const planProducts = assertOk(
+    await supabase.from("planProducts").select("*"),
+  ) as PlanProduct[];
+  const links = assertOk(
+    await supabase.from("orderPlanLinks").select("*"),
+  ) as OrderPlanLink[];
+
+  const productIds = [...new Set(openItems.map((i) => i.productId))];
+  const products = productIds.length > 0
+    ? assertOk(
+        await supabase.from("products").select("*").in("id", productIds),
+      ) as Product[]
+    : [];
+  const mouldIds = products
+    .map((p) => p.defaultMouldId)
+    .filter((x): x is string => !!x);
+  const moulds = mouldIds.length > 0
+    ? assertOk(
+        await supabase.from("moulds").select("*").in("id", mouldIds),
+      ) as Mould[]
+    : [];
+
+  // 2) Run the pure consolidator.
+  const decision = reconcileGlobalProduceDemand({
+    openOrders, openOrderItems: openItems, products, moulds,
+    plans, planProducts, links,
+  });
+
+  // 3) Apply the diff. Order matters: cancel first (frees up plan
+  //    rows), then update existing drafts, then insert new ones. Links
+  //    are batched where possible.
+  const now = new Date();
+  const result: RegeneratePlansResult = {
+    createdPlanIds: [], updatedPlanIds: [], cancelledPlanIds: [],
+    warnings: decision.warnings,
+  };
+
+  if (decision.linksToDelete.length > 0) {
+    const { error } = await supabase
+      .from("orderPlanLinks")
+      .delete()
+      .in("id", decision.linksToDelete);
+    if (error) throw error;
+  }
+  for (const planId of decision.plansToCancel) {
+    const { error } = await supabase
+      .from("productionPlans")
+      .update({ status: "cancelled", updatedAt: now })
+      .eq("id", planId);
+    if (error) throw error;
+    result.cancelledPlanIds.push(planId);
+  }
+  for (const upd of decision.updateBatches) {
+    // Resize the single planProduct + insert replacement links.
+    const { error: ppError } = await supabase
+      .from("planProducts")
+      .update({ quantity: upd.moulds })
+      .eq("id", upd.planProductId);
+    if (ppError) throw ppError;
+    const linkRows = upd.allocations.map((a) => ({
+      id: newId(),
+      orderItemId: a.orderItemId,
+      planId: upd.planId,
+      allocatedQuantity: a.allocatedQuantity,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    if (linkRows.length > 0) {
+      const { error: lkError } = await supabase.from("orderPlanLinks").insert(linkRows);
+      if (lkError) throw lkError;
+    }
+    result.updatedPlanIds.push(upd.planId);
+  }
+  for (const b of decision.newBatches) {
+    const planId = newId();
+    const batchNumber = await generateBatchNumber(now);
+    const { error: planError } = await supabase.from("productionPlans").insert({
+      id: planId,
+      name: `${b.productName} — consolidated`,
+      batchNumber,
+      status: "draft",
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (planError) throw planError;
+    const { error: ppError } = await supabase.from("planProducts").insert({
+      id: newId(),
+      planId,
+      productId: b.productId,
+      mouldId: b.mouldId,
+      quantity: b.moulds,
+      sortOrder: 0,
+    });
+    if (ppError) throw ppError;
+    const linkRows = b.allocations.map((a) => ({
+      id: newId(),
+      orderItemId: a.orderItemId,
+      planId,
+      allocatedQuantity: a.allocatedQuantity,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    if (linkRows.length > 0) {
+      const { error: lkError } = await supabase.from("orderPlanLinks").insert(linkRows);
+      if (lkError) throw lkError;
+    }
+    result.createdPlanIds.push(planId);
+  }
+
+  // 4) Invalidate queries so the UI re-reads.
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+  queryClient.invalidateQueries({ queryKey: ["plan-products"] });
+  queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
+
+  return result;
+}
+
+/**
+ * End-to-end regenerate: rebuild draft batches from current order
+ * demand, then run the scheduler over the full post-reconcile plan
+ * state, then replace the productionSchedule rows. Done server-side
+ * (DB reads, not hook state) so the schedule sees the batches this
+ * regenerate just created, not the pre-reconcile cache.
+ */
+export async function regenerateAllPlansAndSchedule(staticInputs: {
+  config: CapacityConfig | null;
+  people: Person[];
+  unavailability: PersonUnavailability[];
+  blockedDays: EventCalendarEntry[];
+  productionSteps: ProductionStep[];
+  categoryNameById: Map<string, string>;
+}): Promise<{
+  reconcile: RegeneratePlansResult;
+  scheduleCount: number;
+  warnings: string[];
+  unscheduledPlanIds: string[];
+}> {
+  const reconcileResult = await regenerateAllProductionPlans();
+
+  // Fresh reads — the post-reconcile state is what the scheduler must
+  // see. Hook state at this point is stale (invalidation is async).
+  const [plans, planProducts, orderPlanLinks, orders, orderItems, products, moulds] = await Promise.all([
+    supabase.from("productionPlans").select("*").then((r) => assertOk(r) as ProductionPlan[]),
+    supabase.from("planProducts").select("*").then((r) => assertOk(r) as PlanProduct[]),
+    supabase.from("orderPlanLinks").select("*").then((r) => assertOk(r) as OrderPlanLink[]),
+    supabase.from("orders").select("*").then((r) => assertOk(r) as Order[]),
+    supabase.from("orderItems").select("*").then((r) => assertOk(r) as OrderItem[]),
+    supabase.from("products").select("*").then((r) => assertOk(r) as Product[]),
+    supabase.from("moulds").select("*").then((r) => assertOk(r) as Mould[]),
+  ]);
+
+  const { buildSchedule } = await import("@/lib/scheduler");
+  const preview = buildSchedule({
+    plans, planProducts, orders, orderItems, orderPlanLinks,
+    products, moulds,
+    ...staticInputs,
+  });
+
+  await replaceProductionSchedule(preview.entries);
+
+  return {
+    reconcile: reconcileResult,
+    scheduleCount: preview.entries.length,
+    warnings: [...reconcileResult.warnings, ...preview.warnings],
+    unscheduledPlanIds: preview.unscheduledPlanIds,
+  };
+}
+
 /** Short day+month label for fallback names — "05 Mar", "21 Apr".
  *  Used when an order has no customer / event / sourceRef to anchor a
  *  name on. Locale-stable across browsers because we pin en-GB. */
 function formatOrderDate(iso: string | Date): string {
   const d = iso instanceof Date ? iso : new Date(iso);
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-}
-
-/** Keep a single auto-batch in sync with an order's produce-fresh lines.
- *
- *  - Identifies the auto-batch by productionPlans.sourceOrderId = orderId.
- *  - Consolidates line items by productId (sums quantities).
- *  - Creates the batch if missing and produce-fresh lines exist.
- *  - Rebuilds planProducts to match the current set (replace strategy).
- *  - Drops the batch entirely when no produce-fresh lines remain.
- *
- *  Only orders that have status 'pending' or 'in_production' get a
- *  batch — done + cancelled orders leave the board as-is so historical
- *  views stay stable. */
-export async function syncProductionBatchForOrder(orderId: string): Promise<void> {
-  const order = assertOkMaybe(
-    await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
-  ) as Order | null;
-  if (!order) return;
-
-  const existing = assertOkMaybe(
-    await supabase
-      .from("productionPlans")
-      .select("*")
-      .eq("sourceOrderId", orderId)
-      .maybeSingle(),
-  ) as ProductionPlan | null;
-
-  // Closed orders: leave their batch alone so the History view remains
-  // an accurate record of what shipped.
-  if (order.status === "done" || order.status === "cancelled") {
-    return;
-  }
-
-  const items = assertOk(
-    await supabase.from("orderItems").select("*").eq("orderId", orderId),
-  ) as OrderItem[];
-  const produceItems = items.filter((i) => (i.fulfilmentMode ?? "produce") === "produce");
-
-  // No produce lines left → drop the batch if one existed.
-  if (produceItems.length === 0) {
-    if (existing?.id) {
-      await supabase.from("planProducts").delete().eq("planId", existing.id);
-      await supabase.from("productionPlans").delete().eq("id", existing.id);
-      queryClient.invalidateQueries({ queryKey: ["production-plans"] });
-      queryClient.invalidateQueries({ queryKey: ["plan-products"] });
-    }
-    return;
-  }
-
-  // Consolidate by product: sum pieces across lines, keep one entry per product.
-  const piecesByProduct = new Map<string, number>();
-  for (const it of produceItems) {
-    piecesByProduct.set(it.productId, (piecesByProduct.get(it.productId) ?? 0) + it.quantity);
-  }
-
-  // Look up each product's mould + cavity count so we can convert
-  // "ordered pieces" into "number of mould fills".
-  const productIds = [...piecesByProduct.keys()];
-  const products = assertOk(
-    await supabase
-      .from("products")
-      .select("id, defaultMouldId, defaultBatchQty")
-      .in("id", productIds),
-  ) as Array<{ id: string; defaultMouldId?: string; defaultBatchQty?: number }>;
-  const productById = new Map(products.map((p) => [p.id, p]));
-
-  const mouldIds = products.map((p) => p.defaultMouldId).filter((x): x is string => !!x);
-  const moulds = mouldIds.length > 0
-    ? assertOk(
-        await supabase.from("moulds").select("id, numberOfCavities").in("id", mouldIds),
-      ) as Array<{ id: string; numberOfCavities: number }>
-    : [];
-  const mouldById = new Map(moulds.map((m) => [m.id, m]));
-
-  const now = new Date();
-  // Create the batch if missing. Batch name inherits the order's
-  // human-facing label — customer name, event, or the external source
-  // ref if the order came from an import. Falls back to the creation
-  // date, never the raw UUID (was "Order: abc12345…" — useless in
-  // Active batches). Replenishment orders already carry "Shop
-  // Replenishment — …" as customerName; that flows through unchanged.
-  let planId = existing?.id;
-  const orderLabel = order.customerName?.trim()
-    || order.eventName?.trim()
-    || order.sourceRef?.trim()
-    || null;
-  const batchName = orderLabel
-    ?? `Order — ${formatOrderDate(order.createdAt ?? now.toISOString())}`;
-  if (!planId) {
-    planId = newId();
-    const { error } = await supabase.from("productionPlans").insert({
-      id: planId,
-      name: batchName,
-      status: "draft",
-      sourceOrderId: orderId,
-      createdAt: now,
-      updatedAt: now,
-    });
-    if (error) throw error;
-  } else if (existing && existing.name !== batchName) {
-    // Keep the batch name aligned with the current customer/event.
-    await supabase
-      .from("productionPlans")
-      .update({ name: batchName, updatedAt: now })
-      .eq("id", planId);
-  }
-
-  // Replace strategy: delete existing planProducts then insert the new
-  // consolidated set. Correct for small N and avoids diff juggling.
-  await supabase.from("planProducts").delete().eq("planId", planId);
-
-  const rows: Array<Record<string, unknown>> = [];
-  let sortOrder = 0;
-  for (const [productId, pieces] of piecesByProduct) {
-    const product = productById.get(productId);
-    const mould = product?.defaultMouldId ? mouldById.get(product.defaultMouldId) : undefined;
-    const cavities = mould?.numberOfCavities ?? 0;
-    // Number of mould fills to make `pieces` pieces. Falls back to
-    // `pieces` when cavities is unknown (single-piece products).
-    const fills = cavities > 0 ? Math.ceil(pieces / cavities) : pieces;
-    rows.push({
-      id: newId(),
-      planId,
-      productId,
-      mouldId: product?.defaultMouldId ?? "",
-      quantity: fills,
-      sortOrder: sortOrder++,
-      notes: cavities > 0
-        ? `${pieces} pc requested · ${cavities} cavities × ${fills} fill${fills === 1 ? "" : "s"}`
-        : `${pieces} pc requested`,
-    });
-  }
-  // Drop rows that have no mould configured — planProducts.mouldId is
-  // not-null. Warn the user by leaving them out of the batch; the /plan
-  // page's warnings list surfaces the gap already.
-  const insertable = rows.filter((r) => !!r.mouldId);
-  if (insertable.length > 0) {
-    const { error } = await supabase.from("planProducts").insert(insertable);
-    if (error) throw error;
-  }
-
-  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
-  queryClient.invalidateQueries({ queryKey: ["plan-products"] });
 }
 
 export async function syncReplenishmentOrder(parentOrderId: string): Promise<void> {

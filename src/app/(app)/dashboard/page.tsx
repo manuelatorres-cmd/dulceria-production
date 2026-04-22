@@ -7,7 +7,7 @@ import {
   useOrders, useAllOrderItems, useProductsList, useProductionSchedule,
   useProductionSteps, useCapacityConfig, usePeople, usePersonUnavailability,
   useBlockedDays, useProductCategories, useMouldsList, useIngredients,
-  useEquipment,
+  useEquipment, useAllOrderPlanLinks,
   useProductLocationTotals, useStockLocationMinimums, useAllPlanProducts,
   useProductionPlans, useAllPlanStepStatuses, DEFAULT_LOCATION_MINIMUM,
   useFillings, useFillingCategories, useFillingStockItems,
@@ -102,11 +102,12 @@ export default function DashboardPage() {
     [orders, todayIso],
   );
 
+  const orderPlanLinks = useAllOrderPlanLinks();
   // Capacity preview for next 7 working days
   const capacityPreview = useMemo(() => {
     const preview = buildSchedule({
       plans: allPlans, planProducts: allPlanProducts,
-      orders, orderItems, products, productionSteps: steps, moulds,
+      orders, orderItems, orderPlanLinks, products, productionSteps: steps, moulds,
       config, people, unavailability, blockedDays, categoryNameById,
     });
     // Keep today + next 7 days
@@ -114,7 +115,7 @@ export default function DashboardPage() {
     cutoff.setDate(cutoff.getDate() + 7);
     const cutoffIso = toIsoDate(cutoff);
     return preview.dailySummary.filter((d) => d.date >= todayIso && d.date <= cutoffIso);
-  }, [allPlans, allPlanProducts, orders, orderItems, products, steps, moulds, config, people, unavailability, blockedDays, categoryNameById, todayIso]);
+  }, [allPlans, allPlanProducts, orders, orderItems, orderPlanLinks, products, steps, moulds, config, people, unavailability, blockedDays, categoryNameById, todayIso]);
 
   // Production day — Open + Close Production actions and HACCP temperature log
   const todayDay = useTodayProductionDay();

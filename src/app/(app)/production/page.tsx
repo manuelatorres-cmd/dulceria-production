@@ -5,6 +5,7 @@ import {
   useAllPlanProducts, useAllPlanStepStatuses, deleteProductionPlan,
   useProductionSchedule, useOrders, useAllOrderItems,
   useCapacityConfig, usePeople, usePersonUnavailability, useBlockedDays,
+  useAllOrderPlanLinks,
 } from "@/lib/hooks";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import { timeBandFor, TIME_BAND_LABEL } from "@/lib/scheduler";
@@ -34,6 +35,7 @@ export default function ProductionPage() {
   const allPlanProducts = useAllPlanProducts();
   const allStepStatuses = useAllPlanStepStatuses();
   const allOrderItems = useAllOrderItems();
+  const allOrderPlanLinks = useAllOrderPlanLinks();
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [view, setView] = useState<"active" | "scheduled" | "history">("active");
@@ -44,19 +46,24 @@ export default function ProductionPage() {
   const productMap = useMemo(() => new Map(products.map((r) => [r.id!, r])), [products]);
   const mouldMap = useMemo(() => new Map(moulds.map((m) => [m.id!, m])), [moulds]);
 
-  // Ordered-quantity lookup for auto-batches so the Production page can
-  // show "N pcs ordered · M pcs produced" without each PlanRow doing its
-  // own fetch. Indexed by orderId → productId → summed quantity.
-  const orderedByOrderProduct = useMemo(() => {
+  // Ordered-quantity lookup so the Production page can show
+  // "N pcs ordered · M pcs produced" without each PlanRow doing its
+  // own fetch. Sums orderPlanLinks.allocatedQuantity per (planId,
+  // productId via orderItem.productId). Covers consolidated batches
+  // (one plan serving multiple orders) and reconciler-made batches
+  // that don't set the deprecated plan.sourceOrderId.
+  const orderedByPlan = useMemo(() => {
+    const itemById = new Map(allOrderItems.map((oi) => [oi.id!, oi]));
     const m = new Map<string, Map<string, number>>();
-    for (const oi of allOrderItems) {
-      if ((oi.fulfilmentMode ?? "produce") !== "produce") continue;
-      const byProd = m.get(oi.orderId) ?? new Map<string, number>();
-      byProd.set(oi.productId, (byProd.get(oi.productId) ?? 0) + oi.quantity);
-      m.set(oi.orderId, byProd);
+    for (const link of allOrderPlanLinks) {
+      const item = itemById.get(link.orderItemId);
+      if (!item) continue;
+      const byProd = m.get(link.planId) ?? new Map<string, number>();
+      byProd.set(item.productId, (byProd.get(item.productId) ?? 0) + link.allocatedQuantity);
+      m.set(link.planId, byProd);
     }
     return m;
-  }, [allOrderItems]);
+  }, [allOrderItems, allOrderPlanLinks]);
 
   // One pass over all PlanProduct rows → Map<planId, PlanProduct[]>
   const planProductsByPlan = useMemo(() => {
@@ -289,7 +296,7 @@ export default function ProductionPage() {
                           doneKeys={doneKeysByPlan.get(plan.id!) ?? EMPTY_SET}
                           productMap={productMap}
                           mouldMap={mouldMap}
-                          orderedForPlan={plan.sourceOrderId ? orderedByOrderProduct.get(plan.sourceOrderId) : undefined}
+                          orderedForPlan={orderedByPlan.get(plan.id!)}
                           confirmDeleteId={confirmDeleteId}
                           onConfirmDelete={setConfirmDeleteId}
                           onDelete={async (id) => { await deleteProductionPlan(id); setConfirmDeleteId(null); }}
@@ -311,7 +318,7 @@ export default function ProductionPage() {
                 doneKeys={doneKeysByPlan.get(plan.id!) ?? EMPTY_SET}
                 productMap={productMap}
                 mouldMap={mouldMap}
-                orderedForPlan={plan.sourceOrderId ? orderedByOrderProduct.get(plan.sourceOrderId) : undefined}
+                orderedForPlan={orderedByPlan.get(plan.id!)}
                 confirmDeleteId={confirmDeleteId}
                 onConfirmDelete={setConfirmDeleteId}
                 onDelete={async (id) => { await deleteProductionPlan(id); setConfirmDeleteId(null); }}

@@ -9,14 +9,21 @@ import {
   saveFillingStock, deductFillingStock, useShelfStableCategoryNames,
   recordUnmouldIntake, checkDeadlineImpactForProduct,
   usePackagingList, consumePackaging,
+  useLinksForPlan, useOrders, useAllOrderItems,
+  promoteOrdersForPlan, startProductionPlan,
 } from "@/lib/hooks";
 import { PackingModal } from "@/components/packing-modal";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
 import type { Filling, Mould, PlanProduct, Product, DecorationMaterial } from "@/types";
 import { normalizeApplyAt } from "@/types";
-import { ArrowLeft, RotateCcw, Pencil, Check, X, BookOpen, StickyNote, Plus, ClipboardList, Printer } from "lucide-react";
+import { ArrowLeft, RotateCcw, Pencil, Check, X, BookOpen, StickyNote, Plus, ClipboardList, Printer, Play } from "lucide-react";
 import { YieldModal } from "@/components/yield-modal";
 import type { YieldEntry } from "@/components/yield-modal";
+import {
+  AllocationSplitModal,
+  type AllocationSplitOrderRow,
+  type AllocationSplitResult,
+} from "@/components/allocation-split-modal";
 import { LeftoverModal } from "@/components/leftover-modal";
 import type { LeftoverEntry } from "@/components/leftover-modal";
 import { LowStockFlagButton } from "@/components/pantry";
@@ -24,14 +31,24 @@ import { printLabels } from "@/lib/printer";
 import type { LabelData } from "@/lib/printer";
 import Link from "next/link";
 
+/**
+ * 8 phase tabs shown at the top of every batch detail page. The `id`
+ * values are the canonical step-group tokens (kept stable so old
+ * planStepStatus rows keep working); only the `label` text reflects
+ * the operator-facing vocabulary: Polishing / Painting / Shelling /
+ * Filling Prep / Filling / Capping / Unmoulding / Packing. Transfer
+ * is NOT present — transfer sheets are a decoration material applied
+ * during Capping, not a step.
+ */
 const PHASES = [
-  { id: "colour",  label: "Colour"   },
-  { id: "shell",   label: "Shell"    },
-  { id: "filling", label: "Fillings" },
-  { id: "fill",    label: "Fill"     },
-  { id: "cap",     label: "Cap"      },
-  { id: "unmould", label: "Unmould"  },
-  { id: "packing", label: "Packing"  },
+  { id: "polishing", label: "Polishing"    },
+  { id: "colour",    label: "Painting"     },
+  { id: "shell",     label: "Shelling"     },
+  { id: "filling",   label: "Filling Prep" },
+  { id: "fill",      label: "Filling"      },
+  { id: "cap",       label: "Capping"      },
+  { id: "unmould",   label: "Unmoulding"   },
+  { id: "packing",   label: "Packing"      },
 ] as const;
 
 type PhaseId = typeof PHASES[number]["id"];
@@ -94,7 +111,7 @@ function PlanContent({
   planId, plan, planProducts, productNames, productsMap, fillingsMap, mouldsMap, statusMap, productIds,
 }: {
   planId: string;
-  plan: { id?: string; batchNumber?: string; batchSummary?: string; name: string; status: string; notes?: string; fillingOverrides?: string; fillingPreviousBatches?: string; createdAt: Date; completedAt?: Date };
+  plan: { id?: string; batchNumber?: string; batchSummary?: string; name: string; status: "draft" | "active" | "done" | "cancelled" | "orphaned"; notes?: string; fillingOverrides?: string; fillingPreviousBatches?: string; createdAt: Date; updatedAt: Date; completedAt?: Date; surplusDestination?: "store" | "freezer" | "waste" };
   planProducts: PlanProduct[];
   productNames: Map<string, string>;
   productsMap: Map<string, Product>;
@@ -123,7 +140,7 @@ function PlanContent({
   const materialsMap = useMemo(() => new Map(allMaterials.map((m) => [m.id!, m])), [allMaterials]);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
-  const [activePhase, setActivePhase] = useState<PhaseId>("colour");
+  const [activePhase, setActivePhase] = useState<PhaseId>("polishing");
   const [confirmMarkDone, setConfirmMarkDone] = useState(false);
   const [editingBatchNote, setEditingBatchNote] = useState(false);
   const [printState, setPrintState] = useState<"idle" | "printing" | "done" | "error">("idle");
@@ -135,6 +152,13 @@ function PlanContent({
     mode: "single" | "batch"; // single = one unmould checkbox, batch = mark all done
     pendingStepKey?: string; // for single mode: the step key that triggered the modal
   } | null>(null);
+
+  // Allocation-split prompt — fires after yield confirm when the
+  // batch has any orderPlanLinks. Lets the operator distribute the
+  // actual yield across linked orders (+ surplus with a destination),
+  // flagging shortfalls per-order. Captures operator intent only; the
+  // stock write itself moves in the stock-rewrite task.
+  const [splitModal, setSplitModal] = useState<{ totalYield: number } | null>(null);
 
   // Deadline-impact banner after an unmould yield short-stocks an open order.
   const [deadlineImpact, setDeadlineImpact] = useState<Array<{
@@ -153,6 +177,53 @@ function PlanContent({
   } | null>(null);
 
   const printerEnabled = typeof window !== "undefined" && localStorage.getItem("niimbot-printer-enabled") === "true";
+
+  // Linked orders: which orders is this batch serving? The reconciler
+  // wires up orderPlanLinks when Regenerate plan runs. Used to render
+  // the "Contributing to: [Order A · 100 pcs] · [Surplus · 20 pcs]"
+  // header chips.
+  const planLinks = useLinksForPlan(planId);
+  const allOrders = useOrders();
+  const allOrderItems = useAllOrderItems();
+  const linkedOrders = useMemo(() => {
+    if (planLinks.length === 0) return [] as Array<{ orderId: string; label: string; allocatedQuantity: number }>;
+    const itemById = new Map(allOrderItems.map((oi) => [oi.id!, oi]));
+    const orderById = new Map(allOrders.map((o) => [o.id!, o]));
+    const byOrder = new Map<string, { label: string; allocatedQuantity: number }>();
+    for (const link of planLinks) {
+      const item = itemById.get(link.orderItemId);
+      if (!item) continue;
+      const order = orderById.get(item.orderId);
+      if (!order) continue;
+      const label = order.customerName || order.eventName || order.sourceRef || "order";
+      const existing = byOrder.get(order.id!);
+      byOrder.set(order.id!, {
+        label,
+        allocatedQuantity: (existing?.allocatedQuantity ?? 0) + link.allocatedQuantity,
+      });
+    }
+    return [...byOrder.entries()].map(([orderId, v]) => ({ orderId, ...v }));
+  }, [planLinks, allOrders, allOrderItems]);
+
+  /** Total pieces this batch is planned to yield (moulds × cavities
+   *  summed across every planProduct). Drives the surplus chip in the
+   *  header + the default yield in the allocation-split modal. */
+  const totalPlannedPieces = useMemo(() => {
+    let total = 0;
+    for (const pp of planProducts) {
+      const mould = mouldsMap.get(pp.mouldId);
+      const cavities = mould?.numberOfCavities ?? 0;
+      total += pp.quantity * cavities;
+    }
+    return total;
+  }, [planProducts, mouldsMap]);
+
+  const totalAllocated = useMemo(
+    () => planLinks.reduce((s, lk) => s + lk.allocatedQuantity, 0),
+    [planLinks],
+  );
+
+  const surplusPlanned = Math.max(0, totalPlannedPieces - totalAllocated);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -329,13 +400,7 @@ function PlanContent({
 
         const newDoneCount = doneCount + 1;
         const newStatus = newDoneCount >= steps.length ? "done" : newDoneCount > 0 ? "active" : "draft";
-        if (newStatus !== plan.status) {
-          if (newStatus === "done") {
-            await completePlan();
-          } else {
-            await saveProductionPlan({ ...plan as any, id: plan.id, status: newStatus });
-          }
-        }
+        await applyPlanStatusTransition(newStatus);
 
         if (readyFillings.length > 0) {
           // Leftover modal will call deductPreviousBatchStock on confirm/skip
@@ -384,13 +449,27 @@ function PlanContent({
     await toggleStep(planId, key, !current);
     const newDoneCount = doneCount + (current ? -1 : 1);
     const newStatus = newDoneCount >= steps.length ? "done" : newDoneCount > 0 ? "active" : "draft";
-    if (newStatus !== plan.status) {
-      if (newStatus === "done") {
-        await completePlan();
-      } else {
-        await saveProductionPlan({ ...plan as any, id: plan.id, status: newStatus });
-      }
+    await applyPlanStatusTransition(newStatus);
+  }
+
+  /** Shared transition handler used by every step-tick / phase-toggle /
+   *  yield-modal path. Mirrors the pre-existing behaviour — "done" still
+   *  goes through completePlan (so the batch summary gets generated),
+   *  everything else uses saveProductionPlan — and adds ONE extra step:
+   *  when the batch leaves 'draft' (→ active or → done), promote every
+   *  pending order linked to it to 'in_production'. That keeps the
+   *  orders list honest without flipping orders on Regenerate. */
+  async function applyPlanStatusTransition(
+    newStatus: "draft" | "active" | "done",
+  ): Promise<void> {
+    if (newStatus === plan.status) return;
+    const leavingDraft = plan.status === "draft" && newStatus !== "draft";
+    if (newStatus === "done") {
+      await completePlan();
+    } else {
+      await saveProductionPlan({ ...plan as any, id: plan.id, status: newStatus });
     }
+    if (leavingDraft) await promoteOrdersForPlan(planId);
   }
 
   async function completePlan() {
@@ -454,9 +533,7 @@ function PlanContent({
     const otherDone = steps.filter((s) => s.group !== phaseId && (statusMap.get(s.key) ?? false)).length;
     const newDoneCount = otherDone + (targetDone ? phaseSteps.length : 0);
     const newStatus = newDoneCount >= steps.length ? "done" : newDoneCount > 0 ? "active" : "draft";
-    if (newStatus !== plan.status) {
-      await saveProductionPlan({ ...plan as any, id: plan.id, status: newStatus });
-    }
+    await applyPlanStatusTransition(newStatus);
   }
 
   async function handleMarkAllDone() {
@@ -512,6 +589,24 @@ function PlanContent({
         affectedProductIds.add(pb.productId);
       }
     }
+
+    // Allocation split: when the batch has links, let the operator
+    // distribute the actual yield across orders (+ surplus). Fires for
+    // both the "yield ≥ committed" case (surplus to place) and the
+    // shortfall case (which order loses?). Gate on
+    // plan.surplusDestination to avoid re-prompting after the split
+    // has already been captured.
+    if (!plan.surplusDestination && planLinks.length > 0) {
+      const updatedYieldById = new Map<string, number>();
+      for (const entry of entries) updatedYieldById.set(entry.planProductId, entry.yield);
+      const totalProduced = planProducts.reduce((s, pp) => {
+        const y = updatedYieldById.get(pp.id!) ?? pp.actualYield;
+        return s + (typeof y === "number" ? y : 0);
+      }, 0);
+      if (totalProduced > 0) {
+        setSplitModal({ totalYield: totalProduced });
+      }
+    }
     const issues: Array<{ orderId: string; orderName: string; deadline: Date; required: number; projected: number; shortfall: number }> = [];
     for (const productId of affectedProductIds) {
       const productIssues = await checkDeadlineImpactForProduct(productId);
@@ -524,9 +619,7 @@ function PlanContent({
       await toggleStep(planId, yieldModal.pendingStepKey, true);
       const newDoneCount = doneCount + 1;
       const newStatus = newDoneCount >= steps.length ? "done" : newDoneCount > 0 ? "active" : "draft";
-      if (newStatus !== plan.status) {
-        await saveProductionPlan({ ...plan as any, id: plan.id, status: newStatus });
-      }
+      await applyPlanStatusTransition(newStatus);
     } else {
       // Batch mode — toggle all steps, then show leftover modal before finishing
       for (const step of steps) {
@@ -684,7 +777,44 @@ function PlanContent({
                 </>
               )}
             </div>
+            {(linkedOrders.length > 0 || surplusPlanned > 0) && (
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap text-xs">
+                <span className="text-muted-foreground">Contributing to:</span>
+                {linkedOrders.map((lo) => (
+                  <Link
+                    key={lo.orderId}
+                    href={`/orders/${encodeURIComponent(lo.orderId)}`}
+                    className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 hover:border-primary hover:text-primary"
+                  >
+                    <span className="truncate max-w-[14ch]">{lo.label}</span>
+                    <span className="text-muted-foreground tabular-nums">· {lo.allocatedQuantity} pcs</span>
+                  </Link>
+                ))}
+                {surplusPlanned > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
+                    Surplus · {surplusPlanned} pcs
+                  </span>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Start production — lifts a draft batch into 'active' and
+              promotes its linked pending orders to in_production without
+              requiring the operator to tick the first step. Hidden once
+              the batch is active/done/cancelled. */}
+          {plan.status === "draft" && (
+            <button
+              onClick={async () => {
+                if (!plan.id) return;
+                try { await startProductionPlan(plan.id); } catch (e) { console.error(e); }
+              }}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:opacity-90"
+              title="Mark this batch as in-progress and flip its linked orders to in production. Step ticks keep working as before."
+            >
+              <Play className="w-3.5 h-3.5" /> Start production
+            </button>
+          )}
         </div>
 
         {/* Progress bar */}
@@ -1113,6 +1243,27 @@ function PlanContent({
         />
       )}
 
+      {/* Allocation split — distributes actual yield across the
+          batch's linked orders (+ surplus with destination). Only
+          captures intent; the stock move is deferred to the
+          stock-rewrite task. */}
+      {splitModal && (
+        <AllocationSplitModal
+          totalYield={splitModal.totalYield}
+          orders={buildSplitOrderRows(planLinks, allOrderItems, allOrders)}
+          onConfirm={async (result: AllocationSplitResult) => {
+            await applyAllocationSplit({
+              planId: plan.id!,
+              result,
+              saveProductionPlan,
+              plan,
+            });
+            setSplitModal(null);
+          }}
+          onCancel={() => setSplitModal(null)}
+        />
+      )}
+
       {/* Packing modal */}
       {packingTarget && (
         <PackingModal
@@ -1228,5 +1379,60 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
       </div>
     </button>
   );
+}
+
+// ─── Allocation-split helpers ───────────────────────────────────────
+
+/** Build the row data the AllocationSplitModal renders: one entry per
+ *  orderPlanLink, with the order label derived through the line. */
+function buildSplitOrderRows(
+  planLinks: import("@/types").OrderPlanLink[],
+  orderItems: import("@/types").OrderItem[],
+  orders: import("@/types").Order[],
+): AllocationSplitOrderRow[] {
+  const itemById = new Map(orderItems.map((oi) => [oi.id!, oi]));
+  const orderById = new Map(orders.map((o) => [o.id!, o]));
+  const rows: AllocationSplitOrderRow[] = [];
+  for (const link of planLinks) {
+    const item = itemById.get(link.orderItemId);
+    if (!item) continue;
+    const order = orderById.get(item.orderId);
+    if (!order) continue;
+    rows.push({
+      orderPlanLinkId: link.id!,
+      orderId: order.id!,
+      orderLabel: order.customerName || order.eventName || order.sourceRef || "order",
+      requested: link.allocatedQuantity,
+    });
+  }
+  return rows;
+}
+
+/** Apply the operator's split: update each link's allocatedQuantity,
+ *  then set productionPlans.surplusDestination if surplus > 0. Stock
+ *  writes live in the upcoming stock-rewrite task — this function
+ *  touches only the two link/plan tables. */
+async function applyAllocationSplit(args: {
+  planId: string;
+  result: AllocationSplitResult;
+  saveProductionPlan: typeof import("@/lib/hooks").saveProductionPlan;
+  plan: Parameters<typeof import("@/lib/hooks").saveProductionPlan>[0];
+}): Promise<void> {
+  const { supabase: sb } = await import("@/lib/supabase");
+  const now = new Date();
+  for (const perLink of args.result.perLink) {
+    const { error } = await sb
+      .from("orderPlanLinks")
+      .update({ allocatedQuantity: perLink.delivered, updatedAt: now })
+      .eq("id", perLink.orderPlanLinkId);
+    if (error) throw error;
+  }
+  if (args.result.surplusDestination) {
+    await args.saveProductionPlan({
+      ...args.plan,
+      id: args.planId,
+      surplusDestination: args.result.surplusDestination,
+    });
+  }
 }
 

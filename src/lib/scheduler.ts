@@ -1,50 +1,53 @@
 /**
- * Batch-based forward-fill scheduler.
+ * Batch-based scheduler.
  *
- * Scheduling unit: a productionPlan (batch). Each batch has one or
- * more planProducts; products in the same category share a step list
- * and go through the workflow as one wave. Cross-category batches run
- * their waves sequentially on the same day-capacity budget.
+ * Scheduling unit: a productionPlan (batch). For each active batch we
+ * sum the total active minutes across all its steps (across all waves)
+ * and try to land the whole thing on ONE working day. If the batch
+ * doesn't fit a single day, we fall back to packing it across
+ * consecutive working days, preserving step order.
  *
- * Timing model:
- *   - Regular steps:        totalActive = Σ activeMinPerMould × planProduct.quantity
- *   - Fixed-total steps:    totalActive = step.activeMinutes (flat, not scaled).
- *   - Waiting time:         flat per batch, never scaled by moulds.
+ *   Pass 1 — single-day fit (common case):
+ *     Walk candidate days forward from today up to deadline−buffer and
+ *     pick the first day that fits totalActive+totalWait. Same-day
+ *     grouping is a soft preference: if a candidate day already has
+ *     another batch running one of our step types, prefer it (earliest
+ *     grouping day wins). Otherwise take the first fitting day.
  *
- * Day-overflow rule (bug 2 defensive check):
- *   A step whose totalActive ≤ the day's capacity must NEVER split
- *   across days. If it doesn't fit on the current day, the whole step
- *   rolls to the next working day. Only steps larger than a single
- *   day's capacity span — genuinely rare.
+ *   Pass 2 — multi-day fallback:
+ *     Start from the first working day with capacity, pack step-by-step
+ *     forward. Per-step no-split rule: a step whose totalActive ≤ a
+ *     day's capacity must land on ONE day; if it doesn't fit the
+ *     remaining capacity, roll the whole step to the next working day.
+ *     Waits absorb same-day when they fit; otherwise they force the
+ *     next step onto the next working day.
  *
- * Waits are the only thing that force a day break between steps.
- * A waiting time that would extend past end-of-day pushes the NEXT
- * step's active work onto the next working day; otherwise the wait is
- * absorbed same-day and the next step picks up right after.
+ * Deadline cap (both passes):
+ *     latestDay = `deadline − productionBufferDays` (working days).
+ *     Default buffer is 2 when unset. A batch that can't land on or
+ *     before latestDay is marked unscheduled with a warning; we don't
+ *     place work past the deadline.
  *
- * Scheduling order:
- *   Batches are processed earliest-deadline-first, where deadline is
- *   the minimum `orders.deadline` among orderItems with
- *   `linkedBatchId = plan.id`. Unlinked batches run after linked ones
- *   (their lack of a customer-deadline makes them de-facto low
- *   priority). Within a batch, waves are iterated in category-name
- *   order (stable, deterministic).
+ * Capacity source: `effectiveDailyCapacityMinutes(...)` — sums
+ * per-person configured hours on that date (time-window if set, else
+ * defaultHoursPerDay) minus unavailability and workshop-wide blocked
+ * days, then applies the capacity buffer %. No hardcoded fallback.
  *
- * Output rows (ProductionScheduleEntry) carry:
- *   - planId, planProductId         (for the Production link)
- *   - orderId                       (from the plan's sourceOrderId if any)
- *   - stepId, phase                 (which step)
- *   - startAt / endAt, durationMinutes
+ * Scheduling order: earliest-deadline-first; unlinked batches last.
+ * Within a batch, waves run in category-name order.
  *
- * Defensive final sort: (planId, stepSortOrder, startAt) — guarantees
- * visual display order matches production sequence even if stored data
- * was reshuffled or came from a prior algorithm.
+ * Output rows (ProductionScheduleEntry) carry: planId, planProductId,
+ * orderId, stepId, phase, startAt/endAt, durationMinutes.
+ *
+ * Defensive final sort: (planId, stepSortOrder, startAt) so the UI
+ * shows steps in production sequence even if upstream rows got out of
+ * order.
  */
 
 import type {
   Order, OrderItem, Product, ProductionStep, Person, PersonUnavailability,
   EventCalendarEntry, CapacityConfig, ProductionScheduleEntry, Mould,
-  ProductionPlan, PlanProduct,
+  ProductionPlan, PlanProduct, OrderPlanLink,
 } from "@/types";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 
@@ -55,10 +58,13 @@ export interface SchedulerInput {
   products: Product[];
   productionSteps: ProductionStep[];
   moulds: Mould[];
-  /** Used only to compute each batch's effective deadline — the
-   *  earliest `orderItems.linkedBatchId = plan.id` deadline. */
+  /** Used only to compute each batch's effective deadline — via the
+   *  orderPlanLinks → orderItems → orders chain. */
   orders: Order[];
   orderItems: OrderItem[];
+  /** Many-to-many links between order lines and batches. The earliest
+   *  linked-order deadline wins the deadline per batch. */
+  orderPlanLinks: OrderPlanLink[];
   config: CapacityConfig | null;
   people: Person[];
   unavailability: PersonUnavailability[];
@@ -85,11 +91,21 @@ export interface SchedulerResult {
 }
 
 const MAX_WORKING_DAY_SEARCH = 365;
+const DEFAULT_BUFFER_DAYS = 2;
+
+/** A single step's contribution inside a batch's flat sequence. */
+interface FlatStep {
+  step: ProductionStep;
+  typeName: string;
+  activeMinutes: number;
+  waitMinutes: number;
+  perProductMinutes: Array<PlanProduct & { product: Product; minutes: number }>;
+}
 
 export function buildSchedule(input: SchedulerInput): SchedulerResult {
   const {
     plans, planProducts, products, productionSteps, moulds,
-    orders, orderItems,
+    orders, orderItems, orderPlanLinks,
     config, people, unavailability, blockedDays, categoryNameById,
   } = input;
 
@@ -98,37 +114,35 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
   const unscheduled = new Set<string>();
 
   const productMap = new Map<string, Product>(products.map((p) => [p.id!, p]));
-  const mouldMap = new Map<string, Mould>(moulds.map((m) => [m.id!, m]));
   const stepsByType = groupBy(productionSteps, (s) => s.productType);
   const stepSortById = new Map(productionSteps.map((s) => [s.id!, s.sortOrder ?? 0]));
   const planProductsByPlan = groupBy(planProducts, (pp) => pp.planId);
 
-  // Per-batch effective deadline: the earliest deadline of any order
-  // line linked into this batch. Unlinked batches get Infinity so they
-  // sort last (no customer pressure).
+  // Per-batch effective deadline: earliest deadline of any order line
+  // linked into this batch. Unlinked batches get Infinity (low priority).
   const planDeadline = new Map<string, number>();
   const planOrderId = new Map<string, string>();
-  const planOrderRef = new Map<string, string>();
   const orderById = new Map(orders.map((o) => [o.id!, o]));
-  for (const oi of orderItems) {
-    const batchId = oi.linkedBatchId;
-    if (!batchId) continue;
-    const order = orderById.get(oi.orderId);
+  const orderItemById = new Map(orderItems.map((oi) => [oi.id!, oi]));
+  for (const link of orderPlanLinks) {
+    const item = orderItemById.get(link.orderItemId);
+    if (!item) continue;
+    const order = orderById.get(item.orderId);
     if (!order) continue;
     const t = new Date(order.deadline).getTime();
-    const cur = planDeadline.get(batchId);
+    const cur = planDeadline.get(link.planId);
     if (cur === undefined || t < cur) {
-      planDeadline.set(batchId, t);
-      planOrderId.set(batchId, order.id!);
-      planOrderRef.set(
-        batchId,
-        order.customerName || order.eventName || order.sourceRef || "",
-      );
+      planDeadline.set(link.planId, t);
+      planOrderId.set(link.planId, order.id!);
     }
   }
 
   const usedByDate = new Map<string, number>();
   const capacityByDate = new Map<string, number>();
+  /** productType keys (category names) scheduled on each date — used as
+   *  the soft-grouping signal when placing subsequent batches. */
+  const stepTypesByDate = new Map<string, Set<string>>();
+
   function capFor(d: Date): number {
     const key = isoDate(d);
     const cached = capacityByDate.get(key);
@@ -138,6 +152,7 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
     return cap;
   }
 
+  const bufferDays = Math.max(0, Math.round(config?.productionBufferDays ?? DEFAULT_BUFFER_DAYS));
   const today = dateOnly(new Date());
 
   // Sort batches: earliest linked-deadline first, unlinked last.
@@ -156,14 +171,16 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
     const pps = planProductsByPlan.get(plan.id!) ?? [];
     if (pps.length === 0) continue;
 
-    // Category-grouped waves. Products that reference a product with
-    // no category (or unknown productId) are dropped with a warning.
+    // Group plan products by category → waves. Products referencing
+    // missing categories/products are dropped with a warning.
     const wavesByType = new Map<string, Array<PlanProduct & { product: Product }>>();
+    let waveSetupFailed = false;
     for (const pp of pps) {
       const product = productMap.get(pp.productId);
       if (!product) {
         warnings.push(`Batch "${plan.name}" references unknown product ${pp.productId}.`);
         unscheduled.add(plan.id!);
+        waveSetupFailed = true;
         continue;
       }
       const typeName = product.productCategoryId
@@ -172,36 +189,30 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
       if (!typeName) {
         warnings.push(`Product "${product.name}" in batch "${plan.name}" has no category — assign one in Products.`);
         unscheduled.add(plan.id!);
+        waveSetupFailed = true;
         continue;
       }
       const arr = wavesByType.get(typeName) ?? [];
       arr.push({ ...pp, product });
       wavesByType.set(typeName, arr);
     }
+    if (waveSetupFailed) continue;
 
-    // Iterate waves in category-name order. Each wave appends to the
-    // shared cursor so a two-wave batch doesn't double-book the day.
-    let cursor: Date | null = nextWorkingDay(today, capFor, /*inclusive*/ true);
-    let cursorOffset = 0;
-    if (!cursor) {
-      unscheduled.add(plan.id!);
-      warnings.push(`No working day available for batch "${plan.name}".`);
-      continue;
-    }
-
+    // Flatten: waves (alphabetical by category) → steps (sortOrder) →
+    // one FlatStep per step. This is the sequence the scheduler places.
+    const flat: FlatStep[] = [];
+    let flattenFailed = false;
     for (const [typeName, waveProducts] of [...wavesByType.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
       const steps = (stepsByType.get(typeName) ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
       if (steps.length === 0) {
         warnings.push(`No production steps defined for category "${typeName}". Add them under Settings → Production Steps.`);
         unscheduled.add(plan.id!);
-        continue;
+        flattenFailed = true;
+        break;
       }
-
       for (const step of steps) {
-        if (!cursor) break;
-
         const isBatchStep = !!step.perBatch;
-        const totalActive = isBatchStep
+        const active = isBatchStep
           ? Math.max(0, Math.round(step.activeMinutes))
           : waveProducts.reduce(
               (s, wp) => s + Math.round(step.activeMinutes * wp.quantity),
@@ -213,99 +224,165 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
             ? Math.round(step.activeMinutes / Math.max(1, waveProducts.length))
             : Math.round(step.activeMinutes * wp.quantity),
         }));
+        const wait = Math.max(0, Math.round(step.waitingMinutes));
+        flat.push({ step, typeName, activeMinutes: active, waitMinutes: wait, perProductMinutes });
+      }
+    }
+    if (flattenFailed) continue;
 
-        if (totalActive > 0) {
-          // Reconcile cursor against any capacity other plans already
-          // placed on this day.
-          const dayCap = capFor(cursor);
-          const dayUsed = usedByDate.get(isoDate(cursor)) ?? 0;
-          if (cursorOffset < dayUsed) cursorOffset = dayUsed;
+    const totalActive = flat.reduce((s, f) => s + f.activeMinutes, 0);
+    const totalWait = flat.reduce((s, f) => s + f.waitMinutes, 0);
+    if (totalActive === 0) continue; // Nothing to schedule.
 
-          // Defensive no-split rule: a step whose totalActive fits in a
-          // single day's capacity must land on exactly ONE day. If it
-          // doesn't fit in the remaining capacity here, roll the whole
-          // step to the next working day (don't split across days).
-          if (totalActive <= dayCap && cursorOffset + totalActive > dayCap) {
-            const next = nextWorkingDay(cursor, capFor, /*inclusive*/ false);
-            if (!next) {
-              unscheduled.add(plan.id!);
-              warnings.push(`Couldn't place "${step.name}" for batch "${plan.name}" — no working days left.`);
-              cursor = null;
-              break;
-            }
-            cursor = next;
-            cursorOffset = usedByDate.get(isoDate(cursor)) ?? 0;
+    // Compute latestDay from deadline and buffer.
+    const deadlineMs = planDeadline.get(plan.id!);
+    let latestDay: Date | null = null;
+    if (deadlineMs !== undefined) {
+      latestDay = latestWorkingDayForDeadline(new Date(deadlineMs), bufferDays, capFor);
+      if (!latestDay || latestDay.getTime() < today.getTime()) {
+        unscheduled.add(plan.id!);
+        warnings.push(
+          `Batch "${plan.name}" deadline ${new Date(deadlineMs).toISOString().slice(0, 10)} leaves no room — scheduler needs ≥ ${bufferDays} working day${bufferDays === 1 ? "" : "s"} before it.`,
+        );
+        continue;
+      }
+    }
+
+    const batchTypeSet = new Set<string>(flat.map((f) => f.typeName));
+
+    // ─── Pass 1: single-day fit ─────────────────────────────────────
+    // The whole batch (active + waits) has to fit within one day's
+    // remaining capacity AND its total span (active+wait) has to be
+    // short enough that no inter-step wait crosses end-of-day.
+    const singleDaySpan = totalActive + totalWait;
+    const fitDay = findSingleDayFit({
+      today, latestDay, singleDaySpan, totalActive,
+      capFor, usedByDate, stepTypesByDate, batchTypeSet,
+    });
+
+    if (fitDay) {
+      placeOnSingleDay(
+        fitDay, flat, plan, planOrderId.get(plan.id!),
+        entries, usedByDate, stepTypesByDate,
+      );
+      continue;
+    }
+
+    // ─── Pass 2: multi-day fallback ─────────────────────────────────
+    let cursor: Date | null = nextWorkingDay(today, capFor, /*inclusive*/ true);
+    let cursorOffset = 0;
+    if (!cursor) {
+      unscheduled.add(plan.id!);
+      warnings.push(`No working day available for batch "${plan.name}".`);
+      continue;
+    }
+
+    let overflowedDeadline = false;
+    for (const { step, typeName, activeMinutes, waitMinutes, perProductMinutes } of flat) {
+      if (!cursor) break;
+
+      if (activeMinutes > 0) {
+        const dayCap = capFor(cursor);
+        const dayUsed = usedByDate.get(isoDate(cursor)) ?? 0;
+        if (cursorOffset < dayUsed) cursorOffset = dayUsed;
+
+        // No-split rule: step that fits in a day but not in remaining
+        // capacity rolls to the next working day entirely.
+        if (activeMinutes <= dayCap && cursorOffset + activeMinutes > dayCap) {
+          const next = nextWorkingDay(cursor, capFor, /*inclusive*/ false);
+          if (!next) {
+            unscheduled.add(plan.id!);
+            warnings.push(`Couldn't place "${step.name}" for batch "${plan.name}" — no working days left.`);
+            cursor = null;
+            break;
           }
-
-          // Pack the step. For steps that fit in a single day after
-          // the roll above, this loop runs exactly once. For the rare
-          // step that exceeds a single day's capacity, it spans days.
-          const slots: Array<{ date: Date; startOffsetMinutes: number; endOffsetMinutes: number }> = [];
-          let remaining = totalActive;
-          while (remaining > 0 && cursor) {
-            const cap = capFor(cursor);
-            const used = usedByDate.get(isoDate(cursor)) ?? 0;
-            if (cursorOffset < used) cursorOffset = used;
-            const free = Math.max(0, cap - cursorOffset);
-            if (free > 0) {
-              const take = Math.min(free, remaining);
-              slots.push({
-                date: new Date(cursor),
-                startOffsetMinutes: cursorOffset,
-                endOffsetMinutes: cursorOffset + take,
-              });
-              usedByDate.set(isoDate(cursor), (usedByDate.get(isoDate(cursor)) ?? 0) + take);
-              cursorOffset += take;
-              remaining -= take;
-            }
-            if (remaining > 0) {
-              const next = nextWorkingDay(cursor, capFor, /*inclusive*/ false);
-              if (!next) {
-                unscheduled.add(plan.id!);
-                warnings.push(`Couldn't fit "${step.name}" for batch "${plan.name}" — ${remaining} min unplaced.`);
-                cursor = null;
-                break;
-              }
-              cursor = next;
-              cursorOffset = 0;
-            }
-          }
-
-          emitRows({
-            entries, slots, step, perProductMinutes, plan, orderIdForPlan: planOrderId.get(plan.id!),
-          });
+          cursor = next;
+          cursorOffset = usedByDate.get(isoDate(cursor)) ?? 0;
         }
 
-        // Wait — flat per batch, never scaled. Only forces a day-break
-        // when it would extend past end-of-day.
-        const waitMin = Math.max(0, Math.round(step.waitingMinutes));
-        if (waitMin > 0 && cursor) {
+        if (latestDay && cursor.getTime() > latestDay.getTime()) {
+          overflowedDeadline = true;
+        }
+
+        const slots: Array<{ date: Date; startOffsetMinutes: number; endOffsetMinutes: number }> = [];
+        let remaining = activeMinutes;
+        while (remaining > 0 && cursor) {
           const cap = capFor(cursor);
-          if (cursorOffset + waitMin <= cap) {
-            cursorOffset += waitMin;
-          } else {
+          const used = usedByDate.get(isoDate(cursor)) ?? 0;
+          if (cursorOffset < used) cursorOffset = used;
+          const free = Math.max(0, cap - cursorOffset);
+          if (free > 0) {
+            const take = Math.min(free, remaining);
+            slots.push({
+              date: new Date(cursor),
+              startOffsetMinutes: cursorOffset,
+              endOffsetMinutes: cursorOffset + take,
+            });
+            usedByDate.set(isoDate(cursor), used + take);
+            addStepType(stepTypesByDate, isoDate(cursor), typeName);
+            cursorOffset += take;
+            remaining -= take;
+          }
+          if (remaining > 0) {
             const next = nextWorkingDay(cursor, capFor, /*inclusive*/ false);
             if (!next) {
               unscheduled.add(plan.id!);
-              warnings.push(`Can't wait after "${step.name}" for batch "${plan.name}" — no working days left.`);
+              warnings.push(`Couldn't fit "${step.name}" for batch "${plan.name}" — ${remaining} min unplaced.`);
               cursor = null;
               break;
             }
             cursor = next;
             cursorOffset = 0;
+            if (latestDay && cursor.getTime() > latestDay.getTime()) {
+              overflowedDeadline = true;
+            }
+          }
+        }
+
+        emitRows({
+          entries, slots, step, perProductMinutes, plan,
+          orderIdForPlan: planOrderId.get(plan.id!),
+        });
+      }
+
+      // Wait — flat per batch. Only forces a day break when it would
+      // extend past end-of-day.
+      if (waitMinutes > 0 && cursor) {
+        const cap = capFor(cursor);
+        if (cursorOffset + waitMinutes <= cap) {
+          cursorOffset += waitMinutes;
+        } else {
+          const next = nextWorkingDay(cursor, capFor, /*inclusive*/ false);
+          if (!next) {
+            unscheduled.add(plan.id!);
+            warnings.push(`Can't wait after "${step.name}" for batch "${plan.name}" — no working days left.`);
+            cursor = null;
+            break;
+          }
+          cursor = next;
+          cursorOffset = 0;
+          if (latestDay && cursor.getTime() > latestDay.getTime()) {
+            overflowedDeadline = true;
           }
         }
       }
     }
 
-    // Deadline check: warn if the wave's last active end is past the
-    // earliest linked-order deadline.
-    const deadlineMs = planDeadline.get(plan.id!);
+    if (overflowedDeadline) {
+      unscheduled.add(plan.id!);
+      warnings.push(
+        `Batch "${plan.name}" doesn't fit within the ${bufferDays}-day buffer before its deadline — consider splitting it or moving the deadline.`,
+      );
+    }
+
+    // Additional safety: warn if any emitted row ends past the raw
+    // deadline (shouldn't happen after the latestDay cap, but catches
+    // edge cases like a deadline earlier in the same day as latestDay).
     if (deadlineMs !== undefined) {
       const planEntries = entries.filter((e) => e.planId === plan.id);
       if (planEntries.length > 0) {
         const lastEnd = planEntries.reduce((m, e) => Math.max(m, new Date(e.endAt).getTime()), 0);
-        if (lastEnd > deadlineMs) {
+        if (lastEnd > deadlineMs && !overflowedDeadline) {
           unscheduled.add(plan.id!);
           warnings.push(
             `Batch "${plan.name}" finishes past the linked order deadline ${new Date(deadlineMs).toISOString().slice(0, 10)}.`,
@@ -313,17 +390,11 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
         }
       }
     }
-
-    // Record the order ref on every entry for this batch so the UI
-    // can label rows without a separate lookup. Stored via the
-    // convenience "notes" field? Actually, leave to UI join.
-    void planOrderRef;
   }
 
-  // Defensive final ordering so the UI shows steps in production
-  // sequence: group by batch, then by step sortOrder, then by start
-  // time. Protects against stale/legacy rows whose startAt values
-  // came from an older algorithm.
+  // Defensive final ordering: step sortOrder within a batch, then start
+  // time. Protects against stale rows whose startAt came from older
+  // algorithms.
   entries.sort((a, b) => {
     const pa = a.planId ?? "";
     const pb = b.planId ?? "";
@@ -344,6 +415,106 @@ export function buildSchedule(input: SchedulerInput): SchedulerResult {
     warnings,
     unscheduledPlanIds: [...unscheduled],
   };
+}
+
+/**
+ * Walk today → latestDay looking for a working day where the whole
+ * batch fits. The "singleDaySpan" includes waits because every step
+ * (including inter-step waits) has to fit within the day. Same-step
+ * grouping is a soft preference: if we find a fitting day that already
+ * has one of our step types scheduled, stop there (earliest grouping
+ * day wins). Otherwise return the first fitting day.
+ */
+function findSingleDayFit(args: {
+  today: Date;
+  latestDay: Date | null;
+  singleDaySpan: number;
+  totalActive: number;
+  capFor: (d: Date) => number;
+  usedByDate: Map<string, number>;
+  stepTypesByDate: Map<string, Set<string>>;
+  batchTypeSet: Set<string>;
+}): Date | null {
+  const { today, latestDay, singleDaySpan, totalActive, capFor, usedByDate, stepTypesByDate, batchTypeSet } = args;
+
+  const probe = new Date(today);
+  probe.setHours(12, 0, 0, 0);
+  let firstFit: Date | null = null;
+
+  for (let i = 0; i < MAX_WORKING_DAY_SEARCH; i++) {
+    if (latestDay && probe.getTime() > latestDay.getTime()) break;
+    const cap = capFor(probe);
+    if (cap > 0 && cap >= singleDaySpan) {
+      const used = usedByDate.get(isoDate(probe)) ?? 0;
+      const free = cap - used;
+      // The remaining day must hold the full active work; waits can
+      // overlap with other batches' active time without double-booking
+      // (only activeMinutes consumes capacity), so gate on totalActive
+      // for the free check and on singleDaySpan for the cap check.
+      if (free >= totalActive) {
+        if (firstFit === null) firstFit = new Date(probe);
+        const types = stepTypesByDate.get(isoDate(probe));
+        if (types && hasIntersection(types, batchTypeSet)) {
+          return new Date(probe);
+        }
+      }
+    }
+    probe.setDate(probe.getDate() + 1);
+  }
+  return firstFit;
+}
+
+/**
+ * Place all steps of a batch on a single day, sequentially. Starts at
+ * the day's current used offset so we stack after any earlier batch.
+ */
+function placeOnSingleDay(
+  day: Date,
+  flat: FlatStep[],
+  plan: ProductionPlan,
+  orderIdForPlan: string | undefined,
+  entries: SchedulerResult["entries"],
+  usedByDate: Map<string, number>,
+  stepTypesByDate: Map<string, Set<string>>,
+): void {
+  let offset = usedByDate.get(isoDate(day)) ?? 0;
+  let activeUsed = 0;
+
+  for (const { step, typeName, activeMinutes, waitMinutes, perProductMinutes } of flat) {
+    if (activeMinutes > 0) {
+      emitRows({
+        entries,
+        slots: [{
+          date: new Date(day),
+          startOffsetMinutes: offset,
+          endOffsetMinutes: offset + activeMinutes,
+        }],
+        step,
+        perProductMinutes,
+        plan,
+        orderIdForPlan,
+      });
+      offset += activeMinutes;
+      activeUsed += activeMinutes;
+      addStepType(stepTypesByDate, isoDate(day), typeName);
+    }
+    offset += waitMinutes;
+  }
+
+  // Only active minutes count against daily capacity. Waits are
+  // wall-clock time the workshop stays open but the operator is free.
+  usedByDate.set(isoDate(day), (usedByDate.get(isoDate(day)) ?? 0) + activeUsed);
+}
+
+function addStepType(map: Map<string, Set<string>>, key: string, type: string): void {
+  const set = map.get(key) ?? new Set<string>();
+  set.add(type);
+  map.set(key, set);
+}
+
+function hasIntersection(a: Set<string>, b: Set<string>): boolean {
+  for (const v of a) if (b.has(v)) return true;
+  return false;
 }
 
 function emitRows(args: {
@@ -466,6 +637,38 @@ function nextWorkingDay(
   for (let i = 0; i < MAX_WORKING_DAY_SEARCH; i++) {
     if (capFor(probe) > 0) return probe;
     probe.setDate(probe.getDate() + 1);
+  }
+  return null;
+}
+
+/**
+ * Step back `bufferDays` working days from the deadline, so the
+ * returned date is the latest day on which active work may land.
+ *   bufferDays = 0 → deadline day itself, rolled back to nearest
+ *                    working day if needed.
+ *   bufferDays = N → the N-th working day before the deadline.
+ * Returns null if we can't find enough working days.
+ */
+function latestWorkingDayForDeadline(
+  deadline: Date,
+  bufferDays: number,
+  capFor: (d: Date) => number,
+): Date | null {
+  const probe = dateOnly(deadline);
+  if (bufferDays <= 0) {
+    for (let i = 0; i < MAX_WORKING_DAY_SEARCH; i++) {
+      if (capFor(probe) > 0) return probe;
+      probe.setDate(probe.getDate() - 1);
+    }
+    return null;
+  }
+  let remaining = bufferDays;
+  for (let i = 0; i < MAX_WORKING_DAY_SEARCH; i++) {
+    probe.setDate(probe.getDate() - 1);
+    if (capFor(probe) > 0) {
+      remaining--;
+      if (remaining === 0) return new Date(probe);
+    }
   }
   return null;
 }

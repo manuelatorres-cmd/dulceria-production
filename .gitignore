@@ -16,6 +16,9 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+# Catch any *.env file, including accidentally-named ones like
+# UsersmanueDocumentsdulceria-reconciler.env that belong elsewhere.
+*.env
 
 # debug
 npm-debug.log*
@@ -41,3 +44,6 @@ tsconfig.tsbuildinfo
 
 .agents/
 skills-lock.json
+
+# supabase CLI cache
+supabase/.temp/
