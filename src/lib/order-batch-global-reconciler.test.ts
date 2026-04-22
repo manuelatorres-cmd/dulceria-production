@@ -95,7 +95,10 @@ describe("reconcileGlobalProduceDemand — fresh consolidation", () => {
     expect(byProduct.p2.moulds).toBe(3);
   });
 
-  it("produce and borrow lines split into separate batches (produce + packing)", () => {
+  it("borrow lines do NOT create batches — only produce-fresh does", () => {
+    // Updated 2026-04-22: borrow-line packing is a fulfilment action
+    // on the order (Mark as packed), not a scheduled batch. The
+    // reconciler ignores borrow items entirely.
     const result = reconcileGlobalProduceDemand(baseInput({
       openOrders: [mkOrder("oA")],
       openOrderItems: [
@@ -105,14 +108,10 @@ describe("reconcileGlobalProduceDemand — fresh consolidation", () => {
       products: [mkProduct("p1", "Lime", "m1")],
       moulds: [mkMould("m1", 40)],
     }));
-    // Two new batches: produce-fresh for iA1 (40 pcs) + packing-only
-    // for iA2 (borrow lines still need packing work scheduled).
-    expect(result.newBatches).toHaveLength(2);
-    const produce = result.newBatches.find((b) => b.kind !== "packing");
-    const packing = result.newBatches.find((b) => b.kind === "packing");
-    expect(produce?.totalDemand).toBe(40);
-    expect(packing?.totalDemand).toBe(20);
-    expect(packing?.allocations).toEqual([{ orderItemId: "iA2", allocatedQuantity: 20 }]);
+    // Exactly one batch: produce-fresh for iA1 only.
+    expect(result.newBatches).toHaveLength(1);
+    expect(result.newBatches[0].totalDemand).toBe(40);
+    expect(result.newBatches[0].kind).not.toBe("packing");
   });
 
   it("ignores closed orders (done / cancelled)", () => {

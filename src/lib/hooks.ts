@@ -4440,6 +4440,145 @@ export async function commitAllocationSplit(args: {
   queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
 }
 
+/** What's currently allocated to a specific order, joined up to
+ *  productName + batchNumber so the order detail page can show
+ *  "Ready to pack" rows without the consumer doing three selects. */
+export interface OrderAllocatedRow {
+  stockLocationId: string;
+  planProductId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  planId?: string;
+  batchNumber?: string;
+}
+
+export function useAllocatedForOrder(orderId: string | undefined): OrderAllocatedRow[] {
+  const { data } = useQuery({
+    queryKey: ["allocated-for-order", orderId ?? ""],
+    enabled: !!orderId,
+    queryFn: async () => {
+      const locs = assertOk(
+        await supabase
+          .from("stockLocations")
+          .select("*")
+          .eq("orderId", orderId!)
+          .eq("location", "allocated"),
+      ) as StockLocationRow[];
+      if (locs.length === 0) return [] as OrderAllocatedRow[];
+      const ppIds = [...new Set(locs.map((r) => r.planProductId))];
+      const pps = assertOk(
+        await supabase.from("planProducts").select("*").in("id", ppIds),
+      ) as PlanProduct[];
+      const productIds = [...new Set(pps.map((p) => p.productId))];
+      const products = productIds.length > 0
+        ? assertOk(
+            await supabase.from("products").select("id, name").in("id", productIds),
+          ) as Array<{ id: string; name: string }>
+        : [];
+      const productById = new Map(products.map((p) => [p.id, p]));
+      const planIds = [...new Set(pps.map((p) => p.planId))];
+      const plans = planIds.length > 0
+        ? assertOk(
+            await supabase.from("productionPlans").select("id, batchNumber").in("id", planIds),
+          ) as Array<{ id: string; batchNumber?: string }>
+        : [];
+      const planById = new Map(plans.map((p) => [p.id, p]));
+      const ppById = new Map(pps.map((p) => [p.id!, p]));
+      return locs.map((r) => {
+        const pp = ppById.get(r.planProductId);
+        return {
+          stockLocationId: r.id!,
+          planProductId: r.planProductId,
+          productId: pp?.productId ?? "",
+          productName: pp ? (productById.get(pp.productId)?.name ?? pp.productId) : "Unknown",
+          quantity: r.quantity,
+          planId: pp?.planId,
+          batchNumber: pp ? planById.get(pp.planId)?.batchNumber : undefined,
+        };
+      });
+    },
+  });
+  return data ?? [];
+}
+
+/**
+ * Order-level "Mark as packed" — used for borrow (take-from-stock)
+ * orders. Drains the allocated stock tagged with this orderId and
+ * deducts the order's packaging lines. Idempotent: already-sold
+ * allocations are skipped.
+ *
+ * Produce-fresh lines on the same order are untouched; their stock
+ * flow happens on the batch via the Packing step tick. This hook
+ * only handles the from-stock portion.
+ *
+ * Returns the number of pieces moved and a list of warnings
+ * (packaging shortages, missing product refs).
+ */
+export async function markOrderAsPacked(orderId: string): Promise<{
+  piecesMoved: number;
+  warnings: string[];
+}> {
+  const warnings: string[] = [];
+  let piecesMoved = 0;
+
+  // 1. Drain allocated stockLocations for this order → reason='sold'.
+  const allocated = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("*")
+      .eq("orderId", orderId)
+      .eq("location", "allocated"),
+  ) as StockLocationRow[];
+  for (const row of allocated) {
+    const batch = assertOkMaybe(
+      await supabase
+        .from("planProducts")
+        .select("productId")
+        .eq("id", row.planProductId)
+        .maybeSingle(),
+    ) as { productId?: string } | null;
+    if (!batch?.productId) {
+      warnings.push(`planProduct ${row.planProductId} is missing a productId — skipping.`);
+      continue;
+    }
+    await outakeBatchStock({
+      planProductId: row.planProductId,
+      productId: batch.productId,
+      fromLocation: "allocated",
+      quantity: row.quantity,
+      orderId,
+      reason: "sold",
+      notes: "Mark as packed — from-stock fulfilment",
+    });
+    piecesMoved += row.quantity;
+  }
+
+  // 2. Deduct each orderPackagingLine from packaging stock.
+  const packagingLines = assertOk(
+    await supabase.from("orderPackagingLines").select("*").eq("orderId", orderId),
+  ) as OrderPackagingLine[];
+  for (const line of packagingLines) {
+    const actual = await consumePackaging({
+      packagingId: line.packagingId,
+      quantity: line.quantity,
+      orderId,
+      note: "Mark as packed — order fulfilment",
+    });
+    if (actual < line.quantity) {
+      warnings.push(
+        `Packaging ${line.packagingId}: only ${actual} of ${line.quantity} on hand. Add stock on the Packaging page before next pack.`,
+      );
+    }
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+  queryClient.invalidateQueries({ queryKey: ["packaging"] });
+  queryClient.invalidateQueries({ queryKey: ["order-packaging-lines"] });
+  return { piecesMoved, warnings };
+}
+
 /** Packing tick: move `quantity` pieces out of Production stock for
  *  this planProduct (reason='sold'). Called by the Packing modal
  *  confirm handler after packaging has been deducted. Idempotent via
@@ -5835,6 +5974,17 @@ export async function regenerateAllProductionPlans(): Promise<RegeneratePlansRes
       .eq("id", planId);
     if (error) throw error;
     result.cancelledPlanIds.push(planId);
+  }
+  // Hard-delete the legacy "— packing" drafts that the reconciler
+  // flagged. Cascades planProducts + orderPlanLinks + lineItems. We
+  // don't preserve history for these because the concept itself is
+  // gone — borrow-line packing is an order-level fulfilment now.
+  if (decision.plansToDelete.length > 0) {
+    const { error } = await supabase
+      .from("productionPlans")
+      .delete()
+      .in("id", decision.plansToDelete);
+    if (error) throw error;
   }
   for (const upd of decision.updateBatches) {
     // Resize the single planProduct + insert replacement links.

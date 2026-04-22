@@ -108,6 +108,12 @@ export interface GlobalReconcileDecision {
   /** Draft batches whose product has no remaining demand — cancel
    *  them (plan.status → 'cancelled') and drop their links. */
   plansToCancel: string[];
+  /** Draft batches that should be DELETED outright (not just
+   *  cancelled). Currently used to sweep legacy "— packing" drafts
+   *  from the old packing-only model; those batches have no useful
+   *  history to preserve and would clutter /plan and /production if
+   *  left as cancelled rows. */
+  plansToDelete: string[];
   /** Links to delete (belong to cancelled plans, or to draft plans
    *  whose links are about to be rebuilt). */
   linksToDelete: string[];
@@ -149,16 +155,11 @@ export function reconcileGlobalProduceDemand(
       openOrderIds.has(i.orderId) &&
       (i.fulfilmentMode ?? "produce") === "produce",
   );
-  /** Borrow (take-from-stock) items still need packing work scheduled
-   *  — the pieces exist in Store but they have to be boxed, ribboned,
-   *  labelled. We consolidate them into packing-only batches per
-   *  product, scheduled separately from the produce-fresh batches
-   *  that make the pieces. */
-  const borrowItems = openOrderItems.filter(
-    (i) =>
-      openOrderIds.has(i.orderId) &&
-      i.fulfilmentMode === "borrow",
-  );
+  // Borrow (take-from-stock) items no longer create batches. Their
+  // packing is a fulfilment action on the order, not production work
+  // — handled by the "Mark as packed" button on the order detail
+  // page (see markOrderAsPacked in hooks.ts). This reconciler only
+  // cares about produce-fresh demand.
 
   // Per-item: how much is already committed to an active batch? That
   // portion is already in production and shouldn't double-book into a
@@ -200,6 +201,7 @@ export function reconcileGlobalProduceDemand(
     newBatches: [],
     updateBatches: [],
     plansToCancel: [],
+    plansToDelete: [],
     linksToDelete: [],
     warnings: [],
   };
@@ -273,108 +275,20 @@ export function reconcileGlobalProduceDemand(
     draftBatchesByProduct.delete(productId); // consumed
   }
 
-  // ── Packing-only batches for borrow lines ────────────────────────
+  // ── Legacy "— packing" draft sweep ───────────────────────────────
   //
-  // Borrow items pull finished pieces from Store but still need
-  // packing work (boxing, labels, ribbon). We consolidate per-product
-  // into a "— packing" batch per regenerate pass. Draft packing
-  // batches are rebuilt wholesale; active packing batches are left
-  // alone by the upstream filters (status === 'draft').
-  const borrowDemandByProduct = new Map<string, Array<{ itemId: string; remaining: number }>>();
-  for (const item of borrowItems) {
-    const alreadyInActive = activeAllocByItem.get(item.id!) ?? 0;
-    const remaining = Math.max(0, item.quantity - alreadyInActive);
-    if (remaining <= 0) continue;
-    const arr = borrowDemandByProduct.get(item.productId) ?? [];
-    arr.push({ itemId: item.id!, remaining });
-    borrowDemandByProduct.set(item.productId, arr);
-  }
-
-  // Existing draft PACKING batches — detected by name suffix "— packing".
-  // Kept separate from the produce-draft pool so the two consolidation
-  // passes don't fight over the same plan row.
-  const draftPackingByProduct = new Map<string, Array<ProductionPlan & { planProductId: string; productId: string; mouldId: string }>>();
+  // The old packing-only batch concept has been removed (2026-04-22):
+  // borrow-line packing is now a fulfilment action on the order
+  // itself (Mark as packed), not a scheduled production batch. Any
+  // remaining "— packing" drafts from the old model are cruft; sweep
+  // them out of /plan and /production on this Regenerate by queuing
+  // them for DELETE (not cancel — no history to preserve).
   for (const plan of plans) {
     if (plan.status !== "draft") continue;
     if (!plan.name?.endsWith("— packing")) continue;
-    const pp = planProductByPlan.get(plan.id!);
-    if (!pp) continue;
-    const arr = draftPackingByProduct.get(pp.productId) ?? [];
-    arr.push({ ...plan, planProductId: pp.id!, productId: pp.productId, mouldId: pp.mouldId });
-    draftPackingByProduct.set(pp.productId, arr);
-  }
-  // Pull packing drafts out of the produce-draft pool if they slipped
-  // in (they have "— consolidated" not "— packing" in the produce pool,
-  // so this is normally a no-op, but defensive against mis-named data).
-  for (const productId of draftPackingByProduct.keys()) {
-    draftBatchesByProduct.delete(productId);
-  }
-
-  for (const [productId, demands] of borrowDemandByProduct) {
-    const product = productById.get(productId);
-    if (!product) continue; // already warned above if missing
-    // Packing batches don't drive a mould load — use the product's
-    // default mould as a reference only so the planProduct row has a
-    // valid FK. Scheduler recognises packing batches and skips mould
-    // span recording for them.
-    const mould = product.defaultMouldId ? mouldById.get(product.defaultMouldId) : undefined;
-    if (!mould) continue; // skip if no mould at all; packing without a product-mould context is edge
-    const totalDemand = demands.reduce((s, d) => s + d.remaining, 0);
-    const allocations = demands.map((d) => ({ orderItemId: d.itemId, allocatedQuantity: d.remaining }));
-
-    const existingDrafts = draftPackingByProduct.get(productId) ?? [];
-    const primary = existingDrafts[0];
-    for (let i = 1; i < existingDrafts.length; i++) {
-      const extra = existingDrafts[i];
-      decision.plansToCancel.push(extra.id!);
-      for (const link of links) {
-        if (link.planId === extra.id && link.id) decision.linksToDelete.push(link.id);
-      }
-    }
-
-    if (primary) {
-      for (const link of links) {
-        if (link.planId === primary.id && link.id) decision.linksToDelete.push(link.id);
-      }
-      decision.updateBatches.push({
-        tempId: `__update_${tempCounter++}`,
-        planId: primary.id!,
-        planProductId: primary.planProductId,
-        productId,
-        productName: product.name,
-        mouldId: mould.id!,
-        moulds: 1, // nominal — packing doesn't cast moulds
-        totalPieces: totalDemand,
-        totalDemand,
-        surplus: 0,
-        allocations,
-        kind: "packing",
-      });
-    } else {
-      decision.newBatches.push({
-        tempId: `__new_${tempCounter++}`,
-        productId,
-        productName: product.name,
-        mouldId: mould.id!,
-        moulds: 1,
-        totalPieces: totalDemand,
-        totalDemand,
-        surplus: 0,
-        allocations,
-        kind: "packing",
-      });
-    }
-    draftPackingByProduct.delete(productId);
-  }
-
-  // Cancel leftover draft packing batches whose product no longer
-  // has borrow demand.
-  for (const [, extras] of draftPackingByProduct) {
-    for (const plan of extras) {
-      decision.plansToCancel.push(plan.id!);
-      for (const link of links) {
-        if (link.planId === plan.id && link.id) decision.linksToDelete.push(link.id);
-      }
+    decision.plansToDelete.push(plan.id!);
+    for (const link of links) {
+      if (link.planId === plan.id && link.id) decision.linksToDelete.push(link.id);
     }
   }
 
@@ -391,8 +305,9 @@ export function reconcileGlobalProduceDemand(
 
   // Dedup linksToDelete (a link can only be queued once).
   decision.linksToDelete = [...new Set(decision.linksToDelete)];
-  // Dedup plansToCancel too — defensive.
+  // Dedup plansToCancel + plansToDelete too — defensive.
   decision.plansToCancel = [...new Set(decision.plansToCancel)];
+  decision.plansToDelete = [...new Set(decision.plansToDelete)];
 
   return decision;
 }

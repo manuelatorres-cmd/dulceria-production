@@ -15,6 +15,7 @@ import {
   useCustomerProductPrices,
   useProductionPlans, useOrderPlanLinks, useAllPlanStepStatuses,
   useAllProductionDayLineItems, useProductionDays, useProductionSteps,
+  useAllocatedForOrder, markOrderAsPacked,
 } from "@/lib/hooks";
 import { batchPhaseProgress } from "@/lib/batch-progress";
 import { supabase } from "@/lib/supabase";
@@ -666,6 +667,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           packaging={packaging}
           packagingUnitCost={packagingUnitCost}
         />
+
+        {/* Ready to pack — from-stock (borrow) fulfilment. Independent
+            of the production schedule: allocated pieces are sitting on
+            donor batches' stockLocations. Mark as packed drains them
+            and deducts this order's packaging. */}
+        <OrderReadyToPackSection orderId={orderId} />
 
         {/* Inline production schedule */}
         <OrderScheduleSection
@@ -2269,6 +2276,116 @@ function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
 }
 
 // ─── Production schedule (inline per-day view) ─────────────────
+
+/** Ready-to-pack section for borrow / from-stock fulfilment.
+ *  Lists every `allocated` stockLocations row tagged with this
+ *  order, grouped by product, showing the source batch number so
+ *  the operator knows which shelf to grab from. A Mark-as-packed
+ *  button drains the allocated rows → 'sold', deducts the order's
+ *  packaging, and logs audit movements. Idempotent: second click is
+ *  a no-op because allocated will be empty. */
+function OrderReadyToPackSection({ orderId }: { orderId: string }) {
+  const rows = useAllocatedForOrder(orderId);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState<{ pieces: number; warnings: string[] } | null>(null);
+
+  if (rows.length === 0 && !done) return null;
+
+  // Group by product for a cleaner display when a line spans multiple batches.
+  const byProduct = new Map<string, { productName: string; total: number; batches: Array<{ batch?: string; qty: number }> }>();
+  for (const r of rows) {
+    const g = byProduct.get(r.productId) ?? { productName: r.productName, total: 0, batches: [] };
+    g.total += r.quantity;
+    g.batches.push({ batch: r.batchNumber, qty: r.quantity });
+    byProduct.set(r.productId, g);
+  }
+
+  async function handleMarkPacked() {
+    setBusy(true); setErr("");
+    try {
+      const result = await markOrderAsPacked(orderId);
+      setDone({ pieces: result.piecesMoved, warnings: result.warnings });
+    } catch (e) {
+      console.error("markOrderAsPacked failed:", e);
+      setErr(formatOrderErr(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold text-primary mb-2 flex items-center gap-1.5">
+        <Package className="w-4 h-4" /> Ready to pack
+        <span className="text-xs font-normal text-muted-foreground">
+          ({rows.length === 0 ? "nothing allocated" : `from stock`})
+        </span>
+      </h2>
+
+      {rows.length > 0 ? (
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <ul className="divide-y divide-border">
+            {[...byProduct.values()].map((g) => (
+              <li key={g.productName} className="px-3 py-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{g.productName}</span>
+                  <span className="tabular-nums font-semibold">{g.total} pcs</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {g.batches.map((b, i) => (
+                    <span key={i}>
+                      {i > 0 && " · "}
+                      {b.batch ? <span className="font-mono">{b.batch}</span> : "untagged batch"}
+                      {" · "}
+                      <span className="tabular-nums">{b.qty} pcs</span>
+                    </span>
+                  ))}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-muted/30">
+            <p className="text-xs text-muted-foreground">
+              Drains allocated stock + deducts this order's packaging.
+            </p>
+            <button
+              onClick={handleMarkPacked}
+              disabled={busy}
+              className="rounded-full bg-primary text-primary-foreground px-4 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              {busy ? "Packing…" : "Mark as packed"}
+            </button>
+          </div>
+        </div>
+      ) : done ? (
+        <div className="rounded-lg border border-status-ok-edge bg-status-ok-bg px-3 py-2 text-xs text-status-ok">
+          <p className="font-medium">Packed — {done.pieces} piece{done.pieces === 1 ? "" : "s"} moved out.</p>
+          {done.warnings.length > 0 && (
+            <ul className="mt-1 space-y-0.5 text-foreground/80">
+              {done.warnings.map((w, i) => <li key={i}>⚠ {w}</li>)}
+            </ul>
+          )}
+        </div>
+      ) : null}
+      {err && (
+        <p className="text-xs text-status-alert mt-2">{err}</p>
+      )}
+    </section>
+  );
+}
+
+function formatOrderErr(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const o = e as { message?: string; details?: string; code?: string; hint?: string };
+    const core = o.message || o.details || "Operation failed";
+    const code = o.code ? ` (code ${o.code})` : "";
+    const hint = o.hint ? ` — ${o.hint}` : "";
+    return `${core}${code}${hint}`;
+  }
+  return String(e);
+}
 
 function OrderScheduleSection({
   scheduleByDay, productNameById, hasAnySchedule,
