@@ -5602,22 +5602,28 @@ export async function replaceProductionPlanning(
 ): Promise<void> {
   const now = new Date();
 
-  // 1. Find every draft plan — these are the plans we're rewriting.
-  const draftPlans = assertOk(
-    await supabase.from("productionPlans").select("id").eq("status", "draft"),
+  // 1. Find every plan the scheduler is allowed to rewrite. That's
+  //    anything NOT currently active or done: draft (the normal case),
+  //    plus cancelled / orphaned, both of which are "no longer the
+  //    operator's concern" and whose stale lineItems would otherwise
+  //    linger on /plan and /production pointing at ghost orders.
+  const rewritablePlans = assertOk(
+    await supabase
+      .from("productionPlans")
+      .select("id")
+      .in("status", ["draft", "cancelled", "orphaned"]),
   ) as Array<{ id: string }>;
-  const draftPlanIds = draftPlans.map((p) => p.id);
+  const rewritablePlanIds = rewritablePlans.map((p) => p.id);
 
-  // 2. Delete every line item whose planId is a draft. Handles the
-  //    case where the same (productionDayId, planId) pair already
-  //    exists from a previous Regenerate, which would otherwise
-  //    trigger the productionDayLineItems_productionDayId_planId_key
-  //    unique-constraint violation.
-  if (draftPlanIds.length > 0) {
+  // 2. Delete every line item whose planId is rewritable. Handles
+  //    both the duplicate-key crash (same (dayId, planId) alive from
+  //    a previous run) and the ghost-lineItem bug where a cancelled
+  //    plan's old schedule rows kept rendering on the UI.
+  if (rewritablePlanIds.length > 0) {
     const { error } = await supabase
       .from("productionDayLineItems")
       .delete()
-      .in("planId", draftPlanIds);
+      .in("planId", rewritablePlanIds);
     if (error) throw error;
   }
 
