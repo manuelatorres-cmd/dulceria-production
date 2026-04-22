@@ -405,9 +405,17 @@ export function buildDailySchedule(input: DailyScheduleInput): DailyScheduleResu
     // don't use the mould, they just pack pieces out of stock.
     const packingOnly = (plan.name ?? "").trim().endsWith("— packing");
     const effectiveMouldId = packingOnly ? "__packing_no_mould__" : mouldId;
+    // Mould capacity = how many physical copies of this mould the user
+    // owns. A 30-cavity square mould that the user owns 60 of can serve
+    // up to 60 concurrent batches. quantityOwned defaults to 1 when the
+    // mould record doesn't carry it.
+    const mouldRecord = mouldById.get(mouldId);
+    const mouldCapacity = packingOnly
+      ? Number.MAX_SAFE_INTEGER
+      : Math.max(1, mouldRecord?.quantityOwned ?? 1);
     const placement = effectiveMode === "forward"
-      ? placeForward(flat, effectiveMouldId, plan.id!, todayIso, latestDay, days, mouldSpans, capFor, lockedStepsByDate, packingOnly ? undefined : mouldConflictLog)
-      : placeReverse(flat, effectiveMouldId, plan.id!, latestDay!, todayIso, days, mouldSpans, capFor, lockedStepsByDate);
+      ? placeForward(flat, effectiveMouldId, mouldCapacity, plan.id!, todayIso, latestDay, days, mouldSpans, capFor, lockedStepsByDate, packingOnly ? undefined : mouldConflictLog)
+      : placeReverse(flat, effectiveMouldId, mouldCapacity, plan.id!, latestDay!, todayIso, days, mouldSpans, capFor, lockedStepsByDate);
     // Surface mould-sharing conflicts: if placement got bumped off
     // earlier days because another batch was already using the mould,
     // emit a warning with the other batch's name. This is why two
@@ -517,6 +525,7 @@ export function buildDailySchedule(input: DailyScheduleInput): DailyScheduleResu
 function placeForward(
   flat: FlatStep[],
   mouldId: string,
+  mouldCapacity: number,
   planId: string,
   todayIso: string,
   latestDay: string | null,
@@ -540,7 +549,7 @@ function placeForward(
     if (latestDay && cursor > latestDay) return null;
 
     // Mould availability check for this date.
-    const conflictSpan = firstConflictingSpan(mouldId, cursor, cursor, planId, mouldSpans);
+    const conflictSpan = firstConflictingSpan(mouldId, cursor, cursor, planId, mouldSpans, mouldCapacity);
     if (conflictSpan) {
       if (mouldConflictLog) mouldConflictLog.push({ date: cursor, blockedBy: conflictSpan.planId });
       cursor = advanceDay(cursor);
@@ -592,6 +601,7 @@ function placeForward(
 function placeReverse(
   flat: FlatStep[],
   mouldId: string,
+  mouldCapacity: number,
   planId: string,
   latestDay: string,
   earliestDay: string,
@@ -610,7 +620,7 @@ function placeReverse(
   while (stepIdx < reverseFlat.length) {
     if (cursor < earliestDay) return null;
 
-    if (mouldConflicts(mouldId, cursor, cursor, planId, mouldSpans)) {
+    if (mouldConflicts(mouldId, cursor, cursor, planId, mouldSpans, mouldCapacity)) {
       cursor = retreatDay(cursor);
       cursor = retreatToWorkingDay(cursor, capFor);
       continue;
@@ -652,14 +662,24 @@ function placeReverse(
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
+/**
+ * Mould availability respects physical inventory. A mould definition
+ * has `quantityOwned` — if the user owns 60 copies of the same mould
+ * (realistic for small chocolatiers with mass-production squares),
+ * up to 60 batches can run concurrently on the same mouldId.
+ *
+ * `mouldCapacity` defaults to 1 when the mould record doesn't carry
+ * `quantityOwned`.
+ */
 function mouldConflicts(
   mouldId: string,
   from: string,
   to: string,
   excludePlanId: string,
   spans: MouldSpan[],
+  mouldCapacity: number,
 ): boolean {
-  return firstConflictingSpan(mouldId, from, to, excludePlanId, spans) !== null;
+  return firstConflictingSpan(mouldId, from, to, excludePlanId, spans, mouldCapacity) !== null;
 }
 
 function firstConflictingSpan(
@@ -668,14 +688,20 @@ function firstConflictingSpan(
   to: string,
   excludePlanId: string,
   spans: MouldSpan[],
+  mouldCapacity: number,
 ): MouldSpan | null {
+  // Count concurrent occupants of this mould on the proposed span.
+  // If the count has room (< capacity), no conflict. Otherwise return
+  // one of the blocking spans so callers can report it.
+  let overlapping: MouldSpan[] = [];
   for (const s of spans) {
     if (s.mouldId !== mouldId) continue;
     if (s.planId === excludePlanId) continue;
     if (s.to < from || s.from > to) continue;
-    return s;
+    overlapping.push(s);
   }
-  return null;
+  if (overlapping.length < Math.max(1, mouldCapacity)) return null;
+  return overlapping[0];
 }
 
 function advanceDay(iso: string): string {

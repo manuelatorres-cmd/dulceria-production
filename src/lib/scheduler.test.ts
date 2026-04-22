@@ -313,6 +313,45 @@ describe("buildDailySchedule — mould occupancy", () => {
     expect(overlap).toEqual([]);
   });
 
+  it("respects mould.quantityOwned — multiple physical copies of the same mould can run concurrently", () => {
+    // User owns 3 copies of mould "m-shared". Three batches all using
+    // that mould should fit on the same day; a fourth spills.
+    const steps = [
+      mkStep("Polishing",  "Moulded", 1, 60),
+      mkStep("Unmoulding", "Moulded", 2, 60),
+    ];
+    const makeShared = (planId: string, createdAt: string) => makeBatch({
+      planId, productId: `prod-${planId}`,
+      categoryId: "cat-Moulded", categoryName: "Moulded",
+      mouldId: "m-shared", mouldCavities: 10, quantity: 1,
+      deadline: daysFromToday(5),
+      createdAt: new Date(createdAt),
+      steps,
+    });
+    const batches = [
+      makeShared("plan-1", "2024-01-01T00:00:00Z"),
+      makeShared("plan-2", "2024-01-02T00:00:00Z"),
+      makeShared("plan-3", "2024-01-03T00:00:00Z"),
+      makeShared("plan-4", "2024-01-04T00:00:00Z"),
+    ];
+    const assembled = assemble(batches, steps);
+    // Override the mould record to set quantityOwned = 3.
+    const moulds = (assembled.moulds ?? []).map((m) => ({ ...m, quantityOwned: 3 }));
+    const input = makeInput({
+      ...assembled,
+      moulds,
+      productionSteps: steps,
+    } as Partial<DailyScheduleInput>);
+
+    const out = buildDailySchedule(input);
+    const today = toIso(daysFromToday(0));
+    const onToday = out.lineItems.filter((li) => li.dateRef === today);
+    expect(onToday.length).toBe(3); // three concurrent copies fit
+    // plan-4 must spill to tomorrow.
+    const notToday = out.lineItems.filter((li) => li.dateRef !== today);
+    expect(notToday.map((li) => li.planId)).toEqual(["plan-4"]);
+  });
+
   it("allows different moulds to run on the same day", () => {
     const steps = [mkStep("Polishing", "Moulded", 1, 60)];
     const batch1 = makeBatch({

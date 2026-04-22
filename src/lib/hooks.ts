@@ -4614,9 +4614,13 @@ async function allocateLineFromStore(args: {
   });
   const total = moved.reduce((s, m) => s + m.quantity, 0);
   if (total < args.quantity) {
-    // Not enough — revert the partial move so we don't leave the order
-    // half-borrowed. Flip the line back to produce so the UI reflects
-    // reality instead of pretending the borrow worked.
+    // Not enough stock to fulfil the borrow. Revert the partial move
+    // and throw — the caller decides what to do. Previously this
+    // flipped the line back to 'produce' silently, which surprised
+    // the operator by turning a borrow order into a produce batch on
+    // the next Regenerate (reported 2026-04-22). The new contract:
+    // if you ask for borrow and the stock isn't actually there, the
+    // save fails loudly.
     for (const m of moved) {
       await transferBatchStock({
         planProductId: m.planProductId,
@@ -4628,12 +4632,9 @@ async function allocateLineFromStore(args: {
         reason: "allocate",
       });
     }
-    await supabase
-      .from("orderItems")
-      .update({ fulfilmentMode: "produce" })
-      .eq("orderId", args.orderId)
-      .eq("productId", args.productId);
-    queryClient.invalidateQueries({ queryKey: ["order-items"] });
+    throw new Error(
+      `Not enough stock to borrow: only ${total} of ${args.quantity} available. Please re-check stock or switch this line to "Produce fresh".`,
+    );
   }
 }
 
@@ -5488,20 +5489,28 @@ export function useProductionDayLineItems(
 }
 
 /**
- * Replace the scheduler output atomically-enough. Rather than wiping
- * everything first and risking a partial failure leaving the plan in
- * ruins, we:
+ * Replace the scheduler output for every DRAFT plan. Active plans
+ * keep their existing line items untouched (physical work underway).
  *
- *   1. Insert the fresh rows (days + lineItems) tagged with new UUIDs.
- *   2. Delete the previous draft rows by id list.
+ * Flow (delete-before-insert, scoped to draft plans):
  *
- * Active-day rows (status != 'draft') and their lineItems are never
- * touched — physical work underway keeps its plan. Only draft days
- * are rewritten.
+ *   1. Read all draft plan ids.
+ *   2. Delete every productionDayLineItem whose planId is a draft
+ *      plan. Anywhere they live — draft day, active day, whatever —
+ *      they go. This is the move that prevents the duplicate-key
+ *      crash we hit when the old code tried to insert a new row for
+ *      a (productionDayId, planId) pair that still had the previous
+ *      row alive.
+ *   3. Ensure a productionDay row exists per proposed date.
+ *   4. Insert the fresh line items. The unique constraint is now
+ *      guaranteed satisfiable because we wiped overlapping rows in
+ *      step 2.
+ *   5. Delete orphan draft productionDays that no longer carry any
+ *      work.
  *
- * The dateRef → productionDayId resolution happens here: for each
- * proposed day we either reuse an existing row (by date, if present
- * with status='draft' or unopened) or insert a new one.
+ * Failure modes: if step 4 throws, draft plans have no scheduled
+ * work until the next Regenerate — acceptable because Regenerate is
+ * cheap and idempotent. Active plans' line items are never at risk.
  */
 export async function replaceProductionPlanning(
   proposedDays: Array<{ date: string }>,
@@ -5512,31 +5521,32 @@ export async function replaceProductionPlanning(
 ): Promise<void> {
   const now = new Date();
 
-  // Snapshot draft productionDays + their line items so we know what
-  // to clean up afterwards. Active / done days are protected.
+  // 1. Find every draft plan — these are the plans we're rewriting.
+  const draftPlans = assertOk(
+    await supabase.from("productionPlans").select("id").eq("status", "draft"),
+  ) as Array<{ id: string }>;
+  const draftPlanIds = draftPlans.map((p) => p.id);
+
+  // 2. Delete every line item whose planId is a draft. Handles the
+  //    case where the same (productionDayId, planId) pair already
+  //    exists from a previous Regenerate, which would otherwise
+  //    trigger the productionDayLineItems_productionDayId_planId_key
+  //    unique-constraint violation.
+  if (draftPlanIds.length > 0) {
+    const { error } = await supabase
+      .from("productionDayLineItems")
+      .delete()
+      .in("planId", draftPlanIds);
+    if (error) throw error;
+  }
+
+  // 3. Snapshot existing productionDays so we can reuse ids by date.
+  //    Active / done days are preserved regardless of what the
+  //    scheduler outputs.
   const existingDays = assertOk(
     await supabase.from("productionDays").select("id, date, status"),
   ) as Array<{ id: string; date: string; status: string }>;
-  const draftDayIds = existingDays.filter((d) => d.status === "draft").map((d) => d.id);
-  const activeDaysByDate = new Map(
-    existingDays.filter((d) => d.status !== "draft").map((d) => [d.date, d]),
-  );
-  const draftDaysByDate = new Map(
-    existingDays.filter((d) => d.status === "draft").map((d) => [d.date, d]),
-  );
-
-  const existingLineItemIds = draftDayIds.length > 0
-    ? (assertOk(
-        await supabase
-          .from("productionDayLineItems")
-          .select("id")
-          .in("productionDayId", draftDayIds),
-      ) as Array<{ id: string }>).map((r) => r.id)
-    : [];
-
-  // 1. Ensure a productionDay row exists per proposed date, reusing
-  //    any existing one (draft → reuse its id, active/done → reuse
-  //    and attach new line items to it).
+  const dayByDate = new Map(existingDays.map((d) => [d.date, d]));
   const dayIdByDate = new Map<string, string>();
   const daysToInsert: Array<{
     id: string; date: string; status: string;
@@ -5545,14 +5555,9 @@ export async function replaceProductionPlanning(
     createdAt: Date; updatedAt: Date;
   }> = [];
   for (const d of proposedDays) {
-    const active = activeDaysByDate.get(d.date);
-    if (active) {
-      dayIdByDate.set(d.date, active.id);
-      continue;
-    }
-    const draft = draftDaysByDate.get(d.date);
-    if (draft) {
-      dayIdByDate.set(d.date, draft.id);
+    const existing = dayByDate.get(d.date);
+    if (existing) {
+      dayIdByDate.set(d.date, existing.id);
       continue;
     }
     const id = newId();
@@ -5568,8 +5573,9 @@ export async function replaceProductionPlanning(
     if (error) throw error;
   }
 
-  // 2. Insert new lineItems first. If this throws, the old draft
-  //    lineItems are still intact.
+  // 4. Insert the fresh line items. The (productionDayId, planId)
+  //    unique constraint is now satisfiable because step 2 wiped any
+  //    overlaps.
   if (proposedLineItems.length > 0) {
     const rows = proposedLineItems.map((li) => {
       const dayId = dayIdByDate.get(li.dateRef);
@@ -5589,19 +5595,9 @@ export async function replaceProductionPlanning(
     if (error) throw error;
   }
 
-  // 3. Delete the previous draft lineItems by id — bounded to the
-  //    pre-regenerate snapshot so we don't nuke the rows we just wrote.
-  if (existingLineItemIds.length > 0) {
-    const { error } = await supabase
-      .from("productionDayLineItems")
-      .delete()
-      .in("id", existingLineItemIds);
-    if (error) throw error;
-  }
-
-  // 4. Delete any orphan draft productionDays that no longer have
-  //    line items (the regenerate may have dropped a date entirely).
-  //    Active days are preserved regardless.
+  // 5. Delete orphan draft productionDays that no longer carry work
+  //    after this regenerate. Active / done days are preserved.
+  const draftDayIds = existingDays.filter((d) => d.status === "draft").map((d) => d.id);
   if (draftDayIds.length > 0) {
     const stillUsedDayIds = new Set(proposedLineItems.map((li) => dayIdByDate.get(li.dateRef)!));
     const toDelete = draftDayIds.filter((id) => !stillUsedDayIds.has(id));

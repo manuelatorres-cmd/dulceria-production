@@ -1373,13 +1373,17 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
             )}
           </p>
           {item.notes && <p className="text-xs text-muted-foreground truncate">{item.notes}</p>}
-          <button
-            onClick={toggleFulfilmentMode}
-            disabled={switchingMode}
-            className="text-[11px] text-muted-foreground hover:text-foreground hover:underline mt-0.5 disabled:opacity-50"
+          {/* Stock-source label is display-only after save. The choice
+              between "Take from stock" and "Produce fresh" is locked
+              at order creation; changing it post-save would retroactively
+              rearrange allocation, batches, and schedules. To change a
+              line's source, delete the line and re-add it. */}
+          <p
+            className="text-[11px] text-muted-foreground mt-0.5"
+            title="Stock source is locked after save. Delete and re-add this line to change it."
           >
-            {switchingMode ? "Switching…" : isBorrow ? "Produce fresh" : "Use from stock"}
-          </button>
+            {isBorrow ? "Use from stock (locked)" : "Produce fresh (locked)"}
+          </p>
         </div>
 
         {/* Unit price (net) */}
