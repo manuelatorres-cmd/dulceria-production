@@ -649,6 +649,23 @@ function IngredientNutritionReadView({ ingredient, market, onEdit }: { ingredien
   );
 }
 
+/** Format any thrown value into a human-readable string. Handles
+ *  three shapes: Error instances (use .message), Supabase/PostgREST
+ *  error objects (which have .message + .code + .details + .hint and
+ *  aren't Error instances — rendering them directly gives
+ *  "[object Object]"), and everything else. */
+function formatError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const o = e as { message?: string; details?: string; hint?: string; code?: string };
+    const core = o.message || o.details || "Operation failed";
+    const code = o.code ? ` (code ${o.code})` : "";
+    const hint = o.hint ? ` — ${o.hint}` : "";
+    return `${core}${code}${hint}`;
+  }
+  return String(e);
+}
+
 // ── Ingredient Stock panel ────────────────────────────────────────
 //
 // Grams-on-hand view. Three things:
@@ -686,7 +703,8 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       await receiveIngredientStock(ingredientId, qty, receiveNotes.trim() || undefined);
       setReceiveInput(""); setReceiveNotes("");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(formatError(e));
+      console.error("Ingredient stock error:", e);
     } finally {
       setBusy(false);
     }
@@ -705,7 +723,8 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       });
       setAdjustInput("");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(formatError(e));
+      console.error("Ingredient stock error:", e);
     } finally {
       setBusy(false);
     }
@@ -721,7 +740,8 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
     try {
       await setIngredientLowStockThreshold(ingredientId, val);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(formatError(e));
+      console.error("Ingredient stock error:", e);
     } finally {
       setBusy(false);
     }
