@@ -177,8 +177,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   async function handleDelete() {
-    await deleteOrder(orderId);
-    router.replace("/orders");
+    // Previously this had no try/catch — if any step inside
+    // deleteOrder (revertBorrows, cascade, orphan-plan cleanup) threw,
+    // the router.replace never ran and the user was stuck on the
+    // detail page with no visible error. The undeleted row looked
+    // like a silent soft-delete bug. Now failures surface as an
+    // alert so the user knows the delete didn't go through.
+    try {
+      await deleteOrder(orderId);
+      router.replace("/orders");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("deleteOrder failed:", err);
+      alert(`Delete failed: ${msg}\n\nThe order is still in the database. Check the browser console for details.`);
+    }
   }
 
   const totalQty = items.reduce((s, i) => s + i.quantity, 0);

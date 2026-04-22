@@ -5481,7 +5481,13 @@ export async function revertBorrowsForOrder(orderId: string): Promise<void> {
     .eq("fulfilmentMode", "borrow");
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
 
-  // 2. Move every 'allocated' row tagged with this orderId back to store.
+  // 2. Move every 'allocated' row tagged with this orderId back to its
+  //    origin location. Origin is read from the most-recent 'allocate'
+  //    movement for (planProductId, orderId) — so pieces pulled from
+  //    Production go back to Production, pieces pulled from Store go
+  //    back to Store. Falls back to 'store' if no movement row is
+  //    found (defensive for legacy rows that predate the
+  //    store-or-production allocation path).
   const allocated = assertOk(
     await supabase
       .from("stockLocations")
@@ -5490,7 +5496,6 @@ export async function revertBorrowsForOrder(orderId: string): Promise<void> {
       .eq("location", "allocated"),
   ) as StockLocationRow[];
   for (const row of allocated) {
-    // Need the productId for the movement log. Look up the batch.
     const batch = assertOkMaybe(
       await supabase
         .from("planProducts")
@@ -5498,15 +5503,33 @@ export async function revertBorrowsForOrder(orderId: string): Promise<void> {
         .eq("id", row.planProductId)
         .maybeSingle(),
     ) as { productId?: string } | null;
+    // Find the last allocate movement for this (plan product, order).
+    const movement = assertOkMaybe(
+      await supabase
+        .from("stockMovements")
+        .select("fromLocation")
+        .eq("planProductId", row.planProductId)
+        .eq("orderId", orderId)
+        .eq("reason", "allocate")
+        .eq("toLocation", "allocated")
+        .order("movedAt", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ) as { fromLocation?: StockLocation | string } | null;
+    const origin: StockLocation = (movement?.fromLocation === "production"
+      || movement?.fromLocation === "freezer"
+      || movement?.fromLocation === "store")
+      ? (movement!.fromLocation as StockLocation)
+      : "store";
     await transferBatchStock({
       planProductId: row.planProductId,
       productId: batch?.productId ?? "",
       fromLocation: "allocated",
-      toLocation: "store",
+      toLocation: origin,
       quantity: row.quantity,
       orderId,
       reason: "allocate",
-      notes: "Reverted on order cancel/delete.",
+      notes: `Reverted on order cancel/delete (→ ${origin}).`,
     });
   }
 
