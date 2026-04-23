@@ -58,6 +58,8 @@ export default function VariantsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [newStart, setNewStart] = useState(() => new Date().toISOString().split("T")[0]);
+  const [createError, setCreateError] = useState<string>("");
+  const [creating, setCreating] = useState(false);
 
   useNShortcut(() => setShowAdd(true), showAdd);
 
@@ -85,17 +87,28 @@ export default function VariantsPage() {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!newName.trim()) return;
-    const id = await saveVariant({
-      name: newName.trim(),
-      startDate: newStart,
-      labels: [],
-      kind: "curated",
-      vatRatePercent: 10,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    router.push(`/variants/${encodeURIComponent(String(id))}?new=1`);
+    if (!newName.trim() || creating) return;
+    setCreateError("");
+    setCreating(true);
+    try {
+      const id = await saveVariant({
+        name: newName.trim(),
+        startDate: newStart,
+        labels: [],
+        kind: "curated",
+        vatRatePercent: 10,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      router.push(`/variants/${encodeURIComponent(String(id))}?new=1`);
+    } catch (err) {
+      console.error("saveVariant failed", err);
+      const raw: { message?: string; code?: string; details?: string; hint?: string } =
+        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      const code = raw.code ? ` (code ${raw.code})` : "";
+      setCreateError(`${raw.message || raw.details || "Save failed"}${code}${raw.hint ? ` — ${raw.hint}` : ""}`);
+      setCreating(false);
+    }
   }
 
   return (
@@ -150,17 +163,24 @@ export default function VariantsPage() {
               />
             </div>
             <div className="flex gap-2">
-              <button type="submit" disabled={!newName.trim()} className="btn-primary flex-1 py-2">
-                Create Variant
+              <button
+                type="submit"
+                disabled={!newName.trim() || creating}
+                className="btn-primary flex-1 py-2 disabled:opacity-50"
+              >
+                {creating ? "Creating…" : "Create Variant"}
               </button>
               <button
                 type="button"
-                onClick={() => { setShowAdd(false); setNewName(""); }}
+                onClick={() => { setShowAdd(false); setNewName(""); setCreateError(""); }}
                 className="btn-secondary px-4 py-2"
               >
                 Cancel
               </button>
             </div>
+            {createError && (
+              <p className="text-xs text-destructive pt-1">{createError}</p>
+            )}
           </form>
         )}
 
