@@ -1135,9 +1135,71 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-xs">Add a box to see cost breakdowns and margins.</p>
             </div>
           ) : !avgCost ? (
-            <div className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-lg space-y-1">
-              <p>No product cost data available.</p>
-              <p className="text-xs">Ensure products have a default mould and costed ingredients.</p>
+            /* Cost data isn't available yet (products missing a default mould
+             * or ingredients without pricing), so we can't render the margin
+             * card. Still list each saved size with its price and composition
+             * so the user can see and manage what they've configured. */
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
+                Margin details hidden — products need a default mould and costed ingredients for
+                cost/margin math. Box prices and composition still shown below.
+              </div>
+              {variantPackagings.map((cp) => {
+                const cpId = cp.id ?? "";
+                const pkg = packagingMap.get(cp.packagingId);
+                const defaultPrice = cp.price ?? cp.sellPrice ?? 0;
+                return (
+                  <div
+                    key={cpId}
+                    className="rounded-lg border border-border bg-card p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{pkg?.name ?? "Unknown"}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {pkg?.capacity ?? 0} pc{(pkg?.capacity ?? 0) === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      <div className="text-sm font-semibold tabular-nums shrink-0">
+                        {formatPrice(defaultPrice, sym)}
+                      </div>
+                      {pendingRemoveBox === cpId ? (
+                        <span className="flex items-center gap-1.5 text-xs shrink-0">
+                          <span className="text-muted-foreground">Remove?</span>
+                          <button
+                            onClick={() => handleRemoveBox(cpId)}
+                            className="text-red-600 font-medium hover:underline"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            onClick={() => setPendingRemoveBox(null)}
+                            className="text-muted-foreground hover:underline"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setPendingRemoveBox(cpId)}
+                          className="text-muted-foreground/60 hover:text-destructive shrink-0"
+                          aria-label="Remove box"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <BoxExtras
+                      variantPackagingId={cpId}
+                      kind={variant?.kind ?? "curated"}
+                      channelPrices={cp.channelPrices ?? {}}
+                      defaultPrice={defaultPrice}
+                      productMap={productMap}
+                      sym={sym}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="space-y-3">
