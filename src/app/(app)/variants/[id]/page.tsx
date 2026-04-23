@@ -1032,7 +1032,10 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     </span>
                   </p>
                   {newBoxComposition.map((line, idx) => (
-                    <div key={idx} className="flex items-center gap-2 mb-1.5">
+                    <div
+                      key={idx}
+                      className="rounded-md border border-border/70 bg-background/50 p-2 mb-2 space-y-1.5"
+                    >
                       <select
                         value={line.productId}
                         onChange={(e) => {
@@ -1040,32 +1043,38 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                           next[idx] = { ...next[idx], productId: e.target.value };
                           setNewBoxComposition(next);
                         }}
-                        className="input flex-1 text-sm py-1.5"
+                        className="input text-sm"
                       >
-                        <option value="">Select product...</option>
+                        <option value="">Select product…</option>
                         {allProducts.filter((p) => !p.archived).map((p) => (
                           <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                       </select>
-                      <input
-                        type="number"
-                        min="1"
-                        value={line.qty}
-                        onChange={(e) => {
-                          const next = [...newBoxComposition];
-                          next[idx] = { ...next[idx], qty: parseInt(e.target.value) || 0 };
-                          setNewBoxComposition(next);
-                        }}
-                        className="input w-16 text-sm py-1.5"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setNewBoxComposition(newBoxComposition.filter((_, i) => i !== idx))}
-                        className="text-muted-foreground hover:text-foreground"
-                        aria-label="Remove product from box"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] text-muted-foreground">Qty</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={line.qty}
+                          onChange={(e) => {
+                            const next = [...newBoxComposition];
+                            next[idx] = { ...next[idx], qty: parseInt(e.target.value) || 0 };
+                            setNewBoxComposition(next);
+                          }}
+                          className="input w-20 text-sm py-1.5"
+                        />
+                        <div className="flex-1" />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNewBoxComposition(newBoxComposition.filter((_, i) => i !== idx))
+                          }
+                          className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1"
+                          aria-label="Remove product from box"
+                        >
+                          <X className="w-3.5 h-3.5" /> Remove
+                        </button>
+                      </div>
                     </div>
                   ))}
                   <button
