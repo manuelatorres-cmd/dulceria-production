@@ -6,11 +6,11 @@ import {
   useAllPlanProducts,
   useMouldsList,
   useProductsList,
-  useCollections,
+  useVariants,
 } from "@/lib/hooks";
-import { useAllCollectionProducts } from "@/lib/hooks";
+import { useAllVariantProducts } from "@/lib/hooks";
 import { PageHeader } from "@/components/page-header";
-import type { CollectionProduct } from "@/types";
+import type { VariantProduct } from "@/types";
 
 type ProductionEvent = {
   planId: string;
@@ -19,7 +19,7 @@ type ProductionEvent = {
   productCount: number;   // actual yield (or planned if actualYield not set)
   plannedCount: number;  // quantity × cavities (always the calculated max)
   completedAt: Date;
-  collectionIds: string[];
+  variantIds: string[];
 };
 
 type ProductRow = {
@@ -30,7 +30,7 @@ type ProductRow = {
   lastProduced?: Date;
   recent: number;
   previous: number;
-  collectionIds: string[];
+  variantIds: string[];
 };
 
 type TrendWindow = {
@@ -183,14 +183,14 @@ export default function StatsPage() {
   const allPlanProducts = useAllPlanProducts();
   const moulds = useMouldsList(true);
   const products = useProductsList();
-  const collections = useCollections();
-  const allCollectionProducts: CollectionProduct[] = useAllCollectionProducts();
+  const variants = useVariants();
+  const allVariantProducts: VariantProduct[] = useAllVariantProducts();
 
   const [timePreset, setTimePreset] = useState<TimePreset>("12m");
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
   const [granularity, setGranularity] = useState<Granularity>("month");
-  const [collectionFilter, setCollectionFilter] = useState<string>("");
+  const [variantFilter, setVariantFilter] = useState<string>("");
   const [productFilter, setProductFilter] = useState<string>("");
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
 
@@ -210,15 +210,15 @@ export default function StatsPage() {
     [plans]
   );
 
-  const productToCollectionIds = useMemo(() => {
+  const productToVariantIds = useMemo(() => {
     const m = new Map<string, string[]>();
-    for (const cr of allCollectionProducts) {
+    for (const cr of allVariantProducts) {
       const arr = m.get(cr.productId) ?? [];
-      arr.push(cr.collectionId);
+      arr.push(cr.variantId);
       m.set(cr.productId, arr);
     }
     return m;
-  }, [allCollectionProducts]);
+  }, [allVariantProducts]);
 
   const allEvents = useMemo((): ProductionEvent[] => {
     return allPlanProducts
@@ -235,10 +235,10 @@ export default function StatsPage() {
           productCount: pb.actualYield ?? plannedCount,
           plannedCount,
           completedAt: new Date(plan.completedAt!),
-          collectionIds: productToCollectionIds.get(pb.productId) ?? [],
+          variantIds: productToVariantIds.get(pb.productId) ?? [],
         };
       });
-  }, [allPlanProducts, planMap, mouldMap, productMap, productToCollectionIds]);
+  }, [allPlanProducts, planMap, mouldMap, productMap, productToVariantIds]);
 
   // Compute time bounds from preset
   const timeBounds = useMemo((): { from: Date; to: Date } => {
@@ -262,15 +262,15 @@ export default function StatsPage() {
     [timePreset, customStart, customEnd]
   );
 
-  // Apply time + collection + product filters
+  // Apply time + variant + product filters
   const filteredEvents = useMemo(() => {
     return allEvents.filter((e) => {
       if (e.completedAt < timeBounds.from || e.completedAt > timeBounds.to) return false;
-      if (collectionFilter && !e.collectionIds.includes(collectionFilter)) return false;
+      if (variantFilter && !e.variantIds.includes(variantFilter)) return false;
       if (productFilter && e.productId !== productFilter) return false;
       return true;
     });
-  }, [allEvents, timeBounds, collectionFilter, productFilter]);
+  }, [allEvents, timeBounds, variantFilter, productFilter]);
 
   // Products that appear in production history (for filter dropdown)
   const producedProducts = useMemo(() => {
@@ -355,7 +355,7 @@ export default function StatsPage() {
     const tw = trendWindow;
     const baseEvents = allEvents.filter(
       (e) =>
-        (!collectionFilter || e.collectionIds.includes(collectionFilter)) &&
+        (!variantFilter || e.variantIds.includes(variantFilter)) &&
         (!productFilter || e.productId === productFilter)
     );
 
@@ -370,7 +370,7 @@ export default function StatsPage() {
           totalPlanned: 0,
           recent: 0,
           previous: 0,
-          collectionIds: e.collectionIds,
+          variantIds: e.variantIds,
         });
       }
       return byProduct.get(e.productId)!;
@@ -394,11 +394,11 @@ export default function StatsPage() {
     return [...byProduct.values()]
       .filter((row) => row.total > 0)
       .sort((a, b) => b.total - a.total);
-  }, [allEvents, collectionFilter, productFilter, timeBounds, trendWindow]);
+  }, [allEvents, variantFilter, productFilter, timeBounds, trendWindow]);
 
-  const collectionMap = useMemo(
-    () => new Map(collections.map((c) => [c.id!, c.name])),
-    [collections]
+  const variantMap = useMemo(
+    () => new Map(variants.map((c) => [c.id!, c.name])),
+    [variants]
   );
 
   const hasData = allEvents.length > 0;
@@ -417,7 +417,7 @@ export default function StatsPage() {
           ))}
         </div>
       )}
-      <PageHeader title="Production Stats" description="Historical output across batches, products, and collections." />
+      <PageHeader title="Production Stats" description="Historical output across batches, products, and variants." />
 
       <div className="px-4 pb-10 space-y-6">
         {/* Filters */}
@@ -459,17 +459,17 @@ export default function StatsPage() {
             </div>
           )}
 
-          {/* Collection + Product filters */}
-          {(collections.length > 0 || producedProducts.length > 0) && (
+          {/* Variant + Product filters */}
+          {(variants.length > 0 || producedProducts.length > 0) && (
             <div className="flex flex-wrap gap-2">
-              {collections.length > 0 && (
+              {variants.length > 0 && (
                 <select
-                  value={collectionFilter}
-                  onChange={(e) => setCollectionFilter(e.target.value)}
+                  value={variantFilter}
+                  onChange={(e) => setVariantFilter(e.target.value)}
                   className="text-sm border border-border rounded-md px-2 py-1.5 bg-background"
                 >
-                  <option value="">All collections</option>
-                  {collections.map((c) => (
+                  <option value="">All variants</option>
+                  {variants.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
@@ -486,9 +486,9 @@ export default function StatsPage() {
                   ))}
                 </select>
               )}
-              {(collectionFilter || productFilter) && (
+              {(variantFilter || productFilter) && (
                 <button
-                  onClick={() => { setCollectionFilter(""); setProductFilter(""); }}
+                  onClick={() => { setVariantFilter(""); setProductFilter(""); }}
                   className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                 >
                   Clear
@@ -715,8 +715,8 @@ export default function StatsPage() {
                 <ul className="divide-y divide-border/40">
                   {leaderboard.map((row) => {
                     const trend = getTrend(row.recent, row.previous);
-                    const colNames = row.collectionIds
-                      .map((id) => collectionMap.get(id))
+                    const colNames = row.variantIds
+                      .map((id) => variantMap.get(id))
                       .filter(Boolean)
                       .join(", ");
                     const waste = row.totalPlanned - row.total;

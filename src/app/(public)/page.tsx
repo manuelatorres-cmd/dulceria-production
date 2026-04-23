@@ -25,7 +25,7 @@ export default function LandingPage() {
         <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl">
           Dulceria sits on your iPad, phone, or laptop and keeps your entire
           chocolate workshop in one place: ingredients, fillings, products,
-          production plans, stock, collections, and a little bit of business
+          production plans, stock, variants, and a little bit of business
           intelligence.
         </p>
       </section>

@@ -8,7 +8,7 @@ import {
   formatPrice,
   formatMarginPercent,
   marginDelta,
-} from "./collectionPricing";
+} from "./variantPricing";
 import type { PackagingOrder } from "@/types";
 
 // --- latestPackagingUnitCost ---

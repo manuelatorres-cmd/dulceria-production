@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { useProductsList, saveProduct, useProductCategories, useProductCategoryUsageCounts, saveProductCategory, useCoatings, useProductProductionMap, useCollections, useAllCollectionProducts, useProductFillingsForProducts, useFillings, useMarketRegion } from "@/lib/hooks";
+import { useProductsList, saveProduct, useProductCategories, useProductCategoryUsageCounts, saveProductCategory, useCoatings, useProductProductionMap, useVariants, useAllVariantProducts, useProductFillingsForProducts, useFillings, useMarketRegion } from "@/lib/hooks";
 import { Plus, Search, ChevronRight, ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import { ListToolbar, FilterPanel, ArchiveFilterChip, QuickAddForm, EmptyState, ListItemCard } from "@/components/pantry";
 import { useNShortcut } from "@/lib/use-n-shortcut";
@@ -45,7 +45,7 @@ function ProductsPageInner() {
 
   return (
     <div>
-      <PageHeader title="Products" description="Your product collection and the categories that group them" />
+      <PageHeader title="Products" description="Your products and the categories that group them" />
 
       <div className="px-4 mb-3">
         <div className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
@@ -81,8 +81,8 @@ function ProductsTab() {
     filterCoating: "",
     filterCategoryId: "",
     filterMinStars: 0,
-    filterCollectionId: "",
-    filterActiveCollections: false,
+    filterVariantId: "",
+    filterActiveVariants: false,
     filterIncludeAllergens: [] as string[],
     filterExcludeAllergens: [] as string[],
     filterFillingCount: "",
@@ -92,8 +92,8 @@ function ProductsTab() {
   const productionMap = useProductProductionMap();
   const productCategories = useProductCategories(true /* include archived for grouping legacy products */);
   const coatings = useCoatings();
-  const collections = useCollections();
-  const allCollectionProducts = useAllCollectionProducts();
+  const variants = useVariants();
+  const allVariantProducts = useAllVariantProducts();
   const allFillings = useFillings();
   const allProductIds = useMemo(() => products.map((r) => r.id!).filter(Boolean), [products]);
   const productFillingsMap = useProductFillingsForProducts(allProductIds);
@@ -182,34 +182,34 @@ function ProductsTab() {
     return ordered;
   }, [productAllergenMap, marketRegion]);
 
-  // Determine which collections are currently active (startDate <= today, endDate unset or >= today)
+  // Determine which variants are currently active (startDate <= today, endDate unset or >= today)
   const today = new Date().toISOString().slice(0, 10);
-  const activeCollectionIds = useMemo(() => {
+  const activeVariantIds = useMemo(() => {
     return new Set(
-      collections
+      variants
         .filter((c) => c.startDate <= today && (!c.endDate || c.endDate >= today))
         .map((c) => c.id!)
     );
-  }, [collections, today]);
+  }, [variants, today]);
 
-  // Build a set of product IDs for the active collection filter
-  const activeCollectionProductIds = useMemo(() => {
+  // Build a set of product IDs for the active variant filter
+  const activeVariantProductIds = useMemo(() => {
     return new Set(
-      allCollectionProducts
-        .filter((cr) => activeCollectionIds.has(cr.collectionId))
+      allVariantProducts
+        .filter((cr) => activeVariantIds.has(cr.variantId))
         .map((cr) => cr.productId)
     );
-  }, [allCollectionProducts, activeCollectionIds]);
+  }, [allVariantProducts, activeVariantIds]);
 
-  // Build a set of product IDs for the specific collection filter
-  const selectedCollectionProductIds = useMemo(() => {
-    if (!f.filterCollectionId) return null;
+  // Build a set of product IDs for the specific variant filter
+  const selectedVariantProductIds = useMemo(() => {
+    if (!f.filterVariantId) return null;
     return new Set(
-      allCollectionProducts
-        .filter((cr) => cr.collectionId === f.filterCollectionId)
+      allVariantProducts
+        .filter((cr) => cr.variantId === f.filterVariantId)
         .map((cr) => cr.productId)
     );
-  }, [allCollectionProducts, f.filterCollectionId]);
+  }, [allVariantProducts, f.filterVariantId]);
 
   const activeFilterCount =
     (filterTagsSet.size > 0 ? 1 : 0) +
@@ -217,8 +217,8 @@ function ProductsTab() {
     (f.filterCategoryId ? 1 : 0) +
     (f.filterMinStars > 0 ? 1 : 0) +
     (f.showArchived ? 1 : 0) +
-    (f.filterCollectionId ? 1 : 0) +
-    (f.filterActiveCollections ? 1 : 0) +
+    (f.filterVariantId ? 1 : 0) +
+    (f.filterActiveVariants ? 1 : 0) +
     (filterIncludeAllergensSet.size > 0 ? 1 : 0) +
     (filterExcludeAllergensSet.size > 0 ? 1 : 0) +
     (f.filterFillingCount ? 1 : 0) +
@@ -241,8 +241,8 @@ function ProductsTab() {
         const rTags = new Set(r.tags ?? []);
         for (const t of filterTagsSet) if (!rTags.has(t)) return false;
       }
-      if (f.filterActiveCollections && !activeCollectionProductIds.has(r.id!)) return false;
-      if (selectedCollectionProductIds && !selectedCollectionProductIds.has(r.id!)) return false;
+      if (f.filterActiveVariants && !activeVariantProductIds.has(r.id!)) return false;
+      if (selectedVariantProductIds && !selectedVariantProductIds.has(r.id!)) return false;
       if (filterIncludeAllergensSet.size > 0) {
         const rAllergens = productAllergenMap.get(r.id!) ?? new Set();
         let hasAny = false;
@@ -264,7 +264,7 @@ function ProductsTab() {
       }
       return true;
     });
-  }, [products, f.search, f.filterCoating, f.filterCategoryId, f.filterMinStars, filterTagsSet, f.filterActiveCollections, activeCollectionProductIds, selectedCollectionProductIds, filterExcludeAllergensSet, productAllergenMap, f.filterFillingCount, productFillingsMap, filterShelfLifeSet]);
+  }, [products, f.search, f.filterCoating, f.filterCategoryId, f.filterMinStars, filterTagsSet, f.filterActiveVariants, activeVariantProductIds, selectedVariantProductIds, filterExcludeAllergensSet, productAllergenMap, f.filterFillingCount, productFillingsMap, filterShelfLifeSet]);
 
   // Group by productCategoryId; uncategorised goes last — single O(N) pass
   const grouped = useMemo(() => {
@@ -432,31 +432,31 @@ function ProductsTab() {
                 </div>
               </div>
             )}
-            {/* Collection */}
-            {collections.length > 0 && (
+            {/* Variant */}
+            {variants.length > 0 && (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Collection</p>
+                <p className="text-xs text-muted-foreground mb-1">Variant</p>
                 <div className="flex flex-col gap-1.5">
                   <select
-                    value={f.filterCollectionId}
-                    onChange={(e) => { setF("filterCollectionId", e.target.value); if (e.target.value) setF("filterActiveCollections", false); }}
+                    value={f.filterVariantId}
+                    onChange={(e) => { setF("filterVariantId", e.target.value); if (e.target.value) setF("filterActiveVariants", false); }}
                     className="input text-sm py-1"
                   >
-                    <option value="">All collections</option>
-                    {collections.map((c) => (
+                    <option value="">All variants</option>
+                    {variants.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                   <label className="flex items-center gap-2 text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={f.filterActiveCollections}
-                      onChange={(e) => { setF("filterActiveCollections", e.target.checked); if (e.target.checked) setF("filterCollectionId", ""); }}
+                      checked={f.filterActiveVariants}
+                      onChange={(e) => { setF("filterActiveVariants", e.target.checked); if (e.target.checked) setF("filterVariantId", ""); }}
                       className="rounded border-border"
                     />
-                    Active collections only
-                    {activeCollectionIds.size > 0 && (
-                      <span className="text-muted-foreground">({activeCollectionIds.size} active)</span>
+                    Active variants only
+                    {activeVariantIds.size > 0 && (
+                      <span className="text-muted-foreground">({activeVariantIds.size} active)</span>
                     )}
                   </label>
                 </div>
@@ -518,7 +518,7 @@ function ProductsTab() {
             />
             {activeFilterCount > 0 && (
               <button
-                onClick={() => { setF("filterTags", []); setF("filterCoating", ""); setF("filterCategoryId", ""); setF("filterMinStars", 0); setF("showArchived", false); setF("filterCollectionId", ""); setF("filterActiveCollections", false); setF("filterIncludeAllergens", []); setF("filterExcludeAllergens", []); setF("filterFillingCount", ""); setF("filterShelfLife", []); }}
+                onClick={() => { setF("filterTags", []); setF("filterCoating", ""); setF("filterCategoryId", ""); setF("filterMinStars", 0); setF("showArchived", false); setF("filterVariantId", ""); setF("filterActiveVariants", false); setF("filterIncludeAllergens", []); setF("filterExcludeAllergens", []); setF("filterFillingCount", ""); setF("filterShelfLife", []); }}
                 className="text-xs text-muted-foreground flex items-center gap-1"
               >
                 <X className="w-3 h-3" /> Clear all filters

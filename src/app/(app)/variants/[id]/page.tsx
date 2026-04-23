@@ -3,17 +3,17 @@
 import { use, useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  useCollection,
-  useCollectionProducts,
-  useCollectionPackagings,
-  useCollectionPricingSnapshots,
-  saveCollection,
-  deleteCollection,
-  addProductToCollection,
-  removeProductFromCollection,
-  saveCollectionPackaging,
-  saveCollectionPricingSnapshot,
-  deleteCollectionPackaging,
+  useVariant,
+  useVariantProducts,
+  useVariantPackagings,
+  useVariantPricingSnapshots,
+  saveVariant,
+  deleteVariant,
+  addProductToVariant,
+  removeProductFromVariant,
+  saveVariantPackaging,
+  saveVariantPricingSnapshot,
+  deleteVariantPackaging,
   useProductsList,
   usePackagingList,
   useAllPackagingOrders,
@@ -30,13 +30,13 @@ import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import { deriveShellPercentageFromGrams } from "@/lib/costCalculation";
 import { DENSITY_G_PER_ML } from "@/lib/production";
-import { calculateProductNutrition, calculateCollectionNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
-import { buildCollectionIngredientList, type ProductIngredientListInput } from "@/lib/ingredientList";
+import { calculateProductNutrition, calculateVariantNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
+import { buildVariantIngredientList, type ProductIngredientListInput } from "@/lib/ingredientList";
 import { ArrowLeft, Plus, Search, X, Trash2, Pencil, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import Link from "next/link";
-import type { ProductCostSnapshot, Packaging, PackagingOrder, CollectionPricingSnapshot, Ingredient } from "@/types";
+import type { ProductCostSnapshot, Packaging, PackagingOrder, VariantPricingSnapshot, Ingredient } from "@/types";
 import { costPerGram } from "@/types";
 import {
   latestPackagingUnitCost,
@@ -49,11 +49,11 @@ import {
   type ProductCostEntry,
   type BoxPricingResult,
   type MarginHealth,
-} from "@/lib/collectionPricing";
+} from "@/lib/variantPricing";
 
-type CollectionStatus = "active" | "upcoming" | "past" | "permanent";
+type VariantStatus = "active" | "upcoming" | "past" | "permanent";
 
-function getStatus(startDate: string, endDate?: string): CollectionStatus {
+function getStatus(startDate: string, endDate?: string): VariantStatus {
   const today = new Date().toISOString().split("T")[0];
   if (!endDate) return startDate <= today ? "permanent" : "upcoming";
   if (startDate > today) return "upcoming";
@@ -66,14 +66,14 @@ function formatDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-const STATUS_LABEL: Record<CollectionStatus, string> = {
+const STATUS_LABEL: Record<VariantStatus, string> = {
   permanent: "Standard / ongoing",
   active: "Active",
   upcoming: "Upcoming",
   past: "Past",
 };
 
-const STATUS_CLASS: Record<CollectionStatus, string> = {
+const STATUS_CLASS: Record<VariantStatus, string> = {
   permanent: "text-primary bg-primary/10",
   active: "text-emerald-700 bg-emerald-50",
   upcoming: "text-status-warn bg-status-warn-bg",
@@ -107,41 +107,41 @@ function useProductCosts(_productIds: string[]): Map<string, ProductCostSnapshot
   return data ?? new Map();
 }
 
-export default function CollectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function VariantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);
-  const collectionId = decodeURIComponent(idStr);
+  const variantId = decodeURIComponent(idStr);
   const router = useRouter();
   const searchParams = useSearchParams();
   const isNew = searchParams.get("new") === "1";
   const from = searchParams.get("from");
-  const backHref = from === "pricing" ? "/pricing" : "/collections";
-  const backLabel = from === "pricing" ? "Pricing & Margins" : "Collections";
+  const backHref = from === "pricing" ? "/pricing" : "/variants";
+  const backLabel = from === "pricing" ? "Pricing & Margins" : "Variants";
 
   const sym = useCurrencySymbol();
 
-  const collection = useCollection(collectionId);
-  const collectionProducts = useCollectionProducts(collectionId);
-  const collectionPackagings = useCollectionPackagings(collectionId);
+  const variant = useVariant(variantId);
+  const variantProducts = useVariantProducts(variantId);
+  const variantPackagings = useVariantPackagings(variantId);
   // Include archived so the name lookup map still resolves names for
-  // products that were archived after being added to this collection.
+  // products that were archived after being added to this variant.
   // Archived products are filtered out of the "Add product" form separately.
   const allProducts = useProductsList(true);
   const productCategoryMap = useProductCategoryMap();
   const allPackaging = usePackagingList(true);
   const allOrders = useAllPackagingOrders();
-  const allPricingSnapshots = useCollectionPricingSnapshots(collectionId);
+  const allPricingSnapshots = useVariantPricingSnapshots(variantId);
 
   // Build product ID list for cost hooks (stable reference)
   const productIds = useMemo(
-    () => collectionProducts.map((cr) => cr.productId),
-    [collectionProducts]
+    () => variantProducts.map((cr) => cr.productId),
+    [variantProducts]
   );
   const productCostMap = useProductCosts(productIds);
 
-  // Check if any ingredients used in this collection's products have missing pricing
+  // Check if any ingredients used in this variant's products have missing pricing
   const productIdsKey = productIds.join(",");
   const { data: hasMissingIngredientPricing } = useQuery({
-    queryKey: ["collection-missing-ingredient-pricing", productIdsKey],
+    queryKey: ["variant-missing-ingredient-pricing", productIdsKey],
     enabled: productIds.length > 0,
     queryFn: async () => {
       const rls = assertOk(
@@ -187,16 +187,16 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   // Delete confirmation
   const [showDelete, setShowDelete] = useState(false);
 
-  // Sync local state from DB when collection first loads
+  // Sync local state from DB when variant first loads
   useEffect(() => {
-    if (!collection) return;
-    setName(collection.name || "");
-    setDescription(collection.description || "");
-    setStartDate(collection.startDate || "");
-    setEndDate(collection.endDate || "");
-    setNotes(collection.notes || "");
+    if (!variant) return;
+    setName(variant.name || "");
+    setDescription(variant.description || "");
+    setStartDate(variant.startDate || "");
+    setEndDate(variant.endDate || "");
+    setNotes(variant.notes || "");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collection?.id]);
+  }, [variant?.id]);
 
   // Escape key: cancel edit mode or dismiss delete confirmation
   useEffect(() => {
@@ -211,12 +211,12 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   }, [showDelete, editing]);
 
   function enterEdit() {
-    if (!collection) return;
-    setName(collection.name || "");
-    setDescription(collection.description || "");
-    setStartDate(collection.startDate || "");
-    setEndDate(collection.endDate || "");
-    setNotes(collection.notes || "");
+    if (!variant) return;
+    setName(variant.name || "");
+    setDescription(variant.description || "");
+    setStartDate(variant.startDate || "");
+    setEndDate(variant.endDate || "");
+    setNotes(variant.notes || "");
     setEditing(true);
   }
 
@@ -224,14 +224,14 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   function handleCancel() {
     setEditing(false);
-    if (isNew) router.replace(`/collections/${encodeURIComponent(collectionId)}${fromSuffix}`);
+    if (isNew) router.replace(`/variants/${encodeURIComponent(variantId)}${fromSuffix}`);
   }
 
   async function handleSave() {
-    if (!collection?.id || !name.trim() || !startDate) return;
-    await saveCollection({
-      ...collection,
-      id: collection.id,
+    if (!variant?.id || !name.trim() || !startDate) return;
+    await saveVariant({
+      ...variant,
+      id: variant.id,
       name: name.trim(),
       description: description.trim() || undefined,
       startDate,
@@ -240,22 +240,22 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     });
     setSavedOnce(true);
     setEditing(false);
-    if (isNew) router.replace(`/collections/${encodeURIComponent(collectionId)}${fromSuffix}`);
+    if (isNew) router.replace(`/variants/${encodeURIComponent(variantId)}${fromSuffix}`);
   }
 
   async function handleDelete() {
-    if (!collection?.id) return;
-    await deleteCollection(collection.id);
+    if (!variant?.id) return;
+    await deleteVariant(variant.id);
     router.replace(backHref);
   }
 
   async function handleAddProduct(productId: string) {
-    await addProductToCollection(collectionId, productId);
+    await addProductToVariant(variantId, productId);
     setProductSearch("");
   }
 
-  async function handleRemoveProduct(collectionProductId: string) {
-    await removeProductFromCollection(collectionProductId);
+  async function handleRemoveProduct(variantProductId: string) {
+    await removeProductFromVariant(variantProductId);
     setPendingRemove(null);
   }
 
@@ -263,7 +263,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   async function recordPricingSnapshot(
     packagingId: string,
     sellPrice: number,
-    triggerType: CollectionPricingSnapshot["triggerType"],
+    triggerType: VariantPricingSnapshot["triggerType"],
     triggerDetail: string,
   ) {
     if (!avgCost) return;
@@ -274,8 +274,8 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     if (packagingUnitCost === 0) return;
     const capacity = pkg?.capacity ?? 0;
     const pricing = calculateBoxPricing(avgCost.avg, capacity, packagingUnitCost, sellPrice);
-    await saveCollectionPricingSnapshot({
-      collectionId,
+    await saveVariantPricingSnapshot({
+      variantId,
       packagingId,
       avgProductCost: avgCost.avg,
       packagingUnitCost,
@@ -292,8 +292,8 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     if (!selectedPackagingId || !sellPriceStr) return;
     const price = parseFloat(sellPriceStr);
     if (isNaN(price) || price < 0) return;
-    await saveCollectionPackaging({
-      collectionId,
+    await saveVariantPackaging({
+      variantId,
       packagingId: selectedPackagingId,
       sellPrice: price,
       createdAt: new Date(),
@@ -308,9 +308,9 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   async function handleUpdateSellPrice(cpId: string) {
     const price = parseFloat(editSellPriceStr);
     if (isNaN(price) || price < 0) return;
-    const existing = collectionPackagings.find((cp) => cp.id === cpId);
+    const existing = variantPackagings.find((cp) => cp.id === cpId);
     if (!existing) return;
-    await saveCollectionPackaging({ ...existing, id: cpId, sellPrice: price });
+    await saveVariantPackaging({ ...existing, id: cpId, sellPrice: price });
     await recordPricingSnapshot(existing.packagingId, price, "sell_price_change", `Sell price updated to ${formatPrice(price, sym)}`);
     setEditingSellPrice(null);
     setEditSellPriceStr("");
@@ -321,13 +321,13 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   }
 
   async function handleRemoveBox(cpId: string) {
-    await deleteCollectionPackaging(cpId);
+    await deleteVariantPackaging(cpId);
     setPendingRemoveBox(null);
   }
 
   const productIdSet = useMemo(
-    () => new Set(collectionProducts.map((cr) => cr.productId)),
-    [collectionProducts]
+    () => new Set(variantProducts.map((cr) => cr.productId)),
+    [variantProducts]
   );
 
   const availableProducts = useMemo(() => {
@@ -361,7 +361,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   // Group pricing history snapshots by packagingId (already newest-first from hook)
   const snapshotsByPackaging = useMemo(() => {
-    const m = new Map<string, CollectionPricingSnapshot[]>();
+    const m = new Map<string, VariantPricingSnapshot[]>();
     for (const s of allPricingSnapshots) {
       const arr = m.get(s.packagingId) ?? [];
       arr.push(s);
@@ -370,7 +370,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     return m;
   }, [allPricingSnapshots]);
 
-  // Average product cost for this collection
+  // Average product cost for this variant
   const productCosts: ProductCostEntry[] = useMemo(() => {
     const entries: ProductCostEntry[] = [];
     for (const rid of productIds) {
@@ -385,7 +385,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   // Box pricing for each configured packaging
   const boxPricings = useMemo(() => {
     if (!avgCost) return [];
-    return collectionPackagings.map((cp) => {
+    return variantPackagings.map((cp) => {
       const pkg = packagingMap.get(cp.packagingId);
       const orders = ordersByPackaging.get(cp.packagingId) ?? [];
       const unitCost = latestPackagingUnitCost(orders) ?? 0;
@@ -394,40 +394,40 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
       const health = marginHealth(pricing.marginPercent);
       return { cp, pkg, pricing, health, unitCost };
     });
-  }, [avgCost, collectionPackagings, packagingMap, ordersByPackaging]);
+  }, [avgCost, variantPackagings, packagingMap, ordersByPackaging]);
 
   // Packaging already added (to exclude from dropdown)
   const usedPackagingIds = useMemo(
-    () => new Set(collectionPackagings.map((cp) => cp.packagingId)),
-    [collectionPackagings]
+    () => new Set(variantPackagings.map((cp) => cp.packagingId)),
+    [variantPackagings]
   );
 
   const [savedOnce, setSavedOnce] = useState(false);
-  const formDirty = editing && collection != null && (
-    name !== (collection.name || "") ||
-    description !== (collection.description || "") ||
-    startDate !== (collection.startDate || "") ||
-    endDate !== (collection.endDate || "") ||
-    notes !== (collection.notes || "")
+  const formDirty = editing && variant != null && (
+    name !== (variant.name || "") ||
+    description !== (variant.description || "") ||
+    startDate !== (variant.startDate || "") ||
+    endDate !== (variant.endDate || "") ||
+    notes !== (variant.notes || "")
   );
   const isDirty = (isNew && !savedOnce) || formDirty;
 
   const handleConfirmLeave = useCallback(async () => {
-    if (isNew && collection?.id) {
-      await deleteCollection(collection.id);
+    if (isNew && variant?.id) {
+      await deleteVariant(variant.id);
     }
-  }, [isNew, collection?.id]);
+  }, [isNew, variant?.id]);
 
   useNavigationGuard(isDirty, isNew ? handleConfirmLeave : undefined);
 
-  if (collection === undefined) {
+  if (variant === undefined) {
     return <div className="p-6 text-muted-foreground text-sm">Loading...</div>;
   }
-  if (collection === null) {
-    return <div className="p-6 text-muted-foreground text-sm">Collection not found.</div>;
+  if (variant === null) {
+    return <div className="p-6 text-muted-foreground text-sm">Variant not found.</div>;
   }
 
-  const status = getStatus(collection.startDate, collection.endDate);
+  const status = getStatus(variant.startDate, variant.endDate);
 
   return (
     <div>
@@ -445,15 +445,15 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
         {/* Name row + edit button */}
         <div className="flex items-start justify-between gap-2">
           <InlineNameEditor
-            name={collection.name}
-            onSave={async (n) => { await saveCollection({ ...collection, name: n }); }}
+            name={variant.name}
+            onSave={async (n) => { await saveVariant({ ...variant, name: n }); }}
             className="text-xl font-bold"
           />
           {!editing && (
             <button
               onClick={enterEdit}
               className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
-              aria-label="Edit collection"
+              aria-label="Edit variant"
             >
               <Pencil className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -471,7 +471,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
                 onChange={(e) => setName(e.target.value)}
                 autoFocus={isNew}
                 className="input"
-                placeholder="Collection name"
+                placeholder="Variant name"
               />
             </div>
             <div>
@@ -547,23 +547,23 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
             <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_CLASS[status]}`}>
               {STATUS_LABEL[status]}
             </span>
-            {collection.description && (
-              <p className="text-sm text-muted-foreground">{collection.description}</p>
+            {variant.description && (
+              <p className="text-sm text-muted-foreground">{variant.description}</p>
             )}
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">From</span>
-              <span className="font-medium">{formatDate(collection.startDate)}</span>
-              {collection.endDate ? (
+              <span className="font-medium">{formatDate(variant.startDate)}</span>
+              {variant.endDate ? (
                 <>
                   <span className="text-muted-foreground">&rarr;</span>
-                  <span className="font-medium">{formatDate(collection.endDate)}</span>
+                  <span className="font-medium">{formatDate(variant.endDate)}</span>
                 </>
               ) : (
                 <span className="text-muted-foreground">&middot; no end date</span>
               )}
             </div>
-            {collection.notes && (
-              <p className="text-sm whitespace-pre-wrap text-muted-foreground">{collection.notes}</p>
+            {variant.notes && (
+              <p className="text-sm whitespace-pre-wrap text-muted-foreground">{variant.notes}</p>
             )}
           </section>
         )}
@@ -572,7 +572,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-primary">
-              Products <span className="text-xs font-normal text-muted-foreground">({collectionProducts.length})</span>
+              Products <span className="text-xs font-normal text-muted-foreground">({variantProducts.length})</span>
             </h2>
             {editing && (
               <button
@@ -629,13 +629,13 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
             </div>
           )}
 
-          {collectionProducts.length === 0 ? (
+          {variantProducts.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
-              {editing ? 'No products yet \u2014 use "Add product" above.' : "No products in this collection."}
+              {editing ? 'No products yet \u2014 use "Add product" above.' : "No products in this variant."}
             </p>
           ) : (
             <ul className="space-y-2">
-              {collectionProducts.map((cr) => {
+              {variantProducts.map((cr) => {
                 const snap = productCostMap.get(cr.productId);
                 return (
                   <li key={cr.id} className="rounded-lg border border-border bg-card flex items-center gap-2 px-3 py-2.5">
@@ -671,7 +671,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
                         <button
                           onClick={() => setPendingRemove(cr.id ?? "")}
                           className="text-muted-foreground/40 hover:text-muted-foreground shrink-0"
-                          aria-label="Remove product from collection"
+                          aria-label="Remove product from variant"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -703,7 +703,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
             Nutrition & Ingredients
            ═══════════════════════════════════════════════════════════════ */}
         {productIds.length > 0 && (
-          <CollectionNutritionSection productIds={productIds} />
+          <VariantNutritionSection productIds={productIds} />
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
@@ -780,12 +780,12 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
             <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2 mb-3">
               <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
               <p className="text-xs text-status-warn">
-                Some ingredients in this collection&apos;s products have no pricing data — margin calculations may be understated. Check individual product cost tabs.
+                Some ingredients in this variant&apos;s products have no pricing data — margin calculations may be understated. Check individual product cost tabs.
               </p>
             </div>
           )}
 
-          {collectionPackagings.length === 0 ? (
+          {variantPackagings.length === 0 ? (
             <div className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-lg space-y-1">
               <p>No box pricing configured yet.</p>
               <p className="text-xs">Add a box to see cost breakdowns and margins.</p>
@@ -838,13 +838,13 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
           )}
 
           {/* Link to full pricing overview */}
-          {collectionPackagings.length > 0 && (
+          {variantPackagings.length > 0 && (
             <div className="mt-3">
               <Link
                 href="/pricing"
                 className="text-xs text-primary hover:underline"
               >
-                Compare across all collections &rarr;
+                Compare across all variants &rarr;
               </Link>
             </div>
           )}
@@ -857,13 +857,13 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
               onClick={() => setShowDelete(true)}
               className="flex items-center gap-2 text-sm text-destructive hover:underline"
             >
-              <Trash2 className="w-4 h-4" /> Delete collection
+              <Trash2 className="w-4 h-4" /> Delete variant
             </button>
           ) : (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
-              <p className="text-sm font-medium text-destructive">Delete this collection?</p>
+              <p className="text-sm font-medium text-destructive">Delete this variant?</p>
               <p className="text-xs text-muted-foreground">
-                This removes the collection, its product list, and box pricing. The products themselves are not affected.
+                This removes the variant, its product list, and box pricing. The products themselves are not affected.
               </p>
               <div className="flex gap-2">
                 <button onClick={handleDelete} className="btn-destructive px-4 py-2 text-sm">
@@ -883,7 +883,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
 /* ─── Box pricing card ─── */
 
-const TRIGGER_LABELS: Record<CollectionPricingSnapshot["triggerType"], string> = {
+const TRIGGER_LABELS: Record<VariantPricingSnapshot["triggerType"], string> = {
   sell_price_change: "Sell price",
   ingredient_price: "Ingredient cost",
   coating_change: "Coating change",
@@ -891,7 +891,7 @@ const TRIGGER_LABELS: Record<CollectionPricingSnapshot["triggerType"], string> =
   manual: "Recalculated",
 };
 
-const TRIGGER_COLORS: Record<CollectionPricingSnapshot["triggerType"], string> = {
+const TRIGGER_COLORS: Record<VariantPricingSnapshot["triggerType"], string> = {
   sell_price_change: "bg-primary/80",
   ingredient_price: "bg-status-warn-edge",
   coating_change: "bg-purple-400",
@@ -926,7 +926,7 @@ function BoxCard({
   pricing: BoxPricingResult;
   health: MarginHealth;
   packagingUnitCost: number;
-  history: CollectionPricingSnapshot[];
+  history: VariantPricingSnapshot[];
   historyExpanded: boolean;
   onToggleHistory: () => void;
   isEditingSellPrice: boolean;
@@ -1178,9 +1178,9 @@ function BoxCard({
   );
 }
 
-/* ─── Nutrition & Ingredients (collection-level rollup) ─── */
+/* ─── Nutrition & Ingredients (variant-level rollup) ─── */
 
-function CollectionNutritionSection({ productIds }: { productIds: string[] }) {
+function VariantNutritionSection({ productIds }: { productIds: string[] }) {
   const allProducts = useProductsList(true);
   const allIngredients = useIngredients(true);
   const allMoulds = useMouldsList(true);
@@ -1210,7 +1210,7 @@ function CollectionNutritionSection({ productIds }: { productIds: string[] }) {
     [allMoulds],
   );
 
-  // Per-product rollup specs — one entry per product in the collection.
+  // Per-product rollup specs — one entry per product in the variant.
   // Products missing a mould are skipped (same guard as the product helper).
   const perProductInputs: ProductIngredientListInput[] = useMemo(() => {
     const inputs: ProductIngredientListInput[] = [];
@@ -1253,19 +1253,19 @@ function CollectionNutritionSection({ productIds }: { productIds: string[] }) {
     [perProductInputs],
   );
 
-  const collectionNutrition = useMemo(
-    () => calculateCollectionNutrition(perProductNutrition),
+  const variantNutrition = useMemo(
+    () => calculateVariantNutrition(perProductNutrition),
     [perProductNutrition],
   );
 
   const ingredientList = useMemo(
-    () => buildCollectionIngredientList(perProductInputs),
+    () => buildVariantIngredientList(perProductInputs),
     [perProductInputs],
   );
 
   const nutrients = getNutrientsByMarket(market);
   const panelTitle = getNutritionPanelTitle(market);
-  const { per100g, totalWeightG, productsWithData, productsTotal } = collectionNutrition;
+  const { per100g, totalWeightG, productsWithData, productsTotal } = variantNutrition;
   const hasData = Object.keys(per100g).length > 0;
   const productsWithoutMould = productIds.length - perProductInputs.length;
 
@@ -1325,7 +1325,7 @@ function CollectionNutritionSection({ productIds }: { productIds: string[] }) {
         </>
       ) : (
         <p className="text-sm text-muted-foreground py-3 mb-4">
-          No products in this collection have nutrition data yet.
+          No products in this variant have nutrition data yet.
         </p>
       )}
 

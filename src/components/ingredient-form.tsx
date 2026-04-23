@@ -447,7 +447,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium mb-1">Sub-ingredients</legend>
           <p className="text-xs text-muted-foreground">
-            Optional. Used to compose ingredient-list text at filling / product / collection
+            Optional. Used to compose ingredient-list text at filling / product / variant
             level. Enter sub-ingredients in descending order of quantity (EU labelling
             convention); the order you save here is the order they&apos;ll appear on
             rolled-up ingredient lists.

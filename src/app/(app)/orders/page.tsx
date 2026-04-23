@@ -411,25 +411,25 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
   const locationTotals = useProductLocationTotals();
   const linkedCustomer = useCustomer(customerId);
   const customerProductPrices = useCustomerProductPrices(customerId || undefined);
-  const { data: collectionProducts = [] } = useQuery({
-    queryKey: ["collection-products", "all-for-new-order"],
+  const { data: variantProducts = [] } = useQuery({
+    queryKey: ["variant-products", "all-for-new-order"],
     queryFn: async () =>
       assertOk(
-        await supabase.from("collectionProducts").select("collectionId, productId, unitPrice"),
-      ) as Array<{ collectionId: string; productId: string; unitPrice?: number }>,
+        await supabase.from("variantProducts").select("variantId, productId, unitPrice"),
+      ) as Array<{ variantId: string; productId: string; unitPrice?: number }>,
   });
 
-  // productId → highest unitPrice across any collection that lists it.
+  // productId → highest unitPrice across any variant that lists it.
   // Used as the retail fallback in resolveUnitPrice.
   const productRetailPrice = useMemo(() => {
     const map = new Map<string, number>();
-    for (const cp of collectionProducts) {
+    for (const cp of variantProducts) {
       if (cp.unitPrice == null) continue;
       const prev = map.get(cp.productId);
       if (prev == null || cp.unitPrice > prev) map.set(cp.productId, cp.unitPrice);
     }
     return map;
-  }, [collectionProducts]);
+  }, [variantProducts]);
 
   function resolveProductPrice(productId: string) {
     return resolveUnitPrice({
@@ -439,7 +439,7 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
         productId: p.productId, unitPrice: p.unitPrice,
       })),
       customerPriceListId: linkedCustomer?.defaultPriceListId,
-      priceListEntries: collectionProducts,
+      priceListEntries: variantProducts,
       customerDiscountPercent: linkedCustomer?.defaultDiscountPercent,
       retailPrice: productRetailPrice.get(productId),
     });

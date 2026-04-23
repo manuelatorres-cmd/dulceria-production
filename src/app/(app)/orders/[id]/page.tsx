@@ -22,7 +22,7 @@ import {
 import { batchPhaseProgress } from "@/lib/batch-progress";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import { latestPackagingUnitCost } from "@/lib/collectionPricing";
+import { latestPackagingUnitCost } from "@/lib/variantPricing";
 import {
   computeOrderLabourHours, computeOrderCalculatedCost, checkOrderFeasibility,
   type OrderProductLine, type OrderPackagingRollupLine, type ProductStockState,
@@ -100,15 +100,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     queryFn: async () =>
       assertOk(await supabase.from("packagingOrders").select("*")) as PackagingOrder[],
   });
-  // Collection rows (for price-list resolution via migration 0035's
-  // unitPrice column). One query covers every collection since the
+  // Variant rows (for price-list resolution via migration 0035's
+  // unitPrice column). One query covers every variant since the
   // table is small and the hierarchy is evaluated per product.
-  const { data: collectionProducts = [] } = useQuery({
-    queryKey: ["collection-products", "all-for-order-detail"],
+  const { data: variantProducts = [] } = useQuery({
+    queryKey: ["variant-products", "all-for-order-detail"],
     queryFn: async () =>
       assertOk(
-        await supabase.from("collectionProducts").select("collectionId, productId, unitPrice"),
-      ) as Array<{ collectionId: string; productId: string; unitPrice?: number }>,
+        await supabase.from("variantProducts").select("variantId, productId, unitPrice"),
+      ) as Array<{ variantId: string; productId: string; unitPrice?: number }>,
   });
   const customerProductPrices = useCustomerProductPrices(order?.customerId);
 
@@ -141,17 +141,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }, [packagingOrders]);
 
   // productId → a plausible "retail" unit price, picked as the highest
-  // unitPrice on any collection that lists it. Consumed by
+  // unitPrice on any variant that lists it. Consumed by
   // resolveUnitPrice as the last-resort fallback before "none".
   const productRetailPrice = useMemo(() => {
     const map = new Map<string, number>();
-    for (const cp of collectionProducts) {
+    for (const cp of variantProducts) {
       if (cp.unitPrice == null) continue;
       const prev = map.get(cp.productId);
       if (prev == null || cp.unitPrice > prev) map.set(cp.productId, cp.unitPrice);
     }
     return map;
-  }, [collectionProducts]);
+  }, [variantProducts]);
 
   function resolveProductPrice(productId: string) {
     return resolveUnitPrice({
@@ -161,7 +161,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         productId: p.productId, unitPrice: p.unitPrice,
       })),
       customerPriceListId: linkedCustomer?.defaultPriceListId,
-      priceListEntries: collectionProducts,
+      priceListEntries: variantProducts,
       customerDiscountPercent: linkedCustomer?.defaultDiscountPercent,
       retailPrice: productRetailPrice.get(productId),
     });

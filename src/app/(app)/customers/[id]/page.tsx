@@ -8,7 +8,7 @@ import {
   useCustomerContacts, saveCustomerContact, deleteCustomerContact,
   useCustomerFollowups, saveCustomerFollowup, completeCustomerFollowup, deleteCustomerFollowup,
   useOrders, useAllOrderItems, useProductsList, useQuotes,
-  useCollections,
+  useVariants,
   useCustomerProductPrices, saveCustomerProductPrice, deleteCustomerProductPrice,
 } from "@/lib/hooks";
 import { computeCustomerAnalytics } from "@/lib/customerAnalytics";
@@ -35,7 +35,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const orderItems = useAllOrderItems();
   const products = useProductsList(true);
   const quotes = useQuotes({ customerId: id });
-  const collections = useCollections();
+  const variants = useVariants();
   const customerProductPrices = useCustomerProductPrices(id);
 
   // Inline edit state
@@ -307,7 +307,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 <label className="label">Default price list</label>
                 <select value={form.defaultPriceListId} onChange={(e) => setForm({ ...form, defaultPriceListId: e.target.value })} className="input text-sm">
                   <option value="">— none —</option>
-                  {collections.map((c) => <option key={c.id} value={c.id!}>{c.name}</option>)}
+                  {variants.map((c) => <option key={c.id} value={c.id!}>{c.name}</option>)}
                 </select>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   Used for per-product prices when the customer doesn't have a bespoke override.
@@ -364,7 +364,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               {customer.invoiceAddress && <><dt className="text-muted-foreground text-xs">Invoice address</dt><dd>{customer.invoiceAddress}</dd></>}
               {customer.defaultPriceListId && (
                 <><dt className="text-muted-foreground text-xs">Price list</dt>
-                <dd>{collections.find((c) => c.id === customer.defaultPriceListId)?.name ?? "—"}</dd></>
+                <dd>{variants.find((c) => c.id === customer.defaultPriceListId)?.name ?? "—"}</dd></>
               )}
               {customer.defaultDiscountPercent != null && customer.defaultDiscountPercent > 0 && (
                 <><dt className="text-muted-foreground text-xs">Default discount</dt>

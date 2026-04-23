@@ -12,9 +12,9 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import type { ProductCostSnapshot, PackagingOrder, QuoteItem, Collection, CollectionProduct } from "@/types";
+import type { ProductCostSnapshot, PackagingOrder, QuoteItem, Variant, VariantProduct } from "@/types";
 import { computeQuotePricing, checkQuoteFeasibility } from "@/lib/quoteMath";
-import { latestPackagingUnitCost } from "@/lib/collectionPricing";
+import { latestPackagingUnitCost } from "@/lib/variantPricing";
 import { ArrowLeft, Plus, Trash2, FileText, Package, CheckCircle, AlertTriangle } from "lucide-react";
 
 type LineKind = "product" | "box";
@@ -59,13 +59,13 @@ function NewQuotePageInner() {
     queryKey: ["packaging-orders", "all-for-quote"],
     queryFn: async () => assertOk(await supabase.from("packagingOrders").select("*")) as PackagingOrder[],
   });
-  const { data: collections = [] } = useQuery({
-    queryKey: ["collections", "all-for-quote"],
-    queryFn: async () => assertOk(await supabase.from("collections").select("*")) as Collection[],
+  const { data: variants = [] } = useQuery({
+    queryKey: ["variants", "all-for-quote"],
+    queryFn: async () => assertOk(await supabase.from("variants").select("*")) as Variant[],
   });
-  const { data: collectionProducts = [] } = useQuery({
-    queryKey: ["collection-products", "all-for-quote"],
-    queryFn: async () => assertOk(await supabase.from("collectionProducts").select("*")) as CollectionProduct[],
+  const { data: variantProducts = [] } = useQuery({
+    queryKey: ["variant-products", "all-for-quote"],
+    queryFn: async () => assertOk(await supabase.from("variantProducts").select("*")) as VariantProduct[],
   });
 
   const productName = useMemo(() => new Map(products.map((p) => [p.id!, p.name])), [products]);
@@ -101,23 +101,23 @@ function NewQuotePageInner() {
     return map;
   }, [packagingOrders]);
 
-  // productId → retail price (from the latest collection snapshot that lists it)
+  // productId → retail price (from the latest variant snapshot that lists it)
   const productRetailPrice = useMemo(() => {
     const latestPrice = new Map<string, number>();
-    const collectionById = new Map(collections.map((c) => [c.id!, c]));
-    for (const cp of collectionProducts) {
-      const col = collectionById.get(cp.collectionId);
+    const variantById = new Map(variants.map((c) => [c.id!, c]));
+    for (const cp of variantProducts) {
+      const col = variantById.get(cp.variantId);
       if (!col) continue;
-      // Assume retail price is stored on the collection product row
-      // (collectionProducts has unitPrice in the schema) — fall back to 0 if missing.
+      // Assume retail price is stored on the variant product row
+      // (variantProducts has unitPrice in the schema) — fall back to 0 if missing.
       const price = (cp as unknown as { unitPrice?: number }).unitPrice;
       if (price == null) continue;
-      // If a product is in multiple collections, prefer the newest retail price.
+      // If a product is in multiple variants, prefer the newest retail price.
       const prev = latestPrice.get(cp.productId);
       if (prev == null || price > prev) latestPrice.set(cp.productId, price);
     }
     return latestPrice;
-  }, [collections, collectionProducts]);
+  }, [variants, variantProducts]);
 
   // ── UI state ────────────────────────────────────────────────────────────
 

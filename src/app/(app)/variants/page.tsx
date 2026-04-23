@@ -3,17 +3,17 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { useCollections, saveCollection } from "@/lib/hooks";
+import { useVariants, saveVariant } from "@/lib/hooks";
 import { ChevronRight } from "lucide-react";
 import { ListToolbar, FilterPanel, FilterChipGroup } from "@/components/pantry";
 import Link from "next/link";
-import type { Collection } from "@/types";
+import type { Variant } from "@/types";
 import { useNShortcut } from "@/lib/use-n-shortcut";
 import { usePersistedFilters } from "@/lib/use-persisted-filters";
 
-type CollectionStatus = "active" | "upcoming" | "past" | "permanent";
+type VariantStatus = "active" | "upcoming" | "past" | "permanent";
 
-function getStatus(c: Collection): CollectionStatus {
+function getStatus(c: Variant): VariantStatus {
   const today = new Date().toISOString().split("T")[0];
   if (!c.endDate) return c.startDate <= today ? "permanent" : "upcoming";
   if (c.startDate > today) return "upcoming";
@@ -21,14 +21,14 @@ function getStatus(c: Collection): CollectionStatus {
   return "active";
 }
 
-const STATUS_LABEL: Record<CollectionStatus, string> = {
+const STATUS_LABEL: Record<VariantStatus, string> = {
   permanent: "standard",
   active: "active",
   upcoming: "upcoming",
   past: "past",
 };
 
-const STATUS_CLASS: Record<CollectionStatus, string> = {
+const STATUS_CLASS: Record<VariantStatus, string> = {
   permanent: "text-primary bg-primary/10",
   active: "text-emerald-700 bg-emerald-50",
   upcoming: "text-status-warn bg-status-warn-bg",
@@ -47,10 +47,10 @@ function formatDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-export default function CollectionsPage() {
+export default function VariantsPage() {
   const router = useRouter();
-  const collections = useCollections();
-  const [f, setF] = usePersistedFilters("collections", {
+  const variants = useVariants();
+  const [f, setF] = usePersistedFilters("variants", {
     search: "",
     showFilters: false,
     filterStatuses: [] as string[],
@@ -76,37 +76,37 @@ export default function CollectionsPage() {
   }
 
   const filtered = useMemo(() => {
-    return collections.filter((c) => {
+    return variants.filter((c) => {
       if (f.search && !c.name.toLowerCase().includes(f.search.toLowerCase())) return false;
       if (filterStatusesSet.size > 0 && !filterStatusesSet.has(getStatus(c))) return false;
       return true;
     });
-  }, [collections, f.search, filterStatusesSet]);
+  }, [variants, f.search, filterStatusesSet]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
-    const id = await saveCollection({
+    const id = await saveVariant({
       name: newName.trim(),
       startDate: newStart,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    router.push(`/collections/${encodeURIComponent(String(id))}?new=1`);
+    router.push(`/variants/${encodeURIComponent(String(id))}?new=1`);
   }
 
   return (
     <div>
-      <PageHeader title="Collections" description="Seasonal and standard product assortments" />
+      <PageHeader title="Variants" description="Seasonal and standard product assortments" />
       <div className="px-4 space-y-3 pb-6">
         <ListToolbar
           search={f.search}
           onSearchChange={(v) => setF("search", v)}
-          searchPlaceholder="Search collections…"
-          searchAriaLabel="Search collections"
+          searchPlaceholder="Search variants…"
+          searchAriaLabel="Search variants"
           onAdd={() => setShowAdd(true)}
-          addAriaLabel="Add collection"
-          addTitle="New collection (n)"
+          addAriaLabel="Add variant"
+          addTitle="New variant (n)"
           showFilters
           filterPanelOpen={f.showFilters}
           onToggleFilters={() => setF("showFilters", !f.showFilters)}
@@ -131,7 +131,7 @@ export default function CollectionsPage() {
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Collection name *"
+              placeholder="Variant name *"
               required
               autoFocus
               className="input"
@@ -148,7 +148,7 @@ export default function CollectionsPage() {
             </div>
             <div className="flex gap-2">
               <button type="submit" disabled={!newName.trim()} className="btn-primary flex-1 py-2">
-                Create Collection
+                Create Variant
               </button>
               <button
                 type="button"
@@ -163,9 +163,9 @@ export default function CollectionsPage() {
 
         {filtered.length === 0 ? (
           <p className="text-muted-foreground text-sm py-8 text-center">
-            {collections.length === 0
-              ? "No collections yet. Tap + to create your first."
-              : "No collections match your search."}
+            {variants.length === 0
+              ? "No variants yet. Tap + to create your first."
+              : "No variants match your search."}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -174,7 +174,7 @@ export default function CollectionsPage() {
               return (
                 <li key={c.id} className="rounded-lg border border-border bg-card">
                   <Link
-                    href={`/collections/${encodeURIComponent(c.id ?? "")}`}
+                    href={`/variants/${encodeURIComponent(c.id ?? "")}`}
                     className="flex items-center gap-3 p-3 min-w-0"
                   >
                     <div className="min-w-0 flex-1">

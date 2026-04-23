@@ -3,7 +3,7 @@
  * gross margin.
  *
  * Pure: no React, no Supabase. The order page injects every input
- * (customer, products, collection, per-customer overrides, app
+ * (customer, products, variant, per-customer overrides, app
  * defaults) so these functions stay unit-testable.
  *
  * Vocabulary
@@ -14,11 +14,11 @@
  *
  * Pricing hierarchy (highest priority first):
  *   1. customerProductPrices — per-customer + per-product override
- *   2. collection (as price list) — customer.defaultPriceListId +
- *      collectionProducts.unitPrice
+ *   2. variant (as price list) — customer.defaultPriceListId +
+ *      variantProducts.unitPrice
  *   3. customer.defaultDiscountPercent applied against the retail
  *      price (see step 4)
- *   4. product retail price from the latest collection that lists it
+ *   4. product retail price from the latest variant that lists it
  *      (existing behaviour in the quote flow)
  *   5. null — caller renders "— price missing" and blocks save
  */
@@ -33,15 +33,15 @@ export interface ResolveUnitPriceInput {
   customerId?: string;
   /** All rows in customerProductPrices for the current customer. */
   customerProductPrices: Array<{ productId: string; unitPrice: number }>;
-  /** The customer's defaultPriceListId (a collection id) — null if none. */
+  /** The customer's defaultPriceListId (a variant id) — null if none. */
   customerPriceListId?: string;
-  /** Every collectionProducts row that could be relevant — the caller
+  /** Every variantProducts row that could be relevant — the caller
    *  supplies the already-loaded table; the helper filters by
-   *  collectionId + productId. */
-  priceListEntries: Array<{ collectionId: string; productId: string; unitPrice?: number }>;
+   *  variantId + productId. */
+  priceListEntries: Array<{ variantId: string; productId: string; unitPrice?: number }>;
   /** The customer's blanket discount (percent 0..100), or null. */
   customerDiscountPercent?: number;
-  /** The product's catalogue retail price (from the latest collection
+  /** The product's catalogue retail price (from the latest variant
    *  snapshot that lists it, or wherever the UI gets it). */
   retailPrice?: number;
 }
@@ -65,10 +65,10 @@ export function resolveUnitPrice(input: ResolveUnitPriceInput): ResolvedUnitPric
     if (hit) return { unitPrice: hit.unitPrice, source: "customerProductPrice" };
   }
 
-  // 2. Customer's default price list (a Collection).
+  // 2. Customer's default price list (a Variant).
   if (input.customerPriceListId) {
     const hit = input.priceListEntries.find(
-      (e) => e.collectionId === input.customerPriceListId && e.productId === input.productId,
+      (e) => e.variantId === input.customerPriceListId && e.productId === input.productId,
     );
     if (hit && hit.unitPrice != null) return { unitPrice: hit.unitPrice, source: "priceList" };
   }

@@ -2,7 +2,7 @@
  * Ingredient-list text helpers.
  *
  * Produce the ordered text-list of what's inside a filling / product /
- * collection, suitable for customer-facing ingredient labels. Distinct from
+ * variant, suitable for customer-facing ingredient labels. Distinct from
  * `nutrition.ts`, which produces numbers.
  *
  * Convention (EU FIC 1169/2011 and equivalents):
@@ -89,11 +89,11 @@ export function buildProductIngredientList(input: ProductIngredientListInput): I
 }
 
 /**
- * Roll up a collection's ingredient list across every product in the
- * collection. Each product contributes its own shell + filling weights;
+ * Roll up a variant's ingredient list across every product in the
+ * variant. Each product contributes its own shell + filling weights;
  * sub-ingredients are flattened and duplicates merge across every product.
  */
-export function buildCollectionIngredientList(
+export function buildVariantIngredientList(
   perProduct: ProductIngredientListInput[],
 ): IngredientListEntry[] {
   const contributions: Contribution[] = [];

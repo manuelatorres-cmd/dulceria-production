@@ -6,7 +6,7 @@ export interface ProductCostEntry {
   costPerProduct: number;
 }
 
-/** Summary stats for product costs within a collection */
+/** Summary stats for product costs within a variant */
 export interface ProductCostStats {
   avg: number;
   min: number;

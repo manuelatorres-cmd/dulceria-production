@@ -2,9 +2,9 @@
 
 import { useMemo } from "react";
 import {
-  useCollections,
-  useAllCollectionPackagings,
-  useAllCollectionProducts,
+  useVariants,
+  useAllVariantPackagings,
+  useAllVariantProducts,
   usePackagingList,
   useAllPackagingOrders,
   useCurrencySymbol,
@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
-import type { Collection, CollectionPackaging, Packaging, PackagingOrder, ProductCostSnapshot, CollectionProduct } from "@/types";
+import type { Variant, VariantPackaging, Packaging, PackagingOrder, ProductCostSnapshot, VariantProduct } from "@/types";
 import {
   latestPackagingUnitCost,
   averageProductCost,
@@ -25,11 +25,11 @@ import {
   type ProductCostEntry,
   type BoxPricingResult,
   type MarginHealth,
-} from "@/lib/collectionPricing";
+} from "@/lib/variantPricing";
 
-type CollectionStatus = "active" | "upcoming" | "past" | "permanent";
+type VariantStatus = "active" | "upcoming" | "past" | "permanent";
 
-function getStatus(startDate: string, endDate?: string): CollectionStatus {
+function getStatus(startDate: string, endDate?: string): VariantStatus {
   const today = new Date().toISOString().split("T")[0];
   if (!endDate) return startDate <= today ? "permanent" : "upcoming";
   if (startDate > today) return "upcoming";
@@ -37,14 +37,14 @@ function getStatus(startDate: string, endDate?: string): CollectionStatus {
   return "active";
 }
 
-const STATUS_LABEL: Record<CollectionStatus, string> = {
+const STATUS_LABEL: Record<VariantStatus, string> = {
   permanent: "Standard",
   active: "Active",
   upcoming: "Upcoming",
   past: "Past",
 };
 
-const STATUS_CLASS: Record<CollectionStatus, string> = {
+const STATUS_CLASS: Record<VariantStatus, string> = {
   permanent: "text-primary bg-primary/10",
   active: "text-emerald-700 bg-emerald-50",
   upcoming: "text-status-warn bg-status-warn-bg",
@@ -57,9 +57,9 @@ const MARGIN_COLORS: Record<MarginHealth, { bar: string; text: string; bg: strin
   negative: { bar: "bg-status-alert", text: "text-status-alert", bg: "bg-status-alert-bg" },
 };
 
-interface CollectionWithPricing {
-  collection: Collection;
-  status: CollectionStatus;
+interface VariantWithPricing {
+  variant: Variant;
+  status: VariantStatus;
   avgProductCost: number | null;
   productCount: number;
   costDataCount: number;
@@ -73,14 +73,14 @@ interface CollectionWithPricing {
 }
 
 export default function PricingPage() {
-  const collections = useCollections();
-  const allCPs = useAllCollectionPackagings();
+  const variants = useVariants();
+  const allCPs = useAllVariantPackagings();
   const allPackaging = usePackagingList(true);
   const allOrders = useAllPackagingOrders();
   const sym = useCurrencySymbol();
 
-  // Load all collectionProducts and productCostSnapshots in bulk
-  const allCollectionProducts = useAllCollectionProducts();
+  // Load all variantProducts and productCostSnapshots in bulk
+  const allVariantProducts = useAllVariantProducts();
   const { data: allSnapshots = [] } = useQuery({
     queryKey: ["product-cost-snapshots", "all"],
     queryFn: async () => assertOk(await supabase.from("productCostSnapshots").select("*")) as ProductCostSnapshot[],
@@ -103,16 +103,16 @@ export default function PricingPage() {
     return m;
   }, [allOrders]);
 
-  // Group collection products by collectionId
-  const productsByCollection = useMemo(() => {
-    const m = new Map<string, CollectionProduct[]>();
-    for (const cr of allCollectionProducts) {
-      const arr = m.get(cr.collectionId) ?? [];
+  // Group variant products by variantId
+  const productsByVariant = useMemo(() => {
+    const m = new Map<string, VariantProduct[]>();
+    for (const cr of allVariantProducts) {
+      const arr = m.get(cr.variantId) ?? [];
       arr.push(cr);
-      m.set(cr.collectionId, arr);
+      m.set(cr.variantId, arr);
     }
     return m;
-  }, [allCollectionProducts]);
+  }, [allVariantProducts]);
 
   // Latest snapshot per product (pick the most recent recordedAt per productId)
   const latestSnapshotByProduct = useMemo(() => {
@@ -126,35 +126,35 @@ export default function PricingPage() {
     return m;
   }, [allSnapshots]);
 
-  // Group CPs by collectionId
-  const cpsByCollection = useMemo(() => {
-    const m = new Map<string, CollectionPackaging[]>();
+  // Group CPs by variantId
+  const cpsByVariant = useMemo(() => {
+    const m = new Map<string, VariantPackaging[]>();
     for (const cp of allCPs) {
-      const arr = m.get(cp.collectionId) ?? [];
+      const arr = m.get(cp.variantId) ?? [];
       arr.push(cp);
-      m.set(cp.collectionId, arr);
+      m.set(cp.variantId, arr);
     }
     return m;
   }, [allCPs]);
 
-  // Build pricing data per collection
-  const pricedCollections: CollectionWithPricing[] = useMemo(() => {
-    return collections
+  // Build pricing data per variant
+  const pricedVariants: VariantWithPricing[] = useMemo(() => {
+    return variants
       .filter((c) => {
-        const cps = cpsByCollection.get(c.id ?? "") ?? [];
-        return cps.length > 0; // only show collections that have box pricing configured
+        const cps = cpsByVariant.get(c.id ?? "") ?? [];
+        return cps.length > 0; // only show variants that have box pricing configured
       })
       .map((c) => {
         const cId = c.id ?? "";
         const status = getStatus(c.startDate, c.endDate);
-        const crs = productsByCollection.get(cId) ?? [];
+        const crs = productsByVariant.get(cId) ?? [];
         const costs: ProductCostEntry[] = [];
         for (const cr of crs) {
           const snap = latestSnapshotByProduct.get(cr.productId);
           if (snap) costs.push({ productId: cr.productId, costPerProduct: snap.costPerProduct });
         }
         const avg = averageProductCost(costs);
-        const cps = cpsByCollection.get(cId) ?? [];
+        const cps = cpsByVariant.get(cId) ?? [];
 
         const boxes = avg
           ? cps.map((cp) => {
@@ -173,7 +173,7 @@ export default function PricingPage() {
         const worstMargin = margins.length > 0 ? Math.min(...margins) : null;
 
         return {
-          collection: c,
+          variant: c,
           status,
           avgProductCost: avg?.avg ?? null,
           productCount: crs.length,
@@ -183,12 +183,12 @@ export default function PricingPage() {
           worstMargin,
         };
       });
-  }, [collections, cpsByCollection, productsByCollection, latestSnapshotByProduct, packagingMap, ordersByPackaging]);
+  }, [variants, cpsByVariant, productsByVariant, latestSnapshotByProduct, packagingMap, ordersByPackaging]);
 
   // Sort: active/permanent first, then by worst margin ascending (worst margins at top = needs attention)
   const sorted = useMemo(() => {
-    const statusOrder: Record<CollectionStatus, number> = { active: 0, permanent: 1, upcoming: 2, past: 3 };
-    return [...pricedCollections].sort((a, b) => {
+    const statusOrder: Record<VariantStatus, number> = { active: 0, permanent: 1, upcoming: 2, past: 3 };
+    return [...pricedVariants].sort((a, b) => {
       const sa = statusOrder[a.status] ?? 9;
       const sb = statusOrder[b.status] ?? 9;
       if (sa !== sb) return sa - sb;
@@ -197,7 +197,7 @@ export default function PricingPage() {
       const mb = b.worstMargin ?? 999;
       return ma - mb;
     });
-  }, [pricedCollections]);
+  }, [pricedVariants]);
 
   // Summary stats
   const summary = useMemo(() => {
@@ -209,8 +209,8 @@ export default function PricingPage() {
     return { total: allMargins.length, negativeCount, thinCount, healthyCount, avgMargin };
   }, [sorted]);
 
-  // Collections without pricing (for the prompt)
-  const unpricedCount = collections.length - pricedCollections.length;
+  // Variants without pricing (for the prompt)
+  const unpricedCount = variants.length - pricedVariants.length;
 
   return (
     <div>
@@ -246,30 +246,30 @@ export default function PricingPage() {
         {/* No data state */}
         {sorted.length === 0 && (
           <div className="text-center py-12 space-y-2">
-            <p className="text-sm text-muted-foreground">No collections with box pricing yet.</p>
+            <p className="text-sm text-muted-foreground">No variants with box pricing yet.</p>
             <p className="text-xs text-muted-foreground">
-              Open a collection and add a box configuration with a sell price to see margins here.
+              Open a variant and add a box configuration with a sell price to see margins here.
             </p>
           </div>
         )}
 
-        {/* Collection cards */}
+        {/* Variant cards */}
         <div className="space-y-4">
           {sorted.map((item) => {
-            const cId = item.collection.id ?? "";
+            const cId = item.variant.id ?? "";
             return (
               <div key={cId} className="rounded-lg border border-border bg-card overflow-hidden">
-                {/* Collection header */}
+                {/* Variant header */}
                 <div className="px-4 pt-3.5 pb-2 flex items-start justify-between">
                   <div className="min-w-0">
                     <Link
-                      href={`/collections/${encodeURIComponent(cId)}?from=pricing`}
+                      href={`/variants/${encodeURIComponent(cId)}?from=pricing`}
                       className="text-sm font-semibold hover:underline block truncate"
                     >
-                      {item.collection.name}
+                      {item.variant.name}
                     </Link>
-                    {item.collection.description && (
-                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">{item.collection.description}</p>
+                    {item.variant.description && (
+                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">{item.variant.description}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-3">
@@ -349,10 +349,10 @@ export default function PricingPage() {
           })}
         </div>
 
-        {/* Unpriced collections hint */}
+        {/* Unpriced variants hint */}
         {unpricedCount > 0 && sorted.length > 0 && (
           <p className="text-xs text-muted-foreground text-center pt-2">
-            {unpricedCount} collection(s) not shown &mdash; add box pricing on their detail page to include them.
+            {unpricedCount} variant(s) not shown &mdash; add box pricing on their detail page to include them.
           </p>
         )}
       </div>

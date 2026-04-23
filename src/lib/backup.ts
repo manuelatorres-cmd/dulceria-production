@@ -30,10 +30,10 @@ export interface BackupData {
   experiments?: unknown[];
   experimentIngredients?: unknown[];
   shoppingItems?: unknown[];
-  collections?: unknown[];
-  collectionProducts?: unknown[];
-  collectionPackagings?: unknown[];
-  collectionPricingSnapshots?: unknown[];
+  variants?: unknown[];
+  variantProducts?: unknown[];
+  variantPackagings?: unknown[];
+  variantPricingSnapshots?: unknown[];
   fillingStock?: unknown[];
   fillingCategories?: unknown[];
   ingredientCategories?: unknown[];
@@ -76,10 +76,10 @@ const EXPORT_TABLES = [
   "experiments",
   "experimentIngredients",
   "shoppingItems",
-  "collections",
-  "collectionProducts",
-  "collectionPackagings",
-  "collectionPricingSnapshots",
+  "variants",
+  "variantProducts",
+  "variantPackagings",
+  "variantPricingSnapshots",
   "fillingStock",
   "fillingCategories",
   "ingredientCategories",
@@ -122,10 +122,10 @@ export async function exportBackup(): Promise<void> {
     experiments: rowsByName.experiments,
     experimentIngredients: rowsByName.experimentIngredients,
     shoppingItems: rowsByName.shoppingItems,
-    collections: rowsByName.collections,
-    collectionProducts: rowsByName.collectionProducts,
-    collectionPackagings: rowsByName.collectionPackagings,
-    collectionPricingSnapshots: rowsByName.collectionPricingSnapshots,
+    variants: rowsByName.variants,
+    variantProducts: rowsByName.variantProducts,
+    variantPackagings: rowsByName.variantPackagings,
+    variantPricingSnapshots: rowsByName.variantPricingSnapshots,
     fillingStock: rowsByName.fillingStock,
     fillingCategories: rowsByName.fillingCategories,
     ingredientCategories: rowsByName.ingredientCategories,
@@ -161,7 +161,7 @@ const INSERT_ORDER = [
   "shellDesigns",
   "decorationMaterials",
   "packaging",
-  "collections",
+  "variants",
   "products",
   "fillings",
   "experiments",
@@ -177,9 +177,9 @@ const INSERT_ORDER = [
   "productFillingHistory",
   "ingredientPriceHistory",
   "productCostSnapshots",
-  "collectionProducts",
-  "collectionPackagings",
-  "collectionPricingSnapshots",
+  "variantProducts",
+  "variantPackagings",
+  "variantPricingSnapshots",
 ] as const;
 
 /** Map of table name -> the imported rows for that table. */
@@ -269,11 +269,11 @@ function migrateProductCostSnapshot(r: AnyRec): AnyRec {
   return out;
 }
 
-function migrateCollectionProduct(r: AnyRec): AnyRec {
+function migrateVariantProduct(r: AnyRec): AnyRec {
   return renameField(r, "recipeId", "productId");
 }
 
-function migrateCollectionPricingSnapshot(r: AnyRec): AnyRec {
+function migrateVariantPricingSnapshot(r: AnyRec): AnyRec {
   return renameField(r, "avgBonbonCost", "avgProductCost");
 }
 
@@ -341,10 +341,10 @@ export async function importBackup(file: File): Promise<void> {
   const rawExperiments             = data.experiments             ?? [];
   const rawExperimentIngredients   = data.experimentIngredients   ?? [];
   const rawShoppingItems           = data.shoppingItems           ?? [];
-  const rawCollections             = data.collections             ?? [];
-  const rawCollectionProducts      = data.collectionProducts      ?? data.collectionRecipes      ?? [];
-  const rawCollectionPackagings    = data.collectionPackagings    ?? [];
-  const rawCollectionPricingSnaps  = data.collectionPricingSnapshots ?? [];
+  const rawVariants             = data.variants             ?? [];
+  const rawVariantProducts      = data.variantProducts      ?? data.collectionRecipes      ?? [];
+  const rawVariantPackagings    = data.variantPackagings    ?? [];
+  const rawVariantPricingSnaps  = data.variantPricingSnapshots ?? [];
   const rawFillingStock            = data.fillingStock            ?? data.layerStock             ?? [];
   const rawFillingCategories       = data.fillingCategories       ?? [];
   const rawIngredientCategories    = data.ingredientCategories    ?? [];
@@ -373,10 +373,10 @@ export async function importBackup(file: File): Promise<void> {
     experiments:                applyAll(rawExperiments, migrateExperiment),
     experimentIngredients:      passThrough(rawExperimentIngredients),
     shoppingItems:              passThrough(rawShoppingItems),
-    collections:                passThrough(rawCollections),
-    collectionProducts:         applyAll(rawCollectionProducts, migrateCollectionProduct),
-    collectionPackagings:       passThrough(rawCollectionPackagings),
-    collectionPricingSnapshots: applyAll(rawCollectionPricingSnaps, migrateCollectionPricingSnapshot),
+    variants:                passThrough(rawVariants),
+    variantProducts:         applyAll(rawVariantProducts, migrateVariantProduct),
+    variantPackagings:       passThrough(rawVariantPackagings),
+    variantPricingSnapshots: applyAll(rawVariantPricingSnaps, migrateVariantPricingSnapshot),
     fillingStock:               applyAll(rawFillingStock, migrateFillingStock),
     fillingCategories:          passThrough(rawFillingCategories),
     ingredientCategories:       passThrough(rawIngredientCategories),

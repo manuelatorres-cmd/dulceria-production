@@ -2,7 +2,7 @@
  * Pantry shared components
  * ========================
  * Every pantry list page (Ingredients, Fillings, Products, Moulds, Packaging,
- * Collections, Decoration) is built from these primitives. Import from here,
+ * Variants, Decoration) is built from these primitives. Import from here,
  * not from individual files, so consumers don't need to know the file layout.
  *
  * ┌──────────────────────────────────────────────────────────────────────────┐

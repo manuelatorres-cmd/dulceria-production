@@ -268,7 +268,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
                   <p className="text-sm text-muted-foreground py-4">
                     No sub-ingredients recorded.{" "}
                     <button onClick={() => setEditing(true)} className="text-primary hover:underline">Edit ingredient</button>{" "}
-                    to add a breakdown (used for ingredient-list text on fillings, products, and collections).
+                    to add a breakdown (used for ingredient-list text on fillings, products, and variants).
                   </p>
                 )}
               </div>

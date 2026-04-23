@@ -464,7 +464,7 @@ function ClearAllDataSection() {
             <p className="text-sm font-medium">Start from scratch</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Permanently deletes all products, fillings, ingredients, moulds, production plans,
-              collections, experiments, and every other record in the app.
+              variants, experiments, and every other record in the app.
               This cannot be undone — export a backup first if you want to keep anything.
             </p>
           </div>

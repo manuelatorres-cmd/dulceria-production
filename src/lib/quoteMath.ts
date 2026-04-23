@@ -17,7 +17,7 @@ import type { QuoteItem, QuoteCostBreakdown } from "@/types";
 
 /** Per-product cost inputs collected by the calling component from
  *  existing hooks (ingredient cost map, decoration material cost,
- *  retail price on collections). Kept lean — the calculator doesn't
+ *  retail price on variants). Kept lean — the calculator doesn't
  *  care where the numbers came from. */
 export interface QuoteCostInputs {
   /** productId → cost per piece (ingredients + decoration). */

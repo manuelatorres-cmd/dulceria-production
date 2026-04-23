@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, Suspense } from "react";
-import { useProductsList, useMouldsList, useProductFillingsForProducts, useFillingIngredientsForFillings, useIngredients, saveProductionPlan, savePlanProduct, toggleStep, useFillings, usePlanProducts, generateBatchNumber, useProductStockAlerts, useCollections, useAllCollectionProducts, useFillingStockItems, useShelfStableCategoryNames } from "@/lib/hooks";
+import { useProductsList, useMouldsList, useProductFillingsForProducts, useFillingIngredientsForFillings, useIngredients, saveProductionPlan, savePlanProduct, toggleStep, useFillings, usePlanProducts, generateBatchNumber, useProductStockAlerts, useVariants, useAllVariantProducts, useFillingStockItems, useShelfStableCategoryNames } from "@/lib/hooks";
 import { AlertTriangle, ArrowLeft, Check, ChevronDown, History, PackageX, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -33,8 +33,8 @@ function NewPlanContent() {
   const moulds = useMouldsList(true);
   const allFillings = useFillings();
   const shelfStableCategoryNames = useShelfStableCategoryNames();
-  const collections = useCollections();
-  const allCollectionProducts = useAllCollectionProducts();
+  const variants = useVariants();
+  const allVariantProducts = useAllVariantProducts();
   const router = useRouter();
 
   const [phase, setPhase] = useState<"select" | "configure" | "batch-sizes">("select");
@@ -57,8 +57,8 @@ function NewPlanContent() {
   const [yieldModal, setYieldModal] = useState<{ entries: YieldEntry[]; pendingFinalize: ((entries: YieldEntry[]) => Promise<void>) | null } | null>(null);
   // Which product cards have their ingredient warning expanded
   const [expandedWarnings, setExpandedWarnings] = useState<Set<string>>(new Set<string>());
-  // Collection filter — default ON so active-collection products are prioritised
-  const [filterToActiveCollection, setFilterToActiveCollection] = useState(true);
+  // Variant filter — default ON so active-variant products are prioritised
+  const [filterToActiveVariant, setFilterToActiveVariant] = useState(true);
 
   // Load source plan products when duplicating
   const sourcePlanProducts = usePlanProducts(fromPlanId);
@@ -133,25 +133,25 @@ function NewPlanContent() {
     return result;
   }, [products, allProductsFillingsMap, allProductsIngredientMap, allIngredients]);
 
-  // Active collections: startDate <= today, endDate unset or >= today
+  // Active variants: startDate <= today, endDate unset or >= today
   const today = new Date().toISOString().slice(0, 10);
-  const activeCollectionIds = useMemo(() => new Set(
-    collections
+  const activeVariantIds = useMemo(() => new Set(
+    variants
       .filter((c) => c.startDate <= today && (!c.endDate || c.endDate >= today))
       .map((c) => c.id!)
-  ), [collections, today]);
+  ), [variants, today]);
 
-  const hasActiveCollections = activeCollectionIds.size > 0;
+  const hasActiveVariants = activeVariantIds.size > 0;
 
-  const activeCollectionProductIds = useMemo(() => new Set(
-    allCollectionProducts
-      .filter((cr) => activeCollectionIds.has(cr.collectionId))
+  const activeVariantProductIds = useMemo(() => new Set(
+    allVariantProducts
+      .filter((cr) => activeVariantIds.has(cr.variantId))
       .map((cr) => cr.productId)
-  ), [allCollectionProducts, activeCollectionIds]);
+  ), [allVariantProducts, activeVariantIds]);
 
-  // Sort products: when collections exist, active-collection products float to top.
+  // Sort products: when variants exist, active-variant products float to top.
   // Within each group (active / rest): gone → low stock → ingredient issues → alpha.
-  // When no collections defined, sort is unchanged (stock priority → alpha).
+  // When no variants defined, sort is unchanged (stock priority → alpha).
   const sortedProducts = useMemo(() => {
     const stockPriority = (alert: "low" | "gone" | undefined, issues: IngredientIssue[]) => {
       if (alert === "gone") return 0;
@@ -162,15 +162,15 @@ function NewPlanContent() {
       return 5;
     };
 
-    const list = filterToActiveCollection && hasActiveCollections
-      ? products.filter((r) => activeCollectionProductIds.has(r.id!))
+    const list = filterToActiveVariant && hasActiveVariants
+      ? products.filter((r) => activeVariantProductIds.has(r.id!))
       : [...products];
 
     return list.sort((a, b) => {
-      // If collections exist, active-collection products sort before others
-      if (hasActiveCollections) {
-        const aIn = activeCollectionProductIds.has(a.id!);
-        const bIn = activeCollectionProductIds.has(b.id!);
+      // If variants exist, active-variant products sort before others
+      if (hasActiveVariants) {
+        const aIn = activeVariantProductIds.has(a.id!);
+        const bIn = activeVariantProductIds.has(b.id!);
         if (aIn !== bIn) return aIn ? -1 : 1;
       }
       const pa = stockPriority(productStockAlerts.get(a.id!), ingredientIssuesByProduct.get(a.id!) ?? []);
@@ -178,7 +178,7 @@ function NewPlanContent() {
       if (pa !== pb) return pa - pb;
       return a.name.localeCompare(b.name);
     });
-  }, [products, productStockAlerts, ingredientIssuesByProduct, activeCollectionProductIds, hasActiveCollections, filterToActiveCollection]);
+  }, [products, productStockAlerts, ingredientIssuesByProduct, activeVariantProductIds, hasActiveVariants, filterToActiveVariant]);
 
   const hasShelfStableFillings = useMemo(() => {
     for (const productId of selectedProductIds) {
@@ -381,16 +381,16 @@ function NewPlanContent() {
         <div className="px-4 space-y-3 pb-6">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">Select the products you want to make:</p>
-            {hasActiveCollections && (
+            {hasActiveVariants && (
               <button
-                onClick={() => setFilterToActiveCollection((v) => !v)}
+                onClick={() => setFilterToActiveVariant((v) => !v)}
                 className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                  filterToActiveCollection
+                  filterToActiveVariant
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-muted-foreground"
                 }`}
               >
-                {filterToActiveCollection ? "Current collection" : "All products"}
+                {filterToActiveVariant ? "Current variant" : "All products"}
               </button>
             )}
           </div>
@@ -398,8 +398,8 @@ function NewPlanContent() {
             <p className="text-sm text-muted-foreground py-4 text-center">No products yet.</p>
           ) : (
             <>
-            {hasActiveCollections && sortedProducts.length === 0 && (
-              <p className="text-sm text-muted-foreground py-4 text-center">No products in the current collection.</p>
+            {hasActiveVariants && sortedProducts.length === 0 && (
+              <p className="text-sm text-muted-foreground py-4 text-center">No products in the current variant.</p>
             )}
             <ul className="space-y-2">
               {sortedProducts.map((r, idx) => {
@@ -410,14 +410,14 @@ function NewPlanContent() {
                 const hasIngWarning = ingIssues.length > 0;
                 const warningExpanded = expandedWarnings.has(r.id!);
 
-                // When showing all products with active collections, insert a divider
-                // at the boundary between active-collection and other products
+                // When showing all products with active variants, insert a divider
+                // at the boundary between active-variant and other products
                 const showDivider =
-                  !filterToActiveCollection &&
-                  hasActiveCollections &&
+                  !filterToActiveVariant &&
+                  hasActiveVariants &&
                   idx > 0 &&
-                  activeCollectionProductIds.has(sortedProducts[idx - 1].id!) &&
-                  !activeCollectionProductIds.has(r.id!);
+                  activeVariantProductIds.has(sortedProducts[idx - 1].id!) &&
+                  !activeVariantProductIds.has(r.id!);
 
                 return (
                   <li key={r.id}>

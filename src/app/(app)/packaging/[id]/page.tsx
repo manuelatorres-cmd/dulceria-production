@@ -519,15 +519,15 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
           )}
           {confirmDelete ? (
             inUse ? (
-              /* In use by collections — archive only */
+              /* In use by variants — archive only */
               <div className="rounded-lg border border-border bg-card p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                   <p className="text-sm font-medium">Archive this packaging?</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  This packaging is referenced by one or more collections and cannot be deleted.
-                  Archiving will hide it from lists but preserve it for existing collections.
+                  This packaging is referenced by one or more variants and cannot be deleted.
+                  Archiving will hide it from lists but preserve it for existing variants.
                 </p>
                 <div className="flex gap-2">
                   <button

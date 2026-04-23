@@ -5,13 +5,13 @@ import Link from "next/link";
 const CARDS = [
   {
     name: "Pricing & Margins",
-    description: "Collection profitability, box costs, and margin health across your range.",
+    description: "Variant profitability, box costs, and margin health across your range.",
     href: "/pricing",
     icon: PricingIcon,
   },
   {
     name: "Production Stats",
-    description: "Historical batch data, product trends, and collection performance over time.",
+    description: "Historical batch data, product trends, and variant performance over time.",
     href: "/stats",
     icon: StatsIcon,
   },

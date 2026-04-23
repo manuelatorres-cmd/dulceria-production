@@ -482,22 +482,22 @@ export function calculateProductNutrition(input: ProductNutritionInput): Product
 }
 
 // ---------------------------------------------------------------------------
-// Collection-level nutrition: weighted aggregation across products
+// Variant-level nutrition: weighted aggregation across products
 // ---------------------------------------------------------------------------
 
-export interface CollectionNutritionResult {
-  /** Nutrition per 100g of the collection's combined product weight */
+export interface VariantNutritionResult {
+  /** Nutrition per 100g of the variant's combined product weight */
   per100g: NutritionData;
   /** Sum of product weights across every product contributing data */
   totalWeightG: number;
   /** How many products contributed nutrition data */
   productsWithData: number;
-  /** Total products in the collection */
+  /** Total products in the variant */
   productsTotal: number;
 }
 
 /**
- * Aggregate nutrition across a collection's products, weighted by each
+ * Aggregate nutrition across a variant's products, weighted by each
  * product's weight. Products with no nutrition data (empty per100g) or
  * zero weight are excluded from the roll-up.
  *
@@ -505,9 +505,9 @@ export interface CollectionNutritionResult {
  * weight math stays in one place — callers compute per-product nutrition
  * once (useful for the UI anyway) and feed the results in.
  */
-export function calculateCollectionNutrition(
+export function calculateVariantNutrition(
   perProduct: ProductNutritionResult[],
-): CollectionNutritionResult {
+): VariantNutritionResult {
   const entries: IngredientNutritionEntry[] = [];
   let productsWithData = 0;
 

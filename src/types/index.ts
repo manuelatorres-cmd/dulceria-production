@@ -81,7 +81,7 @@ export interface Ingredient {
   // Nutrition data (all values per 100g of ingredient)
   nutrition?: import("@/lib/nutrition").NutritionData;
   /** Optional text-only breakdown of what this compound ingredient is made of.
-   *  Used to generate ingredient-list text at filling / product / collection
+   *  Used to generate ingredient-list text at filling / product / variant
    *  level. Not FK-linked; not used for nutrition rollup (nutrition comes from
    *  the compound ingredient's own `nutrition` field). Percentages are
    *  optional and not required to sum to 100 — when present they drive
@@ -1098,14 +1098,14 @@ export const DEFAULT_SHELL_DESIGNS: ReadonlyArray<{ name: string; defaultApplyAt
   { name: "Transfer Sheet",           defaultApplyAt: "cap" },
 ];
 
-// --- Collections ---
+// --- Variants ---
 
 /**
  * A curated set of products for a season, event, or permanent range.
- * startDate = when the collection first goes on offer.
+ * startDate = when the variant first goes on offer.
  * endDate = undefined means it runs indefinitely (e.g. "standard" range).
  */
-export interface Collection {
+export interface Variant {
   id?: string;
   name: string;
   description?: string;
@@ -1116,23 +1116,23 @@ export interface Collection {
   updatedAt: Date;
 }
 
-/** Join table: which products belong to which collection, and in what order.
- *  A Collection doubles as a price list — `unitPrice` is the NET price
+/** Join table: which products belong to which variant, and in what order.
+ *  A Variant doubles as a price list — `unitPrice` is the NET price
  *  to use for this product whenever a customer whose defaultPriceListId
- *  points at this collection adds it to an order. Null = fall back to
+ *  points at this variant adds it to an order. Null = fall back to
  *  the product's retail price. */
-export interface CollectionProduct {
+export interface VariantProduct {
   id?: string;
-  collectionId: string;
+  variantId: string;
   productId: string;
   sortOrder: number;
   unitPrice?: number;
 }
 
-/** Links a collection to a packaging option with the retail sell price for that box */
-export interface CollectionPackaging {
+/** Links a variant to a packaging option with the retail sell price for that box */
+export interface VariantPackaging {
   id?: string;
-  collectionId: string;
+  variantId: string;
   packagingId: string;
   sellPrice: number;      // retail price for this box configuration (e.g. €24.95)
   notes?: string;
@@ -1141,13 +1141,13 @@ export interface CollectionPackaging {
 }
 
 /**
- * A point-in-time snapshot of the margin for one (collection, packaging) combination.
+ * A point-in-time snapshot of the margin for one (variant, packaging) combination.
  * Created when the sell price is changed, when ingredient/coating/packaging costs change,
  * or on manual recalculation. Used to draw the pricing history chart.
  */
-export interface CollectionPricingSnapshot {
+export interface VariantPricingSnapshot {
   id?: string;
-  collectionId: string;
+  variantId: string;
   packagingId: string;
   /** Average product material cost at time of snapshot */
   avgProductCost: number;
@@ -1315,7 +1315,7 @@ export interface Customer {
   /** ISO-ish language code — 'de', 'en', 'it'. Used to pick the
    *  quote / invoice language. */
   language?: string;
-  /** Collection used as this customer's default price list. When a
+  /** Variant used as this customer's default price list. When a
    *  line's product appears in the list, its unitPrice there wins
    *  over the product default. */
   defaultPriceListId?: string;

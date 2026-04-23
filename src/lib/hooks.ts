@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Collection, CollectionProduct, CollectionPackaging, CollectionPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -3071,10 +3071,10 @@ export async function unarchivePackaging(id: string): Promise<void> {
   queryClient.invalidateQueries({ queryKey: ["packaging"] });
 }
 
-/** Returns true if the packaging is referenced by any collection. */
+/** Returns true if the packaging is referenced by any variant. */
 export async function isPackagingInUse(id: string): Promise<boolean> {
   const { count, error } = await supabase
-    .from("collectionPackagings")
+    .from("variantPackagings")
     .select("*", { count: "exact", head: true })
     .eq("packagingId", id);
   if (error) throw error;
@@ -3588,186 +3588,186 @@ export async function ensureDefaultShellDesigns(): Promise<void> {
   queryClient.invalidateQueries({ queryKey: ["shell-designs"] });
 }
 
-// --- Collections ---
+// --- Variants ---
 
-export function useCollections(): Collection[] {
+export function useVariants(): Variant[] {
   const { data } = useQuery({
-    queryKey: ["collections"],
+    queryKey: ["variants"],
     queryFn: async () => {
-      const rows = assertOk(await supabase.from("collections").select("*")) as Collection[];
+      const rows = assertOk(await supabase.from("variants").select("*")) as Variant[];
       return rows.sort((a, b) => b.startDate.localeCompare(a.startDate));
     },
   });
   return data ?? [];
 }
 
-export function useCollection(id: string | undefined): Collection | undefined {
+export function useVariant(id: string | undefined): Variant | undefined {
   const { data } = useQuery({
-    queryKey: ["collections", id],
+    queryKey: ["variants", id],
     enabled: !!id,
     queryFn: async () => {
       const row = assertOkMaybe(
-        await supabase.from("collections").select("*").eq("id", id!).maybeSingle(),
+        await supabase.from("variants").select("*").eq("id", id!).maybeSingle(),
       );
-      return row as Collection | null;
+      return row as Variant | null;
     },
   });
   return data ?? undefined;
 }
 
-export async function saveCollection(obj: Omit<Collection, "id"> & { id?: string }): Promise<string> {
+export async function saveVariant(obj: Omit<Variant, "id"> & { id?: string }): Promise<string> {
   const now = new Date();
   if (obj.id) {
     const { error } = await supabase
-      .from("collections")
+      .from("variants")
       .update({ ...obj, updatedAt: now })
       .eq("id", obj.id);
     if (error) throw error;
-    queryClient.invalidateQueries({ queryKey: ["collections"] });
+    queryClient.invalidateQueries({ queryKey: ["variants"] });
     return obj.id;
   }
   const createdId = newId();
   const { error } = await supabase
-    .from("collections")
+    .from("variants")
     .insert({ ...obj, id: createdId, createdAt: now, updatedAt: now });
   if (error) throw error;
-  queryClient.invalidateQueries({ queryKey: ["collections"] });
+  queryClient.invalidateQueries({ queryKey: ["variants"] });
   return createdId;
 }
 
-export async function deleteCollection(id: string): Promise<void> {
-  const delCp = await supabase.from("collectionProducts").delete().eq("collectionId", id);
+export async function deleteVariant(id: string): Promise<void> {
+  const delCp = await supabase.from("variantProducts").delete().eq("variantId", id);
   if (delCp.error) throw delCp.error;
-  const delCpk = await supabase.from("collectionPackagings").delete().eq("collectionId", id);
+  const delCpk = await supabase.from("variantPackagings").delete().eq("variantId", id);
   if (delCpk.error) throw delCpk.error;
-  const { error } = await supabase.from("collections").delete().eq("id", id);
+  const { error } = await supabase.from("variants").delete().eq("id", id);
   if (error) throw error;
-  queryClient.invalidateQueries({ queryKey: ["collections"] });
-  queryClient.invalidateQueries({ queryKey: ["collection-products"] });
-  queryClient.invalidateQueries({ queryKey: ["collection-packagings"] });
+  queryClient.invalidateQueries({ queryKey: ["variants"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-products"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
 }
 
-export function useAllCollectionProducts(): CollectionProduct[] {
+export function useAllVariantProducts(): VariantProduct[] {
   const { data } = useQuery({
-    queryKey: ["collection-products", "all"],
-    queryFn: async () => assertOk(await supabase.from("collectionProducts").select("*")) as CollectionProduct[],
+    queryKey: ["variant-products", "all"],
+    queryFn: async () => assertOk(await supabase.from("variantProducts").select("*")) as VariantProduct[],
   });
   return data ?? [];
 }
 
-export function useCollectionProducts(collectionId: string | undefined): CollectionProduct[] {
+export function useVariantProducts(variantId: string | undefined): VariantProduct[] {
   const { data } = useQuery({
-    queryKey: ["collection-products", collectionId],
-    enabled: !!collectionId,
+    queryKey: ["variant-products", variantId],
+    enabled: !!variantId,
     queryFn: async () => {
       const rows = assertOk(
-        await supabase.from("collectionProducts").select("*").eq("collectionId", collectionId!),
-      ) as CollectionProduct[];
+        await supabase.from("variantProducts").select("*").eq("variantId", variantId!),
+      ) as VariantProduct[];
       return rows.sort((a, b) => a.sortOrder - b.sortOrder);
     },
   });
   return data ?? [];
 }
 
-export async function addProductToCollection(collectionId: string, productId: string): Promise<void> {
+export async function addProductToVariant(variantId: string, productId: string): Promise<void> {
   const existing = assertOk(
-    await supabase.from("collectionProducts").select("*").eq("collectionId", collectionId),
-  ) as CollectionProduct[];
+    await supabase.from("variantProducts").select("*").eq("variantId", variantId),
+  ) as VariantProduct[];
   if (existing.some((r) => r.productId === productId)) return;
   const maxSort = existing.reduce((m, r) => Math.max(m, r.sortOrder), -1);
   const { error } = await supabase
-    .from("collectionProducts")
-    .insert({ id: newId(), collectionId, productId, sortOrder: maxSort + 1 });
+    .from("variantProducts")
+    .insert({ id: newId(), variantId, productId, sortOrder: maxSort + 1 });
   if (error) throw error;
-  queryClient.invalidateQueries({ queryKey: ["collection-products"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-products"] });
 }
 
-export async function removeProductFromCollection(id: string): Promise<void> {
-  const { error } = await supabase.from("collectionProducts").delete().eq("id", id);
+export async function removeProductFromVariant(id: string): Promise<void> {
+  const { error } = await supabase.from("variantProducts").delete().eq("id", id);
   if (error) throw error;
-  queryClient.invalidateQueries({ queryKey: ["collection-products"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-products"] });
 }
 
-// --- Collection Packagings (box pricing) ---
+// --- Variant Packagings (box pricing) ---
 
-export function useCollectionPackagings(collectionId: string | undefined): CollectionPackaging[] {
+export function useVariantPackagings(variantId: string | undefined): VariantPackaging[] {
   const { data } = useQuery({
-    queryKey: ["collection-packagings", collectionId],
-    enabled: !!collectionId,
+    queryKey: ["variant-packagings", variantId],
+    enabled: !!variantId,
     queryFn: async () =>
       assertOk(
-        await supabase.from("collectionPackagings").select("*").eq("collectionId", collectionId!),
-      ) as CollectionPackaging[],
+        await supabase.from("variantPackagings").select("*").eq("variantId", variantId!),
+      ) as VariantPackaging[],
   });
   return data ?? [];
 }
 
-export function useAllCollectionPackagings(): CollectionPackaging[] {
+export function useAllVariantPackagings(): VariantPackaging[] {
   const { data } = useQuery({
-    queryKey: ["collection-packagings", "all"],
-    queryFn: async () => assertOk(await supabase.from("collectionPackagings").select("*")) as CollectionPackaging[],
+    queryKey: ["variant-packagings", "all"],
+    queryFn: async () => assertOk(await supabase.from("variantPackagings").select("*")) as VariantPackaging[],
   });
   return data ?? [];
 }
 
-export async function saveCollectionPackaging(obj: Omit<CollectionPackaging, "id"> & { id?: string }): Promise<string> {
+export async function saveVariantPackaging(obj: Omit<VariantPackaging, "id"> & { id?: string }): Promise<string> {
   const now = new Date();
   if (obj.id) {
     const { error } = await supabase
-      .from("collectionPackagings")
+      .from("variantPackagings")
       .update({ ...obj, updatedAt: now })
       .eq("id", obj.id);
     if (error) throw error;
-    queryClient.invalidateQueries({ queryKey: ["collection-packagings"] });
+    queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
     return obj.id;
   }
   const createdId = newId();
   const { error } = await supabase
-    .from("collectionPackagings")
+    .from("variantPackagings")
     .insert({ ...obj, id: createdId, createdAt: now, updatedAt: now });
   if (error) throw error;
-  queryClient.invalidateQueries({ queryKey: ["collection-packagings"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
   return createdId;
 }
 
-export async function deleteCollectionPackaging(id: string): Promise<void> {
-  const { error } = await supabase.from("collectionPackagings").delete().eq("id", id);
+export async function deleteVariantPackaging(id: string): Promise<void> {
+  const { error } = await supabase.from("variantPackagings").delete().eq("id", id);
   if (error) throw error;
-  queryClient.invalidateQueries({ queryKey: ["collection-packagings"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
 }
 
-// --- Collection Pricing Snapshots (margin history) ---
+// --- Variant Pricing Snapshots (margin history) ---
 
-/** All pricing snapshots for a collection, newest-first */
-export function useCollectionPricingSnapshots(collectionId: string | undefined): CollectionPricingSnapshot[] {
+/** All pricing snapshots for a variant, newest-first */
+export function useVariantPricingSnapshots(variantId: string | undefined): VariantPricingSnapshot[] {
   const { data } = useQuery({
-    queryKey: ["collection-pricing-snapshots", collectionId],
-    enabled: !!collectionId,
+    queryKey: ["variant-pricing-snapshots", variantId],
+    enabled: !!variantId,
     queryFn: async () => {
       const rows = assertOk(
-        await supabase.from("collectionPricingSnapshots").select("*").eq("collectionId", collectionId!),
-      ) as CollectionPricingSnapshot[];
+        await supabase.from("variantPricingSnapshots").select("*").eq("variantId", variantId!),
+      ) as VariantPricingSnapshot[];
       return rows.sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime());
     },
   });
   return data ?? [];
 }
 
-export async function saveCollectionPricingSnapshot(
-  obj: Omit<CollectionPricingSnapshot, "id"> & { id?: string },
+export async function saveVariantPricingSnapshot(
+  obj: Omit<VariantPricingSnapshot, "id"> & { id?: string },
 ): Promise<string> {
   if (obj.id) {
-    const { error } = await supabase.from("collectionPricingSnapshots").update(obj).eq("id", obj.id);
+    const { error } = await supabase.from("variantPricingSnapshots").update(obj).eq("id", obj.id);
     if (error) throw error;
-    queryClient.invalidateQueries({ queryKey: ["collection-pricing-snapshots"] });
+    queryClient.invalidateQueries({ queryKey: ["variant-pricing-snapshots"] });
     return obj.id;
   }
   const createdId = newId();
   const { error } = await supabase
-    .from("collectionPricingSnapshots")
+    .from("variantPricingSnapshots")
     .insert({ ...obj, id: createdId });
   if (error) throw error;
-  queryClient.invalidateQueries({ queryKey: ["collection-pricing-snapshots"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-pricing-snapshots"] });
   return createdId;
 }
 

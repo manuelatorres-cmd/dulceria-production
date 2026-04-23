@@ -131,7 +131,7 @@ const SECTIONS: Section[] = [
         <p>
           Dulceria is an app that sits on your iPad, phone, or laptop
           and keeps your entire workshop in one place: ingredients, fillings, products, production
-          plans, stock, collections, and a little bit of business intelligence. Your data lives in your
+          plans, stock, variants, and a little bit of business intelligence. Your data lives in your
           browser — no account, no server, no lock-in. If you want to sync across devices later, you
           can bring your own Dexie Cloud database. Otherwise it works fully offline, for free and always will.
         </p>
@@ -576,23 +576,23 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "collections",
+    id: "variants",
     num: "11",
-    title: "Collections and pricing",
+    title: "Variants and pricing",
     teaser: "Curate seasonal sets; see every box's margin at a glance.",
     render: () => (
       <>
         <p className="sub">
-          A collection is a curated group of products — a spring range, a Valentine&apos;s box, a
-          permanent signature set. Each collection has box offerings: which products go in which size
+          A variant is a curated group of products — a spring range, a Valentine&apos;s box, a
+          permanent signature set. Each variant has box offerings: which products go in which size
           box, at what retail price.
         </p>
         <p>
           The Pricing &amp; Margins dashboard compares every box configuration across every
-          collection, ranked by margin health. Green means you&apos;re making money. Amber means
+          variant, ranked by margin health. Green means you&apos;re making money. Amber means
           it&apos;s tight. Red means you&apos;re paying to make the box.
         </p>
-        <Shot label="Easter 2026 collection with box pricing and margins" src="/docs/screenshots/collection-pricing.png" />
+        <Shot label="Easter 2026 variant with box pricing and margins" src="/docs/screenshots/variant-pricing.png" />
       </>
     ),
   },
@@ -615,7 +615,7 @@ const SECTIONS: Section[] = [
           <li>
             <strong>Pricing &amp; Margins.</strong>
             <ul>
-              <li>Every box, across every collection, ranked by margin health.</li>
+              <li>Every box, across every variant, ranked by margin health.</li>
               <li>Green = making money. Amber = tight. Red = you&apos;re paying to make the box.</li>
               <li>Use this to spot boxes where retail price has drifted behind ingredient inflation.</li>
             </ul>
@@ -623,7 +623,7 @@ const SECTIONS: Section[] = [
           <li>
             <strong>Production Stats.</strong>
             <ul>
-              <li>Historical batch counts by product and collection.</li>
+              <li>Historical batch counts by product and variant.</li>
               <li>Trends over time — what you&apos;re actually making, not what you think you are.</li>
               <li>Useful when deciding what to cut from next season&apos;s range.</li>
             </ul>
@@ -1313,14 +1313,14 @@ jobs:
 const HUB_GROUPS = [
   { title: "Get set up", ids: ["welcome", "hosted-or-local", "install", "demo", "preferences"] },
   { title: "Build your pantry", ids: ["ingredient", "filling", "product"] },
-  { title: "Run the workshop", ids: ["production", "stock", "collections", "observatory"] },
+  { title: "Run the workshop", ids: ["production", "stock", "variants", "observatory"] },
   { title: "Labels, backup, reference", ids: ["allergens", "backup", "dexie-cloud", "shortcuts", "faq"] },
 ];
 
 const HUB_ACCENTS: Record<string, string> = {
   welcome: "cocoa", "hosted-or-local": "mint", install: "blue", demo: "butter", preferences: "taupe",
   ingredient: "sage", filling: "peach", product: "cocoa",
-  production: "terracotta", stock: "taupe", collections: "butter", observatory: "sage",
+  production: "terracotta", stock: "taupe", variants: "butter", observatory: "sage",
   allergens: "mint", backup: "lilac", "dexie-cloud": "mint", shortcuts: "taupe", faq: "blue",
 };
 
@@ -1335,7 +1335,7 @@ const HUB_ICONS: Record<string, ReactNode> = {
   product:     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.5}><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M4 10h16M9 6V4a3 3 0 0 1 6 0v2"/></svg>,
   production:  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.5}><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>,
   stock:       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M3 7l9-4 9 4-9 4zM3 7v10l9 4M21 7v10l-9 4"/></svg>,
-  collections: <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.5}><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
+  variants: <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.5}><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
   observatory: <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M4 20h16M6 20V10M10 20V6M14 20v-8M18 20V4"/></svg>,
   allergens:   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M10.3 3.9 1.8 18.2A2 2 0 0 0 3.5 21h17a2 2 0 0 0 1.7-2.8L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></svg>,
   backup:      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.5}><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.7 1 6.3 2.7L21 8M21 3v5h-5"/></svg>,

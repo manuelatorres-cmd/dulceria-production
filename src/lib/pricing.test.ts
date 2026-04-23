@@ -22,7 +22,7 @@ describe("resolveUnitPrice", () => {
       ...base,
       customerId: "c1",
       customerProductPrices: [{ productId: "p1", unitPrice: 5.5 }],
-      priceListEntries: [{ collectionId: "l1", productId: "p1", unitPrice: 7 }],
+      priceListEntries: [{ variantId: "l1", productId: "p1", unitPrice: 7 }],
       customerPriceListId: "l1",
       retailPrice: 10,
     });
@@ -34,7 +34,7 @@ describe("resolveUnitPrice", () => {
     const r = resolveUnitPrice({
       ...base,
       customerId: "c1",
-      priceListEntries: [{ collectionId: "l1", productId: "p1", unitPrice: 7 }],
+      priceListEntries: [{ variantId: "l1", productId: "p1", unitPrice: 7 }],
       customerPriceListId: "l1",
       retailPrice: 10,
     });
@@ -46,7 +46,7 @@ describe("resolveUnitPrice", () => {
     const r = resolveUnitPrice({
       ...base,
       customerId: "c1",
-      priceListEntries: [{ collectionId: "l1", productId: "p1" }],
+      priceListEntries: [{ variantId: "l1", productId: "p1" }],
       customerPriceListId: "l1",
       retailPrice: 10,
       customerDiscountPercent: 20,
