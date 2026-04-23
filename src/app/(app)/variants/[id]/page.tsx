@@ -7,6 +7,7 @@ import {
   useVariantProducts,
   useVariantPackagings,
   useVariantPackagingProducts,
+  useAllVariantPackagingProducts,
   useVariantPricingSnapshots,
   useAllVariantLabels,
   saveVariant,
@@ -39,7 +40,7 @@ import { ArrowLeft, Plus, Search, X, Trash2, Pencil, ChevronDown, RefreshCw, Ale
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import Link from "next/link";
-import type { ProductCostSnapshot, Packaging, PackagingOrder, VariantPricingSnapshot, Ingredient, VariantKind, OrderChannel } from "@/types";
+import type { ProductCostSnapshot, Packaging, PackagingOrder, VariantPricingSnapshot, VariantPackaging, Ingredient, VariantKind, OrderChannel } from "@/types";
 import { ORDER_CHANNELS, ORDER_CHANNEL_LABELS } from "@/types";
 import { costPerGram } from "@/types";
 import {
@@ -187,6 +188,13 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   // user edits qty per row. Keyed by productId so re-renders don't lose state.
   const [newBoxQtys, setNewBoxQtys] = useState<Record<string, number>>({});
 
+  // When set, the full box-edit form renders in place of that box's
+  // normal BoxCard row. Reuses the same state vars (selectedPackagingId,
+  // sellPriceStr, channelPrice*, newBoxQtys) — only one of add-mode /
+  // edit-mode is active at a time.
+  const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
+  const allVariantPackagingProducts = useAllVariantPackagingProducts();
+
   // Autocomplete source: every label used on any variant
   const knownLabels = useAllVariantLabels();
 
@@ -297,6 +305,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   async function handleAddProduct(productId: string) {
     await addProductToVariant(variantId, productId);
     setProductSearch("");
+    setShowAddProduct(false);
   }
 
   async function handleRemoveProduct(variantProductId: string) {
@@ -410,6 +419,93 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   async function handleRemoveBox(cpId: string) {
     await deleteVariantPackaging(cpId);
     setPendingRemoveBox(null);
+  }
+
+  function handleStartBoxEdit(cp: VariantPackaging) {
+    if (!cp.id) return;
+    setShowAddBox(false);
+    setEditingBoxId(cp.id);
+    setSelectedPackagingId(cp.packagingId);
+    setSellPriceStr(String(cp.price ?? cp.sellPrice ?? ""));
+    const ch = cp.channelPrices ?? {};
+    setChannelPriceB2B(   ch.b2b    != null ? String(ch.b2b)    : "");
+    setChannelPriceShop(  ch.shop   != null ? String(ch.shop)   : "");
+    setChannelPriceEvent( ch.event  != null ? String(ch.event)  : "");
+    setChannelPriceOnline(ch.online != null ? String(ch.online) : "");
+    const qtys: Record<string, number> = {};
+    for (const vpp of allVariantPackagingProducts.filter((x) => x.variantPackagingId === cp.id)) {
+      qtys[vpp.productId] = vpp.qty;
+    }
+    setNewBoxQtys(qtys);
+  }
+
+  function handleCancelBoxEdit() {
+    setEditingBoxId(null);
+    setSelectedPackagingId("");
+    setSellPriceStr("");
+    setChannelPriceB2B("");
+    setChannelPriceShop("");
+    setChannelPriceEvent("");
+    setChannelPriceOnline("");
+    setNewBoxQtys({});
+  }
+
+  async function handleSaveBoxEdit() {
+    if (!editingBoxId) return;
+    const existing = variantPackagings.find((cp) => cp.id === editingBoxId);
+    if (!existing) return;
+
+    const price = parseFloat(sellPriceStr);
+    if (isNaN(price) || price < 0) return;
+
+    const pkg = packagingMap.get(existing.packagingId);
+    const capacity = pkg?.capacity ?? 0;
+    const compEntries = variantProducts
+      .map((vp, i) => ({
+        productId: vp.productId,
+        qty: newBoxQtys[vp.productId] ?? 0,
+        sortOrder: i,
+      }))
+      .filter((e) => e.qty > 0);
+    const compSum = compEntries.reduce((s, x) => s + x.qty, 0);
+    if (kind === "curated" && compSum !== capacity) {
+      alert(`Box composition must sum to ${capacity} (packaging capacity). Currently: ${compSum}.`);
+      return;
+    }
+
+    const channelPrices: Partial<Record<OrderChannel, number>> = {};
+    const pushChannel = (c: OrderChannel, raw: string) => {
+      if (!raw.trim()) return;
+      const n = parseFloat(raw);
+      if (Number.isFinite(n) && n >= 0) channelPrices[c] = n;
+    };
+    pushChannel("b2b", channelPriceB2B);
+    pushChannel("shop", channelPriceShop);
+    pushChannel("event", channelPriceEvent);
+    pushChannel("online", channelPriceOnline);
+
+    await saveVariantPackaging({
+      ...existing,
+      id: editingBoxId,
+      price,
+      channelPrices,
+      sellPrice: price,
+    });
+
+    if (kind === "curated") {
+      await replaceVariantPackagingProducts(editingBoxId, compEntries);
+    }
+
+    if (price !== (existing.price ?? existing.sellPrice)) {
+      await recordPricingSnapshot(
+        existing.packagingId,
+        price,
+        "sell_price_change",
+        `Sell price updated to ${formatPrice(price, sym)}`,
+      );
+    }
+
+    handleCancelBoxEdit();
   }
 
   const productIdSet = useMemo(
@@ -800,54 +896,9 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
-          {editing && showAddProduct && (
-            <div className="rounded-lg border border-border bg-card p-3 mb-3 space-y-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Search products to add..."
-                  autoFocus
-                  className="input !pl-9"
-                />
-              </div>
-              {availableProducts.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-2 text-center">
-                  {allProducts.length === 0 ? "No products in library yet." : "All products already added."}
-                </p>
-              ) : (
-                <ul className="space-y-1 max-h-52 overflow-y-auto">
-                  {availableProducts.map((r) => (
-                    <li key={r.id}>
-                      <button
-                        onClick={() => handleAddProduct(r.id ?? "")}
-                        className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors"
-                      >
-                        {r.name}
-                        {r.productCategoryId && productCategoryMap.get(r.productCategoryId) && (
-                          <span className="ml-1.5 text-xs text-muted-foreground capitalize">
-                            {productCategoryMap.get(r.productCategoryId)!.name}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <button
-                onClick={() => { setShowAddProduct(false); setProductSearch(""); }}
-                className="text-xs text-muted-foreground hover:underline"
-              >
-                Done
-              </button>
-            </div>
-          )}
-
           {variantProducts.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
-              {editing ? 'No products yet \u2014 use "Add product" above.' : "No products in this variant."}
+              {editing ? 'No products yet \u2014 tap "Add product" to start.' : "No products in this variant."}
             </p>
           ) : (
             <ul className="space-y-2">
@@ -899,6 +950,51 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
             </ul>
           )}
 
+          {editing && showAddProduct && (
+            <div className="rounded-lg border border-border bg-card p-3 mt-3 space-y-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search products to add..."
+                  autoFocus
+                  className="input !pl-9"
+                />
+              </div>
+              {availableProducts.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2 text-center">
+                  {allProducts.length === 0 ? "No products in library yet." : "All products already added."}
+                </p>
+              ) : (
+                <ul className="space-y-1 max-h-52 overflow-y-auto">
+                  {availableProducts.map((r) => (
+                    <li key={r.id}>
+                      <button
+                        onClick={() => handleAddProduct(r.id ?? "")}
+                        className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-muted transition-colors"
+                      >
+                        {r.name}
+                        {r.productCategoryId && productCategoryMap.get(r.productCategoryId) && (
+                          <span className="ml-1.5 text-xs text-muted-foreground capitalize">
+                            {productCategoryMap.get(r.productCategoryId)!.name}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                onClick={() => { setShowAddProduct(false); setProductSearch(""); }}
+                className="text-xs text-muted-foreground hover:underline"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {/* Per-product cost summary */}
           {avgCost && productCosts.length > 0 && (
             <div className="mt-3 rounded-lg bg-muted/50 px-3 py-2.5 flex items-baseline justify-between">
@@ -931,16 +1027,19 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
             <h2 className="text-sm font-semibold text-primary">
               Pricing &amp; Margins
             </h2>
-            <button
-              onClick={() => setShowAddBox((v) => !v)}
-              className="flex items-center gap-1 text-xs text-primary hover:underline"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add box
-            </button>
+            {!editingBoxId && (
+              <button
+                onClick={() => setShowAddBox((v) => !v)}
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add box
+              </button>
+            )}
           </div>
 
-          {/* Add box form */}
-          {showAddBox && (() => {
+          {/* Add / edit box form */}
+          {(showAddBox || editingBoxId) && (() => {
+            const isEdit = editingBoxId != null;
             const pkgForForm = selectedPackagingId ? packagingMap.get(selectedPackagingId) : undefined;
             const capacityForForm = pkgForForm?.capacity ?? 0;
             const compSum = variantProducts.reduce(
@@ -957,6 +1056,9 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               : null;
             return (
             <div className="rounded-lg border border-border bg-card p-3 mb-3 space-y-3">
+              <div className="text-xs font-semibold text-primary">
+                {isEdit ? `Edit ${pkgForForm?.name ?? "box"}` : "Add a new box"}
+              </div>
               <div>
                 <label className="label">Packaging</label>
                 <select
@@ -965,17 +1067,23 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     setSelectedPackagingId(e.target.value);
                     setNewBoxQtys({}); // reset qtys on packaging change
                   }}
-                  className="input"
+                  disabled={isEdit}
+                  className="input disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <option value="">Select packaging...</option>
                   {allPackaging
-                    .filter((p) => p.id && !usedPackagingIds.has(p.id))
+                    .filter((p) => p.id && (isEdit || !usedPackagingIds.has(p.id)))
                     .map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.capacity} pcs)
                       </option>
                     ))}
                 </select>
+                {isEdit && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Packaging can&apos;t be changed on an existing box. Remove and re-add to switch packaging.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="label">Default price (gross, VAT-incl)</label>
@@ -1085,22 +1193,26 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
 
               <div className="flex gap-2">
                 <button
-                  onClick={handleAddBox}
+                  onClick={isEdit ? handleSaveBoxEdit : handleAddBox}
                   disabled={!selectedPackagingId || !sellPriceStr || !curatedReady}
                   className="btn-primary px-3 py-1.5 text-sm disabled:opacity-40"
                 >
-                  Add
+                  {isEdit ? "Save" : "Add"}
                 </button>
                 <button
                   onClick={() => {
-                    setShowAddBox(false);
-                    setSelectedPackagingId("");
-                    setSellPriceStr("");
-                    setChannelPriceB2B("");
-                    setChannelPriceShop("");
-                    setChannelPriceEvent("");
-                    setChannelPriceOnline("");
-                    setNewBoxQtys({});
+                    if (isEdit) {
+                      handleCancelBoxEdit();
+                    } else {
+                      setShowAddBox(false);
+                      setSelectedPackagingId("");
+                      setSellPriceStr("");
+                      setChannelPriceB2B("");
+                      setChannelPriceShop("");
+                      setChannelPriceEvent("");
+                      setChannelPriceOnline("");
+                      setNewBoxQtys({});
+                    }
                   }}
                   className="btn-secondary px-3 py-1.5 text-sm"
                 >
@@ -1188,6 +1300,15 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       productMap={productMap}
                       sym={sym}
                     />
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleStartBoxEdit(cp)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Edit box
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1237,6 +1358,15 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       productMap={productMap}
                       sym={sym}
                     />
+                    <div className="mt-1 ml-3">
+                      <button
+                        type="button"
+                        onClick={() => handleStartBoxEdit(cp)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Edit box
+                      </button>
+                    </div>
                   </div>
                 );
               })}
