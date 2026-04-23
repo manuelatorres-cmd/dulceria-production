@@ -66,6 +66,32 @@
   --accent-terracotta-ink:#7a3e1e;
   --accent-taupe-bg:      #dcd4c7;
   --accent-taupe-ink:     #5a4a35;
+  --accent-blush-bg:      #fbe6e3;
+  --accent-blush-ink:     #9b4f48;
+  --accent-sky-bg:        #e8f0f9;
+  --accent-sky-ink:       #4b6b8f;
+
+  /* ─── Production brain planner block tokens ───────────────────────────
+     Semantic names for calendar/planner blocks. Each maps to one of the
+     existing accent pastels so they stay visually consistent with the
+     rest of the app. Used by production-brain calendar/daily views.
+     ──────────────────────────────────────────────────────────────────── */
+  --plan-order-bg:        var(--accent-sky-bg);
+  --plan-order-ink:       var(--accent-sky-ink);
+  --plan-replen-bg:       var(--accent-sage-bg);
+  --plan-replen-ink:      var(--accent-sage-ink);
+  --plan-campaign-bg:     var(--accent-lilac-bg);
+  --plan-campaign-ink:    var(--accent-lilac-ink);
+  --plan-cook-bg:         var(--accent-peach-bg);
+  --plan-cook-ink:        var(--accent-peach-ink);
+  --plan-course-bg:       var(--color-muted);
+  --plan-course-ink:      var(--color-muted-foreground);
+  --plan-ok-bg:           var(--accent-mint-bg);
+  --plan-ok-ink:          var(--accent-mint-ink);
+  --plan-tight-bg:        var(--accent-butter-bg);
+  --plan-tight-ink:       var(--accent-butter-ink);
+  --plan-short-bg:        var(--accent-blush-bg);
+  --plan-short-ink:       var(--accent-blush-ink);
 
   /* Glass overlays — secondary buttons on light / dark surfaces */
   --color-glass-dark: rgba(0, 0, 0, 0.08);
@@ -184,6 +210,8 @@
   body[data-accent="mint"]       { --color-accent: var(--accent-mint-bg);       --color-accent-foreground: var(--accent-mint-ink); }
   body[data-accent="terracotta"] { --color-accent: var(--accent-terracotta-bg); --color-accent-foreground: var(--accent-terracotta-ink); }
   body[data-accent="taupe"]      { --color-accent: var(--accent-taupe-bg);      --color-accent-foreground: var(--accent-taupe-ink); }
+  body[data-accent="blush"]      { --color-accent: var(--accent-blush-bg);      --color-accent-foreground: var(--accent-blush-ink); }
+  body[data-accent="sky"]        { --color-accent: var(--accent-sky-bg);        --color-accent-foreground: var(--accent-sky-ink); }
 
   body {
     letter-spacing: -0.011em;
