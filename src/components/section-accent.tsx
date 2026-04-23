@@ -25,6 +25,7 @@ const ROUTE_ACCENTS: Record<string, string> = {
   "/moulds": "blue",
   "/packaging": "lilac",
   "/variants": "butter",
+  "/collections": "butter",
   "/pantry/decoration": "mint",
   "/workshop": "terracotta",
   "/production": "terracotta",

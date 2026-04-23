@@ -3647,6 +3647,26 @@ export async function deleteVariant(id: string): Promise<void> {
   queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
 }
 
+/** Unique variant labels, case-insensitive dedupe, alphabetically sorted.
+ *  The first-seen casing of each label wins (preserves "B2B" over "b2b"
+ *  if "B2B" appeared on a variant first). Drives the Label autocomplete
+ *  and the Collections page row list. */
+export function useAllVariantLabels(): string[] {
+  const variants = useVariants();
+  return useMemo(() => {
+    const firstByLower = new Map<string, string>();
+    for (const v of variants) {
+      for (const label of v.labels ?? []) {
+        const key = label.toLowerCase();
+        if (!firstByLower.has(key)) firstByLower.set(key, label);
+      }
+    }
+    return Array.from(firstByLower.values()).sort((a, b) =>
+      a.toLowerCase().localeCompare(b.toLowerCase()),
+    );
+  }, [variants]);
+}
+
 export function useAllVariantProducts(): VariantProduct[] {
   const { data } = useQuery({
     queryKey: ["variant-products", "all"],

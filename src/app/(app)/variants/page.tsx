@@ -89,6 +89,7 @@ export default function VariantsPage() {
     const id = await saveVariant({
       name: newName.trim(),
       startDate: newStart,
+      labels: [],
       createdAt: new Date(),
       updatedAt: new Date(),
     });

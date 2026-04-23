@@ -1112,6 +1112,9 @@ export interface Variant {
   startDate: string; // ISO date string, e.g. "2025-01-01"
   endDate?: string;  // ISO date string; undefined = ongoing / no end date
   notes?: string;
+  /** Free-form labels — each unique label (case-insensitive) becomes a
+   *  "collection" on the Collections page. */
+  labels: string[];
   createdAt: Date;
   updatedAt: Date;
 }

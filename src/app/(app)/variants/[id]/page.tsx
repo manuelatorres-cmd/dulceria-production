@@ -7,6 +7,7 @@ import {
   useVariantProducts,
   useVariantPackagings,
   useVariantPricingSnapshots,
+  useAllVariantLabels,
   saveVariant,
   deleteVariant,
   addProductToVariant,
@@ -168,6 +169,11 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [labels, setLabels] = useState<string[]>([]);
+  const [labelInput, setLabelInput] = useState("");
+
+  // Autocomplete source: every label used on any variant
+  const knownLabels = useAllVariantLabels();
 
   // Product management
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -195,6 +201,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     setStartDate(variant.startDate || "");
     setEndDate(variant.endDate || "");
     setNotes(variant.notes || "");
+    setLabels(variant.labels ?? []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant?.id]);
 
@@ -217,7 +224,22 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     setStartDate(variant.startDate || "");
     setEndDate(variant.endDate || "");
     setNotes(variant.notes || "");
+    setLabels(variant.labels ?? []);
+    setLabelInput("");
     setEditing(true);
+  }
+
+  function handleAddLabel(raw: string) {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const lower = trimmed.toLowerCase();
+    if (labels.some((l) => l.toLowerCase() === lower)) return; // case-insensitive dedupe
+    setLabels([...labels, trimmed]);
+    setLabelInput("");
+  }
+
+  function handleRemoveLabel(label: string) {
+    setLabels(labels.filter((l) => l !== label));
   }
 
   const fromSuffix = from ? `?from=${from}` : "";
@@ -237,6 +259,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
       startDate,
       endDate: endDate || undefined,
       notes: notes.trim() || undefined,
+      labels,
     });
     setSavedOnce(true);
     setEditing(false);
@@ -408,7 +431,9 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     description !== (variant.description || "") ||
     startDate !== (variant.startDate || "") ||
     endDate !== (variant.endDate || "") ||
-    notes !== (variant.notes || "")
+    notes !== (variant.notes || "") ||
+    JSON.stringify([...labels].map((l) => l.toLowerCase()).sort()) !==
+      JSON.stringify([...(variant.labels ?? [])].map((l) => l.toLowerCase()).sort())
   );
   const isDirty = (isNew && !savedOnce) || formDirty;
 
@@ -528,6 +553,57 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 placeholder="Internal notes..."
               />
             </div>
+            <div>
+              <label className="label">Label</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {labels.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
+                  >
+                    {label}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveLabel(label)}
+                      aria-label={`Remove label ${label}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  list="variant-label-suggestions"
+                  value={labelInput}
+                  onChange={(e) => setLabelInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddLabel(labelInput); } }}
+                  placeholder="Add label (e.g. B2B, standard)"
+                  className="input"
+                />
+                {knownLabels.length > 0 && (
+                  <datalist id="variant-label-suggestions">
+                    {knownLabels
+                      .filter((t) => !labels.some((l) => l.toLowerCase() === t.toLowerCase()))
+                      .map((t) => (
+                        <option key={t} value={t} />
+                      ))}
+                  </datalist>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleAddLabel(labelInput)}
+                  disabled={!labelInput.trim()}
+                  className="btn-primary px-3 py-1.5"
+                >
+                  Add
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Labels group this variant into Collections. Case-insensitive — &quot;B2B&quot; and &quot;b2b&quot; are the same label.
+              </p>
+            </div>
             <div className="flex gap-2 pt-1">
               <button
                 onClick={handleSave}
@@ -564,6 +640,19 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
             </div>
             {variant.notes && (
               <p className="text-sm whitespace-pre-wrap text-muted-foreground">{variant.notes}</p>
+            )}
+            {(variant.labels ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {(variant.labels ?? []).map((label) => (
+                  <Link
+                    key={label}
+                    href={`/collections/${encodeURIComponent(label.toLowerCase())}`}
+                    className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium hover:bg-primary/20 transition-colors"
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </div>
             )}
           </section>
         )}
