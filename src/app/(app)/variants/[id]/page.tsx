@@ -182,8 +182,10 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   const [channelPriceShop, setChannelPriceShop]     = useState("");
   const [channelPriceEvent, setChannelPriceEvent]   = useState("");
   const [channelPriceOnline, setChannelPriceOnline] = useState("");
-  // Curated composition for the box being added: productId → qty
-  const [newBoxComposition, setNewBoxComposition] = useState<Array<{ productId: string; qty: number }>>([]);
+  // Curated composition for the box being added: productId -> qty.
+  // Rows come from the variant's Products list (one row per variant product);
+  // user edits qty per row. Keyed by productId so re-renders don't lose state.
+  const [newBoxQtys, setNewBoxQtys] = useState<Record<string, number>>({});
 
   // Autocomplete source: every label used on any variant
   const knownLabels = useAllVariantLabels();
@@ -336,12 +338,20 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     const price = parseFloat(sellPriceStr);
     if (isNaN(price) || price < 0) return;
 
-    // Curated kind enforces: composition qtys sum to capacity.
+    // Curated: qty rows come from the variant's Products list; sum must
+    // equal packaging.capacity.
     const pkg = packagingMap.get(selectedPackagingId);
     const capacity = pkg?.capacity ?? 0;
-    const compSum = newBoxComposition.reduce((s, x) => s + x.qty, 0);
+    const compEntries = variantProducts
+      .map((vp, i) => ({
+        productId: vp.productId,
+        qty: newBoxQtys[vp.productId] ?? 0,
+        sortOrder: i,
+      }))
+      .filter((e) => e.qty > 0);
+    const compSum = compEntries.reduce((s, x) => s + x.qty, 0);
     if (kind === "curated" && compSum !== capacity) {
-      alert(`Curated box composition must sum to ${capacity} (packaging capacity). Currently: ${compSum}.`);
+      alert(`Box composition must sum to ${capacity} (packaging capacity). Currently: ${compSum}.`);
       return;
     }
 
@@ -367,11 +377,8 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
       updatedAt: new Date(),
     });
 
-    if (kind === "curated" && newBoxComposition.length > 0) {
-      await replaceVariantPackagingProducts(
-        newVpId,
-        newBoxComposition.map((x, i) => ({ ...x, sortOrder: i })),
-      );
+    if (kind === "curated" && compEntries.length > 0) {
+      await replaceVariantPackagingProducts(newVpId, compEntries);
     }
 
     await recordPricingSnapshot(selectedPackagingId, price, "sell_price_change", `Box pricing configured at ${formatPrice(price, sym)}`);
@@ -381,7 +388,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     setChannelPriceShop("");
     setChannelPriceEvent("");
     setChannelPriceOnline("");
-    setNewBoxComposition([]);
+    setNewBoxQtys({});
     setShowAddBox(false);
   }
 
@@ -776,7 +783,8 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
           </section>
         )}
 
-        {/* Products */}
+        {/* Products (curated only — free-pick variants pick on each order) */}
+        {(variant?.kind ?? "curated") === "curated" && (
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-primary">
@@ -906,6 +914,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
             </p>
           )}
         </section>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════════
             Nutrition & Ingredients
@@ -934,8 +943,13 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
           {showAddBox && (() => {
             const pkgForForm = selectedPackagingId ? packagingMap.get(selectedPackagingId) : undefined;
             const capacityForForm = pkgForForm?.capacity ?? 0;
-            const compSum = newBoxComposition.reduce((s, x) => s + x.qty, 0);
-            const compValid = kind !== "curated" || (capacityForForm > 0 && compSum === capacityForForm);
+            const compSum = variantProducts.reduce(
+              (s, vp) => s + (newBoxQtys[vp.productId] ?? 0),
+              0,
+            );
+            const hasVariantProducts = variantProducts.length > 0;
+            const curatedReady = kind !== "curated"
+              || (capacityForForm > 0 && compSum === capacityForForm && hasVariantProducts);
             const vatN = parseFloat(vatRateStr) || 0;
             const priceGross = parseFloat(sellPriceStr);
             const priceNet = Number.isFinite(priceGross) && vatN >= 0
@@ -949,7 +963,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                   value={selectedPackagingId}
                   onChange={(e) => {
                     setSelectedPackagingId(e.target.value);
-                    setNewBoxComposition([]); // reset composition on packaging change
+                    setNewBoxQtys({}); // reset qtys on packaging change
                   }}
                   className="input"
                 >
@@ -1031,60 +1045,37 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       ({compSum}/{capacityForForm} pieces)
                     </span>
                   </p>
-                  {newBoxComposition.map((line, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-md border border-border/70 bg-background/50 p-2 mb-2 space-y-1.5"
-                    >
-                      <select
-                        value={line.productId}
-                        onChange={(e) => {
-                          const next = [...newBoxComposition];
-                          next[idx] = { ...next[idx], productId: e.target.value };
-                          setNewBoxComposition(next);
-                        }}
-                        className="input text-sm"
-                      >
-                        <option value="">Select product…</option>
-                        {allProducts.filter((p) => !p.archived).map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                      <div className="flex items-center gap-2">
-                        <label className="text-[11px] text-muted-foreground">Qty</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={line.qty}
-                          onChange={(e) => {
-                            const next = [...newBoxComposition];
-                            next[idx] = { ...next[idx], qty: parseInt(e.target.value) || 0 };
-                            setNewBoxComposition(next);
-                          }}
-                          className="input w-20 text-sm py-1.5"
-                        />
-                        <div className="flex-1" />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setNewBoxComposition(newBoxComposition.filter((_, i) => i !== idx))
-                          }
-                          className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1"
-                          aria-label="Remove product from box"
-                        >
-                          <X className="w-3.5 h-3.5" /> Remove
-                        </button>
-                      </div>
+                  {!hasVariantProducts ? (
+                    <p className="text-[11px] text-status-warn border border-dashed border-status-warn-edge rounded-md px-2 py-2">
+                      Add at least one product to this variant first (use the <strong>Products</strong> section above), then configure the box qty here.
+                    </p>
+                  ) : (
+                    <div className="rounded-md border border-border/70 bg-background/50 p-2 space-y-1.5">
+                      {variantProducts.map((vp) => {
+                        const name = productMap.get(vp.productId) ?? vp.productId;
+                        const qty = newBoxQtys[vp.productId] ?? 0;
+                        return (
+                          <div key={vp.id ?? vp.productId} className="flex items-center gap-2">
+                            <span className="flex-1 text-sm truncate">{name}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={qty}
+                              onChange={(e) => {
+                                const n = parseInt(e.target.value);
+                                setNewBoxQtys({
+                                  ...newBoxQtys,
+                                  [vp.productId]: Number.isFinite(n) && n >= 0 ? n : 0,
+                                });
+                              }}
+                              className="input w-20 text-sm py-1.5"
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setNewBoxComposition([...newBoxComposition, { productId: "", qty: 1 }])}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    <Plus className="w-3 h-3 inline" /> Add product
-                  </button>
-                  {!compValid && compSum !== 0 && (
+                  )}
+                  {hasVariantProducts && compSum !== capacityForForm && (
                     <p className="text-[11px] text-status-warn mt-1">
                       Must sum to {capacityForForm} pieces (currently {compSum}).
                     </p>
@@ -1095,7 +1086,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               <div className="flex gap-2">
                 <button
                   onClick={handleAddBox}
-                  disabled={!selectedPackagingId || !sellPriceStr || !compValid}
+                  disabled={!selectedPackagingId || !sellPriceStr || !curatedReady}
                   className="btn-primary px-3 py-1.5 text-sm disabled:opacity-40"
                 >
                   Add
@@ -1109,7 +1100,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     setChannelPriceShop("");
                     setChannelPriceEvent("");
                     setChannelPriceOnline("");
-                    setNewBoxComposition([]);
+                    setNewBoxQtys({});
                   }}
                   className="btn-secondary px-3 py-1.5 text-sm"
                 >
