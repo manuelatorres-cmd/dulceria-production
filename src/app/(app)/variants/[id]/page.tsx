@@ -6,6 +6,7 @@ import {
   useVariant,
   useVariantProducts,
   useVariantPackagings,
+  useVariantPackagingProducts,
   useVariantPricingSnapshots,
   useAllVariantLabels,
   saveVariant,
@@ -15,6 +16,7 @@ import {
   saveVariantPackaging,
   saveVariantPricingSnapshot,
   deleteVariantPackaging,
+  replaceVariantPackagingProducts,
   useProductsList,
   usePackagingList,
   useAllPackagingOrders,
@@ -37,7 +39,8 @@ import { ArrowLeft, Plus, Search, X, Trash2, Pencil, ChevronDown, RefreshCw, Ale
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import Link from "next/link";
-import type { ProductCostSnapshot, Packaging, PackagingOrder, VariantPricingSnapshot, Ingredient } from "@/types";
+import type { ProductCostSnapshot, Packaging, PackagingOrder, VariantPricingSnapshot, Ingredient, VariantKind, OrderChannel } from "@/types";
+import { ORDER_CHANNELS, ORDER_CHANNEL_LABELS } from "@/types";
 import { costPerGram } from "@/types";
 import {
   latestPackagingUnitCost,
@@ -171,6 +174,16 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   const [notes, setNotes] = useState("");
   const [labels, setLabels] = useState<string[]>([]);
   const [labelInput, setLabelInput] = useState("");
+  const [kind, setKind] = useState<VariantKind>("curated");
+  const [vatRateStr, setVatRateStr] = useState("10");
+
+  // Add-box form: channel price overrides (empty string = use default).
+  const [channelPriceB2B, setChannelPriceB2B]       = useState("");
+  const [channelPriceShop, setChannelPriceShop]     = useState("");
+  const [channelPriceEvent, setChannelPriceEvent]   = useState("");
+  const [channelPriceOnline, setChannelPriceOnline] = useState("");
+  // Curated composition for the box being added: productId → qty
+  const [newBoxComposition, setNewBoxComposition] = useState<Array<{ productId: string; qty: number }>>([]);
 
   // Autocomplete source: every label used on any variant
   const knownLabels = useAllVariantLabels();
@@ -202,6 +215,8 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     setEndDate(variant.endDate || "");
     setNotes(variant.notes || "");
     setLabels(variant.labels ?? []);
+    setKind(variant.kind ?? "curated");
+    setVatRateStr(String(variant.vatRatePercent ?? 10));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant?.id]);
 
@@ -226,6 +241,8 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     setNotes(variant.notes || "");
     setLabels(variant.labels ?? []);
     setLabelInput("");
+    setKind(variant.kind ?? "curated");
+    setVatRateStr(String(variant.vatRatePercent ?? 10));
     setEditing(true);
   }
 
@@ -251,6 +268,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
 
   async function handleSave() {
     if (!variant?.id || !name.trim() || !startDate) return;
+    const vatN = parseFloat(vatRateStr);
     await saveVariant({
       ...variant,
       id: variant.id,
@@ -260,6 +278,8 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
       endDate: endDate || undefined,
       notes: notes.trim() || undefined,
       labels,
+      kind,
+      vatRatePercent: Number.isFinite(vatN) && vatN >= 0 ? vatN : 10,
     });
     setSavedOnce(true);
     setEditing(false);
@@ -315,16 +335,53 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     if (!selectedPackagingId || !sellPriceStr) return;
     const price = parseFloat(sellPriceStr);
     if (isNaN(price) || price < 0) return;
-    await saveVariantPackaging({
+
+    // Curated kind enforces: composition qtys sum to capacity.
+    const pkg = packagingMap.get(selectedPackagingId);
+    const capacity = pkg?.capacity ?? 0;
+    const compSum = newBoxComposition.reduce((s, x) => s + x.qty, 0);
+    if (kind === "curated" && compSum !== capacity) {
+      alert(`Curated box composition must sum to ${capacity} (packaging capacity). Currently: ${compSum}.`);
+      return;
+    }
+
+    // Build sparse channel overrides map from the 4 inputs.
+    const channelPrices: Partial<Record<OrderChannel, number>> = {};
+    const pushChannel = (c: OrderChannel, raw: string) => {
+      if (!raw.trim()) return;
+      const n = parseFloat(raw);
+      if (Number.isFinite(n) && n >= 0) channelPrices[c] = n;
+    };
+    pushChannel("b2b", channelPriceB2B);
+    pushChannel("shop", channelPriceShop);
+    pushChannel("event", channelPriceEvent);
+    pushChannel("online", channelPriceOnline);
+
+    const newVpId = await saveVariantPackaging({
       variantId,
       packagingId: selectedPackagingId,
-      sellPrice: price,
+      price,
+      channelPrices,
+      sellPrice: price, // mirror for legacy consumers
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+
+    if (kind === "curated" && newBoxComposition.length > 0) {
+      await replaceVariantPackagingProducts(
+        newVpId,
+        newBoxComposition.map((x, i) => ({ ...x, sortOrder: i })),
+      );
+    }
+
     await recordPricingSnapshot(selectedPackagingId, price, "sell_price_change", `Box pricing configured at ${formatPrice(price, sym)}`);
     setSelectedPackagingId("");
     setSellPriceStr("");
+    setChannelPriceB2B("");
+    setChannelPriceShop("");
+    setChannelPriceEvent("");
+    setChannelPriceOnline("");
+    setNewBoxComposition([]);
     setShowAddBox(false);
   }
 
@@ -432,6 +489,8 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     startDate !== (variant.startDate || "") ||
     endDate !== (variant.endDate || "") ||
     notes !== (variant.notes || "") ||
+    kind !== (variant.kind ?? "curated") ||
+    vatRateStr !== String(variant.vatRatePercent ?? 10) ||
     JSON.stringify([...labels].map((l) => l.toLowerCase()).sort()) !==
       JSON.stringify([...(variant.labels ?? [])].map((l) => l.toLowerCase()).sort())
   );
@@ -553,6 +612,58 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 placeholder="Internal notes..."
               />
             </div>
+
+            <div>
+              <label className="label">Kind</label>
+              <div className="flex gap-2">
+                <label className={`flex-1 rounded-lg border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "curated" ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:bg-muted"}`}>
+                  <input
+                    type="radio"
+                    name="variant-kind"
+                    value="curated"
+                    checked={kind === "curated"}
+                    onChange={() => setKind("curated")}
+                    className="sr-only"
+                  />
+                  Curated
+                  <span className="block text-[11px] font-normal mt-0.5">
+                    Fixed products per size. Locked on orders.
+                  </span>
+                </label>
+                <label className={`flex-1 rounded-lg border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "free-pick" ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:bg-muted"}`}>
+                  <input
+                    type="radio"
+                    name="variant-kind"
+                    value="free-pick"
+                    checked={kind === "free-pick"}
+                    onChange={() => setKind("free-pick")}
+                    className="sr-only"
+                  />
+                  Free pick
+                  <span className="block text-[11px] font-normal mt-0.5">
+                    User picks products on each order.
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">VAT rate (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={vatRateStr}
+                onChange={(e) => setVatRateStr(e.target.value)}
+                className="input"
+                placeholder="10"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Prices entered below are gross; net is derived from this rate.
+              </p>
+            </div>
+
             <div>
               <label className="label">Label</label>
               <div className="flex flex-wrap gap-1.5 mb-2">
@@ -620,9 +731,17 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
         ) : (
           /* View mode */
           <section className="space-y-3">
-            <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_CLASS[status]}`}>
-              {STATUS_LABEL[status]}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_CLASS[status]}`}>
+                {STATUS_LABEL[status]}
+              </span>
+              <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize">
+                {variant.kind ?? "curated"}
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                VAT {variant.vatRatePercent ?? 10}%
+              </span>
+            </div>
             {variant.description && (
               <p className="text-sm text-muted-foreground">{variant.description}</p>
             )}
@@ -812,13 +931,26 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* Add box form */}
-          {showAddBox && (
+          {showAddBox && (() => {
+            const pkgForForm = selectedPackagingId ? packagingMap.get(selectedPackagingId) : undefined;
+            const capacityForForm = pkgForForm?.capacity ?? 0;
+            const compSum = newBoxComposition.reduce((s, x) => s + x.qty, 0);
+            const compValid = kind !== "curated" || (capacityForForm > 0 && compSum === capacityForForm);
+            const vatN = parseFloat(vatRateStr) || 0;
+            const priceGross = parseFloat(sellPriceStr);
+            const priceNet = Number.isFinite(priceGross) && vatN >= 0
+              ? priceGross / (1 + vatN / 100)
+              : null;
+            return (
             <div className="rounded-lg border border-border bg-card p-3 mb-3 space-y-3">
               <div>
                 <label className="label">Packaging</label>
                 <select
                   value={selectedPackagingId}
-                  onChange={(e) => setSelectedPackagingId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedPackagingId(e.target.value);
+                    setNewBoxComposition([]); // reset composition on packaging change
+                  }}
                   className="input"
                 >
                   <option value="">Select packaging...</option>
@@ -832,7 +964,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 </select>
               </div>
               <div>
-                <label className="label">Sell price</label>
+                <label className="label">Default price (gross, VAT-incl)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">&euro;</span>
                   <input
@@ -841,29 +973,143 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     min="0"
                     value={sellPriceStr}
                     onChange={(e) => setSellPriceStr(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleAddBox(); }}
                     className="input !pl-7"
                     placeholder="24.95"
                   />
                 </div>
+                {priceNet !== null && priceNet > 0 && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Net at {vatN}% VAT: {formatPrice(priceNet, sym)}
+                  </p>
+                )}
               </div>
+
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                  Per-Type prices <span className="font-normal">(leave blank to use default)</span>
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {ORDER_CHANNELS.map((c) => {
+                    const val =
+                      c === "b2b"    ? channelPriceB2B :
+                      c === "shop"   ? channelPriceShop :
+                      c === "event"  ? channelPriceEvent :
+                                       channelPriceOnline;
+                    const setter =
+                      c === "b2b"    ? setChannelPriceB2B :
+                      c === "shop"   ? setChannelPriceShop :
+                      c === "event"  ? setChannelPriceEvent :
+                                       setChannelPriceOnline;
+                    return (
+                      <div key={c}>
+                        <label className="text-[11px] text-muted-foreground">
+                          {ORDER_CHANNEL_LABELS[c]}
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">&euro;</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={val}
+                            onChange={(e) => setter(e.target.value)}
+                            className="input text-sm !pl-6 py-1.5"
+                            placeholder="—"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {kind === "curated" && selectedPackagingId && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                    Box composition
+                    <span className="font-normal ml-1">
+                      ({compSum}/{capacityForForm} pieces)
+                    </span>
+                  </p>
+                  {newBoxComposition.map((line, idx) => (
+                    <div key={idx} className="flex items-center gap-2 mb-1.5">
+                      <select
+                        value={line.productId}
+                        onChange={(e) => {
+                          const next = [...newBoxComposition];
+                          next[idx] = { ...next[idx], productId: e.target.value };
+                          setNewBoxComposition(next);
+                        }}
+                        className="input flex-1 text-sm py-1.5"
+                      >
+                        <option value="">Select product...</option>
+                        {allProducts.filter((p) => !p.archived).map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min="1"
+                        value={line.qty}
+                        onChange={(e) => {
+                          const next = [...newBoxComposition];
+                          next[idx] = { ...next[idx], qty: parseInt(e.target.value) || 0 };
+                          setNewBoxComposition(next);
+                        }}
+                        className="input w-16 text-sm py-1.5"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewBoxComposition(newBoxComposition.filter((_, i) => i !== idx))}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Remove product from box"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setNewBoxComposition([...newBoxComposition, { productId: "", qty: 1 }])}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    <Plus className="w-3 h-3 inline" /> Add product
+                  </button>
+                  {!compValid && compSum !== 0 && (
+                    <p className="text-[11px] text-status-warn mt-1">
+                      Must sum to {capacityForForm} pieces (currently {compSum}).
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <button
                   onClick={handleAddBox}
-                  disabled={!selectedPackagingId || !sellPriceStr}
+                  disabled={!selectedPackagingId || !sellPriceStr || !compValid}
                   className="btn-primary px-3 py-1.5 text-sm disabled:opacity-40"
                 >
                   Add
                 </button>
                 <button
-                  onClick={() => { setShowAddBox(false); setSelectedPackagingId(""); setSellPriceStr(""); }}
+                  onClick={() => {
+                    setShowAddBox(false);
+                    setSelectedPackagingId("");
+                    setSellPriceStr("");
+                    setChannelPriceB2B("");
+                    setChannelPriceShop("");
+                    setChannelPriceEvent("");
+                    setChannelPriceOnline("");
+                    setNewBoxComposition([]);
+                  }}
                   className="btn-secondary px-3 py-1.5 text-sm"
                 >
                   Cancel
                 </button>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {hasMissingIngredientPricing && (
             <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2 mb-3">
@@ -891,36 +1137,45 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 // Only show snapshots where packaging was actually priced — filter out initialisation entries
                 const history = (snapshotsByPackaging.get(cp.packagingId) ?? []).filter((s) => s.packagingUnitCost > 0);
                 return (
-                  <BoxCard
-                    key={cpId}
-                    packagingName={pkg?.name ?? "Unknown"}
-                    capacity={pkg?.capacity ?? 0}
-                    pricing={pricing}
-                    health={health}
-                    packagingUnitCost={unitCost}
-                    history={history}
-                    historyExpanded={expandedHistory.has(cpId)}
-                    onToggleHistory={() => setExpandedHistory((prev) => {
-                      const next = new Set(prev);
-                      next.has(cpId) ? next.delete(cpId) : next.add(cpId);
-                      return next;
-                    })}
-                    isEditingSellPrice={editingSellPrice === cpId}
-                    editSellPriceStr={editSellPriceStr}
-                    pendingRemove={pendingRemoveBox === cpId}
-                    onStartEditSellPrice={() => {
-                      setEditingSellPrice(cpId);
-                      setEditSellPriceStr(String(cp.sellPrice));
-                    }}
-                    onEditSellPriceChange={setEditSellPriceStr}
-                    onSaveSellPrice={() => handleUpdateSellPrice(cpId)}
-                    onCancelEditSellPrice={() => setEditingSellPrice(null)}
-                    onStartRemove={() => setPendingRemoveBox(cpId)}
-                    onConfirmRemove={() => handleRemoveBox(cpId)}
-                    onCancelRemove={() => setPendingRemoveBox(null)}
-                    onRecalculate={() => handleRecalculate(cp)}
-                    sym={sym}
-                  />
+                  <div key={cpId}>
+                    <BoxCard
+                      packagingName={pkg?.name ?? "Unknown"}
+                      capacity={pkg?.capacity ?? 0}
+                      pricing={pricing}
+                      health={health}
+                      packagingUnitCost={unitCost}
+                      history={history}
+                      historyExpanded={expandedHistory.has(cpId)}
+                      onToggleHistory={() => setExpandedHistory((prev) => {
+                        const next = new Set(prev);
+                        next.has(cpId) ? next.delete(cpId) : next.add(cpId);
+                        return next;
+                      })}
+                      isEditingSellPrice={editingSellPrice === cpId}
+                      editSellPriceStr={editSellPriceStr}
+                      pendingRemove={pendingRemoveBox === cpId}
+                      onStartEditSellPrice={() => {
+                        setEditingSellPrice(cpId);
+                        setEditSellPriceStr(String(cp.sellPrice));
+                      }}
+                      onEditSellPriceChange={setEditSellPriceStr}
+                      onSaveSellPrice={() => handleUpdateSellPrice(cpId)}
+                      onCancelEditSellPrice={() => setEditingSellPrice(null)}
+                      onStartRemove={() => setPendingRemoveBox(cpId)}
+                      onConfirmRemove={() => handleRemoveBox(cpId)}
+                      onCancelRemove={() => setPendingRemoveBox(null)}
+                      onRecalculate={() => handleRecalculate(cp)}
+                      sym={sym}
+                    />
+                    <BoxExtras
+                      variantPackagingId={cpId}
+                      kind={variant?.kind ?? "curated"}
+                      channelPrices={cp.channelPrices ?? {}}
+                      defaultPrice={cp.price ?? cp.sellPrice}
+                      productMap={productMap}
+                      sym={sym}
+                    />
+                  </div>
                 );
               })}
             </div>
@@ -971,6 +1226,69 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
 }
 
 /* ─── Box pricing card ─── */
+
+/* ─── Per-box channel prices + curated composition (view mode) ─── */
+
+function BoxExtras({
+  variantPackagingId,
+  kind,
+  channelPrices,
+  defaultPrice,
+  productMap,
+  sym,
+}: {
+  variantPackagingId: string;
+  kind: VariantKind;
+  channelPrices: Partial<Record<OrderChannel, number>>;
+  defaultPrice: number;
+  productMap: Map<string, string>;
+  sym: string;
+}) {
+  const composition = useVariantPackagingProducts(variantPackagingId);
+  const overrides = ORDER_CHANNELS
+    .map((c) => ({ c, price: channelPrices[c] }))
+    .filter((x) => x.price != null);
+
+  if (overrides.length === 0 && (kind === "free-pick" || composition.length === 0)) {
+    return null;
+  }
+
+  return (
+    <div className="mt-1 ml-3 pl-3 border-l border-border/40 space-y-1.5 py-1.5">
+      {overrides.length > 0 && (
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground/80 mb-0.5">
+            Per-Type prices
+          </p>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {overrides.map(({ c, price }) => (
+              <span key={c} className="text-[11px] text-muted-foreground tabular-nums">
+                {ORDER_CHANNEL_LABELS[c]}: <span className="font-medium text-foreground">{formatPrice(price!, sym)}</span>
+              </span>
+            ))}
+            <span className="text-[11px] text-muted-foreground/70">
+              (default: {formatPrice(defaultPrice, sym)})
+            </span>
+          </div>
+        </div>
+      )}
+      {kind === "curated" && composition.length > 0 && (
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground/80 mb-0.5">
+            Composition
+          </p>
+          <ul className="flex flex-wrap gap-1">
+            {composition.map((vpp) => (
+              <li key={vpp.id} className="text-[11px] rounded-full bg-muted text-foreground px-2 py-0.5">
+                {productMap.get(vpp.productId) ?? vpp.productId} &times; {vpp.qty}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const TRIGGER_LABELS: Record<VariantPricingSnapshot["triggerType"], string> = {
   sell_price_change: "Sell price",

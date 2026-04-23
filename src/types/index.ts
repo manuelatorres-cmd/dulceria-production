@@ -1105,6 +1105,14 @@ export const DEFAULT_SHELL_DESIGNS: ReadonlyArray<{ name: string; defaultApplyAt
  * startDate = when the variant first goes on offer.
  * endDate = undefined means it runs indefinitely (e.g. "standard" range).
  */
+export const VARIANT_KINDS = ["free-pick", "curated"] as const;
+export type VariantKind = (typeof VARIANT_KINDS)[number];
+
+export const VARIANT_KIND_LABELS: Record<VariantKind, string> = {
+  "free-pick": "Free pick",
+  "curated":   "Curated",
+};
+
 export interface Variant {
   id?: string;
   name: string;
@@ -1115,6 +1123,12 @@ export interface Variant {
   /** Free-form labels — each unique label (case-insensitive) becomes a
    *  "collection" on the Collections page. */
   labels: string[];
+  /** 'curated' = products fixed per size, locked on orders.
+   *  'free-pick' = no stored product list; user picks on each order. */
+  kind: VariantKind;
+  /** VAT rate used to derive the net price from the gross price shown on
+   *  the variant size rows. Austria chocolate default is 10. */
+  vatRatePercent: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -1132,15 +1146,40 @@ export interface VariantProduct {
   unitPrice?: number;
 }
 
-/** Links a variant to a packaging option with the retail sell price for that box */
+/** One "size" of a variant — a packaging + its gross sell price + any
+ *  per-channel overrides. A variant has one row per size it is sold in
+ *  (e.g. Easter Box → 4, 8, 16). Curated variants also have a product
+ *  list per size via {@link VariantPackagingProduct}. */
 export interface VariantPackaging {
   id?: string;
   variantId: string;
   packagingId: string;
-  sellPrice: number;      // retail price for this box configuration (e.g. €24.95)
+  /** Default gross price (VAT-inc). Used when the order's channel has
+   *  no override in {@link channelPrices}. */
+  price: number;
+  /** Sparse map of gross price overrides per order channel. Missing
+   *  channels fall back to {@link price}. Keys are OrderChannel values:
+   *  "b2b" | "event" | "online" | "shop". */
+  channelPrices: Partial<Record<OrderChannel, number>>;
+  /** Legacy single-price column kept for backwards-compat with live
+   *  rows pre-0049. Mirrors {@link price} on write. */
+  sellPrice: number;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** A curated variant's product-in-size composition. For each variant
+ *  size, one row per distinct product with its quantity. Sum of qty
+ *  must equal the packaging's capacity (enforced in UI). */
+export interface VariantPackagingProduct {
+  id?: string;
+  variantPackagingId: string;
+  productId: string;
+  qty: number;
+  sortOrder: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 /**
@@ -1671,6 +1710,14 @@ export interface OrderItem {
    *  Nullable — unlinked lines surface as "No batch" on the order UI
    *  and the user is prompted to create / pick a batch. */
   linkedBatchId?: string;
+  /** Variant this line originated from. Metadata only — production
+   *  reads productId + qty and ignores this. Lets the order UI group
+   *  lines by their originating variant/size and show the right price
+   *  breakdown. */
+  variantId?: string;
+  /** The specific variant size (packaging row) this line came from.
+   *  Metadata only — production ignores it. */
+  variantPackagingId?: string;
 }
 
 /**

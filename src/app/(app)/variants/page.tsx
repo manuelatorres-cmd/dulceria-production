@@ -90,6 +90,8 @@ export default function VariantsPage() {
       name: newName.trim(),
       startDate: newStart,
       labels: [],
+      kind: "curated",
+      vatRatePercent: 10,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

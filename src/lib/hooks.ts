@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -3732,10 +3732,14 @@ export function useAllVariantPackagings(): VariantPackaging[] {
 
 export async function saveVariantPackaging(obj: Omit<VariantPackaging, "id"> & { id?: string }): Promise<string> {
   const now = new Date();
+  // Mirror `price` into legacy `sellPrice` so existing consumers (pricing
+  // dashboard, snapshots) keep reading a populated value until they
+  // migrate to `price` directly.
+  const payload = { ...obj, sellPrice: obj.price ?? obj.sellPrice ?? 0 };
   if (obj.id) {
     const { error } = await supabase
       .from("variantPackagings")
-      .update({ ...obj, updatedAt: now })
+      .update({ ...payload, updatedAt: now })
       .eq("id", obj.id);
     if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
@@ -3744,7 +3748,7 @@ export async function saveVariantPackaging(obj: Omit<VariantPackaging, "id"> & {
   const createdId = newId();
   const { error } = await supabase
     .from("variantPackagings")
-    .insert({ ...obj, id: createdId, createdAt: now, updatedAt: now });
+    .insert({ ...payload, id: createdId, createdAt: now, updatedAt: now });
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
   return createdId;
@@ -3754,6 +3758,70 @@ export async function deleteVariantPackaging(id: string): Promise<void> {
   const { error } = await supabase.from("variantPackagings").delete().eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packaging-products"] });
+}
+
+// --- Variant Packaging Products (curated per-size product composition) ---
+
+/** Products + qty belonging to a single variant size. */
+export function useVariantPackagingProducts(
+  variantPackagingId: string | undefined,
+): VariantPackagingProduct[] {
+  const { data } = useQuery({
+    queryKey: ["variant-packaging-products", variantPackagingId],
+    enabled: !!variantPackagingId,
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase
+          .from("variantPackagingProducts")
+          .select("*")
+          .eq("variantPackagingId", variantPackagingId!),
+      ) as VariantPackagingProduct[];
+      return rows.sort((a, b) => a.sortOrder - b.sortOrder);
+    },
+  });
+  return data ?? [];
+}
+
+/** Every curated-size product row across the whole workshop. Used on
+ *  the order entry page to auto-populate orderItems from a curated
+ *  variant pick. */
+export function useAllVariantPackagingProducts(): VariantPackagingProduct[] {
+  const { data } = useQuery({
+    queryKey: ["variant-packaging-products", "all"],
+    queryFn: async () =>
+      assertOk(
+        await supabase.from("variantPackagingProducts").select("*"),
+      ) as VariantPackagingProduct[],
+  });
+  return data ?? [];
+}
+
+/** Replace the curated product list for a single variant size in one
+ *  atomic step. UI edits the list all-at-once (chip rows), so the
+ *  simplest safe write is delete-then-insert of the whole set. Called
+ *  from saveVariantPackaging's post-save flow in the Variant form. */
+export async function replaceVariantPackagingProducts(
+  variantPackagingId: string,
+  items: Array<{ productId: string; qty: number; sortOrder: number }>,
+): Promise<void> {
+  const del = await supabase
+    .from("variantPackagingProducts")
+    .delete()
+    .eq("variantPackagingId", variantPackagingId);
+  if (del.error) throw del.error;
+  if (items.length > 0) {
+    const rows = items.map((it) => ({
+      id: newId(),
+      variantPackagingId,
+      productId: it.productId,
+      qty: it.qty,
+      sortOrder: it.sortOrder,
+    }));
+    const ins = await supabase.from("variantPackagingProducts").insert(rows);
+    if (ins.error) throw ins.error;
+  }
+  queryClient.invalidateQueries({ queryKey: ["variant-packaging-products"] });
 }
 
 // --- Variant Pricing Snapshots (margin history) ---
