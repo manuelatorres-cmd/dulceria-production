@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
+import { ClockInWidget } from "@/components/clock-in-widget";
 import {
   useProductionPlans,
   useAllPlanProducts,
@@ -68,7 +69,7 @@ export default function ProductionBrainDailyPage() {
         description="Today's batches in execution order. Pick a batch to inspect its pipeline."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-4">
         {/* LEFT — batch list */}
         <aside className="rounded-xl border border-border bg-card p-3">
           <h3 className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold mb-3">
@@ -204,6 +205,11 @@ export default function ProductionBrainDailyPage() {
             </>
           )}
         </main>
+
+        {/* RIGHT rail — clock-in + quick actions */}
+        <aside className="space-y-3">
+          <ClockInWidget linkedPlanId={selectedPlan?.id ?? undefined} />
+        </aside>
       </div>
     </div>
   );
