@@ -22,15 +22,13 @@ type SectionDef = {
 const SECTIONS: SectionDef[] = [
   {
     label: "The Workshop",
-    routes: ["/workshop", "/orders", "/production", "/production-brain", "/plan", "/stock", "/customers", "/quotes"],
+    routes: ["/workshop", "/orders", "/production", "/production-brain", "/plan", "/stock"],
     items: [
       { href: "/orders", label: "Orders", icon: OrdersIcon },
       { href: "/plan", label: "Plan", icon: PlanIcon },
       { href: "/production", label: "Production", icon: ProductionIcon },
-      { href: "/production-brain", label: "Brain (preview)", icon: PlanIcon },
+      { href: "/production-brain", label: "Brain", icon: PlanIcon },
       { href: "/stock", label: "Stock", icon: StockIcon },
-      { href: "/customers", label: "Customers", icon: CustomersIcon },
-      { href: "/quotes", label: "Quotes", icon: QuotesIcon },
     ],
   },
   {
@@ -48,10 +46,12 @@ const SECTIONS: SectionDef[] = [
     ],
   },
   {
-    label: "The Lab",
-    routes: ["/lab", "/calculator"],
+    label: "The Shop",
+    routes: ["/shop", "/customers", "/quotes"],
     items: [
-      { href: "/lab", label: "Product Lab", icon: FlaskIcon, disabled: true },
+      { href: "/shop", label: "Shop counter", icon: ShopIcon },
+      { href: "/customers", label: "Customers", icon: CustomersIcon },
+      { href: "/quotes", label: "Quotes", icon: QuotesIcon },
     ],
   },
   {
@@ -63,15 +63,33 @@ const SECTIONS: SectionDef[] = [
       { href: "/observatory/product-cost", label: "Product Cost", icon: ProductCostIcon },
     ],
   },
+  {
+    label: "The Lab",
+    routes: ["/lab", "/calculator"],
+    items: [
+      { href: "/lab", label: "Product Lab", icon: FlaskIcon, disabled: true },
+    ],
+  },
 ];
 
 const HOME_ITEMS: NavItem[] = [
   { href: "/workshop", label: "Workshop", icon: WorkshopIcon },
   { href: "/pantry", label: "Pantry", icon: PantryIcon },
-  { href: "/lab", label: "Lab", icon: FlaskIcon, disabled: true },
-  { href: "/observatory", label: "Observatory", icon: ObservatoryIcon },
   { href: "/shop", label: "Shop", icon: ShopIcon },
+  { href: "/observatory", label: "Observatory", icon: ObservatoryIcon },
+  { href: "/lab", label: "Lab", icon: FlaskIcon, disabled: true },
 ];
+
+/** Map each top-level section href to its SectionDef so the drill-down
+ *  rail can find the sub-items when the user clicks Workshop / Pantry /
+ *  Shop / Observatory / Lab from the home list. */
+const SECTION_BY_HOME_HREF: Record<string, string> = {
+  "/workshop": "The Workshop",
+  "/pantry": "The Pantry",
+  "/shop": "The Shop",
+  "/lab": "The Lab",
+  "/observatory": "The Observatory",
+};
 
 const FROM_TO_ROUTE: Record<string, string> = {
   pricing: "/pricing",
@@ -218,37 +236,61 @@ export function SideNav() {
       </button>
 
       <div className="flex flex-col gap-0.5 px-2 pt-3 pb-2 flex-1 overflow-y-auto">
-        {/* Always show Dashboard at the top. */}
-        <Link
-          href="/dashboard"
-          title="Dashboard"
-          className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
-            isActive(pathname, "/dashboard")
-              ? "text-foreground font-medium bg-card"
-              : "text-muted-foreground hover:text-foreground hover:bg-card/60"
-          }`}
-        >
-          {isActive(pathname, "/dashboard") ? (
-            <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
-          ) : null}
-          <HomeIcon className="w-[18px] h-[18px] shrink-0" />
-          <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Dashboard</span>
-        </Link>
+        {activeSection ? (
+          <>
+            {/* Back to home */}
+            <Link
+              href="/dashboard"
+              title="Back to dashboard"
+              className="flex items-center gap-2 px-3 py-2 rounded-sm transition-colors text-muted-foreground hover:text-foreground hover:bg-card/60"
+            >
+              <ChevronIcon className="w-3 h-3 rotate-180 shrink-0" />
+              <span className={`${labelClass} text-[11px] uppercase truncate`} style={{ letterSpacing: "0.1em" }}>
+                Dashboard
+              </span>
+            </Link>
 
-        {/* Flat, always-visible section list. No drill-down — every
-            section's items render under its label so navigation is one
-            click from anywhere. */}
-        {SECTIONS.map((section, idx) => (
-          <div key={section.label} className={idx === 0 ? "mt-4" : "mt-5"}>
+            {/* Section title — editorial serif, sits above the sub-nav */}
+            <div className={`${labelClass} px-3 pt-5 pb-2`}>
+              <span
+                className="block text-[17px] text-foreground leading-tight"
+                style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.015em" }}
+              >
+                {stripThePrefix(activeSection.label)}
+              </span>
+            </div>
+
+            {activeSection.items.map(renderItem)}
+          </>
+        ) : (
+          <>
+            {/* Dashboard at the top of the home list */}
+            <Link
+              href="/dashboard"
+              title="Dashboard"
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
+                isActive(pathname, "/dashboard")
+                  ? "text-foreground font-medium bg-card"
+                  : "text-muted-foreground hover:text-foreground hover:bg-card/60"
+              }`}
+            >
+              {isActive(pathname, "/dashboard") ? (
+                <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
+              ) : null}
+              <HomeIcon className="w-[18px] h-[18px] shrink-0" />
+              <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Dashboard</span>
+            </Link>
+
             <span
-              className={`${labelClass} block px-3 pb-2 text-[9.5px] font-medium text-muted-foreground/70 uppercase truncate`}
+              className={`${labelClass} block px-3 pt-6 pb-2 text-[9.5px] font-medium text-muted-foreground/70 uppercase truncate`}
               style={{ letterSpacing: "0.16em" }}
             >
-              {stripThePrefix(section.label)}
+              Spaces
             </span>
-            {section.items.map(renderItem)}
-          </div>
-        ))}
+
+            {HOME_ITEMS.map(renderItem)}
+          </>
+        )}
         {/* Shopping — always pinned at bottom of top block */}
         <div className="mt-auto pt-4">
           <Link
