@@ -431,6 +431,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               Deadline {deadlineDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
               {" "}
               {deadlineDate.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+              {order.isApproxDeadline ? (
+                <span
+                  className="ml-2 text-[9.5px] uppercase border border-[color:var(--color-status-warn-edge)] bg-[color:var(--color-status-warn-bg)] text-[color:var(--color-status-warn)] px-1.5 py-0.5 align-middle"
+                  style={{ letterSpacing: "0.1em", borderRadius: 2 }}
+                >
+                  ±1 week
+                </span>
+              ) : null}
             </p>
             {order.customerId && (
               <Link
@@ -831,6 +839,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
     notes?: string; pricePaid?: number;
     deliveryType?: DeliveryType; deliveryAt?: string;
     deliveryAddress?: string; deliveryNotes?: string;
+    isApproxDeadline?: boolean;
   };
   onSaved: () => void;
   onCancel: () => void;
@@ -840,6 +849,9 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   const [customerName, setCustomerName] = useState(order.customerName ?? "");
   const [eventName, setEventName] = useState(order.eventName ?? "");
   const [deadline, setDeadline] = useState(toLocalDatetime(order.deadline));
+  const [isApproxDeadline, setIsApproxDeadline] = useState<boolean>(
+    order.isApproxDeadline ?? false,
+  );
   const [priority, setPriority] = useState<OrderPriority>(order.priority);
   const [notes, setNotes] = useState(order.notes ?? "");
   const [deliveryType, setDeliveryType] = useState<DeliveryType | "">(order.deliveryType ?? "");
@@ -907,6 +919,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         deliveryAt: deliveryAt ? new Date(deliveryAt).toISOString() : undefined,
         deliveryAddress: deliveryAddress.trim() || undefined,
         deliveryNotes: deliveryNotes.trim() || undefined,
+        isApproxDeadline,
       });
       onSaved();
     } catch (err) {
@@ -1056,6 +1069,15 @@ function OrderEditForm({ order, onSaved, onCancel }: {
       <div>
         <label className="label">Deadline</label>
         <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="input" />
+        <label className="mt-2 inline-flex items-center gap-2 text-[12px] text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={isApproxDeadline}
+            onChange={(e) => setIsApproxDeadline(e.target.checked)}
+            className="w-3.5 h-3.5"
+          />
+          Approximate — customer said "around this date" (±1 week)
+        </label>
       </div>
 
       <div>

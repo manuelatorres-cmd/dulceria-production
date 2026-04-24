@@ -60,6 +60,26 @@ export default function ProductionBrainDashboardPage() {
   const activeBatches = plans.filter((p) => p.status === "active").length;
   const activeStaff = people.filter((p) => !p.archived).length;
 
+  // Dateless orders — need attention within 3 days per Manuela spec.
+  const dateless = useMemo(
+    () =>
+      orders.filter(
+        (o) =>
+          (o.status === "pending" || o.status === "in_production") &&
+          (!o.deadline || o.deadline === ""),
+      ),
+    [orders],
+  );
+  const datelessAging = useMemo(() => {
+    return dateless.map((o) => {
+      const createdAt = o.createdAt
+        ? new Date(o.createdAt).getTime()
+        : Date.now();
+      const ageDays = Math.floor((Date.now() - createdAt) / (1000 * 60 * 60 * 24));
+      return { order: o, ageDays };
+    });
+  }, [dateless]);
+
   return (
     <div>
       <PageHeader
@@ -117,6 +137,71 @@ export default function ProductionBrainDashboardPage() {
           hint={`${campaigns.length} scheduled`}
         />
       </section>
+
+      {/* Dateless orders — awaiting a date before they can be scheduled */}
+      {dateless.length > 0 ? (
+        <section
+          className="mb-4 border border-[color:var(--color-status-warn-edge)] bg-[color:var(--color-status-warn-bg)] p-4"
+          style={{ borderRadius: 4 }}
+        >
+          <div className="flex items-baseline justify-between mb-3">
+            <h3
+              className="text-[14px]"
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontWeight: 500,
+                letterSpacing: "-0.012em",
+              }}
+            >
+              Orders without a date
+              <span
+                className="ml-2 text-[10.5px] uppercase font-normal text-[color:var(--color-status-warn)]"
+                style={{ letterSpacing: "0.12em" }}
+              >
+                {dateless.length} awaiting
+              </span>
+            </h3>
+            <p className="text-[11px] text-muted-foreground">
+              Add a deadline so the brain can schedule them
+            </p>
+          </div>
+          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            {datelessAging.map(({ order, ageDays }) => (
+              <li
+                key={order.id}
+                className="bg-card border border-border px-3 py-2 text-[12px]"
+                style={{ borderRadius: 3 }}
+              >
+                <div className="flex items-baseline justify-between">
+                  <strong
+                    style={{
+                      fontFamily: "var(--font-serif)",
+                      fontWeight: 500,
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {order.customerName || order.eventName || "Unnamed"}
+                  </strong>
+                  <span
+                    className={
+                      "text-[10px] uppercase font-medium " +
+                      (ageDays >= 3
+                        ? "text-[color:var(--color-status-alert)]"
+                        : "text-muted-foreground")
+                    }
+                    style={{ letterSpacing: "0.08em" }}
+                  >
+                    {ageDays}d old
+                  </span>
+                </div>
+                <p className="text-[10.5px] text-muted-foreground mt-0.5">
+                  {order.channel ?? ""} · could ship in ~3–7 days if scheduled today
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Active pipeline */}

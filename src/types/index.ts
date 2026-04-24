@@ -1715,6 +1715,10 @@ export interface Order {
   totalNet?: number;
   totalGross?: number;
   taxTotal?: number;
+  /** True when the customer said "about next week" rather than a
+   *  fixed date. Planner draws these blocks dashed and treats the
+   *  deadline as flexible within a ±1-week window. */
+  isApproxDeadline?: boolean;
   /** External invoice reference — Shopify order id (#1001) or
    *  HelloCash invoice number, added manually after the invoice is
    *  issued externally. Used to reconcile payment status. */
