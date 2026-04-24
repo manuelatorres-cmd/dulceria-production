@@ -63,6 +63,10 @@ export interface BackupData {
   // --- Production brain (phase 4) ---
   notifications?: unknown[];
 
+  // --- B2B price lists ---
+  priceLists?: unknown[];
+  priceListItems?: unknown[];
+
   // --- Legacy key compat (older backups written before the Product/Filling rename) ---
   // These are accepted on import and remapped to the new tables above.
   recipes?: unknown[];
@@ -129,6 +133,9 @@ const EXPORT_TABLES = [
   "locationStockMinimums",
   // Production brain (phase 4)
   "notifications",
+  // B2B price lists
+  "priceLists",
+  "priceListItems",
 ] as const;
 
 export async function exportBackup(): Promise<void> {
@@ -192,6 +199,8 @@ export async function exportBackup(): Promise<void> {
     externalSkuMapping: rowsByName.externalSkuMapping,
     locationStockMinimums: rowsByName.locationStockMinimums,
     notifications: rowsByName.notifications,
+    priceLists: rowsByName.priceLists,
+    priceListItems: rowsByName.priceListItems,
   };
 
   const json = JSON.stringify(backup, (_key, value) => value ?? undefined);
@@ -264,6 +273,9 @@ const INSERT_ORDER = [
   "csvImports",
   // Production brain (phase 4)
   "notifications",
+  // B2B price lists
+  "priceLists",
+  "priceListItems",
 ] as const;
 
 /** Map of table name -> the imported rows for that table. */
@@ -449,6 +461,8 @@ export async function importBackup(file: File): Promise<void> {
   const rawExternalSkuMapping      = data.externalSkuMapping      ?? [];
   const rawLocationStockMinimums   = data.locationStockMinimums   ?? [];
   const rawNotifications           = data.notifications           ?? [];
+  const rawPriceLists              = data.priceLists               ?? [];
+  const rawPriceListItems          = data.priceListItems           ?? [];
 
   // Apply field-level migrations for backups written pre-rename.
   const payload: ImportPayload = {
@@ -498,6 +512,8 @@ export async function importBackup(file: File): Promise<void> {
     externalSkuMapping:         passThrough(rawExternalSkuMapping),
     locationStockMinimums:      passThrough(rawLocationStockMinimums),
     notifications:              passThrough(rawNotifications),
+    priceLists:                 passThrough(rawPriceLists),
+    priceListItems:             passThrough(rawPriceListItems),
   };
 
   // 1. Atomic server-side wipe. Single round-trip, all-or-nothing.

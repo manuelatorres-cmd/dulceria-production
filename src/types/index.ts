@@ -2578,6 +2578,43 @@ export const NOTIFICATION_STATUSES = [
 ] as const;
 export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
 
+// =============================================================
+// Production Brain — Phase 5 types (B2B price lists)
+// =============================================================
+
+/** Named wholesale price list. Assigned to a customer via
+ *  customers.defaultPriceListId (existing). Each list holds
+ *  zero-or-more PriceListItem rows — product-, collection-, or
+ *  tag-scoped overrides. */
+export interface PriceList {
+  id?: string;
+  name: string;
+  description?: string;
+  validFrom?: string;
+  validTo?: string;
+  defaultDiscountPercent?: number;
+  archived: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** One rule inside a price list — can scope by product, collection,
+ *  or tag. Discount % OR fixed price (mutually exclusive, enforced
+ *  by DB check). */
+export interface PriceListItem {
+  id?: string;
+  priceListId: string;
+  productId?: string;
+  collectionId?: string;
+  tag?: string;
+  discountPercent?: number;
+  fixedPrice?: number;
+  minQuantity?: number;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 /** Brain-surfaced decision / alert awaiting user response. Lives in
  *  the notification center (bell icon + dedicated page). Popups
  *  fire only for urgency='critical'. Everything else queues here. */
