@@ -215,6 +215,25 @@ export interface Product {
    *  app-level food default (10%). */
   defaultVatRate?: number;
   archived?: boolean; // soft-delete: hidden from lists, preserved for production history
+  // --- Production brain additions (phase 1) ---
+  /** Replenishment + displacement ladder. 1 = top-seller (never displace),
+   *  2 = normal, 3 = nice-to-have (first to displace when capacity crunched).
+   *  Defaults to 2 for new rows. */
+  priorityTier?: 1 | 2 | 3;
+  /** Whether this product can appear inside a custom box sold in shop.
+   *  Excluded: limited-edition B2B-only, fragile items, near-expiry. */
+  includedInCustomBoxes?: boolean;
+  /** Learned pick weight [0..1] — share of custom boxes this product
+   *  appears in. Engine uses it to size buffer stock. Updated by the
+   *  custom-box sale event pipeline. */
+  customBoxPickWeight?: number;
+  /** True for products that can be sold as "seconds" (B-ware) when
+   *  cosmetically flawed — typically only bars. Bonbon seconds are
+   *  given as free tastings, not sold. */
+  secondsAllowed?: boolean;
+  /** Default discount percent applied when a piece is tagged as
+   *  seconds and sold. Overridable per sale. */
+  defaultDiscountPercentSeconds?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -1549,6 +1568,18 @@ export interface Person {
   /** Soft-delete — archived people are excluded from scheduling
    *  but preserved on historical productionSchedule assignments. */
   archived?: boolean;
+  // --- Production brain additions (phase 1) ---
+  /** Skill tags used to gate step assignment (e.g. ["tempering",
+   *  "shelling", "packing", "decoration", "cooking"]). Engine refuses
+   *  to assign a step to a person missing its required skill. */
+  skills?: string[];
+  /** Where this person mainly works — production lane, shop lane, or
+   *  both. Engine uses it to bias assignment + capacity calc. */
+  primaryRole?: PrimaryRole;
+  /** Free-form per-weekday schedule overrides (e.g. "Mon/Wed full
+   *  day, Tue/Thu shop AM then production PM"). JSON shape is
+   *  intentionally open so UI can evolve without migrations. */
+  weeklyCustomSchedule?: Record<string, unknown>;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -1659,6 +1690,32 @@ export interface Order {
   deliveryAt?: string;
   deliveryAddress?: string;
   deliveryNotes?: string;
+  // --- Production brain additions (phase 1) ---
+  /** Pickup (customer comes), delivery (we deliver locally), or ship
+   *  (courier). Drives pack buffer + lead-day expectations in the
+   *  scheduler. Legacy rows default to 'pickup'. */
+  fulfillmentType?: FulfillmentType;
+  /** Manual override for fulfillment lead days (courier transit etc.)
+   *  baked into backward-scheduling math. 0 = ready on deadline day. */
+  fulfillmentLeadDays?: number;
+  /** Rush flag — brain auto-places + displaces lower tiers per
+   *  priority ladder on save. */
+  timeSensitive?: boolean;
+  rushReason?: string;
+  /** Link back to the quote that was accepted to create this order. */
+  quoteId?: string;
+  /** Price-list snapshot at save time. Nullable for shop/online
+   *  orders that use global retail pricing. */
+  priceListId?: string;
+  /** Snapshot totals (net/gross/tax). Stored at save time so later
+   *  price changes don't retroactively affect the order. */
+  totalNet?: number;
+  totalGross?: number;
+  taxTotal?: number;
+  /** External invoice reference — Shopify order id (#1001) or
+   *  HelloCash invoice number, added manually after the invoice is
+   *  issued externally. Used to reconcile payment status. */
+  invoiceExternalRef?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -1718,6 +1775,21 @@ export interface OrderItem {
   /** The specific variant size (packaging row) this line came from.
    *  Metadata only — production ignores it. */
   variantPackagingId?: string;
+  // --- Production brain additions (phase 1) ---
+  /** Explicit net/gross snapshot. `unitPrice` above stays the
+   *  writable source; these cache net/gross after VAT is applied so
+   *  analytics / invoices don't recompute on every render. */
+  unitPriceNet?: number;
+  unitPriceGross?: number;
+  /** Per-line discount percent [0..100]. Applied on top of the
+   *  resolved unit price. */
+  discountPercent?: number;
+  /** Per-line VAT rate (percent). Mirrors legacy `vatRate` with an
+   *  explicit name for UI forms that need both net + gross. */
+  taxRatePercent?: number;
+  /** Packaging the product ships in on this order line — e.g. the
+   *  specific gift box or sleeve chosen for B2B / online orders. */
+  packagingId?: string;
 }
 
 /**
@@ -1989,4 +2061,147 @@ export interface ShopClosure {
   endDate: string;
   reason?: string;
   createdAt?: Date;
+}
+
+// =============================================================
+// Production Brain — Phase 1 types
+// =============================================================
+
+export const FULFILLMENT_TYPES = ["pickup", "delivery", "ship"] as const;
+export type FulfillmentType = (typeof FULFILLMENT_TYPES)[number];
+
+export const PRIMARY_ROLES = ["production", "shop", "both", "other"] as const;
+export type PrimaryRole = (typeof PRIMARY_ROLES)[number];
+
+export const REPLENISHMENT_REASONS = [
+  "auto-replen",
+  "campaign-prep",
+  "custom-box-buffer",
+  "manual",
+] as const;
+export type ReplenishmentReason = (typeof REPLENISHMENT_REASONS)[number];
+
+export const REPLENISHMENT_STATUSES = ["pending", "scheduled", "dismissed"] as const;
+export type ReplenishmentStatus = (typeof REPLENISHMENT_STATUSES)[number];
+
+/** Engine proposal that a product needs a fresh batch soon.
+ *  Never auto-placed — lives in the planner sidebar until the user
+ *  drags it onto a day (→ 'scheduled') or dismisses it. */
+export interface ReplenishmentProposal {
+  id?: string;
+  productId: string;
+  /** Batch size suggestion in whole pieces. Engine rounds to the
+   *  product's mould floor before writing. */
+  suggestedBatchSize: number;
+  /** ISO date 'YYYY-MM-DD' — latest day production can start without
+   *  breaching the min_stock projection. */
+  earliestNeededDate: string;
+  priorityTier: 1 | 2 | 3;
+  reason: ReplenishmentReason;
+  status: ReplenishmentStatus;
+  /** Set when status = 'scheduled' — FK to the productionPlan the
+   *  user dragged the proposal onto. */
+  scheduledPlanId?: string;
+  /** When status = 'dismissed', suppress re-proposal until this date. */
+  dismissedUntil?: string;
+  /** Stock location the projection was evaluated against. Nullable
+   *  for global (cross-location) proposals. */
+  locationId?: string;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** Rolling demand signal per product per location per day. Sourced
+ *  from HelloCash sales CSV, Shopify order CSV, manual shop
+ *  deductions, and custom-box pick logs. */
+export interface DailySellEstimate {
+  id?: string;
+  productId: string;
+  locationId: string;
+  /** ISO date 'YYYY-MM-DD' — one row per product/location/day. */
+  date: string;
+  soldCount: number;
+  customBoxPickCount: number;
+  /** 30-day rolling mean of soldCount + customBoxPickCount,
+   *  recomputed on each import. */
+  rollingAvg30d: number;
+  updatedAt?: Date;
+}
+
+export const CAMPAIGN_TYPES = [
+  "seasonal",
+  "limited",
+  "collaboration",
+  "launch",
+] as const;
+export type CampaignType = (typeof CAMPAIGN_TYPES)[number];
+
+export const CAMPAIGN_STATUSES = [
+  "planned",
+  "active",
+  "wrapping",
+  "done",
+  "cancelled",
+] as const;
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
+
+/** Named production campaign: Easter collection, Mother's Day box,
+ *  new limited bonbon launch. Engine auto-proposes ramp-up
+ *  replenishment batches (reason='campaign-prep') between
+ *  `productionStartDate` and `startDate`. */
+export interface Campaign {
+  id?: string;
+  name: string;
+  type: CampaignType;
+  /** ISO date 'YYYY-MM-DD' — when the campaign goes live (sale window). */
+  startDate: string;
+  /** ISO date 'YYYY-MM-DD' — last day in the sale window. */
+  endDate: string;
+  /** ISO date 'YYYY-MM-DD' — first day production ramp-up should start.
+   *  Null = use a default lead based on targetTotalUnits. */
+  productionStartDate?: string;
+  /** Aggregate unit target across all included products. */
+  targetTotalUnits?: number;
+  /** Product IDs belonging to this campaign. Stored as array so a
+   *  single read pulls the full set. */
+  productIds: string[];
+  status: CampaignStatus;
+  /** Optional color tag for calendar display (maps to --plan-campaign
+   *  variants). */
+  colorTag?: string;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const MOULD_STATES = [
+  "available",
+  "loaded",
+  "filled",
+  "sealed",
+  "needs-wash",
+  "in-deep-wash",
+  "retired",
+] as const;
+export type MouldState = (typeof MOULD_STATES)[number];
+
+/** Single physical mould instance tracked by the mouldPool table.
+ *  The `moulds` table describes the *type* (cavity count, shape).
+ *  mouldPool tracks each individual copy — usage counter, current
+ *  state, deep-wash schedule. */
+export interface MouldPoolInstance {
+  id?: string;
+  mouldId: string;
+  instanceIndex: number;
+  planId?: string;
+  phase?: string;
+  occupiedSince?: Date;
+  expectedFreeAt?: Date;
+  usesSinceDeepWash: number;
+  deepWashThreshold: number;
+  currentState: MouldState;
+  stateChangedAt?: Date;
+  retired: boolean;
+  notes?: string;
 }

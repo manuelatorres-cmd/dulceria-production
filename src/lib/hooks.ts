@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -9006,5 +9006,212 @@ export async function deleteCustomerProductPrice(id: string): Promise<void> {
   const { error } = await supabase.from("customerProductPrices").delete().eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["customer-product-prices"] });
+}
+
+// =====================================================================
+// Production Brain — replenishment proposals
+// =====================================================================
+
+export function useReplenishmentProposals(
+  status?: ReplenishmentStatus | ReplenishmentStatus[],
+): ReplenishmentProposal[] {
+  const statusList: ReplenishmentStatus[] | undefined = Array.isArray(status)
+    ? status
+    : status
+      ? [status]
+      : undefined;
+  const key = statusList ? statusList.join(",") : "all";
+  const { data } = useQuery({
+    queryKey: ["replenishmentProposals", key],
+    queryFn: async () => {
+      let q = supabase.from("replenishmentProposals").select("*");
+      if (statusList && statusList.length > 0) q = q.in("status", statusList);
+      const rows = assertOk(await q) as ReplenishmentProposal[];
+      return rows.sort((a, b) => {
+        const pa = a.priorityTier ?? 2;
+        const pb = b.priorityTier ?? 2;
+        if (pa !== pb) return pa - pb;
+        return (a.earliestNeededDate ?? "").localeCompare(b.earliestNeededDate ?? "");
+      });
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveReplenishmentProposal(
+  row: Omit<ReplenishmentProposal, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("replenishmentProposals")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["replenishmentProposals"] });
+  return id;
+}
+
+/** Mark a proposal as scheduled. Call this when the user drags the
+ *  proposal from the sidebar onto a calendar day — after the
+ *  corresponding productionPlan is created. */
+export async function markProposalScheduled(
+  proposalId: string,
+  planId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("replenishmentProposals")
+    .update({ status: "scheduled", scheduledPlanId: planId })
+    .eq("id", proposalId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["replenishmentProposals"] });
+}
+
+/** Dismiss a proposal for N days. Engine will not re-propose the same
+ *  product until dismissedUntil passes (or demand drops further). */
+export async function dismissProposal(
+  proposalId: string,
+  untilDate: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("replenishmentProposals")
+    .update({ status: "dismissed", dismissedUntil: untilDate })
+    .eq("id", proposalId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["replenishmentProposals"] });
+}
+
+export async function deleteReplenishmentProposal(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("replenishmentProposals")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["replenishmentProposals"] });
+}
+
+// =====================================================================
+// Production Brain — daily sell estimates
+// =====================================================================
+
+export function useDailySellEstimates(
+  productId: string | undefined,
+  fromDate?: string,
+  toDate?: string,
+): DailySellEstimate[] {
+  const { data } = useQuery({
+    queryKey: ["dailySellEstimates", productId, fromDate, toDate],
+    enabled: !!productId,
+    queryFn: async () => {
+      let q = supabase
+        .from("dailySellEstimates")
+        .select("*")
+        .eq("productId", productId!);
+      if (fromDate) q = q.gte("date", fromDate);
+      if (toDate) q = q.lte("date", toDate);
+      const rows = assertOk(await q) as DailySellEstimate[];
+      return rows.sort((a, b) => a.date.localeCompare(b.date));
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveDailySellEstimate(
+  row: Omit<DailySellEstimate, "id" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("dailySellEstimates")
+    .upsert(payload, { onConflict: "productId,locationId,date" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["dailySellEstimates"] });
+  return id;
+}
+
+// =====================================================================
+// Production Brain — campaigns (limited editions / seasonal boxes)
+// =====================================================================
+
+export function useCampaigns(status?: CampaignStatus | CampaignStatus[]): Campaign[] {
+  const statusList: CampaignStatus[] | undefined = Array.isArray(status)
+    ? status
+    : status
+      ? [status]
+      : undefined;
+  const key = statusList ? statusList.join(",") : "all";
+  const { data } = useQuery({
+    queryKey: ["campaigns", key],
+    queryFn: async () => {
+      let q = supabase.from("campaigns").select("*");
+      if (statusList && statusList.length > 0) q = q.in("status", statusList);
+      const rows = assertOk(await q) as Campaign[];
+      return rows.sort((a, b) => a.startDate.localeCompare(b.startDate));
+    },
+  });
+  return data ?? [];
+}
+
+export function useCampaign(id: string | undefined): Campaign | undefined {
+  const { data } = useQuery({
+    queryKey: ["campaigns", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const row = assertOkMaybe(
+        await supabase.from("campaigns").select("*").eq("id", id!).maybeSingle(),
+      );
+      return row as Campaign | null;
+    },
+  });
+  return data ?? undefined;
+}
+
+export async function saveCampaign(
+  row: Omit<Campaign, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase.from("campaigns").upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+  return id;
+}
+
+export async function deleteCampaign(id: string): Promise<void> {
+  const { error } = await supabase.from("campaigns").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+}
+
+// =====================================================================
+// Production Brain — mould pool (physical instance tracking)
+// =====================================================================
+
+export function useMouldPool(mouldId?: string): MouldPoolInstance[] {
+  const { data } = useQuery({
+    queryKey: ["mouldPool", mouldId ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("mouldPool").select("*");
+      if (mouldId) q = q.eq("mouldId", mouldId);
+      const rows = assertOk(await q) as MouldPoolInstance[];
+      return rows.sort((a, b) => {
+        if (a.mouldId !== b.mouldId) return a.mouldId.localeCompare(b.mouldId);
+        return a.instanceIndex - b.instanceIndex;
+      });
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveMouldPoolInstance(
+  row: Omit<MouldPoolInstance, "id"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("mouldPool")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["mouldPool"] });
+  return id;
 }
 

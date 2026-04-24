@@ -38,6 +38,11 @@ export interface BackupData {
   fillingCategories?: unknown[];
   ingredientCategories?: unknown[];
 
+  // --- Production brain (phase 1) ---
+  replenishmentProposals?: unknown[];
+  dailySellEstimates?: unknown[];
+  campaigns?: unknown[];
+
   // --- Legacy key compat (older backups written before the Product/Filling rename) ---
   // These are accepted on import and remapped to the new tables above.
   recipes?: unknown[];
@@ -83,6 +88,10 @@ const EXPORT_TABLES = [
   "fillingStock",
   "fillingCategories",
   "ingredientCategories",
+  // Production brain (phase 1)
+  "campaigns",
+  "replenishmentProposals",
+  "dailySellEstimates",
 ] as const;
 
 export async function exportBackup(): Promise<void> {
@@ -129,6 +138,9 @@ export async function exportBackup(): Promise<void> {
     fillingStock: rowsByName.fillingStock,
     fillingCategories: rowsByName.fillingCategories,
     ingredientCategories: rowsByName.ingredientCategories,
+    campaigns: rowsByName.campaigns,
+    replenishmentProposals: rowsByName.replenishmentProposals,
+    dailySellEstimates: rowsByName.dailySellEstimates,
   };
 
   const json = JSON.stringify(backup, (_key, value) => value ?? undefined);
@@ -180,6 +192,10 @@ const INSERT_ORDER = [
   "variantProducts",
   "variantPackagings",
   "variantPricingSnapshots",
+  // Production brain (phase 1) — campaigns first (referenced by proposals), then proposals + sell estimates.
+  "campaigns",
+  "replenishmentProposals",
+  "dailySellEstimates",
 ] as const;
 
 /** Map of table name -> the imported rows for that table. */
@@ -348,6 +364,9 @@ export async function importBackup(file: File): Promise<void> {
   const rawFillingStock            = data.fillingStock            ?? data.layerStock             ?? [];
   const rawFillingCategories       = data.fillingCategories       ?? [];
   const rawIngredientCategories    = data.ingredientCategories    ?? [];
+  const rawCampaigns               = data.campaigns               ?? [];
+  const rawReplenishmentProposals  = data.replenishmentProposals  ?? [];
+  const rawDailySellEstimates      = data.dailySellEstimates      ?? [];
 
   // Apply field-level migrations for backups written pre-rename.
   const payload: ImportPayload = {
@@ -380,6 +399,9 @@ export async function importBackup(file: File): Promise<void> {
     fillingStock:               applyAll(rawFillingStock, migrateFillingStock),
     fillingCategories:          passThrough(rawFillingCategories),
     ingredientCategories:       passThrough(rawIngredientCategories),
+    campaigns:                  passThrough(rawCampaigns),
+    replenishmentProposals:     passThrough(rawReplenishmentProposals),
+    dailySellEstimates:         passThrough(rawDailySellEstimates),
   };
 
   // 1. Atomic server-side wipe. Single round-trip, all-or-nothing.
