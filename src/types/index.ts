@@ -1723,6 +1723,15 @@ export interface Order {
    *  HelloCash invoice number, added manually after the invoice is
    *  issued externally. Used to reconcile payment status. */
   invoiceExternalRef?: string;
+  /** Replace + Credit flow — set on the NEW order that re-ships a
+   *  broken/lost/complaint shipment. Points at the original order. */
+  replacesOrderId?: string;
+  /** Free-text reason stamped on the replacement order. */
+  replacementReason?: string;
+  /** HelloCash invoice number (or similar) of the credit note issued
+   *  to the customer for the original order. Lives on the ORIGINAL
+   *  order so bookkeeping can tie the two records together. */
+  creditReference?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

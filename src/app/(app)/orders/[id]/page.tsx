@@ -47,8 +47,10 @@ import {
   type ProductCostSnapshot, type PackagingOrder,
   type OrderItem, type Customer, type CustomerType,
   type OrderPlanLink, type ProductionPlan,
+  type Order,
 } from "@/types";
-import { ArrowLeft, Plus, Trash2, X, Pencil, AlertTriangle, Check, Calendar, Package, UserPlus, User } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, X, Pencil, AlertTriangle, Check, Calendar, Package, UserPlus, User, Copy } from "lucide-react";
+import { newId } from "@/lib/supabase";
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);
@@ -177,6 +179,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   // chooses "Delete anyway" to discard the sunk cost.
   const [reassignProposals, setReassignProposals] = useState<ReassignmentProposal[] | null>(null);
   const [reassignBusy, setReassignBusy] = useState<string | null>(null);
+  const [replaceOpen, setReplaceOpen] = useState(false);
 
   if (order === undefined) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (order === null) return <div className="p-6 text-sm text-muted-foreground">Order not found.</div>;
@@ -728,8 +731,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           hasAnySchedule={orderScheduleRows.length > 0}
         />
 
-        {/* Delete */}
-        <section className="pt-4 border-t border-border">
+        {/* Replace + Delete */}
+        <section className="pt-4 border-t border-border flex items-center gap-5">
           {!confirmDelete ? (
             <button
               onClick={() => setConfirmDelete(true)}
@@ -753,7 +756,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
           )}
+
+          {!confirmDelete && (
+            <button
+              onClick={() => setReplaceOpen(true)}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:underline"
+              title="Clone this order into a new one and stamp a credit-note reference"
+            >
+              <Copy className="w-4 h-4" /> Replace + credit
+            </button>
+          )}
         </section>
+
+        {replaceOpen && order && (
+          <ReplaceAndCreditModal
+            order={order}
+            items={items}
+            packagingLines={packagingLines}
+            onClose={() => setReplaceOpen(false)}
+            onDone={(newOrderId) => {
+              setReplaceOpen(false);
+              router.push(`/orders/${newOrderId}`);
+            }}
+          />
+        )}
 
         {/* Reassignment-proposal modal — fires when handleDelete detects
             Shelling-or-later progress on a linked batch. Gives the
@@ -2674,4 +2700,181 @@ function toLocalDatetime(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Replace + Credit — clones the current order's items + packaging lines
+ * into a new order with `replacesOrderId` pointing back here, and stamps
+ * a `creditReference` on the original so bookkeeping can tie them.
+ *
+ * Deadline on the new order defaults to +7 days from today (Manuela can
+ * edit on the cloned order page). Status starts as 'draft' so the
+ * planner picks it up.
+ */
+function ReplaceAndCreditModal({
+  order,
+  items,
+  packagingLines,
+  onClose,
+  onDone,
+}: {
+  order: Order;
+  items: OrderItem[];
+  packagingLines: OrderPackagingLine[];
+  onClose: () => void;
+  onDone: (newOrderId: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [creditRef, setCreditRef] = useState(order.creditReference ?? "");
+  const [copyPackaging, setCopyPackaging] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  async function doReplace() {
+    if (!order.id) return;
+    setBusy(true);
+    try {
+      const newDeadline = new Date();
+      newDeadline.setDate(newDeadline.getDate() + 7);
+
+      const newOrderId = await saveOrder({
+        channel: order.channel,
+        customerName: order.customerName,
+        customerId: order.customerId,
+        eventName: order.eventName
+          ? `${order.eventName} (replacement)`
+          : undefined,
+        deadline: newDeadline.toISOString(),
+        priority: "normal",
+        status: "pending",
+        notes:
+          (order.notes ? order.notes + "\n" : "") +
+          `[REPLACEMENT ${new Date().toISOString().slice(0, 10)}] ${reason}`,
+        deliveryType: order.deliveryType,
+        deliveryAddress: order.deliveryAddress,
+        fulfillmentType: order.fulfillmentType,
+        fulfillmentLeadDays: order.fulfillmentLeadDays,
+        replacesOrderId: order.id,
+        replacementReason: reason || undefined,
+      });
+
+      for (const [idx, it] of items.entries()) {
+        await saveOrderItem({
+          id: newId(),
+          orderId: newOrderId,
+          productId: it.productId,
+          quantity: it.quantity,
+          unitPrice: 0,
+          sortOrder: idx,
+          fulfilmentMode: it.fulfilmentMode,
+          variantId: it.variantId,
+        });
+      }
+
+      if (copyPackaging) {
+        for (const pl of packagingLines) {
+          await saveOrderPackagingLine({
+            id: newId(),
+            orderId: newOrderId,
+            packagingId: pl.packagingId,
+            quantity: pl.quantity,
+            sortOrder: pl.sortOrder,
+            notes: pl.notes,
+            unitPrice: 0,
+            vatRate: pl.vatRate,
+          });
+        }
+      }
+
+      await saveOrder({
+        ...order,
+        creditReference: creditRef || undefined,
+      });
+
+      onDone(newOrderId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
+      <div
+        className="relative w-full max-w-md mx-4 border border-border bg-card shadow-xl"
+        style={{ borderRadius: 4 }}
+      >
+        <header className="px-5 pt-4 pb-3 border-b border-border">
+          <h3
+            className="text-[16px]"
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontWeight: 500,
+              letterSpacing: "-0.015em",
+            }}
+          >
+            Replace + credit
+          </h3>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Clone {items.length} line{items.length === 1 ? "" : "s"} into a new
+            order. Stamp credit-note reference on the original.
+          </p>
+        </header>
+
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="label">Reason</label>
+            <textarea
+              className="input"
+              rows={2}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. bars shattered in transit; customer complaint"
+            />
+          </div>
+          <div>
+            <label className="label">Credit invoice ref (HelloCash etc.)</label>
+            <input
+              type="text"
+              className="input"
+              value={creditRef}
+              onChange={(e) => setCreditRef(e.target.value)}
+              placeholder="RE-2026-0123"
+            />
+            <p className="text-[10.5px] text-muted-foreground mt-1">
+              Stored on the ORIGINAL order so bookkeeping can reconcile.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-[12px]">
+            <input
+              type="checkbox"
+              checked={copyPackaging}
+              onChange={(e) => setCopyPackaging(e.target.checked)}
+            />
+            <span>
+              Also clone {packagingLines.length} packaging line
+              {packagingLines.length === 1 ? "" : "s"}
+            </span>
+          </label>
+          <p className="text-[11px] text-muted-foreground italic" style={{ fontFamily: "var(--font-serif)" }}>
+            New order starts as draft with deadline +7 days, unit prices zeroed.
+            Adjust after it opens.
+          </p>
+        </div>
+
+        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="btn-secondary">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={doReplace}
+            disabled={busy || !reason.trim()}
+            className="btn-primary"
+          >
+            {busy ? "…" : "Create replacement"}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
 }
