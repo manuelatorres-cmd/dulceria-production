@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Fraunces (serif display) + Inter (sans body) — loaded from Google Fonts.
+   Fraunces is a variable serif with opsz + weight + italic axes, tuned for
+   the artisan / editorial direction Manuela picked. */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@300;400;500;600&display=swap");
+
 @keyframes demo-ripple {
   from { transform: translate(-50%, -50%) scale(0); opacity: 0.8; }
   to   { transform: translate(-50%, -50%) scale(1); opacity: 0; }
@@ -8,35 +13,35 @@
 @theme {
   --animate-demo-ripple: demo-ripple 0.55s ease-out forwards;
 
-  /* ─── Monochrome interface (Figma-inspired) ─────────────────────────────
-     Chrome is strictly black + white. Color exists only inside product
-     content (photos, swatches, status pills). Do not add palette colors
-     here — see DESIGN.md.
+  /* ─── Site-wide palette — warm neutrals, low saturation ─────────────
+     Direction from Manuela 2026-04-24: premium small-batch brand,
+     Kinfolk-meets-artisan-bakery. No bright primaries, no neon. Reserve
+     color for accents only; chrome stays in a paper / ink palette.
      ──────────────────────────────────────────────────────────────────── */
-  --color-background: #ffffff;
-  --color-foreground: #000000;
-  --color-muted: #f5f5f5;
-  --color-muted-foreground: #666666;
-  --color-border: rgba(0, 0, 0, 0.12);
-  --color-primary: #000000;
-  --color-primary-foreground: #ffffff;
-  /* Accent = the per-section pastel surface. Defaults to black/white so
-     components using `bg-accent text-accent-foreground` render unchanged
-     on sections with no accent (Lab, Settings, etc.). Overridden per-
-     section by `body[data-accent=…]` rules in @layer base. */
-  --color-accent: #000000;
-  --color-accent-foreground: #ffffff;
+  --color-background: #fbf7f1;            /* paper — warm cream */
+  --color-foreground: #2a231c;            /* ink — soft warm black */
+  --color-muted: #f4ede1;                 /* paper-deep */
+  --color-muted-foreground: #8a7b6a;      /* warm grey */
+  --color-border: rgba(42, 35, 28, 0.12); /* ink at 12% */
+  --color-primary: #2a231c;
+  --color-primary-foreground: #fbf7f1;
+  /* Accent = the per-section pastel surface. Defaults to ink on paper
+     so components using `bg-accent text-accent-foreground` render
+     unchanged on sections with no accent. Overridden per-section by
+     `body[data-accent=…]` rules in @layer base. */
+  --color-accent: #2a231c;
+  --color-accent-foreground: #fbf7f1;
   --color-card: #ffffff;
-  --color-card-foreground: #000000;
-  /* Destructive — deletion, exclusion, error states. Kept semantic (not
-     pure black) so pills like "exclude allergen" read as cautionary. */
-  --color-destructive: #8c3030;
-  --color-destructive-foreground: #ffffff;
+  --color-card-foreground: #2a231c;
+  /* Destructive — deletion, exclusion, error states. Kept muted so
+     pills like "exclude allergen" read as cautionary without screaming. */
+  --color-destructive: #8e3d2e;
+  --color-destructive-foreground: #fbf7f1;
 
-  /* Side-nav surface — subtle off-white so the nav reads as a distinct
-     column without a divider line. */
-  --color-nav: #f4f4f2;
-  --color-nav-foreground: #000000;
+  /* Side-nav surface — slightly deeper paper so the nav reads as a
+     distinct column without a divider line. */
+  --color-nav: #f4ede1;
+  --color-nav-foreground: #2a231c;
 
   /* ─── Section accents ──────────────────────────────────────────────────
      Each top-level section of the app has a pastel identity used for
@@ -48,28 +53,32 @@
      so every `bg-primary`, `text-primary-foreground`, `btn-primary`, and
      active-tab style inherits it automatically.
      ──────────────────────────────────────────────────────────────────── */
+  /* Section accent tokens — each entry is a muted, dusty pastel.
+     Saturation pulled down from the earlier candy palette to match the
+     warm-neutral direction. Keep tonal distance between entries so
+     the section-accent routing still reads as distinct. */
   --accent-cocoa-bg:      #e0cdba;
   --accent-cocoa-ink:     #4a3324;
-  --accent-peach-bg:      #f6d7b4;
-  --accent-peach-ink:     #8a4a1e;
-  --accent-sage-bg:       #d4e0c7;
-  --accent-sage-ink:      #4f6b3e;
-  --accent-blue-bg:       #cddfe8;
-  --accent-blue-ink:      #3a5a70;
-  --accent-lilac-bg:      #ddd0e5;
-  --accent-lilac-ink:     #5a3d73;
-  --accent-butter-bg:     #f2e3a8;
-  --accent-butter-ink:    #7a5e0c;
-  --accent-mint-bg:       #c9e3d2;
-  --accent-mint-ink:      #3a6648;
-  --accent-terracotta-bg: #e8cdb5;
-  --accent-terracotta-ink:#7a3e1e;
+  --accent-peach-bg:      #f0d5c6;
+  --accent-peach-ink:     #9a6640;
+  --accent-sage-bg:       #e1e6d6;
+  --accent-sage-ink:      #5a7c50;
+  --accent-blue-bg:       #d9e3e8;
+  --accent-blue-ink:      #4e6b7a;
+  --accent-lilac-bg:      #e0d5e4;
+  --accent-lilac-ink:     #6f5983;
+  --accent-butter-bg:     #efe1c2;
+  --accent-butter-ink:    #8a6b20;
+  --accent-mint-bg:       #d6e3d5;
+  --accent-mint-ink:      #4f6b4a;
+  --accent-terracotta-bg: #f1d9c9;
+  --accent-terracotta-ink:#7a3e24;
   --accent-taupe-bg:      #dcd4c7;
   --accent-taupe-ink:     #5a4a35;
-  --accent-blush-bg:      #fbe6e3;
-  --accent-blush-ink:     #9b4f48;
-  --accent-sky-bg:        #e8f0f9;
-  --accent-sky-ink:       #4b6b8f;
+  --accent-blush-bg:      #f3e1db;
+  --accent-blush-ink:     #8e5a51;
+  --accent-sky-bg:        #e2e7ec;
+  --accent-sky-ink:       #506a80;
 
   /* ─── Production brain planner block tokens ───────────────────────────
      Semantic names for calendar/planner blocks. Each maps to one of the
@@ -103,39 +112,39 @@
      ──────────────────────────────────────────────────────────────────── */
 
   /* WARN — low stock, advisory */
-  --color-status-warn:       #7a5c08;
-  --color-status-warn-bg:    #fdf5da;
-  --color-status-warn-edge:  #c9a83a;
+  --color-status-warn:       #8a6b20;
+  --color-status-warn-bg:    #efe1c2;
+  --color-status-warn-edge:  #c9a97a;
 
   /* ALERT — out of stock, urgent */
-  --color-status-alert:      #8c3030;
-  --color-status-alert-bg:   #f5eaea;
-  --color-status-alert-edge: #c98888;
+  --color-status-alert:      #8e3d2e;
+  --color-status-alert-bg:   #f3e1db;
+  --color-status-alert-edge: #d3a79a;
 
   /* OK — ordered, fulfilled */
-  --color-status-ok:         #3a6648;
-  --color-status-ok-bg:      #e8f4eb;
-  --color-status-ok-edge:    #8cbf9a;
+  --color-status-ok:         #5a7c50;
+  --color-status-ok-bg:      #e1e6d6;
+  --color-status-ok-edge:    #a3ae94;
 
-  --color-warning:           #7a5c08;
-  --color-warning-muted:     #fdf5da;
-  --color-success:           #3a6648;
-  --color-success-muted:     #e8f4eb;
+  --color-warning:           #8a6b20;
+  --color-warning-muted:     #efe1c2;
+  --color-success:           #5a7c50;
+  --color-success-muted:     #e1e6d6;
 
-  /* Inter variable supplies the full weight axis; fall back to system UI. */
+  /* Fraunces (serif) for display/headers, Inter (sans) for body + UI.
+     System stack falls back if webfonts don't load. */
   --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, "SF Pro Display", sans-serif;
-  --font-display: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Fraunces", "Cormorant Garamond", "EB Garamond", Georgia, serif;
+  --font-display: var(--font-serif);
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 @layer utilities {
-  /* Standardised form input — use on <input>, <select>, <textarea>.
-     Focus is a solid black border (not dashed) — dashed is reserved for
-     buttons/links where it echoes canvas selection handles. On form
-     fields a dashed outline reads as "error" and feels harsh. */
+  /* Standardised form input — use on <input>, <select>, <textarea>. */
   .input {
-    @apply w-full min-w-0 rounded-md border border-border bg-card px-3 py-2 text-sm
+    @apply w-full min-w-0 border border-border bg-card px-3 py-2 text-sm
            focus:outline-none transition-colors;
+    border-radius: 4px;
   }
   .input:focus,
   .input:focus-visible {
@@ -144,31 +153,47 @@
     outline: none;
   }
 
-  /* Standardised field label */
+  /* Standardised field label — small caps, warm grey */
   .label {
-    @apply block text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wider;
+    @apply block text-xs font-medium text-muted-foreground mb-1 uppercase;
+    letter-spacing: 0.08em;
   }
 
-  /* Filled primary button — pill geometry, asymmetric vertical padding.
-     Uses the section accent; falls back to black when no accent is set. */
+  /* Filled primary button — tight 4px rounding, uppercase spacing,
+     ink-on-paper by default. Section accent can override via
+     body[data-accent=...] mapping below. */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-full
-           bg-accent text-accent-foreground text-sm
-           px-5 py-2
-           transition-[background-color,opacity] hover:opacity-90
+    @apply inline-flex items-center justify-center gap-1.5
+           bg-accent text-accent-foreground
+           text-xs uppercase
+           px-5 py-2.5
+           transition-colors hover:opacity-90
            disabled:opacity-50;
-    font-weight: 480;
-    letter-spacing: -0.14px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    border-radius: 4px;
   }
 
-  /* Outlined secondary button — pill geometry */
+  /* Outlined secondary button — same geometry, paper-backed */
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-full
-           border border-border bg-card text-foreground text-sm
-           px-5 py-2
+    @apply inline-flex items-center justify-center gap-1.5
+           border border-border bg-card text-foreground
+           text-xs uppercase
+           px-5 py-2.5
            transition-colors hover:bg-muted;
-    font-weight: 450;
-    letter-spacing: -0.14px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    border-radius: 4px;
+  }
+
+  /* Serif display class — for tasteful headers inside cards where
+     plain <h2> styling isn't enough context. Apply as
+     <span className="serif"> to opt in. */
+  .serif {
+    font-family: var(--font-serif);
+    font-feature-settings: "ss01", "cv11";
+    letter-spacing: -0.015em;
+    font-weight: 400;
   }
 
   /* Mono label — uppercase technical signpost */
@@ -214,16 +239,20 @@
   body[data-accent="sky"]        { --color-accent: var(--accent-sky-bg);        --color-accent-foreground: var(--accent-sky-ink); }
 
   body {
-    letter-spacing: -0.011em;
+    letter-spacing: -0.005em;
     font-weight: 400;
   }
 
-  /* Display typography — tight tracking, light weight */
+  /* Display typography — serif (Fraunces) for warmth, tight tracking.
+     Keeps editorial character without going precious. */
   h1, h2, h3 {
-    letter-spacing: -0.02em;
-    font-weight: 450;
+    font-family: var(--font-serif);
+    letter-spacing: -0.018em;
+    font-weight: 400;
+    font-feature-settings: "ss01", "cv11";
   }
-  h1 { letter-spacing: -0.03em; }
+  h1 { letter-spacing: -0.025em; }
+  /* h4/h5/h6 stay in the body sans so UI labels keep their mono-caps feel. */
 
   /* Dashed focus indicator — signature accessibility pattern */
   button:focus-visible,
