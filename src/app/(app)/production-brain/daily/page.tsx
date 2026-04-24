@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { ClockInWidget } from "@/components/clock-in-widget";
+import { WorkshopActions } from "@/components/workshop-actions";
 import {
   useProductionPlans,
   useAllPlanProducts,
@@ -209,6 +210,7 @@ export default function ProductionBrainDailyPage() {
         {/* RIGHT rail — clock-in + quick actions */}
         <aside className="space-y-3">
           <ClockInWidget linkedPlanId={selectedPlan?.id ?? undefined} />
+          <WorkshopActions />
         </aside>
       </div>
     </div>
