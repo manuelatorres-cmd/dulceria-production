@@ -2363,3 +2363,175 @@ export interface PersonAvailabilityException {
   createdAt?: Date;
   updatedAt?: Date;
 }
+
+// =============================================================
+// Production Brain — Phase 3 types (stock, HACCP, CSV imports)
+// =============================================================
+
+export const PRODUCT_STOCK_SECONDS_REASONS = [
+  "broken",
+  "flawed",
+  "near-expiry",
+  "other",
+] as const;
+export type ProductStockSecondsReason =
+  (typeof PRODUCT_STOCK_SECONDS_REASONS)[number];
+
+/** Finished-goods stock row per batch per location. Enables FIFO
+ *  allocation + shelf-life countdown + seconds tagging. */
+export interface ProductStock {
+  id?: string;
+  productId: string;
+  planId?: string;
+  quantityPieces: number;
+  lockedPieces: number;
+  locationId: string;
+  producedAt?: Date;
+  bestBeforeDate?: string;
+  lotNumber?: string;
+  isSeconds: boolean;
+  secondsReason?: ProductStockSecondsReason;
+  discountPercent?: number;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const STOCK_TRANSFER_ENTITY_TYPES = [
+  "ingredient",
+  "filling",
+  "product",
+  "packaging",
+] as const;
+export type StockTransferEntityType =
+  (typeof STOCK_TRANSFER_ENTITY_TYPES)[number];
+
+export const STOCK_TRANSFER_REASONS = [
+  "auto-replenish",
+  "shop-request",
+  "manual",
+  "return",
+  "waste",
+  "gift",
+  "tasting",
+] as const;
+export type StockTransferReason = (typeof STOCK_TRANSFER_REASONS)[number];
+
+/** Movement of any stock entity between two locations. */
+export interface StockTransfer {
+  id?: string;
+  entityType: StockTransferEntityType;
+  entityId: string;
+  quantity: number;
+  fromLocationId?: string;
+  toLocationId: string;
+  transferredAt: Date;
+  transferredByPersonId?: string;
+  reason: StockTransferReason;
+  notes?: string;
+  createdAt?: Date;
+}
+
+/** HACCP-compliant temperature reading against a cold storage unit. */
+export interface TemperatureReading {
+  id?: string;
+  coldStorageUnitId: string;
+  readingC: number;
+  loggedAt: Date;
+  loggedByPersonId?: string;
+  inRange?: boolean;
+  actionTaken?: string;
+  productionDayId?: string;
+  notes?: string;
+  createdAt?: Date;
+}
+
+/** Out-of-range incident opened against a reading. */
+export interface HaccpIncident {
+  id?: string;
+  coldStorageUnitId: string;
+  temperatureReadingId?: string;
+  startedAt: Date;
+  resolvedAt?: Date;
+  affectedStockNotes?: string;
+  actionTaken?: string;
+  resolvedByPersonId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const CSV_IMPORT_SOURCES = [
+  "shopify-orders",
+  "shopify-stock",
+  "hellocash-sales",
+  "hellocash-inventory",
+  "other",
+] as const;
+export type CsvImportSource = (typeof CSV_IMPORT_SOURCES)[number];
+
+export const CSV_IMPORT_STATUSES = [
+  "pending",
+  "processing",
+  "ok",
+  "partial",
+  "failed",
+] as const;
+export type CsvImportStatus = (typeof CSV_IMPORT_STATUSES)[number];
+
+/** Log row for every CSV upload. */
+export interface CsvImport {
+  id?: string;
+  source: CsvImportSource;
+  filename?: string;
+  uploadedAt: Date;
+  uploadedByPersonId?: string;
+  rowsTotal: number;
+  rowsImported: number;
+  rowsSkipped: number;
+  rowsFailed: number;
+  status: CsvImportStatus;
+  errorSummary?: string;
+  dryRun: boolean;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const EXTERNAL_SKU_SOURCES = ["shopify", "hellocash", "other"] as const;
+export type ExternalSkuSource = (typeof EXTERNAL_SKU_SOURCES)[number];
+
+/** Map external SKU → internal product/packaging row. Populated
+ *  during CSV import dry-runs when user resolves unmapped rows. */
+export interface ExternalSkuMapping {
+  id?: string;
+  source: ExternalSkuSource;
+  externalSku: string;
+  internalProductId?: string;
+  internalPackagingId?: string;
+  createdAt?: Date;
+}
+
+export const LOCATION_MINIMUM_ENTITY_TYPES = [
+  "product",
+  "ingredient",
+  "filling",
+  "packaging",
+] as const;
+export type LocationMinimumEntityType =
+  (typeof LOCATION_MINIMUM_ENTITY_TYPES)[number];
+
+/** Generic per-entity per-location min/target/max. Supersedes the
+ *  channel-based `stockLocationMinimum` for any new feature. Legacy
+ *  table kept for backwards compatibility. */
+export interface LocationStockMinimum {
+  id?: string;
+  entityType: LocationMinimumEntityType;
+  entityId: string;
+  locationId: string;
+  minQuantity: number;
+  targetQuantity?: number;
+  maxQuantity?: number;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}

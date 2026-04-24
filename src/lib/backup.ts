@@ -51,6 +51,15 @@ export interface BackupData {
   staffShifts?: unknown[];
   personAvailabilityExceptions?: unknown[];
 
+  // --- Production brain (phase 3) ---
+  productStock?: unknown[];
+  stockTransfers?: unknown[];
+  temperatureReadings?: unknown[];
+  haccpIncidents?: unknown[];
+  csvImports?: unknown[];
+  externalSkuMapping?: unknown[];
+  locationStockMinimums?: unknown[];
+
   // --- Legacy key compat (older backups written before the Product/Filling rename) ---
   // These are accepted on import and remapped to the new tables above.
   recipes?: unknown[];
@@ -107,6 +116,14 @@ const EXPORT_TABLES = [
   "mouldUsageLog",
   "staffShifts",
   "personAvailabilityExceptions",
+  // Production brain (phase 3)
+  "productStock",
+  "stockTransfers",
+  "temperatureReadings",
+  "haccpIncidents",
+  "csvImports",
+  "externalSkuMapping",
+  "locationStockMinimums",
 ] as const;
 
 export async function exportBackup(): Promise<void> {
@@ -162,6 +179,13 @@ export async function exportBackup(): Promise<void> {
     mouldUsageLog: rowsByName.mouldUsageLog,
     staffShifts: rowsByName.staffShifts,
     personAvailabilityExceptions: rowsByName.personAvailabilityExceptions,
+    productStock: rowsByName.productStock,
+    stockTransfers: rowsByName.stockTransfers,
+    temperatureReadings: rowsByName.temperatureReadings,
+    haccpIncidents: rowsByName.haccpIncidents,
+    csvImports: rowsByName.csvImports,
+    externalSkuMapping: rowsByName.externalSkuMapping,
+    locationStockMinimums: rowsByName.locationStockMinimums,
   };
 
   const json = JSON.stringify(backup, (_key, value) => value ?? undefined);
@@ -224,6 +248,14 @@ const INSERT_ORDER = [
   "mouldUsageLog",
   "staffShifts",
   "personAvailabilityExceptions",
+  // Production brain (phase 3) — stock + HACCP + CSV imports. locationStockMinimums has no FK so it can go first.
+  "locationStockMinimums",
+  "externalSkuMapping",
+  "productStock",
+  "stockTransfers",
+  "temperatureReadings",
+  "haccpIncidents",
+  "csvImports",
 ] as const;
 
 /** Map of table name -> the imported rows for that table. */
@@ -401,6 +433,13 @@ export async function importBackup(file: File): Promise<void> {
   const rawMouldUsageLog           = data.mouldUsageLog           ?? [];
   const rawStaffShifts             = data.staffShifts             ?? [];
   const rawPersonAvailabilityExceptions = data.personAvailabilityExceptions ?? [];
+  const rawProductStock            = data.productStock            ?? [];
+  const rawStockTransfers          = data.stockTransfers          ?? [];
+  const rawTemperatureReadings     = data.temperatureReadings     ?? [];
+  const rawHaccpIncidents          = data.haccpIncidents          ?? [];
+  const rawCsvImports              = data.csvImports              ?? [];
+  const rawExternalSkuMapping      = data.externalSkuMapping      ?? [];
+  const rawLocationStockMinimums   = data.locationStockMinimums   ?? [];
 
   // Apply field-level migrations for backups written pre-rename.
   const payload: ImportPayload = {
@@ -442,6 +481,13 @@ export async function importBackup(file: File): Promise<void> {
     mouldUsageLog:              passThrough(rawMouldUsageLog),
     staffShifts:                passThrough(rawStaffShifts),
     personAvailabilityExceptions: passThrough(rawPersonAvailabilityExceptions),
+    productStock:               passThrough(rawProductStock),
+    stockTransfers:             passThrough(rawStockTransfers),
+    temperatureReadings:        passThrough(rawTemperatureReadings),
+    haccpIncidents:             passThrough(rawHaccpIncidents),
+    csvImports:                 passThrough(rawCsvImports),
+    externalSkuMapping:         passThrough(rawExternalSkuMapping),
+    locationStockMinimums:      passThrough(rawLocationStockMinimums),
   };
 
   // 1. Atomic server-side wipe. Single round-trip, all-or-nothing.

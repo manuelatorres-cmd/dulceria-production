@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -9440,5 +9440,240 @@ export async function deletePersonAvailabilityException(id: string): Promise<voi
     .eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["personAvailabilityExceptions"] });
+}
+
+// =====================================================================
+// Production Brain — product stock (finished goods per batch per location)
+// =====================================================================
+
+export function useProductStock(
+  productId?: string,
+  locationId?: string,
+): ProductStock[] {
+  const { data } = useQuery({
+    queryKey: ["productStock", productId ?? "all", locationId ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("productStock").select("*");
+      if (productId) q = q.eq("productId", productId);
+      if (locationId) q = q.eq("locationId", locationId);
+      const rows = assertOk(await q) as ProductStock[];
+      return rows.sort((a, b) => {
+        if (a.bestBeforeDate && b.bestBeforeDate) {
+          return a.bestBeforeDate.localeCompare(b.bestBeforeDate);
+        }
+        return 0;
+      });
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveProductStock(
+  row: Omit<ProductStock, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("productStock")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["productStock"] });
+  return id;
+}
+
+// =====================================================================
+// Production Brain — stock transfers
+// =====================================================================
+
+export function useStockTransfers(
+  entityType?: StockTransferEntityType,
+  entityId?: string,
+): StockTransfer[] {
+  const { data } = useQuery({
+    queryKey: ["stockTransfers", entityType ?? "all", entityId ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("stockTransfers").select("*");
+      if (entityType) q = q.eq("entityType", entityType);
+      if (entityId) q = q.eq("entityId", entityId);
+      const rows = assertOk(await q) as StockTransfer[];
+      return rows.sort(
+        (a, b) =>
+          new Date(b.transferredAt).getTime() - new Date(a.transferredAt).getTime(),
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveStockTransfer(
+  row: Omit<StockTransfer, "id" | "createdAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("stockTransfers")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["stockTransfers"] });
+  return id;
+}
+
+// =====================================================================
+// Production Brain — HACCP temperature readings + incidents
+// =====================================================================
+
+export function useTemperatureReadings(
+  coldStorageUnitId?: string,
+  fromDate?: string,
+  toDate?: string,
+): TemperatureReading[] {
+  const { data } = useQuery({
+    queryKey: [
+      "temperatureReadings",
+      coldStorageUnitId ?? "all",
+      fromDate,
+      toDate,
+    ],
+    queryFn: async () => {
+      let q = supabase.from("temperatureReadings").select("*");
+      if (coldStorageUnitId) q = q.eq("coldStorageUnitId", coldStorageUnitId);
+      if (fromDate) q = q.gte("loggedAt", fromDate);
+      if (toDate) q = q.lte("loggedAt", toDate);
+      const rows = assertOk(await q) as TemperatureReading[];
+      return rows.sort(
+        (a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime(),
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveTemperatureReading(
+  row: Omit<TemperatureReading, "id" | "createdAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("temperatureReadings")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["temperatureReadings"] });
+  return id;
+}
+
+export function useHaccpIncidents(open = false): HaccpIncident[] {
+  const { data } = useQuery({
+    queryKey: ["haccpIncidents", open ? "open" : "all"],
+    queryFn: async () => {
+      let q = supabase.from("haccpIncidents").select("*");
+      if (open) q = q.is("resolvedAt", null);
+      const rows = assertOk(await q) as HaccpIncident[];
+      return rows.sort(
+        (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveHaccpIncident(
+  row: Omit<HaccpIncident, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("haccpIncidents")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["haccpIncidents"] });
+  return id;
+}
+
+// =====================================================================
+// Production Brain — CSV imports + external SKU mapping
+// =====================================================================
+
+export function useCsvImports(): CsvImport[] {
+  const { data } = useQuery({
+    queryKey: ["csvImports"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("csvImports").select("*"),
+      ) as CsvImport[];
+      return rows.sort(
+        (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveCsvImport(
+  row: Omit<CsvImport, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("csvImports")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["csvImports"] });
+  return id;
+}
+
+export function useExternalSkuMapping(): ExternalSkuMapping[] {
+  const { data } = useQuery({
+    queryKey: ["externalSkuMapping"],
+    queryFn: async () =>
+      assertOk(
+        await supabase.from("externalSkuMapping").select("*"),
+      ) as ExternalSkuMapping[],
+  });
+  return data ?? [];
+}
+
+export async function saveExternalSkuMapping(
+  row: Omit<ExternalSkuMapping, "id" | "createdAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("externalSkuMapping")
+    .upsert(payload, { onConflict: "source,externalSku" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["externalSkuMapping"] });
+  return id;
+}
+
+// =====================================================================
+// Production Brain — location stock minimums (generic per-entity)
+// =====================================================================
+
+export function useLocationStockMinimums(
+  entityType?: LocationMinimumEntityType,
+): LocationStockMinimum[] {
+  const { data } = useQuery({
+    queryKey: ["locationStockMinimums", entityType ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("locationStockMinimums").select("*");
+      if (entityType) q = q.eq("entityType", entityType);
+      const rows = assertOk(await q) as LocationStockMinimum[];
+      return rows;
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveLocationStockMinimum(
+  row: Omit<LocationStockMinimum, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("locationStockMinimums")
+    .upsert(payload, { onConflict: "entityType,entityId,locationId" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["locationStockMinimums"] });
+  return id;
 }
 
