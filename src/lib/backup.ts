@@ -60,6 +60,9 @@ export interface BackupData {
   externalSkuMapping?: unknown[];
   locationStockMinimums?: unknown[];
 
+  // --- Production brain (phase 4) ---
+  notifications?: unknown[];
+
   // --- Legacy key compat (older backups written before the Product/Filling rename) ---
   // These are accepted on import and remapped to the new tables above.
   recipes?: unknown[];
@@ -124,6 +127,8 @@ const EXPORT_TABLES = [
   "csvImports",
   "externalSkuMapping",
   "locationStockMinimums",
+  // Production brain (phase 4)
+  "notifications",
 ] as const;
 
 export async function exportBackup(): Promise<void> {
@@ -186,6 +191,7 @@ export async function exportBackup(): Promise<void> {
     csvImports: rowsByName.csvImports,
     externalSkuMapping: rowsByName.externalSkuMapping,
     locationStockMinimums: rowsByName.locationStockMinimums,
+    notifications: rowsByName.notifications,
   };
 
   const json = JSON.stringify(backup, (_key, value) => value ?? undefined);
@@ -256,6 +262,8 @@ const INSERT_ORDER = [
   "temperatureReadings",
   "haccpIncidents",
   "csvImports",
+  // Production brain (phase 4)
+  "notifications",
 ] as const;
 
 /** Map of table name -> the imported rows for that table. */
@@ -440,6 +448,7 @@ export async function importBackup(file: File): Promise<void> {
   const rawCsvImports              = data.csvImports              ?? [];
   const rawExternalSkuMapping      = data.externalSkuMapping      ?? [];
   const rawLocationStockMinimums   = data.locationStockMinimums   ?? [];
+  const rawNotifications           = data.notifications           ?? [];
 
   // Apply field-level migrations for backups written pre-rename.
   const payload: ImportPayload = {
@@ -488,6 +497,7 @@ export async function importBackup(file: File): Promise<void> {
     csvImports:                 passThrough(rawCsvImports),
     externalSkuMapping:         passThrough(rawExternalSkuMapping),
     locationStockMinimums:      passThrough(rawLocationStockMinimums),
+    notifications:              passThrough(rawNotifications),
   };
 
   // 1. Atomic server-side wipe. Single round-trip, all-or-nothing.

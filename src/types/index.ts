@@ -1580,6 +1580,9 @@ export interface Person {
    *  day, Tue/Thu shop AM then production PM"). JSON shape is
    *  intentionally open so UI can evolve without migrations. */
   weeklyCustomSchedule?: Record<string, unknown>;
+  /** Admin-role flag. True for owners / managers — unlocks analytics,
+   *  full cost breakdown, contamination + HACCP incident writes. */
+  isAdmin?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -2519,6 +2522,80 @@ export const LOCATION_MINIMUM_ENTITY_TYPES = [
 ] as const;
 export type LocationMinimumEntityType =
   (typeof LOCATION_MINIMUM_ENTITY_TYPES)[number];
+
+// =============================================================
+// Production Brain — Phase 4 types (notifications)
+// =============================================================
+
+export const NOTIFICATION_TYPES = [
+  "tier_change",
+  "surplus_routing",
+  "ingredient_late",
+  "ingredient_shortage",
+  "ingredient_price_change",
+  "campaign_conflict",
+  "campaign_ingredient_advance",
+  "filling_precook",
+  "filling_expiry_warning",
+  "transfer_proposal",
+  "stock_dip",
+  "near_expiry",
+  "markdown_suggestion",
+  "tasting_allocation",
+  "replenishment_proposal",
+  "haccp_incident_open",
+  "contamination_flag",
+  "machine_aging",
+  "mould_deep_wash",
+  "overtime_warning",
+  "quote_expiring",
+  "subscription_cycle_reminder",
+  "capacity_risk",
+  "rush_impossible",
+  "replacement_issued",
+  "other",
+] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+export const NOTIFICATION_URGENCIES = [
+  "critical",
+  "high",
+  "normal",
+  "low",
+] as const;
+export type NotificationUrgency = (typeof NOTIFICATION_URGENCIES)[number];
+
+export const NOTIFICATION_STATUSES = [
+  "open",
+  "snoozed",
+  "approved",
+  "dismissed",
+  "expired",
+] as const;
+export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
+
+/** Brain-surfaced decision / alert awaiting user response. Lives in
+ *  the notification center (bell icon + dedicated page). Popups
+ *  fire only for urgency='critical'. Everything else queues here. */
+export interface Notification {
+  id?: string;
+  type: NotificationType;
+  urgency: NotificationUrgency;
+  status: NotificationStatus;
+  title: string;
+  body?: string;
+  entityType?: string;
+  entityId?: string;
+  snoozedUntil?: Date;
+  approvedAt?: Date;
+  dismissedAt?: Date;
+  approvedByPersonId?: string;
+  adminOnly: boolean;
+  actionLabel?: string;
+  actionPayload?: Record<string, unknown>;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
 /** Generic per-entity per-location min/target/max. Supersedes the
  *  channel-based `stockLocationMinimum` for any new feature. Legacy

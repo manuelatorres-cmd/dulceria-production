@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -9675,5 +9675,147 @@ export async function saveLocationStockMinimum(
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["locationStockMinimums"] });
   return id;
+}
+
+// =====================================================================
+// Production Brain — notification center
+// =====================================================================
+
+export function useNotifications(
+  status: NotificationStatus | NotificationStatus[] = "open",
+): Notification[] {
+  const statusList: NotificationStatus[] = Array.isArray(status) ? status : [status];
+  const key = statusList.join(",");
+  const { data } = useQuery({
+    queryKey: ["notifications", key],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase
+          .from("notifications")
+          .select("*")
+          .in("status", statusList),
+      ) as Notification[];
+      const urgencyWeight: Record<NotificationUrgency, number> = {
+        critical: 0,
+        high: 1,
+        normal: 2,
+        low: 3,
+      };
+      return rows.sort((a, b) => {
+        if (a.urgency !== b.urgency) return urgencyWeight[a.urgency] - urgencyWeight[b.urgency];
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      });
+    },
+  });
+  return data ?? [];
+}
+
+/** Count of open, non-snoozed notifications — drives the bell badge. */
+export function useOpenNotificationCount(): number {
+  const rows = useNotifications("open");
+  const now = Date.now();
+  return rows.filter(
+    (n) => !n.snoozedUntil || new Date(n.snoozedUntil).getTime() <= now,
+  ).length;
+}
+
+/** Create or update a notification. Engines call this to queue
+ *  suggestions; the UI never writes directly. */
+export async function saveNotification(
+  row: Omit<Notification, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("notifications")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  return id;
+}
+
+/** Approve a notification — confirms the suggested action ran. */
+export async function approveNotification(
+  id: string,
+  approvedByPersonId?: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("notifications")
+    .update({
+      status: "approved",
+      approvedAt: new Date(),
+      approvedByPersonId: approvedByPersonId ?? null,
+    })
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["notifications"] });
+}
+
+/** Snooze a notification until the given timestamp (default +1 day). */
+export async function snoozeNotification(
+  id: string,
+  until: Date = new Date(Date.now() + 24 * 60 * 60 * 1000),
+): Promise<void> {
+  const { error } = await supabase
+    .from("notifications")
+    .update({
+      status: "snoozed",
+      snoozedUntil: until,
+    })
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["notifications"] });
+}
+
+/** Dismiss a notification — user rejected the suggestion. */
+export async function dismissNotification(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("notifications")
+    .update({
+      status: "dismissed",
+      dismissedAt: new Date(),
+    })
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["notifications"] });
+}
+
+/** Bulk approve all notifications of a given type.
+ *  Used by the "approve all tier changes" shortcut. */
+export async function bulkApproveByType(
+  type: NotificationType,
+  approvedByPersonId?: string,
+): Promise<number> {
+  const { data, error } = await supabase
+    .from("notifications")
+    .update({
+      status: "approved",
+      approvedAt: new Date(),
+      approvedByPersonId: approvedByPersonId ?? null,
+    })
+    .eq("status", "open")
+    .eq("type", type)
+    .select("id");
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  return (data ?? []).length;
+}
+
+/** Bulk dismiss all notifications of a given type. */
+export async function bulkDismissByType(type: NotificationType): Promise<number> {
+  const { data, error } = await supabase
+    .from("notifications")
+    .update({
+      status: "dismissed",
+      dismissedAt: new Date(),
+    })
+    .eq("status", "open")
+    .eq("type", type)
+    .select("id");
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  return (data ?? []).length;
 }
 

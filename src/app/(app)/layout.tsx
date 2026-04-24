@@ -6,6 +6,7 @@ import { AuthGate } from "@/components/auth-gate";
 import { IosInstallBanner } from "@/components/ios-install-banner";
 import { SectionAccent } from "@/components/section-accent";
 import { UndoAffordance } from "@/components/undo-affordance";
+import { NotificationBell } from "@/components/notification-bell";
 
 export default function AppLayout({
   children,
@@ -24,9 +25,14 @@ export default function AppLayout({
             <SideNav />
           </Suspense>
           <main
-            className="flex-1 min-w-0 min-h-screen transition-[margin-left] duration-200"
+            className="flex-1 min-w-0 min-h-screen transition-[margin-left] duration-200 relative"
             style={{ marginLeft: "var(--nav-w)" }}
           >
+            {/* Global top-right utilities — notification bell. Lives in
+                the main area so it doesn't collide with the sidebar. */}
+            <div className="absolute top-3 right-4 z-30">
+              <NotificationBell />
+            </div>
             {children}
           </main>
         </div>
