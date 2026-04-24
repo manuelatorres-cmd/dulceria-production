@@ -164,7 +164,7 @@ export default function ProductionPage() {
 
       <div className="px-4 pb-8 space-y-4">
         {visibleDays.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-card p-6 text-center">
+          <div className="rounded-sm border border-dashed border-border bg-card p-6 text-center">
             <Calendar className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">
               Nothing scheduled yet. Head to <Link href="/plan" className="text-primary hover:underline">/plan</Link> and click <span className="font-medium">Regenerate plan</span> once you have open orders.
@@ -188,7 +188,7 @@ export default function ProductionPage() {
               return (
                 <section
                   key={day.id ?? day.date}
-                  className={`rounded-lg border overflow-hidden ${
+                  className={`rounded-sm border overflow-hidden ${
                     isToday ? "border-primary/40 bg-primary/5" : "border-border bg-card"
                   }`}
                 >
@@ -327,7 +327,7 @@ export default function ProductionPage() {
         {/* Draft batches with no scheduled days yet — usually because
             the scheduler had warnings (no mould, missing steps, etc.). */}
         {unscheduledDrafts.length > 0 && (
-          <section className="rounded-lg border border-status-warn/40 bg-status-warn-bg/20 p-3 space-y-2">
+          <section className="rounded-sm border border-status-warn/40 bg-status-warn-bg/20 p-3 space-y-2">
             <h2 className="text-sm font-semibold text-status-warn flex items-center gap-1.5">
               <Clock className="w-4 h-4" /> Drafts with nothing scheduled
             </h2>
@@ -360,7 +360,7 @@ export default function ProductionPage() {
         {confirmDeleteId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDeleteId(null)} />
-            <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card shadow-xl p-5 space-y-3">
+            <div className="relative w-full max-w-sm rounded border border-border bg-card shadow-xl p-5 space-y-3">
               <h3 className="text-base font-bold">Delete batch?</h3>
               <p className="text-sm text-muted-foreground">
                 This removes the batch and its scheduling. Step progress and stock movements remain. Deleting does NOT touch the orders it was serving.

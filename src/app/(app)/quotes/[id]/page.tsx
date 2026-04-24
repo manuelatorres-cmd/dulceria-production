@@ -128,7 +128,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         {deadlinePrompt !== null && (
-          <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 print:hidden space-y-2">
+          <div className="rounded-sm border border-primary/40 bg-primary/5 p-3 print:hidden space-y-2">
             <p className="text-xs">
               This quote has no delivery date. Set one before creating the order:
             </p>
@@ -154,13 +154,13 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
         )}
 
         {convertError && (
-          <div className="rounded-lg border border-status-alert/30 bg-status-alert/5 p-2 text-xs text-status-alert print:hidden">
+          <div className="rounded-sm border border-status-alert/30 bg-status-alert/5 p-2 text-xs text-status-alert print:hidden">
             {convertError}
           </div>
         )}
 
         {confirmDelete && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-center justify-between">
+          <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-3 flex items-center justify-between">
             <p className="text-xs text-destructive">Delete this quote permanently?</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(false)} className="text-xs text-muted-foreground">Cancel</button>
@@ -189,7 +189,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
         </section>
 
         {/* Printable sheet — everything below prints */}
-        <div id="quote-sheet" className="rounded-lg border border-border bg-card p-6 space-y-5 print:border-0 print:shadow-none print:p-0">
+        <div id="quote-sheet" className="rounded-sm border border-border bg-card p-6 space-y-5 print:border-0 print:shadow-none print:p-0">
           {/* Letterhead */}
           <div className="flex items-start justify-between">
             <div>

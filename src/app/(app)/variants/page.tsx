@@ -142,7 +142,7 @@ export default function VariantsPage() {
         )}
 
         {showAdd && (
-          <form onSubmit={handleAdd} className="rounded-lg border border-border bg-card p-3 space-y-2">
+          <form onSubmit={handleAdd} className="rounded-sm border border-border bg-card p-3 space-y-2">
             <input
               type="text"
               value={newName}
@@ -195,7 +195,7 @@ export default function VariantsPage() {
             {filtered.map((c) => {
               const status = getStatus(c);
               return (
-                <li key={c.id} className="rounded-lg border border-border bg-card">
+                <li key={c.id} className="rounded-sm border border-border bg-card">
                   <Link
                     href={`/variants/${encodeURIComponent(c.id ?? "")}`}
                     className="flex items-center gap-3 p-3 min-w-0"

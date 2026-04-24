@@ -111,7 +111,7 @@ export default function ProductionBrainDashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Active pipeline */}
-        <section className="lg:col-span-2 rounded-xl border border-border bg-card p-4">
+        <section className="lg:col-span-2 rounded-sm border border-border bg-card p-4">
           <SectionHeader>Active pipeline</SectionHeader>
           {plans.length === 0 ? (
             <Empty>No production plans yet.</Empty>
@@ -120,7 +120,7 @@ export default function ProductionBrainDashboardPage() {
               {plans.slice(0, 6).map((plan) => (
                 <li
                   key={plan.id}
-                  className="rounded-lg bg-muted px-3 py-2 text-sm flex items-center justify-between"
+                  className="rounded-sm bg-muted px-3 py-2 text-sm flex items-center justify-between"
                 >
                   <span className="font-medium">
                     {plan.name ?? `Batch ${plan.batchNumber ?? plan.id?.slice(0, 6)}`}
@@ -135,7 +135,7 @@ export default function ProductionBrainDashboardPage() {
         </section>
 
         {/* Replenishment proposals + alerts */}
-        <section className="rounded-xl border border-border bg-card p-4">
+        <section className="rounded-sm border border-border bg-card p-4">
           <SectionHeader>Replenishment proposals</SectionHeader>
           {proposals.length === 0 ? (
             <Empty>No proposals from engine. Run replenishment job to populate.</Empty>
@@ -217,7 +217,7 @@ function SectionHeader({
 
 function KPI({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3">
+    <div className="rounded-sm border border-border bg-card px-4 py-3">
       <div className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold">
         {label}
       </div>

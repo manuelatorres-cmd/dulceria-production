@@ -541,14 +541,14 @@ export default function ProductCostPage() {
                 placeholder="Search products…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 min-w-[12rem] sm:flex-initial sm:w-72 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="flex-1 min-w-[12rem] sm:flex-initial sm:w-72 px-3 py-2 text-sm border border-border rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="whitespace-nowrap">Sort by</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortMode)}
-                  className="px-2 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="px-2 py-2 text-sm border border-border rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="cost-asc">Cost/product — low→high</option>
                   <option value="cost-desc">Cost/product — high→low</option>
@@ -561,7 +561,7 @@ export default function ProductCostPage() {
                 <select
                   value={productCatFilter}
                   onChange={(e) => setProductCatFilter(e.target.value)}
-                  className="px-2 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 capitalize"
+                  className="px-2 py-2 text-sm border border-border rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 capitalize"
                 >
                   <option value="">All kinds</option>
                   {availableProductCategories.map((c) => (
@@ -605,14 +605,14 @@ export default function ProductCostPage() {
         )}
 
         {productsWithCost.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-8 text-center">
+          <div className="rounded-sm border border-dashed border-border p-8 text-center">
             <p className="text-muted-foreground text-sm mb-1">No cost data yet</p>
             <p className="text-xs text-muted-foreground/70">
               Open a product and trigger a cost calculation from the Cost tab to get started.
             </p>
           </div>
         ) : (
-          <div className="space-y-px rounded-lg border border-border overflow-hidden">
+          <div className="space-y-px rounded-sm border border-border overflow-hidden">
             {/* Header row */}
             <div className="grid grid-cols-[2rem_1fr_auto_auto] gap-3 items-center px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
               <span>#</span>
@@ -743,7 +743,7 @@ export default function ProductCostPage() {
       </button>
 
       {/* ---- Focus card ---- */}
-      <div className="rounded-xl border border-border bg-card p-5 mb-6">
+      <div className="rounded-sm border border-border bg-card p-5 mb-6">
         {/* Name + type */}
         <div className="flex items-start gap-3 mb-4">
           <div className="flex-1 min-w-0">
@@ -876,7 +876,7 @@ export default function ProductCostPage() {
               return (
                 <div
                   key={productId}
-                  className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
+                  className="flex items-center gap-3 rounded-sm border border-border bg-card p-3"
                 >
                   {/* Similarity score */}
                   <div className="shrink-0 w-10 text-center">
@@ -965,10 +965,10 @@ export default function ProductCostPage() {
                     setCompareSearch("");
                   }
                 }}
-                className="w-full px-3 py-2 text-sm border border-primary/40 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-3 py-2 text-sm border border-primary/40 rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               {compareSearchResults.length > 0 && (
-                <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-border bg-card shadow-lg overflow-hidden">
+                <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-sm border border-border bg-card shadow-lg overflow-hidden">
                   {compareSearchResults.map((r) => {
                     const snap = latestSnapshotByProduct.get(r.id!);
                     return (
@@ -1012,7 +1012,7 @@ export default function ProductCostPage() {
             Comparison
           </h3>
 
-          <div className="overflow-x-auto rounded-xl border border-border">
+          <div className="overflow-x-auto rounded-sm border border-border">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border bg-muted/40">

@@ -162,7 +162,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 rounded-lg bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1 overflow-hidden"
+                  className="w-20 h-20 rounded-sm bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1 overflow-hidden"
                 >
                   {photo ? (
                     <img src={photo} alt="" className="w-full h-full object-cover" />
@@ -187,7 +187,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
               <button
                 type="button"
                 aria-label="Edit mould photo"
-                className="w-20 h-20 rounded-lg overflow-hidden cursor-pointer"
+                className="w-20 h-20 rounded-sm overflow-hidden cursor-pointer"
                 onClick={startEditing}
               >
                 {mould.photo ? (
@@ -374,7 +374,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
           /* ── Read-only view ── */
           <>
             {mould.cavityWeightG > 0 && (
-              <div className="rounded-lg border border-border bg-card divide-y divide-border">
+              <div className="rounded-sm border border-border bg-card divide-y divide-border">
                 <div className="flex justify-between px-3 py-2 text-sm">
                   <span className="text-muted-foreground">Cavity weight</span>
                   <span className="font-medium">{mould.cavityWeightG} g</span>
@@ -437,7 +437,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
           {confirmDelete ? (
             inUse ? (
               /* In use by products or plans — archive only */
-              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+              <div className="rounded-sm border border-border bg-card p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                   <p className="text-sm font-medium">Archive this mould?</p>
@@ -463,7 +463,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             ) : (
               /* Not in use — allow full delete */
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+              <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                 <p className="text-sm font-medium text-destructive">Delete this mould?</p>
                 <p className="text-xs text-muted-foreground">This will permanently remove the mould. This cannot be undone.</p>
                 <div className="flex gap-2">

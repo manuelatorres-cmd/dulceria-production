@@ -49,7 +49,7 @@ export function UsedInPanel({ singular, plural, items, emptyMessage, className }
             <li key={item.id}>
               <Link
                 href={item.href}
-                className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
+                className="flex items-center gap-3 rounded-sm border border-border bg-card p-3"
               >
                 {/* Thumbnail: photo > icon > initial-letter avatar */}
                 {item.photo ? (

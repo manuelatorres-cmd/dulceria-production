@@ -340,7 +340,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
         ) : (
           /* ── Read-only view ── */
           <>
-            <div className="rounded-lg border border-border bg-card divide-y divide-border">
+            <div className="rounded-sm border border-border bg-card divide-y divide-border">
               <div className="flex justify-between items-center px-3 py-2 text-sm">
                 <span className="text-muted-foreground">Colour</span>
                 <div className="flex items-center gap-2">
@@ -405,7 +405,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
               ) : usedInProducts.length > 0 ? (
                 /* In use — archive only, no delete */
                 confirmDelete ? (
-                  <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                  <div className="rounded-sm border border-border bg-card p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                       <p className="text-sm font-medium">Archive this material?</p>
@@ -434,7 +434,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
               ) : (
                 /* Not in use — allow full delete */
                 confirmDelete ? (
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+                  <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                     <p className="text-sm text-destructive font-medium">Delete this material?</p>
                     <p className="text-xs text-muted-foreground">
                       This cannot be undone.

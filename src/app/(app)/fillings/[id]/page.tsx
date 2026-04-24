@@ -449,7 +449,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
           {editing && filling.status === "confirmed" && (
-            <div className={`flex items-center justify-between rounded-lg px-3 py-2 mb-2 text-xs ${unlocked ? "bg-warning-muted text-warning border border-warning/30" : "bg-muted text-muted-foreground"}`}>
+            <div className={`flex items-center justify-between rounded-sm px-3 py-2 mb-2 text-xs ${unlocked ? "bg-warning-muted text-warning border border-warning/30" : "bg-muted text-muted-foreground"}`}>
               {unlocked ? (
                 <>
                   <span className="flex items-center gap-1.5"><LockOpen aria-hidden="true" className="w-3.5 h-3.5" /> Unlocked — be careful editing a confirmed filling</span>
@@ -466,7 +466,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
           {fillingIngredients.length > 0 ? (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={fillingIngredients.map((li) => li.id!)} strategy={verticalListSortingStrategy}>
-                <div className="divide-y divide-border rounded-lg border border-border bg-card px-3">
+                <div className="divide-y divide-border rounded-sm border border-border bg-card px-3">
                   {fillingIngredients.map((li) => {
                     const g = toGrams(li.amount, li.unit);
                     const pct = totalGrams > 0 && g != null ? (g / totalGrams) * 100 : undefined;
@@ -521,7 +521,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
         <div className="px-4 pb-8 border-t border-border pt-4 space-y-4">
           {/* Create new version */}
           {showForkPanel ? (
-            <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div className="rounded-sm border border-border bg-card p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <GitBranch className="w-4 h-4 text-muted-foreground shrink-0" />
                 <p className="text-sm font-medium">Create new version of &ldquo;{filling.name}&rdquo;</p>
@@ -613,7 +613,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Archive (for produced fillings) */}
           {!filling.archived && showArchivePanel && archiveImpact ? (
-            <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div className="rounded-sm border border-border bg-card p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                 <p className="text-sm font-medium">Archive &ldquo;{filling.name}&rdquo;</p>
@@ -728,7 +728,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
           {!filling.archived && !fillingProduced && (
             <>
               {confirmDelete ? (
-                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+                <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                   <p className="text-sm font-medium text-destructive">Delete this filling?</p>
                   <p className="text-xs text-muted-foreground">This will permanently remove the filling and all its ingredient data. This cannot be undone.</p>
 
@@ -945,7 +945,7 @@ function FillingProductSection({ fillingId, products }: { fillingId: string; pro
       )}
 
       {action === "create" && (
-        <form onSubmit={handleCreateProduct} className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <form onSubmit={handleCreateProduct} className="rounded-sm border border-border bg-card p-3 space-y-2">
           <input
             type="text"
             value={newProductName}
@@ -968,7 +968,7 @@ function FillingProductSection({ fillingId, products }: { fillingId: string; pro
       )}
 
       {action === "add" && (
-        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <div className="rounded-sm border border-border bg-card p-3 space-y-2">
           <div className="relative">
             <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
@@ -1080,7 +1080,7 @@ function FillingNutritionTab({
               Filling weight: {totalWeightG.toFixed(1)}g
             </p>
 
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="rounded-sm border border-border bg-card overflow-hidden">
               <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
                 <span className="flex-1">Nutrient</span>
                 <span className="w-24 text-right">Per 100g</span>
@@ -1165,13 +1165,13 @@ function FillingCostTab({
     <div className="px-4 pb-6 space-y-4">
       {/* Headline figures */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-border bg-card p-3">
+        <div className="rounded-sm border border-border bg-card p-3">
           <p className="text-xs text-muted-foreground">Cost per 100g</p>
           <p className="text-2xl font-bold text-primary">
             {costPer100g != null ? formatCost(costPer100g, sym) : "—"}
           </p>
         </div>
-        <div className="rounded-lg border border-border bg-card p-3">
+        <div className="rounded-sm border border-border bg-card p-3">
           <p className="text-xs text-muted-foreground">Total batch cost</p>
           <p className="text-2xl font-bold text-primary">{formatCost(totalCost, sym)}</p>
           {totalGrams > 0 && (
@@ -1206,7 +1206,7 @@ function FillingCostTab({
       {!noPriceable && (
         <div>
           <h2 className="text-sm font-medium text-muted-foreground mb-2">Breakdown</h2>
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <div className="rounded-sm border border-border bg-card overflow-hidden">
             <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
               <span className="flex-1">Ingredient</span>
               <span className="w-20 text-right">Grams</span>
@@ -1264,7 +1264,7 @@ function FillingVersionHistoryTab({ versions, currentId }: { versions: import("@
         return (
           <li
             key={v.id}
-            className={`rounded-lg border bg-card p-3 ${isCurrent ? "border-primary/40" : "border-border"}`}
+            className={`rounded-sm border bg-card p-3 ${isCurrent ? "border-primary/40" : "border-border"}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">

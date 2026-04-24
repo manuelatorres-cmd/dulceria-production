@@ -133,7 +133,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
         {/* Archive / Delete */}
         <section className="pt-4 border-t border-border">
           {deleteError && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 mb-3">
+            <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-3 mb-3">
               <p className="text-xs text-destructive">{deleteError}</p>
             </div>
           )}
@@ -153,7 +153,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
           ) : inUseCount > 0 ? (
             /* In use — archive only, no delete */
             confirmDelete ? (
-              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+              <div className="rounded-sm border border-border bg-card p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                   <p className="text-sm font-medium">Archive this category?</p>
@@ -183,7 +183,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
           ) : (
             /* Not in use — allow full delete */
             confirmDelete ? (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+              <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                 <p className="text-sm text-destructive font-medium">Delete this category?</p>
                 <p className="text-xs text-muted-foreground">
                   No ingredients are currently using it. This cannot be undone.

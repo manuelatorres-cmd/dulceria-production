@@ -100,7 +100,7 @@ export default function LabPage() {
             className="w-full text-left group rounded-full border-2 border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all px-5 py-4"
           >
             <div className="flex items-start gap-4">
-              <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors flex items-center justify-center">
+              <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-sm bg-primary/10 group-hover:bg-primary/20 transition-colors flex items-center justify-center">
                 <FlaskConical className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -118,7 +118,7 @@ export default function LabPage() {
             className="w-full text-left group rounded-full border border-border bg-card hover:border-primary/30 hover:bg-muted/40 transition-all px-5 py-4"
           >
             <div className="flex items-start gap-4">
-              <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-lg bg-muted group-hover:bg-primary/10 transition-colors flex items-center justify-center">
+              <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-sm bg-muted group-hover:bg-primary/10 transition-colors flex items-center justify-center">
                 <Layers className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
               <div>
@@ -276,7 +276,7 @@ function CreateForm({
     : newName.trim().length > 0 && !!cloneFillingId && !saving;
 
   return (
-    <div className="mb-6 rounded-xl border border-border bg-muted/40 p-4 space-y-3">
+    <div className="mb-6 rounded-sm border border-border bg-muted/40 p-4 space-y-3">
       <p className="text-sm font-medium">
         {mode === "blank" ? "New blank experiment" : "Clone a ganache filling"}
       </p>
@@ -362,7 +362,7 @@ function ExperimentCard({
   if (deleteId === id) {
     return (
       <li>
-        <div className="p-3 rounded-xl border border-destructive/30 bg-destructive/5 text-sm space-y-2">
+        <div className="p-3 rounded-sm border border-destructive/30 bg-destructive/5 text-sm space-y-2">
           <p className="font-medium">Delete &ldquo;{exp.name}&rdquo;?</p>
           <p className="text-muted-foreground text-xs">This experiment will be permanently removed.</p>
           <div className="flex gap-3">
@@ -386,7 +386,7 @@ function ExperimentCard({
 
   return (
     <li>
-      <div className={`rounded-xl border transition-colors ${muted ? "border-border/60 bg-card/60" : "border-border bg-card"}`}>
+      <div className={`rounded-sm border transition-colors ${muted ? "border-border/60 bg-card/60" : "border-border bg-card"}`}>
         <div className="px-4 pt-3 pb-2">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">

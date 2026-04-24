@@ -401,7 +401,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   alt={product.name}
                   width={80}
                   height={80}
-                  className="w-20 h-20 rounded-lg object-cover cursor-pointer"
+                  className="w-20 h-20 rounded-sm object-cover cursor-pointer"
                   onClick={() => { if (!confirmRemovePhoto) fileInputRef.current?.click(); }}
                 />
                 {confirmRemovePhoto ? (
@@ -431,7 +431,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             ) : (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-20 h-20 rounded-lg bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1"
+                className="w-20 h-20 rounded-sm bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1"
               >
                 <Camera className="w-5 h-5" />
                 <span className="text-[10px]">Photo</span>
@@ -521,7 +521,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               />
               {saveErrors.length > 0 && (
                 <div className="px-4 pb-3">
-                  <ul className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+                  <ul className="rounded-sm border border-destructive/30 bg-destructive/5 p-3 space-y-1">
                     {saveErrors.map((err, i) => (
                       <li key={i} className="text-xs text-destructive">{err}</li>
                     ))}
@@ -845,7 +845,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Assign existing filling picker */}
           {showAssign && (
-            <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+            <div className="rounded-sm border border-border bg-card p-3 space-y-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -969,7 +969,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         {/* Validation errors */}
         {saveErrors.length > 0 && (
           <div className="px-4 pb-3">
-            <ul className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+            <ul className="rounded-sm border border-destructive/30 bg-destructive/5 p-3 space-y-1">
               {saveErrors.map((err, i) => (
                 <li key={i} className="text-xs text-destructive">{err}</li>
               ))}
@@ -1133,7 +1133,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       <div className="px-4 pb-8 border-t border-border pt-4 space-y-4">
         {/* Duplicate */}
         {showDuplicatePanel ? (
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div className="rounded-sm border border-border bg-card p-4 space-y-3">
             <div className="flex items-center gap-2">
               <Copy className="w-4 h-4 text-muted-foreground shrink-0" />
               <p className="text-sm font-medium">Duplicate &ldquo;{product?.name}&rdquo;</p>
@@ -1207,7 +1207,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         {/* Archive (for produced products) */}
         {!product?.archived && productProduced && (
           confirmDelete ? (
-            <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div className="rounded-sm border border-border bg-card p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                 <p className="text-sm font-medium">Archive this product?</p>
@@ -1241,7 +1241,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         {/* Delete (only for non-archived, non-produced products) */}
         {!product?.archived && !productProduced && (
           confirmDelete ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+            <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
               <p className="text-sm font-medium text-destructive">Delete this product?</p>
               <p className="text-xs text-muted-foreground">This will permanently remove the product and all its filling assignments. This cannot be undone.</p>
               <div className="flex gap-2">
@@ -1298,7 +1298,7 @@ function ProductFillingHistorySection({ productId }: { productId: string }) {
         const newVersion = entry.newFilling?.version ?? 1;
         const fillingName = entry.newFilling?.name ?? entry.oldFilling?.name ?? "Unknown filling";
         return (
-          <li key={entry.id} className="rounded-lg border border-border bg-card p-3">
+          <li key={entry.id} className="rounded-sm border border-border bg-card p-3">
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-medium">{fillingName}</p>
               <span className="text-xs text-muted-foreground shrink-0">{dateStr}</span>
@@ -1381,7 +1381,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
         const isDone = plan.status === "done";
 
         return (
-          <li key={pb.id} className="rounded-lg border border-border bg-card overflow-hidden">
+          <li key={pb.id} className="rounded-sm border border-border bg-card overflow-hidden">
             {/* Header row */}
             <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-2">
               <div className="min-w-0">
@@ -1828,7 +1828,7 @@ function ProductCostTab({
           </div>
 
           {breakdownView === "grouped" ? (
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="rounded-sm border border-border bg-card overflow-hidden">
               {groupedBreakdown.map((group, gi) => {
                 const collapsed = collapsedLayers.has(group.layerId);
                 return (
@@ -1876,7 +1876,7 @@ function ProductCostTab({
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="rounded-sm border border-border bg-card overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
@@ -1978,7 +1978,7 @@ function ProductCostTab({
               const prev = snapshots[i + 1];
               const delta = prev ? costDelta(snap.costPerProduct, prev.costPerProduct, sym) : null;
               return (
-                <li key={snap.id} className="rounded-lg border border-border bg-card px-3 py-2.5">
+                <li key={snap.id} className="rounded-sm border border-border bg-card px-3 py-2.5">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-sm font-medium">{formatCost(snap.costPerProduct, sym)}</span>
                     <div className="flex items-center gap-2">
@@ -2261,7 +2261,7 @@ function MaterialPicker({
         className="input"
       />
       {open && (filtered.length > 0 || showCreate) && (
-        <ul className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+        <ul className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-sm border border-border bg-card shadow-lg">
           {filtered.map((m, idx) => (
             <li key={m.id}>
               <button
@@ -2366,7 +2366,7 @@ function ShellDesignSection({
       {steps.length > 0 && (
         <ol className="space-y-3">
           {steps.map((step, i) => (
-            <li key={i} className="rounded-lg border border-border bg-card p-3 space-y-3">
+            <li key={i} className="rounded-sm border border-border bg-card p-3 space-y-3">
               {/* Technique row */}
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 select-none">
@@ -2628,7 +2628,7 @@ function ProductFillingRow({
   }
 
   return (
-    <li className={`rounded-lg border border-border bg-card p-3 flex items-start gap-2 ${isDragging ? "opacity-50" : ""}`}>
+    <li className={`rounded-sm border border-border bg-card p-3 flex items-start gap-2 ${isDragging ? "opacity-50" : ""}`}>
       {!readonly && (
         <button
           type="button"
@@ -2933,7 +2933,7 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
           </p>
 
           {/* Nutrition table */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="rounded-sm border border-border bg-card overflow-hidden">
         {/* Header row */}
         <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
           <span className="flex-1">Nutrient</span>

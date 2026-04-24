@@ -218,7 +218,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         {missingRequired.length > 0 && (
           <button
             onClick={() => setEditing(true)}
-            className="w-full flex items-center gap-2 rounded-lg border border-status-warn/40 bg-status-warn/5 px-3 py-2 text-left hover:bg-status-warn/10"
+            className="w-full flex items-center gap-2 rounded-sm border border-status-warn/40 bg-status-warn/5 px-3 py-2 text-left hover:bg-status-warn/10"
           >
             <AlertTriangle className="w-4 h-4 text-status-warn shrink-0" />
             <span className="flex-1 text-sm">
@@ -230,7 +230,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         )}
 
         {/* Profile */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary flex items-center gap-2">
               Profile
@@ -392,7 +392,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
         {/* Analytics */}
         {analytics && (
-          <section className="rounded-lg border border-border bg-card p-4">
+          <section className="rounded-sm border border-border bg-card p-4">
             <h2 className="text-sm font-semibold text-primary mb-3">Performance</h2>
             <div className="grid grid-cols-4 gap-3">
               <Metric label="Orders" value={`${analytics.orderCount}`} />
@@ -439,7 +439,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         )}
 
         {/* Contact log */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5"><Users className="w-4 h-4" /> Contact log</h2>
             <span className="text-xs text-muted-foreground">{contacts.length} {contacts.length === 1 ? "entry" : "entries"}</span>
@@ -512,7 +512,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </section>
 
         {/* Follow-ups */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> Follow-ups</h2>
             <span className="text-xs text-muted-foreground">
@@ -585,7 +585,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </section>
 
         {/* Order history */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary">Order history</h2>
             <span className="text-xs text-muted-foreground">{customerOrders.length} {customerOrders.length === 1 ? "order" : "orders"}</span>
@@ -622,7 +622,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </section>
 
         {/* Quotes */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5"><FileText className="w-4 h-4" /> Quotes</h2>
             <Link
@@ -716,7 +716,7 @@ function CustomerProductPricesSection({
   }
 
   return (
-    <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+    <section className="rounded-sm border border-border bg-card p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
           <Tag className="w-4 h-4" /> Custom product prices ({prices.length})

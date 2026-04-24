@@ -157,7 +157,7 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
                         if (entries.length === 1) handleConfirm();
                       }
                     }}
-                    className="flex-1 h-8 rounded-lg border border-border bg-card text-center text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="flex-1 h-8 rounded-sm border border-border bg-card text-center text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="text-xs text-muted-foreground w-4">g</span>
                 </div>

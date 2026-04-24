@@ -41,7 +41,7 @@ export default function ObservatoryPage() {
             <Link
               key={card.name}
               href={card.href}
-              className="flex flex-col bg-card border border-border rounded-lg p-5 transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="flex flex-col bg-card border border-border rounded-sm p-5 transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <div className="flex items-center gap-3 mb-3">
                 <Icon className="w-6 h-6 text-primary" />

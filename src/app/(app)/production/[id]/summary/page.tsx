@@ -72,7 +72,7 @@ export default function BatchSummaryPage({ params }: { params: Promise<{ id: str
       </div>
 
       <div className="px-4 pb-8">
-        <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed bg-muted/50 rounded-lg border border-border p-4 text-foreground">
+        <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed bg-muted/50 rounded-sm border border-border p-4 text-foreground">
           {plan.batchSummary}
         </pre>
       </div>

@@ -121,7 +121,7 @@ export default function ShopifyImportPage() {
         </Link>
 
         {!parsed && !result && (
-          <section className="rounded-lg border border-dashed border-border bg-card p-8 text-center space-y-3">
+          <section className="rounded-sm border border-dashed border-border bg-card p-8 text-center space-y-3">
             <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
             <div>
               <p className="text-sm">Drop your Shopify orders CSV here or</p>
@@ -160,7 +160,7 @@ export default function ShopifyImportPage() {
         )}
 
         {result && (
-          <div className="rounded-lg border border-status-ok-edge bg-status-ok-bg p-4 flex items-start gap-2">
+          <div className="rounded-sm border border-status-ok-edge bg-status-ok-bg p-4 flex items-start gap-2">
             <CheckCircle className="w-4 h-4 text-status-ok mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-status-ok">
@@ -191,7 +191,7 @@ export default function ShopifyImportPage() {
 
         {parsed && parsed.missingRequiredColumns.length === 0 && !result && (
           <>
-            <section className="rounded-lg border border-border bg-card p-4">
+            <section className="rounded-sm border border-border bg-card p-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <h2 className="text-sm font-semibold text-primary">Preview</h2>
@@ -237,7 +237,7 @@ export default function ShopifyImportPage() {
                 return (
                   <li
                     key={o.name}
-                    className={`rounded-lg border bg-card p-3 space-y-2 ${isDup ? "border-border/60 opacity-60" : "border-border"}`}
+                    className={`rounded-sm border bg-card p-3 space-y-2 ${isDup ? "border-border/60 opacity-60" : "border-border"}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>

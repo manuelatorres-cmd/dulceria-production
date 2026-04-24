@@ -512,7 +512,7 @@ export default function StatsPage() {
           <>
             {/* KPI cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-sm border border-border bg-card p-4">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">To stock</p>
                 <p className="text-2xl font-semibold tabular-nums mt-1">
                   {kpis.totalProducts.toLocaleString()}
@@ -523,7 +523,7 @@ export default function StatsPage() {
                   </p>
                 )}
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-sm border border-border bg-card p-4">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Yield</p>
                 <p className={`text-2xl font-semibold tabular-nums mt-1 ${
                   kpis.yieldRate >= 98 ? "text-status-ok" : kpis.yieldRate >= 90 ? "" : "text-status-warn"
@@ -536,11 +536,11 @@ export default function StatsPage() {
                   </p>
                 )}
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-sm border border-border bg-card p-4">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Batches</p>
                 <p className="text-2xl font-semibold tabular-nums mt-1">{kpis.uniquePlans}</p>
               </div>
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-sm border border-border bg-card p-4">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Top product</p>
                 <p className="text-sm font-semibold mt-1 truncate" title={kpis.topProduct?.name}>
                   {kpis.topProduct?.name ?? "—"}
@@ -555,7 +555,7 @@ export default function StatsPage() {
 
             {/* Chart */}
             {filteredEvents.length > 0 && (
-              <div className="rounded-lg border border-border bg-card p-4">
+              <div className="rounded-sm border border-border bg-card p-4">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Products per {granularity === "month" ? "month" : "week"}
@@ -703,7 +703,7 @@ export default function StatsPage() {
 
             {/* Product leaderboard */}
             {leaderboard.length > 0 && (
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="rounded-sm border border-border bg-card overflow-hidden">
                 <div className="px-4 py-3 border-b border-border/50">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Product breakdown

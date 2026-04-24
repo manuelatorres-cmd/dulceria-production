@@ -151,7 +151,7 @@ export default function StockAdjustPage() {
           <ArrowLeft className="w-3.5 h-3.5" /> Back to stock
         </Link>
 
-        <section className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <section className="rounded-sm border border-border bg-card p-3 space-y-2">
           <p className="text-xs text-muted-foreground">
             Enter real stock that the app doesn&apos;t know about yet. Positive
             quantity adds, negative removes. Each row is saved as a permanent
@@ -177,7 +177,7 @@ export default function StockAdjustPage() {
               const items = itemsByType[row.itemType];
               const needsLocation = row.itemType === "product";
               return (
-                <li key={row.key} className="rounded-lg border border-border bg-card p-3 space-y-2">
+                <li key={row.key} className="rounded-sm border border-border bg-card p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-medium text-muted-foreground">Row {idx + 1}</span>
                     <button
@@ -334,7 +334,7 @@ export default function StockAdjustPage() {
           {recent.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No adjustments logged yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+            <ul className="divide-y divide-border rounded-sm border border-border bg-card">
               {recent.map((adj) => {
                 const name = nameById.get(`${adj.itemType}:${adj.itemId}`) ?? adj.itemId;
                 const delta = Number(adj.deltaQty);

@@ -348,7 +348,7 @@ export default function DashboardPage() {
             yet and the user actually has temp-check equipment). The
             user can also dismiss for the rest of today. */}
         {showProductionBanner && (
-          <section className="rounded-lg border border-border bg-card p-3 flex items-center justify-between gap-3 flex-wrap">
+          <section className="rounded-sm border border-border bg-card p-3 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3">
               <div className={`w-2 h-2 rounded-full ${
                 !todayDay
@@ -426,7 +426,7 @@ export default function DashboardPage() {
               <Link
                 key={`crit-${i}`}
                 href={a.href}
-                className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive hover:border-destructive/50"
+                className="flex items-start gap-3 rounded-sm border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive hover:border-destructive/50"
               >
                 <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
                 <span className="flex-1 font-medium">{a.text}</span>
@@ -451,7 +451,7 @@ export default function DashboardPage() {
 
         {/* Close Production summary */}
         {closeSummary && (
-          <section className="rounded-lg border border-status-ok-edge bg-status-ok-bg p-3 text-sm">
+          <section className="rounded-sm border border-status-ok-edge bg-status-ok-bg p-3 text-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-semibold text-status-ok">Production closed</p>
@@ -517,11 +517,11 @@ export default function DashboardPage() {
             <Link href="/plan" className="text-xs text-primary hover:underline">Full plan →</Link>
           </div>
           {capacityPreview.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
               No scheduled work in the next week.
             </p>
           ) : (
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="rounded-sm border border-border bg-card overflow-hidden">
               {capacityPreview.map((row) => (
                 <div key={row.date} className={`flex items-center px-3 py-1.5 text-sm border-b border-border last:border-b-0 ${row.level === "over" || row.level === "critical" ? "bg-destructive/5" : row.level === "warn" ? "bg-status-warn-bg/30" : ""}`}>
                   <span className="flex-1 font-medium">{formatDayLabel(row.date)}</span>
@@ -542,11 +542,11 @@ export default function DashboardPage() {
             <Link href="/orders" className="text-xs text-primary hover:underline">All orders →</Link>
           </div>
           {in14.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
               Nothing due in the next 14 days.
             </p>
           ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+            <ul className="divide-y divide-border rounded-sm border border-border bg-card">
               {in14.slice(0, 10).map((order) => {
                 const days = Math.round((new Date(order.deadline).getTime() - new Date(todayIso + "T00:00:00").getTime()) / 86_400_000);
                 const isOverdue = days < 0;
@@ -581,7 +581,7 @@ export default function DashboardPage() {
               </h2>
               <Link href="/customers" className="text-xs text-primary hover:underline">All customers →</Link>
             </div>
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+            <ul className="divide-y divide-border rounded-sm border border-border bg-card">
               {upcomingFollowups.slice(0, 6).map((f) => {
                 const overdue = f.dueDate < todayIsoStr;
                 const customer = customerByIdDash.get(f.customerId);
@@ -628,7 +628,7 @@ export default function DashboardPage() {
               </h2>
               <Link href="/plan/fillings" className="text-xs text-primary hover:underline">Full list →</Link>
             </div>
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+            <ul className="divide-y divide-border rounded-sm border border-border bg-card">
               {fillingsToCook.slice(0, 5).map((need) => {
                 const daysToCook = Math.round((need.cookByDate.getTime() - Date.now()) / 86_400_000);
                 const cls = daysToCook <= 0 ? "text-status-alert" : daysToCook <= 2 ? "text-status-warn" : "text-muted-foreground";
@@ -669,7 +669,7 @@ export default function DashboardPage() {
               </h2>
               <Link href="/stock" className="text-xs text-primary hover:underline">Stock page →</Link>
             </div>
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+            <ul className="divide-y divide-border rounded-sm border border-border bg-card">
               {lowStock.slice(0, 6).map((row) => (
                 <li key={`${row.productId}:${row.location}`} className="flex items-center px-3 py-2 text-sm">
                   <span className="flex-1 truncate">{row.productName}</span>
@@ -695,7 +695,7 @@ export default function DashboardPage() {
               </h2>
               <Link href="/stock" className="text-xs text-primary hover:underline">Stock page →</Link>
             </div>
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+            <ul className="divide-y divide-border rounded-sm border border-border bg-card">
               {expiryWarn.slice(0, 6).map((row) => {
                 const expired = row.remainingDays <= 0;
                 return (
@@ -731,7 +731,7 @@ export default function DashboardPage() {
               </h2>
               <Link href="/shopping" className="text-xs text-primary hover:underline">Shopping list →</Link>
             </div>
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+            <ul className="divide-y divide-border rounded-sm border border-border bg-card">
               {shortages.slice(0, 5).map((row) => (
                 <li key={row.ingredientId} className="flex items-center px-3 py-2 text-sm">
                   <Link href={`/ingredients/${encodeURIComponent(row.ingredientId)}`} className="flex-1 truncate hover:underline">
@@ -965,7 +965,7 @@ function TodaysProductionSection({
   const doneCount = cards.filter((c) => c.status === "done").length;
 
   return (
-    <section className="rounded-lg border border-border bg-card p-3 space-y-2">
+    <section className="rounded-sm border border-border bg-card p-3 space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
           <Clock className="w-4 h-4" /> Today&apos;s production
@@ -991,7 +991,7 @@ function TodaysProductionSection({
               <li key={c.key} className="shrink-0 snap-start w-48">
                 <Link
                   href={`/production/${encodeURIComponent(c.plan.id!)}`}
-                  className={`block h-full rounded-lg border p-2.5 space-y-1.5 transition-colors ${
+                  className={`block h-full rounded-sm border p-2.5 space-y-1.5 transition-colors ${
                     c.status === "done"
                       ? "border-status-ok/30 bg-status-ok/5 hover:border-status-ok/50"
                       : "border-border bg-card hover:border-primary/40"

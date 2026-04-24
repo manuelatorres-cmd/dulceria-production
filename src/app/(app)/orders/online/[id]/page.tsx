@@ -69,7 +69,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
         </div>
 
         {/* The sheet — everything below is the packing slip */}
-        <div className="rounded-lg border border-border bg-card p-6 space-y-5 print:border-0 print:p-0 print:shadow-none">
+        <div className="rounded-sm border border-border bg-card p-6 space-y-5 print:border-0 print:p-0 print:shadow-none">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Packing slip</p>

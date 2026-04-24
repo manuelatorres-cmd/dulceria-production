@@ -463,7 +463,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           || linkedCustomer.language
           || linkedCustomer.paymentTerms
         ) && (
-          <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs space-y-1">
+          <div className="rounded-sm border border-border bg-muted/30 px-3 py-2 text-xs space-y-1">
             <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
               <User className="w-3.5 h-3.5" /> Customer preferences
             </div>
@@ -484,7 +484,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {parentOrder && (
           <Link
             href={`/orders/${encodeURIComponent(parentOrder.id!)}`}
-            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm hover:bg-primary/10"
+            className="flex items-center gap-2 rounded-sm border border-primary/30 bg-primary/5 px-3 py-2 text-sm hover:bg-primary/10"
           >
             <Package className="w-4 h-4 text-primary" />
             <span className="flex-1">
@@ -497,7 +497,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {replenishmentOrder && (
           <Link
             href={`/orders/${encodeURIComponent(replenishmentOrder.id!)}`}
-            className="flex items-center gap-2 rounded-lg border border-status-ok/30 bg-status-ok/5 px-3 py-2 text-sm hover:bg-status-ok/10"
+            className="flex items-center gap-2 rounded-sm border border-status-ok/30 bg-status-ok/5 px-3 py-2 text-sm hover:bg-status-ok/10"
           >
             <Package className="w-4 h-4 text-status-ok" />
             <span className="flex-1">
@@ -558,7 +558,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
         {/* Priority + notes + delivery */}
         {!editing && (
-          <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+          <div className="rounded-sm border border-border bg-card p-4 space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Priority</span>
               <span className="font-medium">{ORDER_PRIORITY_LABELS[order.priority]}</span>
@@ -670,7 +670,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
               No products yet.
             </p>
           ) : (
@@ -724,7 +724,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <Trash2 className="w-4 h-4" /> Delete order
             </button>
           ) : (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+            <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
               <p className="text-sm font-medium text-destructive">Delete this order?</p>
               <p className="text-xs text-muted-foreground">
                 All line items will be removed. This cannot be undone.
@@ -748,7 +748,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {reassignProposals && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setReassignProposals(null)} />
-            <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+            <div className="relative w-full max-w-lg rounded border border-border bg-card shadow-xl overflow-hidden">
               <div className="px-5 pt-5 pb-3 border-b border-border bg-amber-50">
                 <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" /> In-flight work — reassign or discard?
@@ -761,7 +761,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
               <ul className="px-5 py-3 space-y-3 max-h-80 overflow-y-auto">
                 {reassignProposals.map((p) => (
-                  <li key={p.orderPlanLinkId} className="rounded-lg border border-border p-3 space-y-2">
+                  <li key={p.orderPlanLinkId} className="rounded-sm border border-border p-3 space-y-2">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="text-sm font-semibold">{p.productName}</p>
                       <span className="text-[11px] tabular-nums text-muted-foreground">
@@ -915,7 +915,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+    <div className="rounded-sm border border-border bg-card p-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Type</label>
@@ -1207,7 +1207,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 space-y-2 mb-2">
+    <div className="rounded-sm border border-border bg-card p-3 space-y-2 mb-2">
       <div className="grid grid-cols-6 gap-2">
         <div className="col-span-3 relative">
           <input
@@ -1482,7 +1482,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
     : short ? "bg-status-alert" : "bg-status-ok";
 
   return (
-    <li className={`rounded-lg border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+    <li className={`rounded-sm border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
       <div className="flex items-center gap-3">
         <span
           className={`w-2 h-2 rounded-full shrink-0 ${feasibilityColor}`}
@@ -1743,7 +1743,7 @@ function OrderPackagingSection({ orderId, packaging, packagingUnitCost }: {
         />
       )}
       {lines.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
           No packaging lines. Add ribbons, gift bags, outer boxes, etc.
         </p>
       ) : (
@@ -1830,7 +1830,7 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, packagingUni
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3 space-y-2 mb-2">
+    <div className="rounded-sm border border-border bg-card p-3 space-y-2 mb-2">
       <div className="grid grid-cols-6 gap-2">
         <div className="col-span-3 relative">
           <input
@@ -1991,7 +1991,7 @@ function OrderPackagingLineRow({ line, packagingItem, latestCost }: {
   }
 
   return (
-    <li className="rounded-lg border border-border bg-card px-3 py-2.5">
+    <li className="rounded-sm border border-border bg-card px-3 py-2.5">
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{packagingName}</p>
@@ -2134,7 +2134,7 @@ function OrderSummaryCard({
         : "border-status-alert/40 bg-status-alert/5 text-status-alert";
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+    <div className="rounded-sm border border-border bg-card p-4 space-y-3">
       {/* Customer-facing totals */}
       <div className="space-y-1.5">
         <TotalLine label="Products (net)" value={productsSubtotalNet} />
@@ -2430,7 +2430,7 @@ function OrderReadyToPackSection({ orderId }: { orderId: string }) {
       </h2>
 
       {rows.length > 0 ? (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="rounded-sm border border-border bg-card overflow-hidden">
           <ul className="divide-y divide-border">
             {[...byProduct.values()].map((g) => (
               <li key={g.productName} className="px-3 py-2 text-sm">
@@ -2465,7 +2465,7 @@ function OrderReadyToPackSection({ orderId }: { orderId: string }) {
           </div>
         </div>
       ) : done ? (
-        <div className="rounded-lg border border-status-ok-edge bg-status-ok-bg px-3 py-2 text-xs text-status-ok">
+        <div className="rounded-sm border border-status-ok-edge bg-status-ok-bg px-3 py-2 text-xs text-status-ok">
           <p className="font-medium">Packed — {done.pieces} piece{done.pieces === 1 ? "" : "s"} moved out.</p>
           {done.warnings.length > 0 && (
             <ul className="mt-1 space-y-0.5 text-foreground/80">
@@ -2510,7 +2510,7 @@ function OrderScheduleSection({
         <Calendar className="w-4 h-4" /> Production schedule
       </h2>
       {!hasAnySchedule ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
           Not scheduled yet. Open the <Link href="/plan" className="text-primary hover:underline">Plan</Link> to generate production steps for this order.
         </p>
       ) : (
@@ -2518,7 +2518,7 @@ function OrderScheduleSection({
           {Array.from(scheduleByDay.entries()).map(([day, steps]) => {
             const totalMin = steps.reduce((a, s) => a + s.durationMinutes, 0);
             return (
-              <div key={day} className="rounded-lg border border-border bg-card p-3">
+              <div key={day} className="rounded-sm border border-border bg-card p-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium">
                     {new Date(day + "T12:00:00").toLocaleDateString("en-GB", {
@@ -2606,7 +2606,7 @@ function InlineNewCustomer({
   }
 
   return (
-    <div className="mt-2 rounded-lg border border-border bg-card p-3 space-y-2">
+    <div className="mt-2 rounded-sm border border-border bg-card p-3 space-y-2">
       <p className="text-xs font-semibold text-muted-foreground">New customer (quick)</p>
       <input
         value={companyName}

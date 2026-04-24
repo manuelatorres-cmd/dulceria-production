@@ -170,7 +170,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
         {/* Name row — always visible */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-lg bg-muted shrink-0 flex items-center justify-center text-muted-foreground mt-0.5">
+            <div className="w-12 h-12 rounded-sm bg-muted shrink-0 flex items-center justify-center text-muted-foreground mt-0.5">
               <Package className="w-6 h-6" />
             </div>
             <div>
@@ -302,7 +302,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
           </div>
 
           {showOrderForm && (
-            <form onSubmit={handleLogOrder} className="rounded-lg border border-border bg-card p-3 space-y-2">
+            <form onSubmit={handleLogOrder} className="rounded-sm border border-border bg-card p-3 space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="label">Date *</label>
@@ -446,7 +446,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
           ) : (
             <ul className="space-y-2">
               {orders.map((order) => (
-                <li key={order.id} className="rounded-lg border border-border bg-card">
+                <li key={order.id} className="rounded-sm border border-border bg-card">
                   {deletingOrderId === order.id ? (
                     <div className="p-3 space-y-2">
                       <p className="text-sm font-medium text-destructive">Delete this entry?</p>
@@ -520,7 +520,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
           {confirmDelete ? (
             inUse ? (
               /* In use by variants — archive only */
-              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+              <div className="rounded-sm border border-border bg-card p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                   <p className="text-sm font-medium">Archive this packaging?</p>
@@ -546,7 +546,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
               </div>
             ) : (
               /* Not in use — allow full delete */
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+              <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                 <p className="text-sm font-medium text-destructive">Delete this packaging?</p>
                 <p className="text-xs text-muted-foreground">
                   This will permanently remove the packaging and all {orders.length} purchase{orders.length !== 1 ? "s" : ""} logged for it. This cannot be undone.

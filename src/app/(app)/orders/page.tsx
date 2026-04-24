@@ -245,7 +245,7 @@ export default function OrdersPage() {
         {adding && <NewOrderForm onSaved={() => setAdding(false)} onCancel={() => setAdding(false)} />}
 
         {filtered.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-lg">
+          <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-sm">
             {orders.length === 0 ? "No orders yet." : "No orders match the filters."}
           </p>
         ) : (
@@ -273,7 +273,7 @@ export default function OrdersPage() {
                 <li key={order.id}>
                   <Link
                     href={`/orders/${encodeURIComponent(order.id!)}`}
-                    className="block rounded-lg border border-border bg-card p-3 hover:border-primary/40 transition-colors"
+                    className="block rounded-sm border border-border bg-card p-3 hover:border-primary/40 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -712,7 +712,7 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+    <div className="rounded-sm border border-border bg-card p-4 space-y-4">
       <p className="text-sm font-medium">New order</p>
 
       {/* Header fields */}
@@ -824,7 +824,7 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
           const variantSizes = allVariantPackagings.filter((vp) => vp.variantId === pickedVariantId);
           const pickedVariant = variants.find((v) => v.id === pickedVariantId);
           return (
-            <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+            <div className="rounded-sm border border-border bg-card p-3 space-y-2">
               <p className="text-xs text-muted-foreground">
                 Pick a variant, its size, and how many boxes. Price uses{" "}
                 <strong>{ORDER_CHANNEL_LABELS[channel]}</strong> — change the Type above first if wrong.
@@ -994,7 +994,7 @@ function DraftLineRow({
     .filter((k) => (locs?.[k] ?? 0) > 0);
 
   return (
-    <div className="rounded-lg border border-border bg-card/50 p-2 space-y-2">
+    <div className="rounded-sm border border-border bg-card/50 p-2 space-y-2">
       <div className="grid grid-cols-12 gap-2 items-start">
         <div className="col-span-6">
           <ProductPicker
@@ -1133,7 +1133,7 @@ function PartialStockPrompt({ lines, onApply, onCancel }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
-      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+      <div className="relative w-full max-w-lg rounded border border-border bg-card shadow-xl overflow-hidden">
         <div className="px-5 pt-5 pb-3 border-b border-border">
           <h3 className="text-base font-bold text-foreground">Not enough in stock</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -1142,7 +1142,7 @@ function PartialStockPrompt({ lines, onApply, onCancel }: {
         </div>
         <ul className="max-h-96 overflow-y-auto px-5 py-3 space-y-3">
           {local.map((l) => (
-            <li key={l.key} className="rounded-lg border border-border p-3 space-y-2">
+            <li key={l.key} className="rounded-sm border border-border p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-medium">{l.productName}</p>
                 <p className="text-xs text-muted-foreground tabular-nums shrink-0">

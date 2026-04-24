@@ -76,7 +76,7 @@ export default function ProductionBrainPlannerPage() {
           {campaigns.map((c) => (
             <div
               key={c.id}
-              className="rounded-xl border border-border bg-card p-3 text-sm"
+              className="rounded-sm border border-border bg-card p-3 text-sm"
             >
               <div className="flex items-center justify-between">
                 <strong className="tracking-tight">{c.name}</strong>
@@ -95,7 +95,7 @@ export default function ProductionBrainPlannerPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
         {/* Calendar */}
-        <section className="rounded-xl border border-border bg-card p-4">
+        <section className="rounded-sm border border-border bg-card p-4">
           <header className="flex items-center justify-between mb-3">
             <h3 className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold">
               Month view
@@ -124,7 +124,7 @@ export default function ProductionBrainPlannerPage() {
                   <div
                     key={`${wi}-${di}`}
                     className={
-                      "min-h-[96px] rounded-lg border p-1.5 " +
+                      "min-h-[96px] rounded-sm border p-1.5 " +
                       (inMonth
                         ? "bg-muted border-border"
                         : "bg-card border-border opacity-40")
@@ -162,7 +162,7 @@ export default function ProductionBrainPlannerPage() {
         </section>
 
         {/* Sidebar — replenishment proposals */}
-        <aside className="rounded-xl border border-border bg-card p-3">
+        <aside className="rounded-sm border border-border bg-card p-3">
           <h3 className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold mb-3">
             Proposals · {proposals.length}
           </h3>

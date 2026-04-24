@@ -87,7 +87,7 @@ export default function FillingConsolidationPage() {
         </Link>
 
         {/* Window selector + summary */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-1.5">
               {WINDOW_OPTIONS.map((opt) => (
@@ -134,7 +134,7 @@ export default function FillingConsolidationPage() {
 
         {/* Unresolved items */}
         {result.unresolved.length > 0 && (
-          <section className="rounded-lg border border-status-warn-edge bg-status-warn-bg px-3 py-2.5 text-xs text-status-warn">
+          <section className="rounded-sm border border-status-warn-edge bg-status-warn-bg px-3 py-2.5 text-xs text-status-warn">
             <p className="font-medium">
               {result.unresolved.length} order item{result.unresolved.length > 1 ? "s" : ""} couldn&apos;t be included
             </p>
@@ -157,7 +157,7 @@ export default function FillingConsolidationPage() {
 
         {/* Cooking list */}
         {result.needs.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
+          <div className="rounded-sm border border-dashed border-border bg-card p-8 text-center">
             <p className="text-sm text-muted-foreground">
               No fillings needed in the next {windowDays} days.
             </p>
@@ -184,7 +184,7 @@ export default function FillingConsolidationPage() {
                 return (
                   <li
                     key={need.fillingId}
-                    className={`rounded-lg border bg-card overflow-hidden ${
+                    className={`rounded-sm border bg-card overflow-hidden ${
                       nothingToCook ? "border-status-ok-edge" : "border-border"
                     }`}
                   >

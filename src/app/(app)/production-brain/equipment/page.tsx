@@ -87,7 +87,7 @@ export default function ProductionBrainEquipmentPage() {
       />
 
       {/* Tempering + melting pots */}
-      <section className="rounded-xl border border-border bg-card p-4 mb-4">
+      <section className="rounded-sm border border-border bg-card p-4 mb-4">
         <SectionHeader count={temperingInstances.length}>
           Tempering machines &amp; melting pots
         </SectionHeader>
@@ -107,7 +107,7 @@ export default function ProductionBrainEquipmentPage() {
               return (
                 <li
                   key={inst.id}
-                  className="rounded-lg border border-border bg-muted p-3 text-sm"
+                  className="rounded-sm border border-border bg-muted p-3 text-sm"
                 >
                   <div className="flex items-baseline justify-between">
                     <strong className="tracking-tight">{inst.name}</strong>
@@ -161,7 +161,7 @@ export default function ProductionBrainEquipmentPage() {
       </section>
 
       {/* Mould pool */}
-      <section className="rounded-xl border border-border bg-card p-4 mb-4">
+      <section className="rounded-sm border border-border bg-card p-4 mb-4">
         <SectionHeader count={mouldPool.length}>Mould pool · by type</SectionHeader>
         {mouldPool.length === 0 ? (
           <EmptyBlock>
@@ -201,7 +201,7 @@ export default function ProductionBrainEquipmentPage() {
       </section>
 
       {/* Cold storage */}
-      <section className="rounded-xl border border-border bg-card p-4 mb-4">
+      <section className="rounded-sm border border-border bg-card p-4 mb-4">
         <SectionHeader count={storage.length}>Cold storage · HACCP</SectionHeader>
         {storage.length === 0 ? (
           <EmptyBlock>
@@ -213,7 +213,7 @@ export default function ProductionBrainEquipmentPage() {
             {storage.map((unit) => (
               <li
                 key={unit.id}
-                className="rounded-lg border border-border bg-muted p-3 text-sm"
+                className="rounded-sm border border-border bg-muted p-3 text-sm"
               >
                 <div className="flex items-baseline justify-between">
                   <strong className="tracking-tight">{unit.name}</strong>
@@ -242,13 +242,13 @@ export default function ProductionBrainEquipmentPage() {
 
       {/* Other equipment */}
       {otherInstances.length > 0 ? (
-        <section className="rounded-xl border border-border bg-card p-4">
+        <section className="rounded-sm border border-border bg-card p-4">
           <SectionHeader count={otherInstances.length}>Other equipment</SectionHeader>
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {otherInstances.map((inst) => (
               <li
                 key={inst.id}
-                className="rounded-lg border border-border bg-muted p-3 text-sm"
+                className="rounded-sm border border-border bg-muted p-3 text-sm"
               >
                 <div className="flex items-baseline justify-between">
                   <strong className="tracking-tight">{inst.name}</strong>

@@ -89,7 +89,7 @@ export function FreezeModal({
                 value={qtyStr}
                 onChange={(e) => setQtyStr(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleConfirm(); }}
-                className="flex-1 h-9 rounded-lg border border-border bg-card px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500"
+                className="flex-1 h-9 rounded-sm border border-border bg-card px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500"
               />
               <span className="text-xs text-muted-foreground w-10">{unit}</span>
             </div>
@@ -114,7 +114,7 @@ export function FreezeModal({
                 value={daysStr}
                 onChange={(e) => setDaysStr(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleConfirm(); }}
-                className="flex-1 h-9 rounded-lg border border-border bg-card px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500"
+                className="flex-1 h-9 rounded-sm border border-border bg-card px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500"
               />
               <span className="text-xs text-muted-foreground w-10">days</span>
             </div>
@@ -188,12 +188,12 @@ export function DefrostConfirmModal({
 
         <div className="px-5 pb-3">
           {sellBy ? (
-            <div className="rounded-lg bg-muted/40 border border-border px-3 py-2 text-xs text-foreground">
+            <div className="rounded-sm bg-muted/40 border border-border px-3 py-2 text-xs text-foreground">
               New sell-by date: <span className="font-medium">{sellBy}</span>
               <span className="text-muted-foreground"> ({preservedShelfLifeDays} days from today)</span>
             </div>
           ) : (
-            <div className="rounded-lg bg-muted/40 border border-border px-3 py-2 text-xs text-muted-foreground">
+            <div className="rounded-sm bg-muted/40 border border-border px-3 py-2 text-xs text-muted-foreground">
               No preserved shelf life recorded — defrosting will not set a new sell-by date.
             </div>
           )}

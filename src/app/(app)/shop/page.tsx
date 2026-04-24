@@ -51,7 +51,7 @@ function LiveStatusCard({ live }: { live: ReturnType<typeof computeLiveShopStatu
   return (
     <section>
       <h2 className="text-sm font-semibold text-primary mb-2">Right now</h2>
-      <div className={`rounded-lg border p-4 ${
+      <div className={`rounded-sm border p-4 ${
         live.isOpenNow ? "border-status-ok/40 bg-status-ok/5" : "border-border bg-card"
       }`}>
         <div className="flex items-center gap-3">
@@ -188,7 +188,7 @@ function ShopStockSection() {
     <section>
       <h2 className="text-sm font-semibold text-primary mb-2">Store stock</h2>
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-border rounded-sm">
           No products yet configured for the shop. Set a Store minimum in Stock → minimums.
         </p>
       ) : (
@@ -255,7 +255,7 @@ function ShopStockRow({ row }: {
   }
 
   return (
-    <li className="rounded-lg border border-border bg-card p-3">
+    <li className="rounded-sm border border-border bg-card p-3">
       <div className="flex items-center gap-3">
         <div className={`w-3 h-3 rounded-full shrink-0 ${dotColor}`} />
         <div className="flex-1 min-w-0">
@@ -350,7 +350,7 @@ function OpeningHoursSection({
   return (
     <section>
       <h2 className="text-sm font-semibold text-primary mb-2">Opening hours</h2>
-      <div className="rounded-lg border border-border bg-card divide-y divide-border">
+      <div className="rounded-sm border border-border bg-card divide-y divide-border">
         {WEEKDAY_FULL.map((_, dow) => {
           const row = hours.find((h) => h.dayOfWeek === dow);
           return (
@@ -476,12 +476,12 @@ function ClosuresEditor({ closures }: {
   return (
     <div className="space-y-2">
       {closures.length === 0 && !adding && (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
           No closures configured.
         </p>
       )}
       {closures.map((c) => (
-        <div key={c.id} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+        <div key={c.id} className="flex items-center gap-2 rounded-sm border border-border bg-card px-3 py-2">
           <Circle className="w-2 h-2 fill-status-warn text-status-warn shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">
@@ -501,7 +501,7 @@ function ClosuresEditor({ closures }: {
       ))}
 
       {adding ? (
-        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <div className="rounded-sm border border-border bg-card p-3 space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="label">From</label>
@@ -548,7 +548,7 @@ function LabelPrintingPlaceholder() {
   return (
     <section>
       <h2 className="text-sm font-semibold text-primary mb-2">Label printing</h2>
-      <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center">
+      <div className="rounded-sm border border-dashed border-border bg-muted/30 p-6 text-center">
         <Printer className="w-8 h-8 mx-auto text-muted-foreground/60 mb-2" />
         <p className="text-sm font-medium text-muted-foreground">Coming soon</p>
         <p className="text-xs text-muted-foreground mt-1">

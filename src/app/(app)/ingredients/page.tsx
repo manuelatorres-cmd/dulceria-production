@@ -290,7 +290,7 @@ function IngredientsTab() {
       </div>
 
       {f.showFilters && (
-        <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+        <div className="rounded-sm border border-border bg-card p-3 space-y-3">
           {/* Stock status */}
           <div>
             <p className="text-xs text-muted-foreground mb-1">Stock status</p>
@@ -434,7 +434,7 @@ function IngredientsTab() {
       )}
 
       {showAdd && (
-        <form onSubmit={handleAdd} className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <form onSubmit={handleAdd} className="rounded-sm border border-border bg-card p-3 space-y-2">
           <input
             type="text"
             value={newName}
@@ -500,7 +500,7 @@ function IngredientsTab() {
                       return (
                         <li
                           key={ing.id}
-                          className={`rounded-lg border bg-card ${stockStatus === "out-of-stock" ? "border-status-alert-edge" : stockStatus === "low-stock" ? "border-status-warn-edge" : ing.archived ? "border-border/50 opacity-60" : "border-border"}`}
+                          className={`rounded-sm border bg-card ${stockStatus === "out-of-stock" ? "border-status-alert-edge" : stockStatus === "low-stock" ? "border-status-warn-edge" : ing.archived ? "border-border/50 opacity-60" : "border-border"}`}
                           style={{ contentVisibility: "auto", containIntrinsicSize: "0 64px" }}
                         >
                           <div className="flex items-center min-w-0">

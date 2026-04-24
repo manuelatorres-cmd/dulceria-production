@@ -429,7 +429,7 @@ function NewPlanContent() {
                       </div>
                     )}
                     <div
-                      className={`rounded-lg border transition-colors ${
+                      className={`rounded-sm border transition-colors ${
                         selected
                           ? "border-primary bg-primary/5"
                           : stockAlert === "gone"
@@ -566,7 +566,7 @@ function NewPlanContent() {
               const cfg = config[r.id!] ?? { mouldId: "", quantity: 1 };
               const selectedMould = moulds.find((m) => m.id === cfg.mouldId);
               return (
-                <div key={r.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
+                <div key={r.id} className="rounded-sm border border-border bg-card p-3 space-y-2">
                   <h3 className="font-medium text-sm">{r.name}</h3>
                   <div className="space-y-2">
                     <div>
@@ -632,13 +632,13 @@ function NewPlanContent() {
                 onChange={(e) => setBatchNote(e.target.value)}
                 placeholder="General notes about this batch…"
                 rows={3}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                className="w-full rounded-sm border border-border bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
               />
             </div>
           )}
 
           {mouldWarnings.length > 0 && (
-            <div className="rounded-lg border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
+            <div className="rounded-sm border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
               <p className="text-sm font-medium text-status-warn flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
                 Not enough moulds
@@ -951,7 +951,7 @@ function BatchSizesPhase({
           const stockCoversAll = hasStock && minNeededG !== null && effectiveStockG >= minNeededG;
 
           return (
-            <div key={fillingId} className="rounded-lg border border-border bg-card p-3 space-y-2.5">
+            <div key={fillingId} className="rounded-sm border border-border bg-card p-3 space-y-2.5">
               {/* Filling header + mode toggle */}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

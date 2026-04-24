@@ -350,7 +350,7 @@ function ProductsTab() {
         </div>
 
         {f.showFilters && (
-          <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+          <div className="rounded-sm border border-border bg-card p-3 space-y-3">
             {/* Min stars */}
             <div>
               <p className="text-xs text-muted-foreground mb-1">Min. popularity</p>
@@ -528,7 +528,7 @@ function ProductsTab() {
         )}
 
         {showAdd && (
-          <form onSubmit={handleAdd} className="rounded-lg border border-border bg-card p-3 space-y-2">
+          <form onSubmit={handleAdd} className="rounded-sm border border-border bg-card p-3 space-y-2">
             <input
               type="text"
               value={newName}
@@ -626,7 +626,7 @@ function ProductRow({ product, productionInfo, fillingNames, allergens }: { prod
 
   return (
     <li
-      className={`rounded-lg border bg-card ${product.archived ? "border-border/50 opacity-60" : "border-border"}`}
+      className={`rounded-sm border bg-card ${product.archived ? "border-border/50 opacity-60" : "border-border"}`}
       style={{ contentVisibility: "auto", containIntrinsicSize: "0 64px" }}
     >
       <Link href={`/products/${encodeURIComponent(product.id ?? '')}`} className="flex items-center gap-2.5 px-3 py-2.5 min-w-0">

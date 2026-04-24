@@ -71,7 +71,7 @@ export default function CollectionsPage() {
         ) : (
           <ul className="space-y-2">
             {rows.labelled.map((row) => (
-              <li key={row.key} className="rounded-lg border border-border bg-card">
+              <li key={row.key} className="rounded-sm border border-border bg-card">
                 <Link
                   href={`/collections/${encodeURIComponent(row.slug)}`}
                   className="flex items-center gap-3 p-3"
@@ -87,7 +87,7 @@ export default function CollectionsPage() {
               </li>
             ))}
             {rows.unlabelled > 0 && (
-              <li className="rounded-lg border border-border border-dashed bg-card">
+              <li className="rounded-sm border border-border border-dashed bg-card">
                 <Link
                   href={`/collections/${UNLABELLED_SLUG}`}
                   className="flex items-center gap-3 p-3"

@@ -363,7 +363,7 @@ function SyncStatusLink({ labelClass }: { labelClass: string }) {
       type="button"
       onClick={() => supabase.auth.signOut()}
       title={`Signed in as ${email} — click to sign out`}
-      className="flex items-center gap-3 px-2 py-2.5 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted w-full text-left"
+      className="flex items-center gap-3 px-2 py-2.5 rounded-sm transition-colors text-muted-foreground hover:text-foreground hover:bg-muted w-full text-left"
     >
       <LogOutIcon className="w-5 h-5 shrink-0" />
       <span className={`${labelClass} text-sm truncate`}>{email}</span>

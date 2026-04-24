@@ -292,7 +292,7 @@ function NewQuotePageInner() {
         </Link>
 
         {/* Header */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="label">Title</label>
@@ -364,7 +364,7 @@ function NewQuotePageInner() {
         </section>
 
         {/* Line items */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary">Line items</h2>
             <div className="flex items-center gap-2">
@@ -515,7 +515,7 @@ function NewQuotePageInner() {
         </section>
 
         {/* Pricing */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <h2 className="text-sm font-semibold text-primary">Pricing</h2>
           <div className="flex items-center gap-2">
             <button
@@ -589,7 +589,7 @@ function NewQuotePageInner() {
 
         {/* Feasibility */}
         {feasibility && (
-          <section className={`rounded-lg border p-4 ${feasibility.feasible ? "border-status-ok-edge bg-status-ok-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
+          <section className={`rounded-sm border p-4 ${feasibility.feasible ? "border-status-ok-edge bg-status-ok-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
             <div className="flex items-start gap-2">
               {feasibility.feasible ? (
                 <CheckCircle className="w-4 h-4 text-status-ok mt-0.5" />
@@ -610,7 +610,7 @@ function NewQuotePageInner() {
         )}
 
         {/* Notes + save */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div>
             <label className="label">Internal notes (not shown to the customer)</label>
             <textarea

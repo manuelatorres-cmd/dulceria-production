@@ -239,7 +239,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
             {activeTab === "composition" && (
               <div>
                 {COMPOSITION_FIELDS.some((f) => (ingredient[f.key] ?? 0) > 0) ? (
-                  <div className="rounded-lg border border-border bg-card divide-y divide-border">
+                  <div className="rounded-sm border border-border bg-card divide-y divide-border">
                     {COMPOSITION_FIELDS.filter((f) => (ingredient[f.key] ?? 0) > 0).map((f) => (
                       <div key={f.key} className="flex justify-between px-3 py-2 text-sm">
                         <span className="text-muted-foreground">{f.label}</span>
@@ -257,7 +257,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
             {activeTab === "ingredients" && (
               <div>
                 {ingredient.subIngredients && ingredient.subIngredients.length > 0 ? (
-                  <div className="rounded-lg border border-border bg-card divide-y divide-border">
+                  <div className="rounded-sm border border-border bg-card divide-y divide-border">
                     {ingredient.subIngredients.map((s, i) => (
                       <div key={i} className="px-3 py-2 text-sm text-foreground">
                         {s.name}
@@ -299,7 +299,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
               <div>
                 {ingredient.purchaseCost != null ? (
                   <div className="mb-4">
-                    <div className="rounded-lg border border-border bg-card px-3 py-2 space-y-1.5">
+                    <div className="rounded-sm border border-border bg-card px-3 py-2 space-y-1.5">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Purchase cost</span>
                         <span className="font-medium">{sym}{ingredient.purchaseCost}</span>
@@ -500,7 +500,7 @@ function IngredientDeletePanel({
   // Case 3: produced AND still in active fillings → blocked
   if (produced && hasActiveFillings) {
     return (
-      <div className="rounded-lg border border-warning/30 bg-warning-muted p-4 space-y-3">
+      <div className="rounded-sm border border-warning/30 bg-warning-muted p-4 space-y-3">
         <p className="text-sm font-medium text-warning">Cannot remove this ingredient</p>
         <p className="text-xs text-muted-foreground">
           This ingredient has been used in production and is still part of {activeFillings.length === 1 ? "an active filling" : `${activeFillings.length} active fillings`}.
@@ -525,7 +525,7 @@ function IngredientDeletePanel({
   // Case 4: produced but only in superseded fillings → safe to archive
   if (produced && !hasActiveFillings) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+      <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
         <p className="text-sm font-medium text-destructive">Archive this ingredient?</p>
         <p className="text-xs text-muted-foreground">
           This ingredient has been used in production batches. It will be archived — hidden from lists but preserved for history.
@@ -546,7 +546,7 @@ function IngredientDeletePanel({
   // Case 2: in active fillings but never produced → warn, allow delete
   if (hasActiveFillings) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+      <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
         <p className="text-sm font-medium text-destructive">Delete this ingredient?</p>
         <p className="text-xs text-muted-foreground">
           This ingredient is used in {activeFillings.length} filling{activeFillings.length !== 1 ? "s" : ""}. Deleting it will remove it from {activeFillings.length === 1 ? "that filling" : "those fillings"}. This cannot be undone.
@@ -574,13 +574,13 @@ function IngredientDeletePanel({
 
   // Case 1: not in use anywhere → simple delete
   return (
-    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+    <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
       <p className="text-sm font-medium text-destructive">Delete this ingredient?</p>
       <p className="text-xs text-muted-foreground">This will permanently remove the ingredient from your library. This cannot be undone.</p>
       <div className="flex gap-2">
         <button
           onClick={onDelete}
-          className="inline-flex items-center justify-center rounded-lg bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
+          className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
         >
           Yes, delete ingredient
         </button>
@@ -614,7 +614,7 @@ function IngredientNutritionReadView({ ingredient, market, onEdit }: { ingredien
       <h2 className="text-sm font-medium text-muted-foreground mb-2">{panelTitle}</h2>
       <p className="text-xs text-muted-foreground mb-3">Values per 100g</p>
 
-      <div className="rounded-lg border border-border bg-card divide-y divide-border">
+      <div className="rounded-sm border border-border bg-card divide-y divide-border">
         {nutrients.map((n) => {
           const val = nutrition?.[n.key];
           const dv = showDV ? percentDailyValue(val, n.dailyValue) : undefined;
@@ -750,7 +750,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
   return (
     <div className="space-y-5">
       {/* Current balance */}
-      <div className={`rounded-lg border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-border bg-card"}`}>
+      <div className={`rounded-sm border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-border bg-card"}`}>
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">On hand</p>
         <p className={`text-3xl font-bold tabular-nums ${belowThreshold ? "text-status-warn" : "text-foreground"}`}>
           {currentG.toLocaleString("en-GB", { maximumFractionDigits: 1 })} <span className="text-base font-normal text-muted-foreground">g</span>
@@ -769,7 +769,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       )}
 
       {/* Receive stock */}
-      <section className="rounded-lg border border-border bg-card p-4 space-y-2">
+      <section className="rounded-sm border border-border bg-card p-4 space-y-2">
         <h3 className="text-sm font-semibold text-primary">Receive stock</h3>
         <p className="text-xs text-muted-foreground">Just bought more of this ingredient? Enter grams here.</p>
         <div className="flex gap-2 items-center">
@@ -801,7 +801,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       </section>
 
       {/* Manual adjust (recount) */}
-      <section className="rounded-lg border border-border bg-card p-4 space-y-2">
+      <section className="rounded-sm border border-border bg-card p-4 space-y-2">
         <h3 className="text-sm font-semibold text-primary">Adjust (recount / waste)</h3>
         <p className="text-xs text-muted-foreground">For corrections after a count, or writing off waste.</p>
         <div className="flex gap-2 items-center">
@@ -831,7 +831,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       </section>
 
       {/* Low-stock threshold */}
-      <section className="rounded-lg border border-border bg-card p-4 space-y-2">
+      <section className="rounded-sm border border-border bg-card p-4 space-y-2">
         <h3 className="text-sm font-semibold text-primary">Low-stock alert threshold</h3>
         <p className="text-xs text-muted-foreground">Empty to disable alerts for this ingredient.</p>
         <div className="flex gap-2 items-center">
@@ -855,7 +855,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       </section>
 
       {/* Movement history */}
-      <section className="rounded-lg border border-border bg-card overflow-hidden">
+      <section className="rounded-sm border border-border bg-card overflow-hidden">
         <div className="px-4 py-2 border-b border-border bg-muted/40">
           <h3 className="text-sm font-semibold text-primary">Recent movements</h3>
         </div>

@@ -364,7 +364,7 @@ function ProductStockTab() {
         </div>
         <button
           onClick={() => setShowFilters((v) => !v)}
-          className={`relative rounded-lg border p-2 transition-colors ${showFilters ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}
+          className={`relative rounded-sm border p-2 transition-colors ${showFilters ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}
           aria-label="Filters"
         >
           <SlidersHorizontal className="w-5 h-5" />
@@ -377,7 +377,7 @@ function ProductStockTab() {
       </div>
 
       {showFilters && (
-        <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+        <div className="rounded-sm border border-border bg-card p-3 space-y-3">
           <div>
             <p className="text-xs text-muted-foreground mb-1.5">Stock level</p>
             <button
@@ -457,7 +457,7 @@ function ProductStockTab() {
         groups.map((group) => (
           <div
             key={group.productId}
-            className={`rounded-lg border bg-card overflow-hidden ${
+            className={`rounded-sm border bg-card overflow-hidden ${
               group.isLow ? "border-status-warn-edge border-l-4" : "border-border"
             }`}
           >
@@ -1001,7 +1001,7 @@ function FillingStockTab() {
         </div>
         <button
           onClick={() => setShowFilters((v) => !v)}
-          className={`relative rounded-lg border p-2 transition-colors ${showFilters ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}
+          className={`relative rounded-sm border p-2 transition-colors ${showFilters ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}
           aria-label="Filters"
         >
           <SlidersHorizontal className="w-5 h-5" />
@@ -1022,7 +1022,7 @@ function FillingStockTab() {
       </div>
 
       {showFilters && (
-        <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+        <div className="rounded-sm border border-border bg-card p-3 space-y-3">
           <div>
             <p className="text-xs text-muted-foreground mb-1.5">Freezer</p>
             <div className="flex flex-wrap gap-1">
@@ -1051,7 +1051,7 @@ function FillingStockTab() {
 
       {/* Manual add form */}
       {showAdd && (
-        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <div className="rounded-sm border border-border bg-card p-3 space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Add leftover filling manually</p>
           <select
             value={addFillingId}
@@ -1108,7 +1108,7 @@ function FillingStockTab() {
         <p className="text-sm text-muted-foreground py-6 text-center">No fillings match your search.</p>
       ) : (
         groups.map((group) => (
-          <div key={group.fillingId} className="rounded-lg border border-border bg-card overflow-hidden">
+          <div key={group.fillingId} className="rounded-sm border border-border bg-card overflow-hidden">
             {/* Group header */}
             <div className="px-3 py-2 bg-muted/30 border-b border-border flex justify-between items-baseline">
               <div>

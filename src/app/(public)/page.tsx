@@ -33,11 +33,11 @@ export default function LandingPage() {
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-20">
         <Link
           href="/app"
-          className="group flex flex-col justify-between bg-card border border-border rounded-lg p-6 min-h-[220px] transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-offset-2"
+          className="group flex flex-col justify-between bg-card border border-border rounded-sm p-6 min-h-[220px] transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-offset-2"
         >
           <div>
             <div
-              className="inline-flex items-center justify-center w-11 h-11 rounded-lg mb-4"
+              className="inline-flex items-center justify-center w-11 h-11 rounded-sm mb-4"
               style={{
                 background: "var(--accent-terracotta-bg)",
                 color: "var(--accent-terracotta-ink)",
@@ -62,11 +62,11 @@ export default function LandingPage() {
 
         <Link
           href="/getting-started"
-          className="group flex flex-col justify-between bg-card border border-border rounded-lg p-6 min-h-[220px] transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-offset-2"
+          className="group flex flex-col justify-between bg-card border border-border rounded-sm p-6 min-h-[220px] transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-offset-2"
         >
           <div>
             <div
-              className="inline-flex items-center justify-center w-11 h-11 rounded-lg mb-4"
+              className="inline-flex items-center justify-center w-11 h-11 rounded-sm mb-4"
               style={{
                 background: "var(--accent-cocoa-bg)",
                 color: "var(--accent-cocoa-ink)",
@@ -91,11 +91,11 @@ export default function LandingPage() {
 
         <Link
           href="/getting-started#faq"
-          className="group flex flex-col justify-between bg-card border border-border rounded-lg p-6 min-h-[220px] transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-offset-2"
+          className="group flex flex-col justify-between bg-card border border-border rounded-sm p-6 min-h-[220px] transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-offset-2"
         >
           <div>
             <div
-              className="inline-flex items-center justify-center w-11 h-11 rounded-lg mb-4"
+              className="inline-flex items-center justify-center w-11 h-11 rounded-sm mb-4"
               style={{
                 background: "var(--accent-blue-bg)",
                 color: "var(--accent-blue-ink)",
@@ -122,11 +122,11 @@ export default function LandingPage() {
           href="https://github.com/manuelatorres-cmd/dulceria-production"
           target="_blank"
           rel="noreferrer"
-          className="group flex flex-col justify-between bg-card border border-border rounded-lg p-6 min-h-[220px] transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-offset-2"
+          className="group flex flex-col justify-between bg-card border border-border rounded-sm p-6 min-h-[220px] transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-offset-2"
         >
           <div>
             <div
-              className="inline-flex items-center justify-center w-11 h-11 rounded-lg mb-4"
+              className="inline-flex items-center justify-center w-11 h-11 rounded-sm mb-4"
               style={{
                 background: "var(--accent-taupe-bg)",
                 color: "var(--accent-taupe-ink)",

@@ -97,7 +97,7 @@ export default function PantryPage() {
             return (
               <div
                 key={card.name}
-                className="flex flex-col border border-border border-dashed rounded-lg p-5 opacity-50"
+                className="flex flex-col border border-border border-dashed rounded-sm p-5 opacity-50"
               >
                 {inner}
                 <div className="text-xs text-muted-foreground/70 mt-4">Coming soon</div>
@@ -109,7 +109,7 @@ export default function PantryPage() {
             <Link
               key={card.name}
               href={card.href}
-              className="flex flex-col bg-card border border-border rounded-lg p-5 transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="flex flex-col bg-card border border-border rounded-sm p-5 transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {inner}
             </Link>

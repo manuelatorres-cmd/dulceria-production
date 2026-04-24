@@ -264,7 +264,7 @@ export default function PlanPage() {
         {daySummary.length > 0 && (
           <section>
             <h2 className="text-sm font-semibold text-primary mb-2">Capacity per day</h2>
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="rounded-sm border border-border bg-card overflow-hidden">
               <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
                 <span className="flex-1">Date</span>
                 <span className="w-20 text-right">Batches</span>
@@ -305,7 +305,7 @@ export default function PlanPage() {
                   .filter((li) => li.productionDayId === day.id)
                   .sort((a, b) => a.sortOrder - b.sortOrder);
                 return (
-                  <div key={day.id} className="rounded-lg border border-border bg-card overflow-hidden">
+                  <div key={day.id} className="rounded-sm border border-border bg-card overflow-hidden">
                     <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border">
                       <span className="text-sm font-medium">{formatDayLabel(day.date)}</span>
                       <span className="text-xs text-muted-foreground">
@@ -382,7 +382,7 @@ export default function PlanPage() {
             </div>
           </section>
         ) : (
-          <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-lg">
+          <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-sm">
             No plan saved yet. Click Regenerate to compute one from your open orders.
           </p>
         )}

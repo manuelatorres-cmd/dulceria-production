@@ -169,7 +169,7 @@ export default function ShoppingPage() {
                     <p className="text-xs text-muted-foreground mb-1.5 ml-1">Ingredients</p>
                     <ul className="space-y-1.5">
                       {pendingIngredients.map((ing) => (
-                        <li key={ing.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${ing.outOfStock ? "border-status-alert-edge bg-status-alert-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
+                        <li key={ing.id} className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 ${ing.outOfStock ? "border-status-alert-edge bg-status-alert-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
                           <div className={`w-2 h-2 rounded-full shrink-0 ${ing.outOfStock ? "bg-status-alert-edge" : "bg-status-warn-edge"}`} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
@@ -232,7 +232,7 @@ export default function ShoppingPage() {
                     <p className="text-xs text-muted-foreground mb-1.5 ml-1">Packaging</p>
                     <ul className="space-y-1.5">
                       {pendingPackaging.map((pkg) => (
-                        <li key={pkg.id} className="flex items-center gap-3 rounded-lg border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
+                        <li key={pkg.id} className="flex items-center gap-3 rounded-sm border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
                           <div className="w-2 h-2 rounded-full bg-status-warn-edge shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{pkg.name}</p>
@@ -284,7 +284,7 @@ export default function ShoppingPage() {
                     <p className="text-xs text-muted-foreground mb-1.5 ml-1">Decoration</p>
                     <ul className="space-y-1.5">
                       {pendingMaterials.map((m) => (
-                        <li key={m.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${m.outOfStock ? "border-status-alert-edge bg-status-alert-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
+                        <li key={m.id} className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 ${m.outOfStock ? "border-status-alert-edge bg-status-alert-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
                           <span
                             className="w-2 h-2 rounded-full shrink-0 border border-black/10"
                             style={{ backgroundColor: m.color ?? (m.outOfStock ? "#f87171" : "#fbbf24") }}
@@ -350,7 +350,7 @@ export default function ShoppingPage() {
                     <p className="text-xs text-muted-foreground mb-1.5 ml-1">Other items</p>
                     <ul className="space-y-1.5">
                       {pendingItems.map((item) => (
-                        <li key={item.id} className="flex items-center gap-3 rounded-lg border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
+                        <li key={item.id} className="flex items-center gap-3 rounded-sm border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
                           <div className="w-2 h-2 rounded-full bg-status-warn-edge shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{item.name}</p>
@@ -403,7 +403,7 @@ export default function ShoppingPage() {
 
             {/* Add item */}
             {showAddForm ? (
-              <form onSubmit={handleAddItem} className="rounded-lg border border-border bg-card p-3 space-y-2">
+              <form onSubmit={handleAddItem} className="rounded-sm border border-border bg-card p-3 space-y-2">
                 <div>
                   <input
                     type="text"
@@ -479,7 +479,7 @@ export default function ShoppingPage() {
                 {orderedExpanded && (
                   <ul className="space-y-1.5 ml-6">
                     {orderedIngredients.map((ing) => (
-                      <li key={ing.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+                      <li key={ing.id} className="flex items-center gap-3 rounded-sm border border-border bg-card px-3 py-2.5">
                         <div className="w-2 h-2 rounded-full bg-status-ok-edge shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{ing.name}</p>
@@ -504,7 +504,7 @@ export default function ShoppingPage() {
                       </li>
                     ))}
                     {orderedPackaging.map((pkg) => (
-                      <li key={pkg.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+                      <li key={pkg.id} className="flex items-center gap-3 rounded-sm border border-border bg-card px-3 py-2.5">
                         <div className="w-2 h-2 rounded-full bg-status-ok-edge shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{pkg.name}</p>
@@ -529,7 +529,7 @@ export default function ShoppingPage() {
                       </li>
                     ))}
                     {orderedMaterials.map((m) => (
-                      <li key={m.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+                      <li key={m.id} className="flex items-center gap-3 rounded-sm border border-border bg-card px-3 py-2.5">
                         <span
                           className="w-2 h-2 rounded-full shrink-0 border border-black/10"
                           style={{ backgroundColor: m.color ?? "#86efac" }}
@@ -557,7 +557,7 @@ export default function ShoppingPage() {
                       </li>
                     ))}
                     {orderedItems.map((item) => (
-                      <li key={item.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+                      <li key={item.id} className="flex items-center gap-3 rounded-sm border border-border bg-card px-3 py-2.5">
                         <div className="w-2 h-2 rounded-full bg-status-ok-edge shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{item.name}</p>
@@ -678,11 +678,11 @@ function PlannedDemandSection() {
       )}
 
       {shortfalls.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
           You have enough stock for every open order.
         </p>
       ) : (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="rounded-sm border border-border bg-card overflow-hidden">
           <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
             <span className="flex-1">Ingredient</span>
             <span className="w-24 text-right">Needed</span>
@@ -797,7 +797,7 @@ function IngredientStockBelowThresholdSection() {
         Ingredients currently under the low-stock threshold you set on each ingredient's Stock tab.
         Open the ingredient to Receive more.
       </p>
-      <div className="rounded-lg border border-status-warn/40 bg-status-warn-bg/20 overflow-hidden">
+      <div className="rounded-sm border border-status-warn/40 bg-status-warn-bg/20 overflow-hidden">
         <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
           <span className="flex-1">Ingredient</span>
           <span className="w-24 text-right">On hand</span>

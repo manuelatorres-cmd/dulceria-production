@@ -219,7 +219,7 @@ export default function PricingPage() {
       <div className="px-4 space-y-6 pb-10">
         {/* Summary banner */}
         {summary.total > 0 && (
-          <div className="rounded-lg border border-border bg-card p-4">
+          <div className="rounded-sm border border-border bg-card p-4">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div>
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Avg. margin</p>
@@ -258,7 +258,7 @@ export default function PricingPage() {
           {sorted.map((item) => {
             const cId = item.variant.id ?? "";
             return (
-              <div key={cId} className="rounded-lg border border-border bg-card overflow-hidden">
+              <div key={cId} className="rounded-sm border border-border bg-card overflow-hidden">
                 {/* Variant header */}
                 <div className="px-4 pt-3.5 pb-2 flex items-start justify-between">
                   <div className="min-w-0">

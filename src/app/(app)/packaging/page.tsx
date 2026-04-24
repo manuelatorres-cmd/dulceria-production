@@ -140,7 +140,7 @@ export default function PackagingPage() {
         )}
 
         {showAdd && (
-          <form onSubmit={handleAdd} className="rounded-lg border border-border bg-card p-3 space-y-2">
+          <form onSubmit={handleAdd} className="rounded-sm border border-border bg-card p-3 space-y-2">
             <input
               type="text"
               value={newName}

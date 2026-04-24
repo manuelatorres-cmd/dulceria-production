@@ -250,7 +250,7 @@ export default function ProductCategoryDetailPage({ params }: { params: Promise<
             </div>
 
             {errors.length > 0 && (
-              <ul className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+              <ul className="rounded-sm border border-destructive/30 bg-destructive/5 p-3 space-y-1">
                 {errors.map((err, i) => (
                   <li key={i} className="text-xs text-destructive">{err}</li>
                 ))}
@@ -265,7 +265,7 @@ export default function ProductCategoryDetailPage({ params }: { params: Promise<
         ) : (
           /* ── Read-only view ── */
           <>
-            <div className="rounded-lg border border-border bg-card divide-y divide-border">
+            <div className="rounded-sm border border-border bg-card divide-y divide-border">
               <div className="flex justify-between items-center px-3 py-2 text-sm">
                 <span className="text-muted-foreground">Shell % range</span>
                 <span className="font-mono">{formatCategoryRange(category)}</span>
@@ -306,7 +306,7 @@ export default function ProductCategoryDetailPage({ params }: { params: Promise<
               ) : inUseCount > 0 ? (
                 /* In use — archive only, no delete */
                 confirmDelete ? (
-                  <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                  <div className="rounded-sm border border-border bg-card p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                       <p className="text-sm font-medium">Archive this category?</p>
@@ -336,7 +336,7 @@ export default function ProductCategoryDetailPage({ params }: { params: Promise<
               ) : (
                 /* Not in use — allow full delete */
                 confirmDelete ? (
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+                  <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                     <p className="text-sm text-destructive font-medium">Delete this category?</p>
                     <p className="text-xs text-muted-foreground">
                       No products are currently using it. This cannot be undone.

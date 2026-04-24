@@ -70,7 +70,7 @@ export default function QuotesPage() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
+          <div className="rounded-sm border border-dashed border-border bg-card p-8 text-center">
             <FileText className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">
               {quotes.length === 0
@@ -79,7 +79,7 @@ export default function QuotesPage() {
             </p>
           </div>
         ) : (
-          <ul className="rounded-lg border border-border bg-card divide-y divide-border">
+          <ul className="rounded-sm border border-border bg-card divide-y divide-border">
             {filtered.map((q) => {
               const cName = q.customerId ? (customerName.get(q.customerId) ?? "—") : (q.isWhatIf ? "What-If" : "—");
               const expired = q.expiresAt && new Date(q.expiresAt) < new Date();

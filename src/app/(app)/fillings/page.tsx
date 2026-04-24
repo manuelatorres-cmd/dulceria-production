@@ -311,7 +311,7 @@ function FillingsTab() {
       )}
 
       {showAdd && (
-        <form onSubmit={handleAdd} className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <form onSubmit={handleAdd} className="rounded-sm border border-border bg-card p-3 space-y-2">
           <input
             type="text"
             value={newName}
@@ -375,7 +375,7 @@ function FillingsTab() {
                     {group.fillings.map((filling) => (
                       <li
                         key={filling.id}
-                        className={`rounded-lg border bg-card ${filling.archived ? "border-muted opacity-60" : "border-border"}`}
+                        className={`rounded-sm border bg-card ${filling.archived ? "border-muted opacity-60" : "border-border"}`}
                         style={{ contentVisibility: "auto", containIntrinsicSize: "0 72px" }}
                       >
                         <Link

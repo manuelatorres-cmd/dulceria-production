@@ -554,7 +554,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
             ))}
           </div>
 
-          <div className="border border-border rounded-lg overflow-hidden">
+          <div className="border border-border rounded-sm overflow-hidden">
             <div className="px-3 py-2 bg-muted/50 flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-foreground uppercase tracking-wide">Tree nuts</span>
               <div className="flex gap-3">

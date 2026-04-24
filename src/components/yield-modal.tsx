@@ -112,7 +112,7 @@ export function YieldModal({ entries, mode = "batch", onConfirm, onCancel, cance
                         if (localEntries.length === 1) onConfirm(localEntries);
                       }
                     }}
-                    className="flex-1 h-8 rounded-lg border border-border bg-card text-center text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="flex-1 h-8 rounded-sm border border-border bg-card text-center text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
                     onClick={() => updateYield(entry.planProductId, Math.min(entry.totalProducts, entry.yield + 1))}

@@ -32,7 +32,7 @@ export default function ProductionBrainHaccpPage() {
       />
 
       {units.length === 0 ? (
-        <section className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+        <section className="rounded-sm border border-border bg-card p-6 text-sm text-muted-foreground">
           <p>
             No cold storage units configured yet. Insert rows into the
             <code className="mx-1">coldStorageUnits</code>
@@ -48,7 +48,7 @@ export default function ProductionBrainHaccpPage() {
       )}
 
       {incidents.length > 0 ? (
-        <section className="mt-8 rounded-xl border border-status-alert-edge bg-status-alert-bg p-4">
+        <section className="mt-8 rounded-sm border border-status-alert-edge bg-status-alert-bg p-4">
           <h3 className="uppercase tracking-wider text-[10px] text-status-alert font-semibold mb-3">
             Open incidents · {incidents.length}
           </h3>
@@ -121,7 +121,7 @@ function UnitCard({ unit }: { unit: ColdStorageUnit }) {
   }
 
   return (
-    <li className="rounded-xl border border-border bg-card p-4">
+    <li className="rounded-sm border border-border bg-card p-4">
       <header className="flex items-baseline justify-between">
         <div>
           <strong className="tracking-tight text-sm">{unit.name}</strong>
@@ -138,7 +138,7 @@ function UnitCard({ unit }: { unit: ColdStorageUnit }) {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 mt-3">
-        <div className="rounded-lg bg-muted p-3">
+        <div className="rounded-sm bg-muted p-3">
           <h4 className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold mb-2">
             Last reading
           </h4>
@@ -176,7 +176,7 @@ function UnitCard({ unit }: { unit: ColdStorageUnit }) {
           )}
         </div>
 
-        <div className="rounded-lg bg-muted p-3">
+        <div className="rounded-sm bg-muted p-3">
           <h4 className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold mb-2">
             Log reading
           </h4>

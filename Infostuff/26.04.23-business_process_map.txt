@@ -1,0 +1,197 @@
+# Dulceria — How the Business Runs
+
+*Reference map — generated 2026-04-23. End-to-end view of how Dulceria operates, independent of the app implementation. Pair with the code only when building a new feature.*
+
+## 0. At a glance
+- **What:** Handmade vegan chocolate praline production in Vienna.
+- **Sells through 4 channels:** B2B, Events, Online shop, Physical store.
+- **Produces via:** Multi-step batches (9 steps; bars skip 1–2), mould-constrained, people-constrained.
+- **Tracks:** Products (pieces) + Ingredients (grams) + Packaging (units) + Fillings (grams).
+- **Non-negotiable:** HACCP — daily temperature logs, cleaning checklists.
+
+## 1. Catalog hierarchy
+```
+Ingredients (g) → Fillings (g, versioned) → Products (pieces) → Variants (SKUs: product+packaging+price) → Collections (label groupings, derived)
+```
+- Products: default mould, shell %, fillings, production steps, shelf life, decoration design, allergens.
+- Fillings: fresh OR shelf-stable (water-activity-tracked) OR frozen/reused (FIFO).
+- Moulds: physical inventory — **the real bottleneck**. 60 praline + 25 bar. Locked from Polishing to Unmoulding.
+- Packaging: boxes/inserts/ribbons. Own low-stock thresholds + lead times.
+- Ingredients: stock in grams, consumed at Shelling + Filling steps, FIFO.
+- Variants: `kind` = curated (fixed products per box, locked on order) or free-pick. Sizes = packagings with per-channel price overrides (b2b/shop/event/online).
+- Labels on variants → Collections page.
+
+## 2. Who we sell to
+- **B2B** (hotels/pastry shops/retailers) — negotiated prices, quotes, branded packaging, longer lead times.
+- **Private** (retail/walk-ins/online/events).
+- Customer record: company, contact, VAT number, payment terms, delivery method, invoice address, allergen notes, packaging prefs, language, default price list (a variant), default discount %.
+- CRM: contact log (append-only), follow-ups (manual or seasonal-suggested — seasonal not wired yet), quotes (draft→sent→won→order), analytics (LTV, repeat, AOV).
+
+## 3. Pricing hierarchy (top wins)
+1. Per-customer, per-product fixed override
+2. Per-customer, per-product % discount *(proposed, not yet built)*
+3. Per-customer, per-collection % discount *(proposed, not yet built)*
+4. Variant × channel override price
+5. Variant default price
+6. Customer `defaultDiscountPercent`
+7. Retail price
+
+Prices stored gross; per-variant VAT rate (Austria food = 10%); net derived on display.
+
+## 4. Sales channels
+| Channel | Order arrival | Cadence | Quirks |
+|---|---|---|---|
+| **Online shop** | CSV import (Shopify etc.) | ~every 2 days | `sourceRef` dedup |
+| **Shop floor** | POS + weekly count upload | Weekly reconcile | Auto-replenish on min; can **borrow** to serve incoming B2B if replenishment can finish before next opening |
+| **Events** | Manual (event name req.) | Pre-planned per calendar | **Packed-and-ready deadline BEFORE event day** |
+| **B2B** | Manual, often via Quote | Per-customer deadline | Often branded/custom packaging + custom prices |
+
+Every order: channel, customer, deadline, priority, delivery method. Every line: product (or variant-expanded), qty, unit price, VAT rate, fulfilment mode (`produce` or `borrow`).
+
+## 5. Order → Production end-to-end
+```
+Customer buys → Order saved → Regenerate click → Batches grouped → Scheduler assigns days → 9 production steps → Stock moves → Packing → Done
+```
+
+### Scheduling rules (the important part)
+- Batches are created/rescheduled **only** by user clicking Regenerate.
+- Reconciler: one draft batch per productId; multiple orders for same product SHARE a batch.
+- Batch effective deadline = min(deadline of any linked order).
+- `daysToDeadline ≤ mergingWindowDays` (default 14) → **forward mode** (start today, pack forward).
+- Else → **reverse mode**: anchor at `deadline − productionBufferDays` (default 2 working days), walk backward.
+- Capacity = sum of available people-minutes/day; waiting/drying minutes don't count.
+- Mould occupancy hard-locked step 1→7.
+- `planStepStatus.done=true` = session lock; regenerate respects it.
+- Only `draft` batches rebuild. Active/done batches frozen.
+- **Shelf life NOT considered.** Known gap — can schedule too early for long-deadline orders.
+
+### 9 production steps
+| # | Step | Stock effect |
+|---|---|---|
+| 1 | Polishing | — |
+| 2 | Painting | — |
+| 3 | Shelling | **Ingredient grams −** |
+| 4 | Filling Prep | — (sources filling stock) |
+| 5 | Filling | **Filling grams −** |
+| 6 | Capping | — |
+| 7 | Unmoulding | **Pieces + (Production Storage)**; moulds freed; waste logged |
+| 8 | Transfer | Stock movement to Store/Freezer/Allocated |
+| 9 | Packing | **Packaging units −** |
+
+Bars skip 1–2. Drying times are **info notes only**. No countdown timers.
+
+## 6. Stock — two parallel systems
+
+### Pieces (products) — 4 locations
+```
+Production Storage ← unmould default
+       ↓↑
+     Store          ← walk-in customers, per-product min
+       ↓↑
+    Freezer         ← frozenAt/defrostedAt, preserved shelf life
+       ↓
+   Allocated        ← reserved for specific order
+```
+- Every move logged: reason/date/who/qty.
+- FIFO across batches.
+- Per-product per-location min → low-stock alerts + auto-add to shopping list.
+
+### Grams / units (raw materials)
+- **Ingredients**: per-ingredient g + min threshold; movements on Shelling + Filling Prep.
+- **Fillings**: per-filling g + made-at date + freeze status.
+- **Packaging**: per-unit qty; deducted on Packing; lead-time aware.
+
+### Inventory counts
+- Weekly physical count per location → variance + reason (sold/waste/breakage/unknown).
+- Variance report surfaces consistent losses.
+
+## 7. People & capacity
+- Per person: roles, working days, default hours/day, start/end time, unavailability windows.
+- Workshop-wide config: warn%, critical%, fillingBufferPercent, labourHourlyRate (€/h), productionBufferDays, mergingWindowWeeks, stockExpiryWarnDays.
+- Equipment: 2× Selmi PlusEx, 1× Selmi small, 1× Royal Catering, 2+1 Chocolate World melters, 1× Selmi R200 belt. Tempering allocated per step; conflict alerts.
+
+## 8. HACCP / compliance
+- **Daily temperature log** on opening; pre-filled with yesterday's values; out-of-range → required note; exportable CSV/PDF. Defaults: Fridge 2–5 °C, Freezer ≤ −18 °C, Chocolate storage 16–18 °C.
+- **Close Production** scans unfinished steps → rolls to tomorrow → scheduler recomputes deadline slippage → opens cleaning checklist.
+- **Cleaning checklist UI NOT YET BUILT** (schema reserved, table skipped).
+- **Traceability**: batchNumber `DUL-YYYYMMDD-NN` + batchSummary (exact recipe + filling version) + waste log + temp readings → recall can reconstruct every piece.
+
+## 9. Events & calendar
+- Event calendar entries types: event / peak / blocked / holiday.
+- Scheduler skips blocked; highlights peaks.
+- Shop opening hours + closures drive the borrow-or-produce decision.
+
+## 10. Business intelligence
+- **Dashboard**: today's batches, open orders by urgency, low-stock alerts, capacity %.
+- **Pricing & Margins**: variant margin health, avg product cost, box price vs cost.
+- **Production Stats**: output by product/variant, trends.
+- **Product Cost**: full breakdown per product (shell/fillings/decoration/overhead).
+- **Customer analytics**: LTV, AOV, repeat, last order.
+- **Stock reports**: low-stock, oldest, waste reasons.
+
+## 11. Cross-process connections
+```
+Ingredient stock ── deducted on ─→ Shelling, Filling Prep
+Filling stock    ── deducted on ─→ Filling; replenished after Filling Prep
+Packaging stock  ── deducted on ─→ Packing
+Product pieces   ── created on ──→ Unmoulding → moved by Transfer → reserved in Allocated
+
+Moulds pool      ── locked by ──→ batch steps 1–7
+                 ── freed by ──→ Unmoulding → alerts "N moulds just freed"
+People calendar  ── drives ──→ daily capacity minutes
+Equipment        ── allocated by ──→ Shelling, Capping
+
+Orders           ── group by productId ──→ Batches (Reconciler)
+Batches          ── scheduled using ──→ deadlines + capacity + moulds + equipment
+Unmould waste    ── triggers ──→ "can order still be fulfilled?" alert
+Order items      ── fulfilled from ──→ Allocated (produce) OR Store (borrow)
+Shop opening     ── drives ──→ borrow-or-produce decision
+
+Weekly filling consolidation ── reads ALL open orders → sums → buffer → − stock → cooking list
+HACCP temp log   ── required on ──→ every production-day open
+Cleaning checklist ── required on ──→ every production-day close
+
+Quotes           ── won converts to ──→ Order
+B2B feasibility  ── reads ──→ capacity config + current schedule load
+```
+
+## 12. Gaps & logical next steps
+
+### HIGH
+1. **Shelf-life-aware scheduling.** Blocks like Veganmania 2026-06-03 landing today. Add `earliestStartDay = deadline − shelfLifeDays + packingMargin`.
+2. **Cleaning checklist UI.** Schema ready, no UI. Regulatory exposure.
+3. **Customer pricing (per-product % + per-collection %).** Design locked, not yet built. Migration 0051 planned.
+4. **Per-customer branded packaging.** B2B wants own boxes. Piggyback on orderPackagingLines + customer packagingPrefs.
+
+### MEDIUM
+5. Label printer integration (wait for printer model purchase).
+6. Online shop API (Shopify direct) vs CSV.
+7. Weekly shop-count upload UI (POS CSV import + variance).
+8. Undo-last-action top-bar button.
+9. Auto-add-to-shopping-list with supplier lead times (schema ready).
+10. Seasonal follow-up suggestions engine.
+
+### LOW
+11. "What-If" B2B quote mode (orphaned from handover spec).
+12. Who-packed-which-box traceability.
+13. Shop in-store custom-box builder (allergen/nutrition/best-before live calc).
+14. Event pre-plan runway nudges.
+
+### Lost-in-translation (flagged in handover transcripts)
+- Order-line batch dropdown removal — confirm UI is clean.
+- Workshop landing page — confirm dropped.
+- Variance report for consistent stock loss — threaded into build yet?
+- Surplus destination UX in Unmoulding modal — fully enforced?
+
+## 13. Founder's one-page narrative
+> Ingredients → Fillings → Products → Variants (SKUs) → Collections (labels). Four channels — shop / online / events / B2B — at channel-specific prices to labelled customer segments.
+>
+> Orders save. Nothing is produced yet. Regenerate groups open orders by product into one batch each, and plans them backward from deadlines across the calendar — respecting moulds, people, blocked days, and started work.
+>
+> Each batch walks ≤ 9 steps (polishing → painting → shelling → filling → capping → unmoulding → transfer → packing), decrementing ingredient/filling/packaging stock, freeing moulds at the end, landing pieces in Production → Store / Freezer / Allocated. Every step logged for traceability.
+>
+> Daily: open production (temp check required) → run batches → close production (cleaning checklist required).
+>
+> On top: two parallel stock systems (pieces / grams), FIFO + shelf-life + weekly recount. CRM around B2B (quotes, follow-ups, pricing hierarchy). Events pre-plan the calendar. Equipment + people set capacity ceiling.
+>
+> The system's job: keep the whole web consistent and honest, warn Manuela the moment any part drifts out of feasibility.

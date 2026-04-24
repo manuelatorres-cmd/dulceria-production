@@ -956,7 +956,7 @@ function PlanContent({
               onKeyDown={(e) => { if (e.key === "Escape") setEditingBatchNote(false); }}
               placeholder="Note for this batch…"
               rows={3}
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              className="w-full rounded-sm border border-border bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
           </div>
         ) : plan.notes ? (
@@ -979,7 +979,7 @@ function PlanContent({
 
         {/* Deadline impact warning after an unmould yield short-stocks open orders */}
         {deadlineImpact && deadlineImpact.length > 0 && (
-          <div className="mt-3 rounded-lg border border-status-alert-edge bg-status-alert-bg px-3 py-2.5">
+          <div className="mt-3 rounded-sm border border-status-alert-edge bg-status-alert-bg px-3 py-2.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-status-alert">
@@ -1080,7 +1080,7 @@ function PlanContent({
             {/* Materials needed — Colour tab: on-mould steps only; Cap tab: transfer sheets + after-cap steps */}
             {((activePhase === "colour" && colouringMaterialIds.length > 0) ||
               (activePhase === "cap" && cappingMaterialIds.length > 0)) && (
-              <div className="rounded-lg border border-border bg-card p-3 mb-1">
+              <div className="rounded-sm border border-border bg-card p-3 mb-1">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Materials needed for this step</p>
                 <ul className="space-y-1.5">
                   {(activePhase === "colour" ? colouringMaterialIds : cappingMaterialIds).map((id) => {
@@ -1295,7 +1295,7 @@ function PlanContent({
               const productName = productNames.get(pb.productId) ?? "Unknown";
               const isEditing = editingProductNoteId === pb.id;
               return (
-                <div key={pb.id} className="rounded-lg border border-border bg-card px-3 py-2.5">
+                <div key={pb.id} className="rounded-sm border border-border bg-card px-3 py-2.5">
                   <p className="text-xs font-medium text-foreground mb-1.5">{productName}</p>
                   {isEditing ? (
                     <textarea
@@ -1335,7 +1335,7 @@ function PlanContent({
       {plan.status !== "done" && (
         <div className="px-4 pt-4 pb-8 border-t border-border mt-2">
           {confirmMarkDone ? (
-            <div className="rounded-lg border border-status-ok-edge bg-status-ok-bg px-3 py-2.5">
+            <div className="rounded-sm border border-status-ok-edge bg-status-ok-bg px-3 py-2.5">
               <p className="text-sm font-medium text-status-ok mb-0.5">Mark entire batch as done?</p>
               <p className="text-xs text-status-ok mb-2.5">
                 All {steps.length} steps will be marked complete and this batch will be closed out.
@@ -1484,7 +1484,7 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
   return (
     <button
       onClick={() => onToggle(step.key)}
-      className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
+      className={`w-full flex items-center gap-3 p-3 rounded-sm border text-left transition-colors ${
         done ? "border-status-ok-edge bg-status-ok-bg" : "border-border bg-card"
       }`}
     >

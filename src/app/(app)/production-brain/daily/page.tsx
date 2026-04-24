@@ -71,7 +71,7 @@ export default function ProductionBrainDailyPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-4">
         {/* LEFT — batch list */}
-        <aside className="rounded-xl border border-border bg-card p-3">
+        <aside className="rounded-sm border border-border bg-card p-3">
           <h3 className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold mb-3">
             Batches today · {todayBatches.length}
           </h3>
@@ -124,7 +124,7 @@ export default function ProductionBrainDailyPage() {
         </aside>
 
         {/* RIGHT — selected batch */}
-        <main className="rounded-xl border border-border bg-card p-5">
+        <main className="rounded-sm border border-border bg-card p-5">
           {!selectedPlan ? (
             <p className="text-sm text-muted-foreground italic">
               No batch selected. Pick one from the list.
@@ -155,7 +155,7 @@ export default function ProductionBrainDailyPage() {
                     <li
                       key={step.id ?? idx}
                       className={
-                        "rounded-lg border px-2 py-2 text-center text-xs " +
+                        "rounded-sm border px-2 py-2 text-center text-xs " +
                         (done
                           ? "bg-status-ok-bg border-status-ok-edge text-status-ok"
                           : "bg-muted border-border")

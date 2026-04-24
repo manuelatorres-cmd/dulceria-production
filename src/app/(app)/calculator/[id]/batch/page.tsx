@@ -215,7 +215,7 @@ export default function BatchPage({ params }: { params: Promise<{ id: string }> 
 
       {/* Needs improvement outcome */}
       {step === "to_improve_done" && (
-        <div className="p-4 rounded-lg border border-status-warn-edge bg-status-warn-bg space-y-2 text-sm">
+        <div className="p-4 rounded-sm border border-status-warn-edge bg-status-warn-bg space-y-2 text-sm">
           <p className="font-medium text-status-warn">Feedback saved.</p>
           <p className="text-xs text-status-warn">Come back to the lab to refine the product. Start a new version when you&rsquo;re ready to tweak.</p>
           <div className="flex gap-2 pt-1">
@@ -279,7 +279,7 @@ function ScaledProductCard({ title, subtitle, rows }: { title: string; subtitle:
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-sm border border-border bg-card overflow-hidden">
       <div className="flex justify-between items-start px-3 pt-3 pb-2 bg-primary/8">
         <div>
           <h3 className="font-medium text-sm">{title}</h3>

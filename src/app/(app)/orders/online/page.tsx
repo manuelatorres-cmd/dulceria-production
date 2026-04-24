@@ -81,7 +81,7 @@ export default function OnlineOrdersPage() {
                 <ShoppingCart className="w-4 h-4" /> What needs producing
               </h2>
             </div>
-            <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="rounded-sm border border-border bg-card overflow-hidden">
               <div className="flex items-center px-3 py-1.5 bg-muted/30 border-b border-border text-[10px] uppercase tracking-wide text-muted-foreground">
                 <span className="flex-1">Product</span>
                 <span className="w-20 text-right">Ordered</span>
@@ -108,7 +108,7 @@ export default function OnlineOrdersPage() {
         <section>
           <h2 className="text-sm font-semibold text-primary mb-2">Orders</h2>
           {onlineOrders.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
+            <div className="rounded-sm border border-dashed border-border bg-card p-8 text-center">
               <p className="text-sm text-muted-foreground">
                 No open online orders. Import a Shopify CSV to get started.
               </p>
@@ -129,7 +129,7 @@ export default function OnlineOrdersPage() {
                   return it.quantity > avail;
                 });
                 return (
-                  <li key={o.id} className="rounded-lg border border-border bg-card p-3">
+                  <li key={o.id} className="rounded-sm border border-border bg-card p-3">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold">

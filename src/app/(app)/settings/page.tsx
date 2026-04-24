@@ -202,7 +202,7 @@ function BackupTab({
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-primary">Backup & Restore</h2>
         {!isCloudConfigured ? (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+          <div className="rounded-sm border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
             <p>
               <strong>You&apos;re using local-only mode.</strong> All data lives in this browser
               and isn&apos;t synced anywhere.
@@ -221,7 +221,7 @@ function BackupTab({
         )}
 
         {/* Export */}
-        <div className="rounded-lg border border-border bg-card p-4 space-y-2">
+        <div className="rounded-sm border border-border bg-card p-4 space-y-2">
           <div className="flex items-start gap-3">
             <Download className="w-5 h-5 text-primary shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
@@ -251,7 +251,7 @@ function BackupTab({
       {/* About */}
       <section className="space-y-1">
         <h2 className="text-sm font-semibold text-primary">About</h2>
-        <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-1">
+        <div className="rounded-sm border border-border bg-card px-4 py-3 space-y-1">
           <p className="text-sm font-medium">Dulceria{isCloudConfigured ? "" : " — local only"}</p>
           {isCloudConfigured ? (
             <>
@@ -295,7 +295,7 @@ function LabelPrinterSection() {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-primary">Label Printer</h2>
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <div className="rounded-sm border border-border bg-card p-4 space-y-3">
         <div className="flex items-center gap-3">
           <Printer className="w-5 h-5 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
@@ -335,7 +335,7 @@ function DemoModeSection() {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-primary">Demo Mode</h2>
-      <div className="rounded-lg border border-border bg-card p-4">
+      <div className="rounded-sm border border-border bg-card p-4">
         <div className="flex items-center gap-3">
           <Video className="w-5 h-5 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
@@ -388,7 +388,7 @@ function DemoDataSection() {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-primary">Demo Data</h2>
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <div className="rounded-sm border border-border bg-card p-4 space-y-3">
         <div className="flex items-start gap-3">
           <FlaskConical className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
@@ -457,7 +457,7 @@ function ClearAllDataSection() {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-destructive">Delete All Data</h2>
-      <div className="rounded-lg border border-destructive/30 bg-card p-4 space-y-3">
+      <div className="rounded-sm border border-destructive/30 bg-card p-4 space-y-3">
         <div className="flex items-start gap-3">
           <Trash2 className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
@@ -632,7 +632,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
       {/* Buffers */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-primary">Buffers</h2>
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Capacity buffer (%)</label>
@@ -692,7 +692,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
       {/* Thresholds */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-primary">Dashboard thresholds</h2>
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Warn threshold (%)</label>
@@ -827,7 +827,7 @@ function PeopleSection({ people, unavailability, knownRoles }: {
       )}
 
       {sorted.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
           No people added yet.
         </p>
       ) : (
@@ -880,7 +880,7 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
     : "—";
 
   return (
-    <li className={`rounded-lg border bg-card overflow-hidden ${person.archived ? "border-border opacity-70" : "border-border"}`}>
+    <li className={`rounded-sm border bg-card overflow-hidden ${person.archived ? "border-border opacity-70" : "border-border"}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button
           onClick={onToggle}
@@ -1040,7 +1040,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
   );
 
   return (
-    <div className={`rounded-lg ${isNew ? "border border-border bg-card p-4" : ""} space-y-3`}>
+    <div className={`rounded-sm ${isNew ? "border border-border bg-card p-4" : ""} space-y-3`}>
       <div>
         <label className="label">Name</label>
         <input
@@ -1407,7 +1407,7 @@ function EquipmentTab() {
       )}
 
       {sorted.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
           No equipment added yet.
         </p>
       ) : (
@@ -1455,7 +1455,7 @@ function EquipmentCard({ equipment: eq, expanded, onToggle }: {
     "text-muted-foreground bg-muted border-border";
 
   return (
-    <li className={`rounded-lg border bg-card overflow-hidden ${eq.archived ? "opacity-70 border-border" : "border-border"}`}>
+    <li className={`rounded-sm border bg-card overflow-hidden ${eq.archived ? "opacity-70 border-border" : "border-border"}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button
           onClick={onToggle}
@@ -1588,7 +1588,7 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
   }
 
   return (
-    <div className={`space-y-3 ${isNew ? "rounded-lg border border-border bg-card p-4" : ""}`}>
+    <div className={`space-y-3 ${isNew ? "rounded-sm border border-border bg-card p-4" : ""}`}>
       <div>
         <label className="label">Name</label>
         <input
@@ -1802,12 +1802,12 @@ function ProductionStepsTab() {
       </section>
 
       {categories.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
           No product categories yet. Add one under Products → Categories first.
         </p>
       ) : (
         <>
-          <div className="rounded-lg border border-border bg-card p-4">
+          <div className="rounded-sm border border-border bg-card p-4">
             <label className="label">Product type</label>
             <select
               value={selectedType}
@@ -1847,7 +1847,7 @@ function ProductionStepsTab() {
               )}
 
               {stepsForType.length === 0 && !adding ? (
-                <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-lg">
+                <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
                   No steps yet for {selectedType}. Click Add step to start.
                 </p>
               ) : (
@@ -1901,7 +1901,7 @@ function ProductionStepRow({ step, knownStepNames, index, total, onMoveUp, onMov
   }
 
   return (
-    <li className="rounded-lg border border-border bg-card overflow-hidden">
+    <li className="rounded-sm border border-border bg-card overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2.5">
         <div className="flex flex-col shrink-0">
           <button
@@ -2051,7 +2051,7 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
   }
 
   return (
-    <div className={`space-y-3 ${isNew ? "rounded-lg border border-border bg-card p-4" : ""}`}>
+    <div className={`space-y-3 ${isNew ? "rounded-sm border border-border bg-card p-4" : ""}`}>
       <div>
         <label className="label">Step name</label>
         <input
@@ -2230,7 +2230,7 @@ function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
       </div>
 
       {adding && (
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
           <div>
             <label className="label">Reason</label>
             <input
@@ -2282,7 +2282,7 @@ function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
       )}
 
       {blocked.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2 text-center border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground py-2 text-center border border-dashed border-border rounded-sm">
           No blocked periods.
         </p>
       ) : (
@@ -2312,7 +2312,7 @@ function BlockedDayRow({ entry }: { entry: EventCalendarEntry }) {
   }
 
   return (
-    <li className="rounded-lg border border-border bg-card flex items-center gap-3 px-3 py-2.5">
+    <li className="rounded-sm border border-border bg-card flex items-center gap-3 px-3 py-2.5">
       <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{entry.name}</p>
@@ -2488,7 +2488,7 @@ function PreferencesTab({
         </div>
 
         {/* Key-value card */}
-        <div className="rounded-lg border border-border bg-card divide-y divide-border">
+        <div className="rounded-sm border border-border bg-card divide-y divide-border">
           <div className="flex justify-between px-4 py-3">
             <span className="text-sm text-muted-foreground">Currency</span>
             <span className="text-sm font-medium">{currencyInfo?.label ?? activeCurrency}</span>
@@ -2508,7 +2508,7 @@ function PreferencesTab({
         </div>
 
         {/* May Contain summary */}
-        <div className="rounded-lg border border-border bg-card px-4 py-3">
+        <div className="rounded-sm border border-border bg-card px-4 py-3">
           <p className="text-sm text-muted-foreground mb-1.5">Facility &ldquo;may contain&rdquo; advisories</p>
           {activeMayContain.length > 0 ? (
             <div className="flex flex-wrap gap-1">
@@ -2536,7 +2536,7 @@ function PreferencesTab({
           All prices, costs, and margins throughout the app are displayed in this currency.
           Changing currency does not convert existing values — it only changes the symbol shown.
         </p>
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
           <label className="block text-sm font-medium">Display currency</label>
           <select
             value={draftCurrency}
@@ -2557,7 +2557,7 @@ function PreferencesTab({
           Controls which allergen checklist appears when editing ingredients.
           You are responsible for understanding and complying with your region&rsquo;s labelling regulations.
         </p>
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
           <label className="block text-sm font-medium">Target market</label>
           <select
             value={draftRegion}
@@ -2581,7 +2581,7 @@ function PreferencesTab({
           Controls how filling amounts are entered by default when assigning fillings to products.
           Individual products can still override this.
         </p>
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
           <label className="block text-sm font-medium">Default fill mode</label>
           <select
             value={draftFillMode}
@@ -2601,7 +2601,7 @@ function PreferencesTab({
           Cross-contamination risk from shared equipment or production environment. This applies to your
           entire facility — not to individual products.
         </p>
-        <div className="rounded-lg border border-border bg-card p-4 space-y-1">
+        <div className="rounded-sm border border-border bg-card p-4 space-y-1">
           {activeAllergens.filter(a => !a.group).map((a) => (
             <label key={a.id} className="flex items-center gap-2.5 cursor-pointer py-1">
               <input
@@ -2730,7 +2730,7 @@ function ImportTab() {
         </p>
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-4">
+      <section className="rounded-sm border border-border bg-card p-4">
         <SpreadsheetImport
           config={ingredientImportConfig}
           getExistingKeys={getExistingIngredientKeys}
@@ -2739,7 +2739,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-4">
+      <section className="rounded-sm border border-border bg-card p-4">
         <SpreadsheetImport
           config={mouldImportConfig}
           getExistingKeys={getExistingMouldKeys}
@@ -2748,7 +2748,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-4">
+      <section className="rounded-sm border border-border bg-card p-4">
         <SpreadsheetImport
           config={packagingImportConfig}
           getExistingKeys={getExistingPackagingKeys}
@@ -2757,7 +2757,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-4">
+      <section className="rounded-sm border border-border bg-card p-4">
         <SpreadsheetImport
           config={decorationImportConfig}
           getExistingKeys={getExistingDecorationKeys}
@@ -2766,7 +2766,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-4">
+      <section className="rounded-sm border border-border bg-card p-4">
         <SpreadsheetImport
           config={fillingImportConfig}
           getExistingKeys={getExistingFillingKeys}
@@ -2775,7 +2775,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-4">
+      <section className="rounded-sm border border-border bg-card p-4">
         <SpreadsheetImport
           config={productImportConfig}
           getExistingKeys={getExistingProductKeys}

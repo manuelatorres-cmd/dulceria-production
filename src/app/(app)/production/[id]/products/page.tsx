@@ -196,7 +196,7 @@ function FillingProductCard({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-sm border border-border bg-card overflow-hidden">
       {/* Header */}
       <div className="flex justify-between items-start px-3 pt-3 pb-2 bg-primary/8">
         <div>

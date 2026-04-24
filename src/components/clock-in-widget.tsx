@@ -71,7 +71,7 @@ export function ClockInWidget({ date, linkedPlanId, defaultLocation = "productio
   ).length;
 
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3">
+    <div className="rounded-sm border border-border bg-card px-4 py-3">
       <div className="flex items-baseline justify-between mb-2">
         <span className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold">
           On shift

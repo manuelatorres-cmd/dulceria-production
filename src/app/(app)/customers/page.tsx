@@ -116,7 +116,7 @@ export default function CustomersPage() {
         </div>
 
         {creating && (
-          <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+          <div className="rounded-sm border border-border bg-card p-3 space-y-2">
             <p className="text-xs font-medium text-muted-foreground">New customer</p>
             <input
               type="text"
@@ -196,7 +196,7 @@ export default function CustomersPage() {
 
         {/* List */}
         {rows.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
+          <div className="rounded-sm border border-dashed border-border bg-card p-8 text-center">
             <p className="text-sm text-muted-foreground">
               {customers.length === 0
                 ? "No customers yet. Create the first one to start tracking orders and follow-ups."
@@ -204,7 +204,7 @@ export default function CustomersPage() {
             </p>
           </div>
         ) : (
-          <ul className="rounded-lg border border-border bg-card divide-y divide-border">
+          <ul className="rounded-sm border border-border bg-card divide-y divide-border">
             {rows.map((c) => {
               const s = stats.get(c.id!);
               return (
