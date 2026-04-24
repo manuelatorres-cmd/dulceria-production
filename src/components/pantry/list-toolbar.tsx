@@ -82,17 +82,21 @@ export function ListToolbar({
         <button
           type="button"
           onClick={onToggleFilters}
-          className={`relative rounded-full border p-2 transition-colors ${
+          className={`relative border px-3 h-[38px] transition-colors ${
             filterPanelOpen
-              ? "bg-accent text-accent-foreground border-accent"
-              : "border-border bg-background hover:bg-muted"
+              ? "bg-foreground text-background border-foreground"
+              : "border-border bg-card hover:border-foreground"
           }`}
+          style={{ borderRadius: 4 }}
           aria-label="Filters"
           aria-expanded={filterPanelOpen}
         >
-          <SlidersHorizontal className="w-5 h-5" />
+          <SlidersHorizontal className="w-4 h-4" />
           {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+            <span
+              className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-[color:var(--accent-terracotta-ink)] text-white text-[9px] font-semibold flex items-center justify-center leading-none"
+              style={{ borderRadius: 2 }}
+            >
               {activeFilterCount}
             </span>
           )}
@@ -105,9 +109,10 @@ export function ListToolbar({
         onClick={onAdd}
         title={addTitle}
         aria-label={addAriaLabel}
-        className="rounded-full bg-accent text-accent-foreground p-2 hover:opacity-90 transition-opacity"
+        className="bg-foreground text-background px-3 h-[38px] hover:opacity-90 transition-opacity"
+        style={{ borderRadius: 4 }}
       >
-        <Plus className="w-5 h-5" />
+        <Plus className="w-4 h-4" />
       </button>
     </div>
   );

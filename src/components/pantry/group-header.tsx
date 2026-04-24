@@ -50,8 +50,13 @@ export function GroupHeader({
           isCollapsed ? "-rotate-90" : ""
         }`}
       />
-      <h2 className="text-sm font-semibold text-primary">{label}</h2>
-      <span className="text-xs text-muted-foreground">({count})</span>
+      <h2
+        className="text-[14.5px] text-foreground"
+        style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.015em" }}
+      >
+        {label}
+      </h2>
+      <span className="text-[11px] text-muted-foreground font-medium">{count}</span>
       <GroupStockBadge outCount={outCount} lowCount={lowCount} />
     </button>
   );

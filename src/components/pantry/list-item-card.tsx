@@ -48,11 +48,15 @@ export function ListItemCard({
 
   return (
     <li
-      className={`rounded-lg border bg-card ${borderClass}`}
-      style={{ contentVisibility: "auto", containIntrinsicSize: "0 56px" }}
+      className={`border bg-card transition-colors hover:border-foreground/30 ${borderClass}`}
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: "0 56px",
+        borderRadius: 4,
+      }}
     >
       <div className="flex items-center min-w-0">
-        <Link href={href} className="flex items-center gap-3 p-3 min-w-0 flex-1">
+        <Link href={href} className="flex items-center gap-3 px-3.5 py-3 min-w-0 flex-1">
           {children}
           <ChevronRight aria-hidden="true" className="w-4 h-4 text-muted-foreground shrink-0" />
         </Link>
