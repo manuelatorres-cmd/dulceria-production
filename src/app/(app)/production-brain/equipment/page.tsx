@@ -32,8 +32,23 @@ export default function ProductionBrainEquipmentPage() {
   const loads = useMachineLoads();
   const [loadModal, setLoadModal] = useState<EquipmentInstance | null>(null);
 
-  async function handleMouldClick(inst: MouldPoolInstance) {
+  async function handleMouldClick(inst: MouldPoolInstance, e: React.MouseEvent) {
     if (!inst.id) return;
+    // Shift-click flips to/from 'broken'. Broken moulds drop out of the
+    // usable pool until a replacement instance is inserted or the
+    // operator un-breaks them (unlikely but reversible).
+    if (e.shiftKey) {
+      const next = inst.currentState === "broken" ? "available" : "broken";
+      if (next === "broken" && !confirm(`Mark mould #${inst.instanceIndex} as broken? It will drop out of the usable pool.`)) {
+        return;
+      }
+      await saveMouldPoolInstance({
+        ...inst,
+        currentState: next,
+        stateChangedAt: new Date(),
+      });
+      return;
+    }
     const current = inst.currentState;
     let nextState = current;
     if (current === "available") nextState = "needs-wash";
@@ -42,6 +57,7 @@ export default function ProductionBrainEquipmentPage() {
     else if (current === "loaded" || current === "filled" || current === "sealed") {
       nextState = "needs-wash";
     } else if (current === "retired") nextState = "available";
+    else if (current === "broken") nextState = "available";
     await saveMouldPoolInstance({
       ...inst,
       currentState: nextState,
@@ -220,8 +236,8 @@ export default function ProductionBrainEquipmentPage() {
                       <button
                         key={inst.id}
                         type="button"
-                        onClick={() => handleMouldClick(inst)}
-                        title={`#${inst.instanceIndex} · ${inst.currentState} · used ${inst.usesSinceDeepWash}/${inst.deepWashThreshold}`}
+                        onClick={(e) => handleMouldClick(inst, e)}
+                        title={`#${inst.instanceIndex} · ${inst.currentState} · used ${inst.usesSinceDeepWash}/${inst.deepWashThreshold}\nShift-click to mark broken`}
                         className={
                           "aspect-square rounded cursor-pointer hover:outline hover:outline-1 hover:outline-foreground " +
                           MOULD_STATE_CLASS[inst.currentState]
@@ -364,6 +380,7 @@ const MOULD_STATE_CLASS: Record<string, string> = {
   "needs-wash": "bg-status-alert-bg",
   "in-deep-wash": "bg-accent-lilac-bg",
   retired: "bg-muted/50 opacity-50",
+  broken: "bg-destructive/20 opacity-70 ring-1 ring-destructive",
 };
 
 function summariseMouldGroup(list: MouldPoolInstance[]): string[] {

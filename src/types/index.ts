@@ -2199,6 +2199,7 @@ export const MOULD_STATES = [
   "needs-wash",
   "in-deep-wash",
   "retired",
+  "broken",
 ] as const;
 export type MouldState = (typeof MOULD_STATES)[number];
 
