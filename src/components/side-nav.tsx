@@ -134,10 +134,10 @@ export function SideNav() {
       return (
         <span
           key={item.href}
-          className="flex items-center gap-3 px-2 py-2.5 rounded-lg text-muted-foreground/40 cursor-not-allowed"
+          className="relative flex items-center gap-3 px-3 py-2 rounded-sm text-muted-foreground/40 cursor-not-allowed"
         >
-          <item.icon className="w-5 h-5 shrink-0" />
-          <span className={`${showLabels ? "hidden sm:block" : "hidden"} text-sm truncate`}>{item.label}</span>
+          <item.icon className="w-[18px] h-[18px] shrink-0" />
+          <span className={`${showLabels ? "hidden sm:block" : "hidden"} text-[13px] truncate`}>{item.label}</span>
         </span>
       );
     }
@@ -147,21 +147,24 @@ export function SideNav() {
       <Link
         key={item.href}
         href={item.href}
-        className={`flex items-center gap-3 px-2 py-2.5 rounded-lg transition-colors ${
+        className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
           active
-            ? "text-primary font-medium bg-primary/8"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            ? "text-foreground font-medium bg-card"
+            : "text-muted-foreground hover:text-foreground hover:bg-card/60"
         }`}
       >
+        {active ? (
+          <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
+        ) : null}
         <div className="relative shrink-0">
-          <item.icon className="w-5 h-5" />
+          <item.icon className="w-[18px] h-[18px]" />
           {badge > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center leading-none">
+            <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[color:var(--accent-terracotta-ink)] text-white text-[9px] font-semibold flex items-center justify-center leading-none">
               {badge > 9 ? "9+" : badge}
             </span>
           )}
         </div>
-        <span className="hidden sm:block text-sm truncate">{item.label}</span>
+        <span className="hidden sm:block text-[13px] truncate tracking-tight">{item.label}</span>
       </Link>
     );
   };
@@ -176,10 +179,15 @@ export function SideNav() {
       <Link
         href="/dashboard"
         title="Home"
-        className="flex items-center gap-2 px-2 py-3 shrink-0 rounded-lg hover:bg-muted/60 transition-colors"
+        className="flex items-center gap-2.5 px-3 py-4 shrink-0 rounded-sm hover:bg-card/60 transition-colors"
       >
-        <img src="/logo.png" alt="Dulceria — home" className="w-9 h-9 shrink-0 rounded object-contain" />
-        <span className={`${labelClass} text-sm font-semibold text-foreground truncate`}>Dulceria</span>
+        <img src="/logo.png" alt="Dulceria — home" className="w-8 h-8 shrink-0 rounded-sm object-contain" />
+        <span
+          className={`${labelClass} text-[17px] text-foreground truncate tracking-tight`}
+          style={{ fontFamily: "var(--font-serif)", fontWeight: 400, letterSpacing: "-0.01em" }}
+        >
+          Dulceria
+        </span>
       </Link>
 
       {/* Floating collapse toggle — half-overhangs the nav's right edge.
@@ -201,13 +209,13 @@ export function SideNav() {
             <Link
               href="/dashboard"
               title="Dashboard"
-              className="flex items-center gap-3 px-2 py-2.5 rounded-lg transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="flex items-center gap-3 px-3 py-2 rounded-sm transition-colors text-muted-foreground hover:text-foreground hover:bg-card/60"
             >
-              <HomeIcon className="w-5 h-5 shrink-0" />
-              <span className={`${labelClass} text-sm truncate`}>Dashboard</span>
+              <HomeIcon className="w-[18px] h-[18px] shrink-0" />
+              <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Dashboard</span>
             </Link>
             {/* Section label */}
-            <span className={`${labelClass} px-2 pt-3 pb-1 text-xs font-semibold text-muted-foreground/60 uppercase tracking-wide truncate`}>
+            <span className={`${labelClass} px-3 pt-4 pb-1 text-[10px] font-medium text-muted-foreground/70 uppercase truncate`} style={{ letterSpacing: "0.12em" }}>
               {activeSection.label}
             </span>
             {/* Section sub-items */}
@@ -220,21 +228,24 @@ export function SideNav() {
         <div className="mt-auto pt-4">
           <Link
             href="/shopping"
-            className={`flex items-center gap-3 px-2 py-2.5 rounded-lg transition-colors ${
+            className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
               isActive(pathname, "/shopping")
-                ? "text-primary font-medium bg-primary/8"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                ? "text-foreground font-medium bg-card"
+                : "text-muted-foreground hover:text-foreground hover:bg-card/60"
             }`}
           >
+            {isActive(pathname, "/shopping") ? (
+              <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
+            ) : null}
             <div className="relative shrink-0">
-              <ShoppingIcon className="w-5 h-5" />
+              <ShoppingIcon className="w-[18px] h-[18px]" />
               {pendingShoppingCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center leading-none">
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[color:var(--accent-terracotta-ink)] text-white text-[9px] font-semibold flex items-center justify-center leading-none">
                   {pendingShoppingCount > 9 ? "9+" : pendingShoppingCount}
                 </span>
               )}
             </div>
-            <span className={`${labelClass} text-sm truncate`}>Shopping</span>
+            <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Shopping</span>
           </Link>
         </div>
       </div>
@@ -242,14 +253,17 @@ export function SideNav() {
         <SyncStatusLink labelClass={labelClass} />
         <Link
           href="/settings"
-          className={`flex items-center gap-3 px-2 py-2.5 rounded-lg transition-colors ${
+          className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
             pathname.startsWith("/settings")
-              ? "text-primary font-medium bg-primary/8"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              ? "text-foreground font-medium bg-card"
+              : "text-muted-foreground hover:text-foreground hover:bg-card/60"
           }`}
         >
-          <SettingsIcon className="w-5 h-5 shrink-0" />
-          <span className={`${labelClass} text-sm truncate`}>Settings</span>
+          {pathname.startsWith("/settings") ? (
+            <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
+          ) : null}
+          <SettingsIcon className="w-[18px] h-[18px] shrink-0" />
+          <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Settings</span>
         </Link>
       </div>
     </nav>
