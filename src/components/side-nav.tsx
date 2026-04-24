@@ -48,11 +48,20 @@ const SECTIONS: SectionDef[] = [
   },
   {
     label: "The Shop",
-    routes: ["/shop", "/customers", "/quotes"],
+    routes: ["/shop"],
     items: [
-      { href: "/shop", label: "Shop overview", icon: ShopIcon },
+      { href: "/shop", label: "Overview", icon: ShopIcon },
       { href: "/shop/counter", label: "Counter", icon: ShopIcon },
-      { href: "/customers", label: "Customers", icon: CustomersIcon },
+      { href: "/shop/transfer", label: "Transfer in", icon: ShopIcon },
+      { href: "/shop/breakage", label: "Breakage · tastings", icon: ShopIcon },
+      { href: "/shop/count", label: "Monthly count", icon: ShopIcon },
+    ],
+  },
+  {
+    label: "Customers",
+    routes: ["/customers", "/quotes"],
+    items: [
+      { href: "/customers", label: "Customer list", icon: CustomersIcon },
       { href: "/quotes", label: "Quotes", icon: QuotesIcon },
     ],
   },
@@ -80,6 +89,7 @@ const HOME_ITEMS: NavItem[] = [
   { href: "/workshop", label: "Workshop", icon: WorkshopIcon },
   { href: "/pantry", label: "Pantry", icon: PantryIcon },
   { href: "/shop", label: "Shop", icon: ShopIcon },
+  { href: "/customers", label: "Customers", icon: CustomersIcon },
   { href: "/observatory", label: "Observatory", icon: ObservatoryIcon },
   { href: "/lab", label: "Lab", icon: FlaskIcon, disabled: true },
 ];
@@ -91,6 +101,7 @@ const SECTION_BY_HOME_HREF: Record<string, string> = {
   "/workshop": "The Workshop",
   "/pantry": "The Pantry",
   "/shop": "The Shop",
+  "/customers": "Customers",
   "/lab": "The Lab",
   "/observatory": "The Observatory",
 };
