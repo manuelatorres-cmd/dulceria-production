@@ -20,8 +20,8 @@
 -- physical machine/pot the workshop owns so we can track chocolate
 -- loaded, days aging, brand/model, serial.
 create table if not exists public."equipmentInstances" (
-  id text primary key,
-  "equipmentId" text not null references public.equipment(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  "equipmentId" uuid not null references public.equipment(id) on delete cascade,
   name text not null,
   brand text,
   model text,
@@ -50,10 +50,10 @@ create policy "authenticated_full_access" on public."equipmentInstances"
 -- chocolate is fully drained or switched, row moves to status
 -- 'idle' / 'draining' or a new row is inserted for the next load.
 create table if not exists public."machineLoads" (
-  id text primary key,
-  "equipmentInstanceId" text not null
+  id uuid primary key default gen_random_uuid(),
+  "equipmentInstanceId" uuid not null
     references public."equipmentInstances"(id) on delete cascade,
-  "ingredientId" text not null references public.ingredients(id) on delete restrict,
+  "ingredientId" uuid not null references public.ingredients(id) on delete restrict,
   "loadedQuantityG" numeric(12, 2) not null,
   "remainingQuantityG" numeric(12, 2) not null,
   "loadedAt" timestamptz not null default now(),
@@ -81,7 +81,7 @@ create policy "authenticated_full_access" on public."machineLoads"
 -- Temperature readings hang off this table (phase 3 migration
 -- will add the `temperatureReadings` child table).
 create table if not exists public."coldStorageUnits" (
-  id text primary key,
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   "location" text not null
     check ("location" in ('production', 'shop', 'storage', 'other')),
@@ -107,9 +107,9 @@ create policy "authenticated_full_access" on public."coldStorageUnits"
 -- Full cycle history per mould instance — needed for traceability
 -- and deep-wash scheduling.
 create table if not exists public."mouldUsageLog" (
-  id text primary key,
-  "mouldPoolId" text not null references public."mouldPool"(id) on delete cascade,
-  "planId" text references public."productionPlans"(id) on delete set null,
+  id uuid primary key default gen_random_uuid(),
+  "mouldPoolId" uuid not null references public."mouldPool"(id) on delete cascade,
+  "planId" uuid references public."productionPlans"(id) on delete set null,
   "startedAt" timestamptz not null default now(),
   "freedAt" timestamptz,
   "cycleCompleted" boolean not null default false,
@@ -131,15 +131,15 @@ create policy "authenticated_full_access" on public."mouldUsageLog"
 -- Per-person per-day shift tracking. Powers the clock-in/out
 -- widget + labor cost per batch attribution.
 create table if not exists public."staffShifts" (
-  id text primary key,
-  "personId" text not null references public.people(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  "personId" uuid not null references public.people(id) on delete cascade,
   "shiftDate" date not null,
   "clockInAt" timestamptz not null default now(),
   "clockOutAt" timestamptz,
   "breakMinutes" integer not null default 0 check ("breakMinutes" >= 0),
   "location" text
     check ("location" in ('production', 'shop', 'course', 'other') or "location" is null),
-  "linkedPlanIds" text[] not null default '{}'::text[],
+  "linkedPlanIds" uuid[] not null default '{}'::uuid[],
   notes text,
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now()
@@ -160,8 +160,8 @@ create policy "authenticated_full_access" on public."staffShifts"
 -- cases (course-leading, training, partial days) model themselves
 -- without the constraints of the legacy table.
 create table if not exists public."personAvailabilityExceptions" (
-  id text primary key,
-  "personId" text not null references public.people(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  "personId" uuid not null references public.people(id) on delete cascade,
   "dateFrom" date not null,
   "dateTo" date not null,
   "type" text not null default 'vacation'

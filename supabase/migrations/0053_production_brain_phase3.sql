@@ -3,8 +3,8 @@
 -- Migration 0053
 -- =============================================================
 --
--- Five new tables + one column extension. All additive, idempotent,
--- RLS under authenticated_full_access.
+-- Seven new tables. All additive, idempotent, RLS under
+-- authenticated_full_access.
 --
 --   1) productStock              — per-batch finished-goods stock row
 --   2) stockTransfers            — moves between locations
@@ -12,18 +12,16 @@
 --   4) haccpIncidents            — out-of-range events + resolutions
 --   5) csvImports                — log of Shopify/HelloCash CSV imports
 --   6) externalSkuMapping        — resolve unknown external SKUs
---
--- Also: location_stock_minimums table to replace the channel-based
--- StockLocationMinimum with a richer per-entity per-location row.
+--   7) locationStockMinimums     — per-entity per-location min/target/max
 -- =============================================================
 
 -- ─── 1) productStock ─────────────────────────────────────────
 -- Finished bonbon / bar / box stock tracked per-batch per-location
 -- so FIFO allocation + shelf-life countdown can work.
 create table if not exists public."productStock" (
-  id text primary key,
-  "productId" text not null references public.products(id) on delete restrict,
-  "planId" text references public."productionPlans"(id) on delete set null,
+  id uuid primary key default gen_random_uuid(),
+  "productId" uuid not null references public.products(id) on delete restrict,
+  "planId" uuid references public."productionPlans"(id) on delete set null,
   "quantityPieces" integer not null default 0 check ("quantityPieces" >= 0),
   "lockedPieces" integer not null default 0 check ("lockedPieces" >= 0),
   "locationId" text not null,
@@ -56,17 +54,19 @@ create policy "authenticated_full_access" on public."productStock"
 
 -- ─── 2) stockTransfers ──────────────────────────────────────
 -- Moves of ingredients / fillings / products / packaging between
--- stock locations.
+-- stock locations. `entityId` is a uuid but left without an FK
+-- because it can point at several different tables; the entityType
+-- discriminator tells the app which one.
 create table if not exists public."stockTransfers" (
-  id text primary key,
+  id uuid primary key default gen_random_uuid(),
   "entityType" text not null
     check ("entityType" in ('ingredient', 'filling', 'product', 'packaging')),
-  "entityId" text not null,
+  "entityId" uuid not null,
   quantity numeric(12, 3) not null,
   "fromLocationId" text,
   "toLocationId" text not null,
   "transferredAt" timestamptz not null default now(),
-  "transferredByPersonId" text references public.people(id) on delete set null,
+  "transferredByPersonId" uuid references public.people(id) on delete set null,
   reason text not null default 'manual'
     check (reason in (
       'auto-replenish',
@@ -93,15 +93,15 @@ create policy "authenticated_full_access" on public."stockTransfers"
 -- ─── 3) temperatureReadings ─────────────────────────────────
 -- One row per manual temperature check against a cold storage unit.
 create table if not exists public."temperatureReadings" (
-  id text primary key,
-  "coldStorageUnitId" text not null
+  id uuid primary key default gen_random_uuid(),
+  "coldStorageUnitId" uuid not null
     references public."coldStorageUnits"(id) on delete cascade,
   "readingC" numeric(5, 2) not null,
   "loggedAt" timestamptz not null default now(),
-  "loggedByPersonId" text references public.people(id) on delete set null,
+  "loggedByPersonId" uuid references public.people(id) on delete set null,
   "inRange" boolean,
   "actionTaken" text,
-  "productionDayId" text references public."productionDays"(id) on delete set null,
+  "productionDayId" uuid references public."productionDays"(id) on delete set null,
   notes text,
   "createdAt" timestamptz not null default now()
 );
@@ -119,16 +119,16 @@ create policy "authenticated_full_access" on public."temperatureReadings"
 -- Out-of-range events opened against a reading; closed manually
 -- with resolution notes.
 create table if not exists public."haccpIncidents" (
-  id text primary key,
-  "coldStorageUnitId" text not null
+  id uuid primary key default gen_random_uuid(),
+  "coldStorageUnitId" uuid not null
     references public."coldStorageUnits"(id) on delete cascade,
-  "temperatureReadingId" text
+  "temperatureReadingId" uuid
     references public."temperatureReadings"(id) on delete set null,
   "startedAt" timestamptz not null default now(),
   "resolvedAt" timestamptz,
   "affectedStockNotes" text,
   "actionTaken" text,
-  "resolvedByPersonId" text references public.people(id) on delete set null,
+  "resolvedByPersonId" uuid references public.people(id) on delete set null,
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now()
 );
@@ -146,7 +146,7 @@ create policy "authenticated_full_access" on public."haccpIncidents"
 -- Log of every CSV upload (Shopify orders, HelloCash sales, stock
 -- counts). One row per upload, with preview + commit counts.
 create table if not exists public."csvImports" (
-  id text primary key,
+  id uuid primary key default gen_random_uuid(),
   "source" text not null
     check ("source" in (
       'shopify-orders',
@@ -157,7 +157,7 @@ create table if not exists public."csvImports" (
     )),
   filename text,
   "uploadedAt" timestamptz not null default now(),
-  "uploadedByPersonId" text references public.people(id) on delete set null,
+  "uploadedByPersonId" uuid references public.people(id) on delete set null,
   "rowsTotal" integer not null default 0,
   "rowsImported" integer not null default 0,
   "rowsSkipped" integer not null default 0,
@@ -185,12 +185,12 @@ create policy "authenticated_full_access" on public."csvImports"
 -- or packaging IDs. Populated when the user matches an unmapped
 -- row during a dry-run import.
 create table if not exists public."externalSkuMapping" (
-  id text primary key,
+  id uuid primary key default gen_random_uuid(),
   "source" text not null
     check ("source" in ('shopify', 'hellocash', 'other')),
   "externalSku" text not null,
-  "internalProductId" text references public.products(id) on delete set null,
-  "internalPackagingId" text references public.packaging(id) on delete set null,
+  "internalProductId" uuid references public.products(id) on delete set null,
+  "internalPackagingId" uuid references public.packaging(id) on delete set null,
   "createdAt" timestamptz not null default now(),
   unique ("source", "externalSku")
 );
@@ -204,15 +204,15 @@ create policy "authenticated_full_access" on public."externalSkuMapping"
   for all to authenticated using (true) with check (true);
 
 
--- ─── 7) location stock minimums (richer replacement) ────────
--- The legacy `stockMinimums` + `StockLocationMinimum` tables use a
--- channel string. This new table is generic (any entity) + linked to
--- any stock location id so multi-location expansion is trivial.
+-- ─── 7) locationStockMinimums ───────────────────────────────
+-- Generic replacement for the channel-based stockLocationMinimums.
+-- entityId is a uuid (points at products/ingredients/etc depending
+-- on entityType); not FK-constrained since the target varies.
 create table if not exists public."locationStockMinimums" (
-  id text primary key,
+  id uuid primary key default gen_random_uuid(),
   "entityType" text not null
     check ("entityType" in ('product', 'ingredient', 'filling', 'packaging')),
-  "entityId" text not null,
+  "entityId" uuid not null,
   "locationId" text not null,
   "minQuantity" numeric(12, 3) not null default 0,
   "targetQuantity" numeric(12, 3),

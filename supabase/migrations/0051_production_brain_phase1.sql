@@ -26,8 +26,8 @@
 -- Dismissals suppress re-proposal for 7 days unless conditions
 -- change.
 create table if not exists public."replenishmentProposals" (
-  id text primary key,
-  "productId" text not null references public.products(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  "productId" uuid not null references public.products(id) on delete cascade,
   "suggestedBatchSize" integer not null default 40,
   "earliestNeededDate" date not null,
   "priorityTier" integer not null default 2 check ("priorityTier" in (1, 2, 3)),
@@ -40,7 +40,7 @@ create table if not exists public."replenishmentProposals" (
     )),
   status text not null default 'pending'
     check (status in ('pending', 'scheduled', 'dismissed')),
-  "scheduledPlanId" text references public."productionPlans"(id) on delete set null,
+  "scheduledPlanId" uuid references public."productionPlans"(id) on delete set null,
   "dismissedUntil" date,
   "locationId" text,
   notes text,
@@ -66,8 +66,8 @@ create policy "authenticated_full_access" on public."replenishmentProposals"
 -- deductions. Engine reads the rolling 30d avg to forecast
 -- demand for #1.
 create table if not exists public."dailySellEstimates" (
-  id text primary key,
-  "productId" text not null references public.products(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  "productId" uuid not null references public.products(id) on delete cascade,
   "locationId" text not null,
   date date not null,
   "soldCount" integer not null default 0,
@@ -90,7 +90,7 @@ create policy "authenticated_full_access" on public."dailySellEstimates"
 -- Limited editions, seasonal boxes, launches. Drives
 -- auto-proposed ramp-up batches (reason='campaign-prep').
 create table if not exists public.campaigns (
-  id text primary key,
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   "type" text not null default 'seasonal'
     check ("type" in ('seasonal', 'limited', 'collaboration', 'launch')),
@@ -98,7 +98,7 @@ create table if not exists public.campaigns (
   "endDate" date not null,
   "productionStartDate" date,
   "targetTotalUnits" integer,
-  "productIds" text[] not null default '{}'::text[],
+  "productIds" uuid[] not null default '{}'::uuid[],
   status text not null default 'planned'
     check (status in ('planned', 'active', 'wrapping', 'done', 'cancelled')),
   "colorTag" text,
@@ -120,8 +120,6 @@ create policy "authenticated_full_access" on public.campaigns
 alter table public.products
   add column if not exists "priorityTier" integer not null default 2
     check ("priorityTier" in (1, 2, 3));
-alter table public.products
-  add column if not exists tags text[] not null default '{}'::text[];
 alter table public.products
   add column if not exists "includedInCustomBoxes" boolean not null default true;
 alter table public.products
@@ -179,7 +177,7 @@ alter table public."orderItems"
   add column if not exists "taxRatePercent" numeric(5, 2) not null default 10
     check ("taxRatePercent" >= 0 and "taxRatePercent" <= 100);
 alter table public."orderItems"
-  add column if not exists "packagingId" text references public.packaging(id) on delete set null;
+  add column if not exists "packagingId" uuid references public.packaging(id) on delete set null;
 
 
 -- ─── 7) mouldPool — new columns ──────────────────────────────
