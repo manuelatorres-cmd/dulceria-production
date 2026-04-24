@@ -269,12 +269,12 @@ function IngredientsTab() {
         </div>
         <button
           onClick={() => setF("showFilters", !f.showFilters)}
-          className={`relative rounded-full border p-2 transition-colors ${f.showFilters ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}
+          className={`relative rounded-sm border p-2 transition-colors ${f.showFilters ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}
           aria-label="Filters"
         >
           <SlidersHorizontal className="w-5 h-5" />
           {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-sm bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
               {activeFilterCount}
             </span>
           )}
@@ -282,7 +282,7 @@ function IngredientsTab() {
         <button
           onClick={() => setShowAdd(true)}
           title="Add ingredient (n)"
-          className="rounded-full bg-accent text-accent-foreground p-2"
+          className="rounded-sm bg-accent text-accent-foreground p-2"
           aria-label="Add ingredient"
         >
           <Plus className="w-5 h-5" />
@@ -546,7 +546,7 @@ function IngredientsTab() {
                                 {ing.allergens.filter((a) => VALID_TAGS.has(a)).length > 0 && (
                                   <div className="flex flex-wrap gap-1 mt-1">
                                     {ing.allergens.filter((a) => VALID_TAGS.has(a)).map((a) => (
-                                      <span key={a} className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold">
+                                      <span key={a} className="rounded-sm bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold">
                                         {allergenLabel(a)}
                                       </span>
                                     ))}

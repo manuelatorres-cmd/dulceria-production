@@ -174,7 +174,7 @@ export function AllocationSplitModal({
                   <button
                     type="button"
                     onClick={() => setFor(o.orderPlanLinkId, v - 1)}
-                    className="w-7 h-7 rounded-full border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
+                    className="w-7 h-7 rounded-sm border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
                   >
                     &minus;
                   </button>
@@ -192,7 +192,7 @@ export function AllocationSplitModal({
                   <button
                     type="button"
                     onClick={() => setFor(o.orderPlanLinkId, v + 1)}
-                    className="w-7 h-7 rounded-full border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
+                    className="w-7 h-7 rounded-sm border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
                   >
                     +
                   </button>
@@ -257,7 +257,7 @@ export function AllocationSplitModal({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-border px-4 py-2 text-sm"
+            className="rounded-sm border border-border px-4 py-2 text-sm"
           >
             Back
           </button>

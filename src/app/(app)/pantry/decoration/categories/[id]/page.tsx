@@ -104,7 +104,7 @@ export default function DecorationCategoryDetailPage({ params }: { params: Promi
               className="text-xl font-bold"
             />
             {category.archived && (
-              <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
+              <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
                 <Archive className="w-3 h-3" /> Archived
               </span>
             )}

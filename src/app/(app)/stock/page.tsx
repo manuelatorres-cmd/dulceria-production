@@ -130,7 +130,7 @@ export default function StockPage() {
         </div>
         <Link
           href="/stock/adjust"
-          className="ml-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary"
+          className="ml-auto inline-flex items-center gap-1 rounded-sm border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary"
           title="Opening balance, recounts, breakage"
         >
           Adjust stock →
@@ -369,7 +369,7 @@ function ProductStockTab() {
         >
           <SlidersHorizontal className="w-5 h-5" />
           {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-sm bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
               {activeFilterCount}
             </span>
           )}
@@ -484,18 +484,18 @@ function ProductStockTab() {
                         ? "border-status-warn-edge bg-status-warn-bg text-status-warn"
                         : "border-border bg-background text-foreground";
                       return (
-                        <span className={`shrink-0 rounded-full border ${pillCls} px-1.5 py-0 text-[10px] font-semibold tabular-nums inline-flex items-center gap-0.5`}>
+                        <span className={`shrink-0 rounded-sm border ${pillCls} px-1.5 py-0 text-[10px] font-semibold tabular-nums inline-flex items-center gap-0.5`}>
                           {group.totalProducts} pcs
                         </span>
                       );
                     })()}
                     {group.isLow && (
-                      <span className="shrink-0 rounded-full border border-status-warn-edge bg-status-warn-bg text-status-warn px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide">
+                      <span className="shrink-0 rounded-sm border border-status-warn-edge bg-status-warn-bg text-status-warn px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide">
                         Low
                       </span>
                     )}
                     {group.frozenProducts > 0 && (
-                      <span className="shrink-0 rounded-full border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-semibold inline-flex items-center gap-0.5">
+                      <span className="shrink-0 rounded-sm border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-semibold inline-flex items-center gap-0.5">
                         <Snowflake className="w-2.5 h-2.5" />
                         {group.frozenProducts}
                       </span>
@@ -532,7 +532,7 @@ function ProductStockTab() {
                           else if (empty) cls = "border-border/50 bg-muted/30 text-muted-foreground";
                           if (editing) {
                             return (
-                              <span key={loc} className={`rounded-full border px-1.5 py-0 text-[10px] font-medium inline-flex items-center gap-1 ${cls}`}>
+                              <span key={loc} className={`rounded-sm border px-1.5 py-0 text-[10px] font-medium inline-flex items-center gap-1 ${cls}`}>
                                 {STOCK_LOCATION_SHORT_LABELS[loc]}
                                 <input
                                   autoFocus
@@ -593,7 +593,7 @@ function ProductStockTab() {
                                 setCountingProductLocation({ productId: group.productId, location: loc });
                                 setLocationCountInput(String(qty));
                               }}
-                              className={`rounded-full border px-1.5 py-0 text-[10px] font-medium tabular-nums inline-flex items-center gap-0.5 hover:border-primary transition-colors ${cls}`}
+                              className={`rounded-sm border px-1.5 py-0 text-[10px] font-medium tabular-nums inline-flex items-center gap-0.5 hover:border-primary transition-colors ${cls}`}
                               title={`${STOCK_LOCATION_SHORT_LABELS[loc]}: ${qty} pcs${below ? ` (below minimum ${minimum})` : ""}. Click to recount.`}
                             >
                               {STOCK_LOCATION_SHORT_LABELS[loc]} {qty}
@@ -607,7 +607,7 @@ function ProductStockTab() {
                 {countingProductId !== group.productId && (
                   <button
                     onClick={() => { setCountingProductId(group.productId); setCountInput(String(group.totalProducts)); }}
-                    className="shrink-0 inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                    className="shrink-0 inline-flex items-center gap-1 rounded-sm border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                     title="Record the latest stock count for this product"
                   >
                     <ClipboardList className="w-3 h-3" /> Latest stock count
@@ -702,21 +702,21 @@ function ProductStockTab() {
                       <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
                         <button
                           onClick={() => setTransferPbId(pb.id!)}
-                          className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors inline-flex items-center gap-0.5"
+                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors inline-flex items-center gap-0.5"
                           title="Move pieces between Store / Production / Freezer / Allocated"
                         >
                           <Move className="w-3 h-3" /> Move
                         </button>
                         <button
                           onClick={() => setFreezingPbId(pb.id!)}
-                          className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:border-sky-500 hover:bg-sky-50 transition-colors inline-flex items-center gap-0.5"
+                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:border-sky-500 hover:bg-sky-50 transition-colors inline-flex items-center gap-0.5"
                           title="Move pieces to the freezer"
                         >
                           <Snowflake className="w-3 h-3" /> Freeze
                         </button>
                         <button
                           onClick={() => setConfirmGone(pb.id!)}
-                          className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
                         >
                           Gone
                         </button>
@@ -751,7 +751,7 @@ function ProductStockTab() {
                       <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
                         <button
                           onClick={() => setDefrostingPbId(pb.id!)}
-                          className="rounded-full border border-sky-200 bg-white px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-100 transition-colors"
+                          className="rounded-sm border border-sky-200 bg-white px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-100 transition-colors"
                         >
                           Defrost
                         </button>
@@ -1006,14 +1006,14 @@ function FillingStockTab() {
         >
           <SlidersHorizontal className="w-5 h-5" />
           {filterFreezer !== "all" && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-sm bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
               1
             </span>
           )}
         </button>
         <button
           onClick={() => setShowAdd((v) => !v)}
-          className="rounded-full border border-border bg-background p-2 transition-colors hover:bg-muted"
+          className="rounded-sm border border-border bg-background p-2 transition-colors hover:bg-muted"
           aria-label="Add filling stock"
           title="Add filling stock manually"
         >
@@ -1092,7 +1092,7 @@ function FillingStockTab() {
             <button
               onClick={handleAddManual}
               disabled={!addFillingId || !addAmount}
-              className="rounded-full bg-accent text-accent-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              className="rounded-sm bg-accent text-accent-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
             >
               Add
             </button>
@@ -1119,7 +1119,7 @@ function FillingStockTab() {
               </div>
               <div className="flex items-center gap-2">
                 {group.frozenG > 0 && (
-                  <span className="shrink-0 rounded-full border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-semibold inline-flex items-center gap-0.5">
+                  <span className="shrink-0 rounded-sm border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-semibold inline-flex items-center gap-0.5">
                     <Snowflake className="w-2.5 h-2.5" />
                     {Math.round(group.frozenG)}g
                   </span>
@@ -1222,7 +1222,7 @@ function FillingStockTab() {
                     {entry.frozen ? (
                       <button
                         onClick={() => setDefrostingId(entry.id!)}
-                        className="rounded-full border border-sky-200 bg-white px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-100 transition-colors"
+                        className="rounded-sm border border-sky-200 bg-white px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-100 transition-colors"
                       >
                         Defrost
                       </button>
@@ -1230,20 +1230,20 @@ function FillingStockTab() {
                       <>
                         <button
                           onClick={() => setFreezingId(entry.id!)}
-                          className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:border-sky-500 hover:bg-sky-50 transition-colors inline-flex items-center gap-0.5"
+                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:border-sky-500 hover:bg-sky-50 transition-colors inline-flex items-center gap-0.5"
                           title="Move to freezer"
                         >
                           <Snowflake className="w-3 h-3" /> Freeze
                         </button>
                         <button
                           onClick={() => { setAdjustingId(entry.id!); setAdjustInput(String(Math.round(entry.remainingG))); }}
-                          className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
                         >
                           Adjust
                         </button>
                         <button
                           onClick={() => setConfirmDiscard(entry.id!)}
-                          className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-status-alert hover:text-status-alert transition-colors"
+                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-status-alert hover:text-status-alert transition-colors"
                         >
                           Discard
                         </button>

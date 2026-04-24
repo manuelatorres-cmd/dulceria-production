@@ -200,12 +200,12 @@ export default function FillingConsolidationPage() {
                               <span className="text-[10px] text-muted-foreground">· {need.category}</span>
                             )}
                             {need.shared && (
-                              <span className="inline-flex items-center gap-0.5 rounded-full border border-primary/40 bg-primary/5 text-primary px-1.5 py-0 text-[10px] font-medium">
+                              <span className="inline-flex items-center gap-0.5 rounded-sm border border-primary/40 bg-primary/5 text-primary px-1.5 py-0 text-[10px] font-medium">
                                 <Users className="w-2.5 h-2.5" /> Shared ({need.usedBy.length})
                               </span>
                             )}
                             {need.frozenG > 0 && (
-                              <span className="inline-flex items-center gap-0.5 rounded-full border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-medium">
+                              <span className="inline-flex items-center gap-0.5 rounded-sm border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-medium">
                                 <Snowflake className="w-2.5 h-2.5" /> {formatGrams(need.frozenG)} frozen
                               </span>
                             )}

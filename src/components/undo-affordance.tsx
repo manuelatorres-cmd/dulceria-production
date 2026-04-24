@@ -80,7 +80,7 @@ export function UndoAffordance() {
       onClick={handleUndo}
       disabled={busy}
       title={`${label} — click or press Ctrl+Z to undo.`}
-      className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border border-border bg-card shadow-lg px-3 py-2 text-xs font-medium hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+      className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-sm border border-border bg-card shadow-lg px-3 py-2 text-xs font-medium hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
     >
       <RotateCcw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} />
       <span className="truncate max-w-[42ch]">

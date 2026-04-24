@@ -210,14 +210,14 @@ export default function PlanPage() {
           <div className="flex items-center gap-2">
             <Link
               href="/plan/fillings"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary hover:text-primary transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary hover:text-primary transition-colors"
             >
               <Flame className="w-3.5 h-3.5" /> Filling cooking list
             </Link>
             <button
               onClick={handleRegenerate}
               disabled={regenerating || !configStatus.isComplete}
-              className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
               {regenerating ? "Regenerating…" : "Regenerate plan"}
@@ -284,7 +284,7 @@ export default function PlanPage() {
                   <span className="w-32 text-right tabular-nums">
                     {row.usedMinutes} / {row.availableMinutes} min
                   </span>
-                  <span className={`w-20 text-right text-xs font-medium rounded-full border px-2 py-0.5 ${LEVEL_STYLE[row.level]}`}>
+                  <span className={`w-20 text-right text-xs font-medium rounded-sm border px-2 py-0.5 ${LEVEL_STYLE[row.level]}`}>
                     {row.utilisationPercent}%
                   </span>
                 </div>

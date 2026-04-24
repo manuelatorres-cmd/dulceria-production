@@ -384,7 +384,7 @@ function NewPlanContent() {
             {hasActiveVariants && (
               <button
                 onClick={() => setFilterToActiveVariant((v) => !v)}
-                className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-sm border px-2.5 py-1 text-xs font-medium transition-colors ${
                   filterToActiveVariant
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-muted-foreground"
@@ -529,7 +529,7 @@ function NewPlanContent() {
           <button
             onClick={() => setPhase("configure")}
             disabled={selectedIds.size === 0}
-            className="w-full rounded-full bg-accent text-accent-foreground py-2.5 text-sm font-medium disabled:opacity-50 mt-2"
+            className="w-full rounded-sm bg-accent text-accent-foreground py-2.5 text-sm font-medium disabled:opacity-50 mt-2"
           >
             Continue ({selectedIds.size} selected)
           </button>
@@ -657,14 +657,14 @@ function NewPlanContent() {
           <div className="flex gap-2">
             <button
               onClick={() => fromPlanId ? router.push("/production") : setPhase("select")}
-              className="rounded-full border border-border px-4 py-2.5 text-sm"
+              className="rounded-sm border border-border px-4 py-2.5 text-sm"
             >
               {fromPlanId ? "Cancel" : "Back"}
             </button>
             <button
               onClick={() => !isPastBatch && hasShelfStableFillings ? setPhase("batch-sizes") : handleCreate()}
               disabled={selectedProducts.some((r) => !config[r.id!]?.mouldId) || saving}
-              className="flex-1 rounded-full bg-accent text-accent-foreground py-2.5 text-sm font-medium disabled:opacity-50"
+              className="flex-1 rounded-sm bg-accent text-accent-foreground py-2.5 text-sm font-medium disabled:opacity-50"
             >
               {saving ? (isPastBatch ? "Logging…" : "Creating…") : !isPastBatch && hasShelfStableFillings ? "Continue" : isPastBatch ? "Log completed batch" : "Create plan"}
             </button>
@@ -893,13 +893,13 @@ function BatchSizesPhase({
           No fruit or nut-based fillings in this batch — nothing to configure.
         </p>
         <div className="flex gap-2">
-          <button onClick={onBack} className="rounded-full border border-border px-4 py-2.5 text-sm">
+          <button onClick={onBack} className="rounded-sm border border-border px-4 py-2.5 text-sm">
             Back
           </button>
           <button
             onClick={onCreate}
             disabled={saving}
-            className="flex-1 rounded-full bg-accent text-accent-foreground py-2.5 text-sm font-medium disabled:opacity-50"
+            className="flex-1 rounded-sm bg-accent text-accent-foreground py-2.5 text-sm font-medium disabled:opacity-50"
           >
             {saving ? "Creating…" : "Create plan"}
           </button>
@@ -959,7 +959,7 @@ function BatchSizesPhase({
                     {filling.name}
                     {frozenG > 0 && (
                       <span
-                        className="shrink-0 rounded-full border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-semibold inline-flex items-center gap-0.5"
+                        className="shrink-0 rounded-sm border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-semibold inline-flex items-center gap-0.5"
                         title={`${Math.round(frozenG)}g in the freezer — enable the toggle below to include it`}
                       >
                         ❄ {Math.round(frozenG)}g frozen
@@ -1178,13 +1178,13 @@ function BatchSizesPhase({
       </div>
 
       <div className="flex gap-2">
-        <button onClick={onBack} className="rounded-full border border-border px-4 py-2.5 text-sm">
+        <button onClick={onBack} className="rounded-sm border border-border px-4 py-2.5 text-sm">
           Back
         </button>
         <button
           onClick={onCreate}
           disabled={saving}
-          className="flex-1 rounded-full bg-accent text-accent-foreground py-2.5 text-sm font-medium disabled:opacity-50"
+          className="flex-1 rounded-sm bg-accent text-accent-foreground py-2.5 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Creating…" : "Create plan"}
         </button>

@@ -375,7 +375,7 @@ export default function DashboardPage() {
                     setPreviousReadings(await yesterdayTemperatureReadings());
                     setTempModalOpen(true);
                   }}
-                  className="inline-flex items-center gap-1 rounded-full border border-status-warn-edge bg-status-warn-bg text-status-warn px-3 py-1.5 text-xs font-medium"
+                  className="inline-flex items-center gap-1 rounded-sm border border-status-warn-edge bg-status-warn-bg text-status-warn px-3 py-1.5 text-xs font-medium"
                 >
                   <Thermometer className="w-3.5 h-3.5" /> Log temperatures
                 </button>
@@ -384,7 +384,7 @@ export default function DashboardPage() {
                 <button
                   onClick={handleOpenProduction}
                   disabled={busyDayAction === "opening"}
-                  className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                 >
                   <Play className="w-3.5 h-3.5" /> Open production
                 </button>
@@ -408,7 +408,7 @@ export default function DashboardPage() {
             <button
               onClick={handleCloseProduction}
               disabled={busyDayAction === "closing"}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-sm border border-border bg-card px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary disabled:opacity-50"
             >
               <Square className="w-3 h-3" /> Close production day
             </button>
@@ -526,7 +526,7 @@ export default function DashboardPage() {
                 <div key={row.date} className={`flex items-center px-3 py-1.5 text-sm border-b border-border last:border-b-0 ${row.level === "over" || row.level === "critical" ? "bg-destructive/5" : row.level === "warn" ? "bg-status-warn-bg/30" : ""}`}>
                   <span className="flex-1 font-medium">{formatDayLabel(row.date)}</span>
                   <span className="w-32 text-right tabular-nums text-xs text-muted-foreground">{row.usedMinutes} / {row.availableMinutes} min</span>
-                  <span className={`w-16 text-right text-xs font-medium rounded-full border px-2 py-0.5 ${LEVEL_STYLE[row.level]}`}>{row.utilisationPercent}%</span>
+                  <span className={`w-16 text-right text-xs font-medium rounded-sm border px-2 py-0.5 ${LEVEL_STYLE[row.level]}`}>{row.utilisationPercent}%</span>
                 </div>
               ))}
             </div>
@@ -589,7 +589,7 @@ export default function DashboardPage() {
                   <li key={f.id} className="flex items-center gap-2 px-3 py-2 text-sm">
                     <button
                       onClick={() => completeCustomerFollowup(f.id!, true)}
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${overdue ? "border-status-alert" : "border-border"}`}
+                      className={`w-4 h-4 rounded-sm border flex items-center justify-center shrink-0 ${overdue ? "border-status-alert" : "border-border"}`}
                       aria-label="Mark follow-up complete"
                     >
                       <CheckCircle className="w-3 h-3 opacity-0" />

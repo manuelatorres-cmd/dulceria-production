@@ -109,7 +109,7 @@ export default function CustomersPage() {
           </div>
           <button
             onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
+            className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
           >
             <Plus className="w-4 h-4" /> New customer
           </button>
@@ -138,7 +138,7 @@ export default function CustomersPage() {
               <button
                 onClick={handleCreate}
                 disabled={!newName.trim() || busy}
-                className="rounded-full bg-accent text-accent-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                className="rounded-sm bg-accent text-accent-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               >
                 {busy ? "Saving…" : "Create"}
               </button>
@@ -154,7 +154,7 @@ export default function CustomersPage() {
                 <button
                   key={t}
                   onClick={() => setSelectedTag(selectedTag === t ? "" : t)}
-                  className={`rounded-full border px-2 py-0.5 ${
+                  className={`rounded-sm border px-2 py-0.5 ${
                     selectedTag === t
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border text-muted-foreground"
@@ -233,7 +233,7 @@ export default function CustomersPage() {
                           );
                         })()}
                         {c.tags?.map((t) => (
-                          <span key={t} className="rounded-full border border-border px-1.5 py-0 text-[10px] text-muted-foreground">
+                          <span key={t} className="rounded-sm border border-border px-1.5 py-0 text-[10px] text-muted-foreground">
                             {t}
                           </span>
                         ))}

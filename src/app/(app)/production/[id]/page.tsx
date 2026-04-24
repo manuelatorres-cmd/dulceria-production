@@ -904,14 +904,14 @@ function PlanContent({
                   <Link
                     key={lo.orderId}
                     href={`/orders/${encodeURIComponent(lo.orderId)}`}
-                    className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 hover:border-primary hover:text-primary"
+                    className="inline-flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-0.5 hover:border-primary hover:text-primary"
                   >
                     <span className="truncate max-w-[14ch]">{lo.label}</span>
                     <span className="text-muted-foreground tabular-nums">· {lo.allocatedQuantity} pcs</span>
                   </Link>
                 ))}
                 {surplusPlanned > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
                     Surplus · {surplusPlanned} pcs
                   </span>
                 )}
@@ -929,7 +929,7 @@ function PlanContent({
                 if (!plan.id) return;
                 try { await startProductionPlan(plan.id); } catch (e) { console.error(e); }
               }}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:opacity-90"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:opacity-90"
               title="Mark this batch as in-progress and flip its linked orders to in production. Step ticks keep working as before."
             >
               <Play className="w-3.5 h-3.5" /> Start production
@@ -938,7 +938,7 @@ function PlanContent({
         </div>
 
         {/* Progress bar */}
-        <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className="mt-3 h-1.5 rounded-sm bg-muted overflow-hidden">
           <div
             className="h-full bg-accent rounded-full transition-all duration-300"
             style={{ width: `${(phaseDoneCount / PHASES.length) * 100}%` }}
@@ -1088,7 +1088,7 @@ function PlanContent({
                     return (
                       <li key={id} className="flex items-center gap-2.5">
                         <span
-                          className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0"
+                          className="w-3.5 h-3.5 rounded-sm border border-black/10 shrink-0"
                           style={{ backgroundColor: material?.color ?? "#9ca3af" }}
                         />
                         <span className="text-sm flex-1">{material?.name ?? id}</span>
@@ -1247,7 +1247,7 @@ function PlanContent({
                                 return (
                                   <span
                                     key={id}
-                                    className="inline-block w-2.5 h-2.5 rounded-full border border-black/10"
+                                    className="inline-block w-2.5 h-2.5 rounded-sm border border-black/10"
                                     style={{ backgroundColor: m?.color ?? "#9ca3af" }}
                                     title={m?.name ?? id}
                                   />
@@ -1349,7 +1349,7 @@ function PlanContent({
                 </button>
                 <button
                   onClick={() => setConfirmMarkDone(false)}
-                  className="rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground"
+                  className="rounded-sm border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground"
                 >
                   Cancel
                 </button>
@@ -1358,7 +1358,7 @@ function PlanContent({
           ) : (
             <button
               onClick={() => setConfirmMarkDone(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
             >
               <Check className="w-3.5 h-3.5" />
               Mark batch as done
@@ -1504,7 +1504,7 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
             return (
               <span
                 key={id}
-                className="inline-block w-3 h-3 rounded-full border border-black/10"
+                className="inline-block w-3 h-3 rounded-sm border border-black/10"
                 style={{ backgroundColor: m?.color ?? "#9ca3af" }}
                 title={m?.name ?? id}
               />

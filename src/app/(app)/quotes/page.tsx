@@ -82,7 +82,7 @@ export default function QuotesPage() {
           </select>
           <Link
             href="/quotes/new"
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
+            className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
           >
             <Plus className="w-4 h-4" /> New quote
           </Link>

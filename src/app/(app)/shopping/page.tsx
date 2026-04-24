@@ -197,7 +197,7 @@ export default function ShoppingPage() {
                             </Link>
                             <button
                               onClick={() => markIngredientOrdered(ing.id!)}
-                              className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
                               title="Mark as ordered"
                             >
                               <Check className="w-3 h-3" /> Ordered
@@ -249,7 +249,7 @@ export default function ShoppingPage() {
                             </Link>
                             <button
                               onClick={() => markPackagingOrdered(pkg.id!)}
-                              className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
                               title="Mark as ordered"
                             >
                               <Check className="w-3 h-3" /> Ordered
@@ -315,7 +315,7 @@ export default function ShoppingPage() {
                             </Link>
                             <button
                               onClick={() => markDecorationMaterialOrdered(m.id!)}
-                              className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
                               title="Mark as ordered"
                             >
                               <Check className="w-3 h-3" /> Ordered
@@ -369,7 +369,7 @@ export default function ShoppingPage() {
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               onClick={() => markShoppingItemOrdered(item.id!)}
-                              className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
                               title="Mark as ordered"
                             >
                               <Check className="w-3 h-3" /> Ordered

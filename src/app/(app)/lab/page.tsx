@@ -97,7 +97,7 @@ export default function LabPage() {
           <button
             onClick={() => setCreateMode("blank")}
             title="New blank experiment (n)"
-            className="w-full text-left group rounded-full border-2 border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all px-5 py-4"
+            className="w-full text-left group rounded-sm border-2 border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all px-5 py-4"
           >
             <div className="flex items-start gap-4">
               <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-sm bg-primary/10 group-hover:bg-primary/20 transition-colors flex items-center justify-center">
@@ -115,7 +115,7 @@ export default function LabPage() {
 
           <button
             onClick={() => setCreateMode("clone")}
-            className="w-full text-left group rounded-full border border-border bg-card hover:border-primary/30 hover:bg-muted/40 transition-all px-5 py-4"
+            className="w-full text-left group rounded-sm border border-border bg-card hover:border-primary/30 hover:bg-muted/40 transition-all px-5 py-4"
           >
             <div className="flex items-start gap-4">
               <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-sm bg-muted group-hover:bg-primary/10 transition-colors flex items-center justify-center">
@@ -429,14 +429,14 @@ function ExperimentCard({
             <>
               <button
                 onClick={() => router.push(`/calculator/${encodeURIComponent(id)}/run`)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors"
               >
                 <Play className="w-3.5 h-3.5" />
                 Make product
               </button>
               <button
                 onClick={() => router.push(`/calculator/${encodeURIComponent(id)}`)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-xs text-foreground hover:bg-muted transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-border text-xs text-foreground hover:bg-muted transition-colors"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 Edit product
@@ -444,7 +444,7 @@ function ExperimentCard({
               {needsWork && (
                 <button
                   onClick={() => onNewVersion(id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/30 text-xs text-primary hover:bg-primary/5 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-primary/30 text-xs text-primary hover:bg-primary/5 transition-colors"
                 >
                   <GitBranch className="w-3.5 h-3.5" />
                   New version

@@ -252,7 +252,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
               </span>
             )}
             {filling.archived && (
-              <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1">
+              <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1">
                 <Archive className="w-3 h-3" /> Archived
               </span>
             )}
@@ -380,7 +380,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                 {filling.allergens.map((a) => (
                   <span
                     key={a}
-                    className="rounded-full border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-xs"
+                    className="rounded-sm border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-xs"
                   >
                     {allergenLabel(a)}
                   </span>
@@ -546,7 +546,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                     <ul className="space-y-1">
                       {forkImpact.map((r) => (
                         <li key={r.id} className="text-xs font-medium flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-primary shrink-0" />
+                          <span className="w-1 h-1 rounded-sm bg-primary shrink-0" />
                           {r.name}
                         </li>
                       ))}
@@ -662,7 +662,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                     <ul className="space-y-1">
                       {archiveImpact.multiFillingProducts.map((r) => (
                         <li key={r.id} className="text-xs font-medium flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-primary shrink-0" />
+                          <span className="w-1 h-1 rounded-sm bg-primary shrink-0" />
                           {r.name}
                         </li>
                       ))}
@@ -744,7 +744,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                         <ul className="space-y-1">
                           {deleteImpact.multiFillingProducts.map((r) => (
                             <li key={r.id} className="text-xs font-medium flex items-center gap-1.5">
-                              <span className="w-1 h-1 rounded-full bg-primary shrink-0" />
+                              <span className="w-1 h-1 rounded-sm bg-primary shrink-0" />
                               {r.name}
                             </li>
                           ))}
@@ -786,7 +786,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                         <ul className="space-y-1">
                           {deletableProducts.map((r) => (
                             <li key={r.id} className="text-xs font-medium flex items-center gap-1.5">
-                              <span className="w-1 h-1 rounded-full bg-destructive shrink-0" />
+                              <span className="w-1 h-1 rounded-sm bg-destructive shrink-0" />
                               {r.name}
                             </li>
                           ))}
@@ -813,7 +813,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                         });
                         router.replace("/fillings");
                       }}
-                      className="inline-flex items-center justify-center rounded-full bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
+                      className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
                     >
                       Yes, delete filling
                     </button>

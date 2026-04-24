@@ -96,7 +96,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
+              className="inline-flex items-center gap-1 rounded-sm border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
             >
               <Printer className="w-3.5 h-3.5" /> Print / PDF
             </button>
@@ -104,7 +104,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               <button
                 onClick={startConvert}
                 disabled={converting}
-                className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               >
                 <Check className="w-3.5 h-3.5" /> {converting ? "Converting…" : "Convert to order"}
               </button>
@@ -112,7 +112,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             {quote.convertedToOrderId && (
               <Link
                 href={`/orders/${encodeURIComponent(quote.convertedToOrderId)}`}
-                className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs text-primary hover:border-primary"
+                className="inline-flex items-center gap-1 rounded-sm border border-border px-3 py-1.5 text-xs text-primary hover:border-primary"
               >
                 View order →
               </Link>
@@ -142,7 +142,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               <button
                 onClick={() => { const d = deadlinePrompt; setDeadlinePrompt(null); finishConvert(d!); }}
                 disabled={!deadlinePrompt || converting}
-                className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50"
+                className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50"
               >
                 {converting ? "Converting…" : "Convert with this date"}
               </button>
@@ -164,7 +164,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             <p className="text-xs text-destructive">Delete this quote permanently?</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(false)} className="text-xs text-muted-foreground">Cancel</button>
-              <button onClick={handleDelete} className="rounded-full bg-destructive text-white px-3 py-1 text-xs font-medium">
+              <button onClick={handleDelete} className="rounded-sm bg-destructive text-white px-3 py-1 text-xs font-medium">
                 Delete
               </button>
             </div>

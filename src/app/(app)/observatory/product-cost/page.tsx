@@ -589,7 +589,7 @@ export default function ProductCostPage() {
                   <button
                     key={cat}
                     onClick={() => toggleFillingCat(cat)}
-                    className={`text-[11px] px-2 py-0.5 rounded-full border font-medium transition-colors ${
+                    className={`text-[11px] px-2 py-0.5 rounded-sm border font-medium transition-colors ${
                       active
                         ? catChipClass(cat) + " ring-1 ring-current/40"
                         : "text-muted-foreground bg-background border-border hover:bg-muted/60"
@@ -846,7 +846,7 @@ export default function ProductCostPage() {
             {[...new Set(focusCategories)].map((cat) => (
               <span
                 key={cat}
-                className={`text-xs px-2 py-0.5 rounded-full border font-medium ${catChipClass(cat)}`}
+                className={`text-xs px-2 py-0.5 rounded-sm border font-medium ${catChipClass(cat)}`}
               >
                 {shortCat(cat)}
               </span>
@@ -993,7 +993,7 @@ export default function ProductCostPage() {
             <button
               onClick={() => setAddingCompare(true)}
               disabled={compareIds.length >= 3}
-              className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
+              className={`text-sm px-3 py-1.5 rounded-sm border transition-colors ${
                 compareIds.length >= 3
                   ? "border-border text-muted-foreground/40 cursor-not-allowed"
                   : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"

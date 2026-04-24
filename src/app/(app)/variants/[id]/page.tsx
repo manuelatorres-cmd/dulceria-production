@@ -773,7 +773,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 {labels.map((label) => (
                   <span
                     key={label}
-                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
+                    className="inline-flex items-center gap-1 rounded-sm bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
                   >
                     {label}
                     <button
@@ -838,7 +838,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_CLASS[status]}`}>
                 {STATUS_LABEL[status]}
               </span>
-              <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize">
+              <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-sm bg-muted text-muted-foreground capitalize">
                 {variant.kind ?? "curated"}
               </span>
               <span className="text-[11px] text-muted-foreground">
@@ -869,7 +869,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                   <Link
                     key={label}
                     href={`/collections/${encodeURIComponent(label.toLowerCase())}`}
-                    className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium hover:bg-primary/20 transition-colors"
+                    className="inline-flex items-center rounded-sm bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium hover:bg-primary/20 transition-colors"
                   >
                     {label}
                   </Link>
@@ -1471,7 +1471,7 @@ function BoxExtras({
           </p>
           <ul className="flex flex-wrap gap-1">
             {composition.map((vpp) => (
-              <li key={vpp.id} className="text-[11px] rounded-full bg-muted text-foreground px-2 py-0.5">
+              <li key={vpp.id} className="text-[11px] rounded-sm bg-muted text-foreground px-2 py-0.5">
                 {productMap.get(vpp.productId) ?? vpp.productId} &times; {vpp.qty}
               </li>
             ))}

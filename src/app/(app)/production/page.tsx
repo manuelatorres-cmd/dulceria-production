@@ -201,7 +201,7 @@ export default function ProductionPage() {
                         {DAY_STATUS_LABEL[day.status]}
                       </span>
                       {isToday && (
-                        <span className="text-[10px] uppercase tracking-wide rounded-full bg-primary text-primary-foreground px-2 py-0.5">
+                        <span className="text-[10px] uppercase tracking-wide rounded-sm bg-primary text-primary-foreground px-2 py-0.5">
                           Today
                         </span>
                       )}
@@ -286,7 +286,7 @@ export default function ProductionPage() {
                                     return (
                                       <span
                                         key={stepId}
-                                        className={`rounded-full border px-1.5 py-0.5 flex items-center gap-1 ${
+                                        className={`rounded-sm border px-1.5 py-0.5 flex items-center gap-1 ${
                                           done
                                             ? "border-status-ok/40 bg-status-ok/10 text-status-ok"
                                             : "border-border bg-card text-muted-foreground"
@@ -368,13 +368,13 @@ export default function ProductionPage() {
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => setConfirmDeleteId(null)}
-                  className="text-sm rounded-full border border-border px-3 py-1.5 hover:bg-muted"
+                  className="text-sm rounded-sm border border-border px-3 py-1.5 hover:bg-muted"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleDelete(confirmDeleteId)}
-                  className="text-sm rounded-full bg-destructive text-destructive-foreground px-3 py-1.5 hover:opacity-90"
+                  className="text-sm rounded-sm bg-destructive text-destructive-foreground px-3 py-1.5 hover:opacity-90"
                 >
                   Delete
                 </button>

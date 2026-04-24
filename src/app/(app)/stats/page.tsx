@@ -428,7 +428,7 @@ export default function StatsPage() {
               <button
                 key={p.value}
                 onClick={() => handlePresetChange(p.value)}
-                className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                className={`px-3 py-1 text-xs rounded-sm border transition-colors ${
                   timePreset === p.value
                     ? "bg-stone-800 text-white border-stone-800"
                     : "bg-transparent text-stone-600 border-stone-300 hover:bg-stone-100 hover:border-stone-400"

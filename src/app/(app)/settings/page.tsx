@@ -235,7 +235,7 @@ function BackupTab({
           <button
             onClick={onExport}
             disabled={exporting}
-            className="w-full rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium disabled:opacity-50"
+            className="w-full rounded-sm bg-primary text-primary-foreground py-2 text-sm font-medium disabled:opacity-50"
           >
             {exporting ? "Exporting…" : "Export backup"}
           </button>
@@ -407,7 +407,7 @@ function DemoDataSection() {
         {state === "idle" && (
           <button
             onClick={handleLoad}
-            className="w-full rounded-full border border-border py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full rounded-sm border border-border py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             Load demo data
           </button>
@@ -473,7 +473,7 @@ function ClearAllDataSection() {
         {state === "idle" && (
           <button
             onClick={() => setState("confirm")}
-            className="w-full rounded-full border border-destructive/30 text-destructive py-2 text-sm font-medium hover:bg-destructive/5 transition-colors"
+            className="w-full rounded-sm border border-destructive/30 text-destructive py-2 text-sm font-medium hover:bg-destructive/5 transition-colors"
           >
             Delete all data
           </button>
@@ -486,13 +486,13 @@ function ClearAllDataSection() {
             <div className="flex gap-2">
               <button
                 onClick={handleClear}
-                className="flex-1 rounded-full bg-destructive text-white py-2 text-sm font-medium"
+                className="flex-1 rounded-sm bg-destructive text-white py-2 text-sm font-medium"
               >
                 Yes, delete everything
               </button>
               <button
                 onClick={() => setState("idle")}
-                className="rounded-full border border-border px-4 py-2 text-sm"
+                className="rounded-sm border border-border px-4 py-2 text-sm"
               >
                 Cancel
               </button>
@@ -767,7 +767,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
         <button
           onClick={handleSave}
           disabled={saving || !isDirty}
-          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save buffers & thresholds"}
         </button>
@@ -1058,7 +1058,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         {roles.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2">
             {roles.map((r) => (
-              <span key={r} className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">
+              <span key={r} className="inline-flex items-center gap-1 rounded-sm bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">
                 {r}
                 <button
                   onClick={() => removeRole(r)}
@@ -1089,7 +1089,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
             type="button"
             onClick={() => addRole(roleDraft)}
             disabled={!roleDraft.trim()}
-            className="rounded-full border border-border px-3 py-1.5 text-sm disabled:opacity-50"
+            className="rounded-sm border border-border px-3 py-1.5 text-sm disabled:opacity-50"
           >
             Add role
           </button>
@@ -1156,7 +1156,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 key={day}
                 type="button"
                 onClick={() => toggleWorkingDay(day)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-card text-muted-foreground border-border hover:bg-muted"
@@ -1173,14 +1173,14 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         <button
           onClick={handleSave}
           disabled={saving || !name.trim()}
-          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : isNew ? "Add person" : "Save changes"}
         </button>
         {onCancel && (
           <button
             onClick={onCancel}
-            className="rounded-full border border-border px-4 py-2 text-sm"
+            className="rounded-sm border border-border px-4 py-2 text-sm"
           >
             Cancel
           </button>
@@ -1267,13 +1267,13 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
             <button
               onClick={handleAdd}
               disabled={!canSave}
-              className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50"
+              className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50"
             >
               {saving ? "Adding…" : "Add"}
             </button>
             <button
               onClick={() => { setAdding(false); setStartDate(""); setEndDate(""); setNotes(""); }}
-              className="rounded-full border border-border px-3 py-1 text-xs"
+              className="rounded-sm border border-border px-3 py-1 text-xs"
             >
               Cancel
             </button>
@@ -1473,7 +1473,7 @@ function EquipmentCard({ equipment: eq, expanded, onToggle }: {
             </p>
           </div>
         </button>
-        <span className={`shrink-0 rounded-full border text-[10px] font-medium px-2 py-0.5 ${availColor}`}>
+        <span className={`shrink-0 rounded-sm border text-[10px] font-medium px-2 py-0.5 ${availColor}`}>
           {EQUIPMENT_AVAILABILITY_LABEL[avail]}
         </span>
       </div>
@@ -1741,14 +1741,14 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
         <button
           onClick={handleSave}
           disabled={saving || !name.trim()}
-          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : isNew ? "Add equipment" : "Save changes"}
         </button>
         {onCancel && (
           <button
             onClick={onCancel}
-            className="rounded-full border border-border px-4 py-2 text-sm"
+            className="rounded-sm border border-border px-4 py-2 text-sm"
           >
             Cancel
           </button>
@@ -2163,14 +2163,14 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
         <button
           onClick={handleSave}
           disabled={saving || !name.trim() || activeMinutes === "" || waitingMinutes === ""}
-          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : isNew ? "Add step" : "Save changes"}
         </button>
         {onCancel && (
           <button
             onClick={onCancel}
-            className="rounded-full border border-border px-4 py-2 text-sm"
+            className="rounded-sm border border-border px-4 py-2 text-sm"
           >
             Cancel
           </button>
@@ -2267,13 +2267,13 @@ function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
             <button
               onClick={handleAdd}
               disabled={!canSave}
-              className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving ? "Adding…" : "Add"}
             </button>
             <button
               onClick={() => { setAdding(false); setName(""); setStartDate(""); setEndDate(""); }}
-              className="rounded-full border border-border px-4 py-2 text-sm"
+              className="rounded-sm border border-border px-4 py-2 text-sm"
             >
               Cancel
             </button>
@@ -2480,7 +2480,7 @@ function PreferencesTab({
           <div />
           <button
             onClick={startEditing}
-            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Pencil className="w-3.5 h-3.5" />
             Edit
@@ -2643,13 +2643,13 @@ function PreferencesTab({
       <div className="flex gap-2">
         <button
           onClick={handleSave}
-          className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium"
+          className="flex-1 rounded-sm bg-primary text-primary-foreground py-2 text-sm font-medium"
         >
           Save
         </button>
         <button
           onClick={handleCancel}
-          className="rounded-full border border-border px-4 py-2 text-sm"
+          className="rounded-sm border border-border px-4 py-2 text-sm"
         >
           Cancel
         </button>

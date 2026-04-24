@@ -182,7 +182,7 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
           <button
             onClick={handleFreeze}
             disabled={!anyPositive}
-            className="rounded-full border border-sky-200 bg-white px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+            className="rounded-sm border border-sky-200 bg-white px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
           >
             <Snowflake className="w-4 h-4" /> Freeze leftover
           </button>

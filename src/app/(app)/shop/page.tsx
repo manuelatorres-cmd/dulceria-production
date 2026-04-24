@@ -521,10 +521,10 @@ function ClosuresEditor({ closures }: {
           />
           <div className="flex gap-2">
             <button onClick={handleAdd} disabled={saving}
-              className="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
+              className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
               {saving ? "Adding…" : "Add closure"}
             </button>
-            <button onClick={() => setAdding(false)} className="rounded-full border border-border px-3 py-1 text-xs">
+            <button onClick={() => setAdding(false)} className="rounded-sm border border-border px-3 py-1 text-xs">
               Cancel
             </button>
           </div>

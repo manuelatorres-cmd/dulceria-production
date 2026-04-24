@@ -181,7 +181,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                   className="text-xl font-bold"
                 />
                 {pkg.archived && (
-                  <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
+                  <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
                     <Archive className="w-3 h-3" /> Archived
                   </span>
                 )}
@@ -438,7 +438,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
             <button
               onClick={() => setShowOrderForm(true)}
               disabled={editing}
-              className="w-full rounded-full border border-dashed border-border py-4 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full rounded-sm border border-dashed border-border py-4 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
               Log first purchase
@@ -456,7 +456,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                             await deletePackagingOrder(order.id!);
                             setDeletingOrderId(null);
                           }}
-                          className="inline-flex items-center justify-center rounded-full bg-destructive text-white px-3 py-1.5 text-xs font-medium transition-colors hover:bg-destructive/90"
+                          className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-3 py-1.5 text-xs font-medium transition-colors hover:bg-destructive/90"
                         >
                           Yes, delete
                         </button>
@@ -557,7 +557,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                       await deletePackaging(packagingId);
                       router.replace("/packaging");
                     }}
-                    className="inline-flex items-center justify-center rounded-full bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
+                    className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
                   >
                     Yes, delete packaging
                   </button>

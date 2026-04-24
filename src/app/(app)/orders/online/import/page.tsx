@@ -127,7 +127,7 @@ export default function ShopifyImportPage() {
               <p className="text-sm">Drop your Shopify orders CSV here or</p>
               <button
                 onClick={() => fileRef.current?.click()}
-                className="mt-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium"
+                className="mt-2 rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium"
               >
                 Choose file
               </button>
@@ -216,7 +216,7 @@ export default function ShopifyImportPage() {
                   <button
                     onClick={handleImport}
                     disabled={importable.orders.length === 0 || importing}
-                    className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+                    className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
                   >
                     {importing
                       ? "Importing…"

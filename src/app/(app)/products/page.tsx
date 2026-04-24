@@ -330,19 +330,19 @@ function ProductsTab() {
           </div>
           <button
             onClick={() => setF("showFilters", !f.showFilters)}
-            className={`relative rounded-full border p-2 transition-colors ${f.showFilters ? "bg-accent text-accent-foreground border-accent" : "border-border bg-background"}`}
+            className={`relative rounded-sm border p-2 transition-colors ${f.showFilters ? "bg-accent text-accent-foreground border-accent" : "border-border bg-background"}`}
             aria-label="Filters"
           >
             <SlidersHorizontal className="w-5 h-5" />
             {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-sm bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
           </button>
           <button
             onClick={() => setShowAdd(true)}
-            className="rounded-full bg-accent text-accent-foreground p-2"
+            className="rounded-sm bg-accent text-accent-foreground p-2"
             aria-label="Add new product"
           >
             <Plus className="w-5 h-5" />
@@ -660,12 +660,12 @@ function ProductRow({ product, productionInfo, fillingNames, allergens }: { prod
           {(hasTags || hasAllergens) && (
             <div className="flex flex-wrap gap-1 mt-0.5">
               {(product.tags ?? []).map((tag) => (
-                <span key={tag} className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[10px] capitalize">
+                <span key={tag} className="rounded-sm bg-muted text-muted-foreground px-2 py-0.5 text-[10px] capitalize">
                   {tag}
                 </span>
               ))}
               {(allergens ?? []).map((a) => (
-                <span key={a} className="rounded-full border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-[10px]">
+                <span key={a} className="rounded-sm border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-[10px]">
                   {allergenLabel(a)}
                 </span>
               ))}

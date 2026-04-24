@@ -370,13 +370,13 @@ function NewQuotePageInner() {
             <div className="flex items-center gap-2">
               <button
                 onClick={addProductLine}
-                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
+                className="inline-flex items-center gap-1 rounded-sm border border-border px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
               >
                 <Plus className="w-3 h-3" /> Product
               </button>
               <button
                 onClick={addBoxLine}
-                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
+                className="inline-flex items-center gap-1 rounded-sm border border-border px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
               >
                 <Package className="w-3 h-3" /> Box
               </button>
@@ -624,7 +624,7 @@ function NewQuotePageInner() {
             <button
               onClick={() => handleSave("draft")}
               disabled={!canSave}
-              className="rounded-full border border-border bg-card px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="rounded-sm border border-border bg-card px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               Save as draft
             </button>
@@ -632,7 +632,7 @@ function NewQuotePageInner() {
               onClick={() => handleSave("sent")}
               disabled={!canSave || isWhatIf}
               title={isWhatIf ? "What-If quotes can only be saved as drafts" : undefined}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               <FileText className="w-3.5 h-3.5" /> Save &amp; send
             </button>

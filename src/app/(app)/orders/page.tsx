@@ -205,14 +205,14 @@ export default function OrdersPage() {
           <div className="flex items-center gap-2 shrink-0">
             <Link
               href="/orders/online"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"
+              className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"
             >
               <ShoppingBag className="w-3.5 h-3.5" /> Online
             </Link>
             {!adding && (
               <button
                 onClick={() => setAdding(true)}
-                className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
+                className="flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
               >
                 <Plus className="w-3.5 h-3.5" /> New order
               </button>
@@ -228,7 +228,7 @@ export default function OrdersPage() {
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                 filterStatus === s
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-card text-muted-foreground border-border hover:bg-muted"
@@ -801,14 +801,14 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
           <button
             type="button"
             onClick={() => setShowAddVariant((v) => !v)}
-            className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
+            className="flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
           >
             <Plus className="w-3.5 h-3.5" /> Add variant
           </button>
           <button
             type="button"
             onClick={addEmptyLine}
-            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            className="flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
           >
             <Plus className="w-3.5 h-3.5" /> Add product
           </button>
@@ -951,11 +951,11 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
         <button
           onClick={handleSave}
           disabled={!canSave}
-          className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save order"}
         </button>
-        <button onClick={onCancel} className="rounded-full border border-border px-4 py-2 text-sm">
+        <button onClick={onCancel} className="rounded-sm border border-border px-4 py-2 text-sm">
           Cancel
         </button>
       </div>
@@ -1106,7 +1106,7 @@ function StockSourceButton({ icon, label, active, disabled, onClick }: {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+      className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-[11px] font-medium transition-colors ${
         active
           ? "bg-primary text-primary-foreground border-primary"
           : "border-border text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:text-muted-foreground"
@@ -1180,7 +1180,7 @@ function PartialStockPrompt({ lines, onApply, onCancel }: {
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-border px-4 py-2 text-sm"
+            className="rounded-sm border border-border px-4 py-2 text-sm"
           >
             Back to edit
           </button>
@@ -1188,7 +1188,7 @@ function PartialStockPrompt({ lines, onApply, onCancel }: {
             type="button"
             onClick={() => onApply(local)}
             disabled={!allDecided}
-            className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             Apply &amp; save
           </button>

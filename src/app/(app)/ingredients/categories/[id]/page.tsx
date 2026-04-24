@@ -111,7 +111,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
               className="text-xl font-bold"
             />
             {category.archived && (
-              <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
+              <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
                 <Archive className="w-3 h-3" /> Archived
               </span>
             )}
@@ -191,7 +191,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
                 <div className="flex gap-2">
                   <button
                     onClick={handleHardDelete}
-                    className="rounded-full bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
+                    className="rounded-sm bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
                   >
                     Yes, delete
                   </button>

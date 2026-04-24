@@ -404,7 +404,7 @@ function FillingsTab() {
                               {filling.allergens.map((a) => (
                                 <span
                                   key={a}
-                                  className="rounded-full border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-[10px]"
+                                  className="rounded-sm border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-[10px]"
                                 >
                                   {allergenLabel(a)}
                                 </span>

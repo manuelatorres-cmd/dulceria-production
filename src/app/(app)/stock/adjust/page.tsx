@@ -282,7 +282,7 @@ export default function StockAdjustPage() {
           <div className="mt-3 flex items-center gap-2">
             <button
               onClick={addRow}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary"
+              className="inline-flex items-center gap-1 rounded-sm border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary"
             >
               <Plus className="w-3.5 h-3.5" /> Add row
             </button>
@@ -290,7 +290,7 @@ export default function StockAdjustPage() {
             <button
               onClick={handleSave}
               disabled={!canSave}
-              className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
               {saving

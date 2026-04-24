@@ -51,7 +51,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
+              className="inline-flex items-center gap-1 rounded-sm border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
             >
               <Printer className="w-3.5 h-3.5" /> Print
             </button>
@@ -60,7 +60,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
                 onClick={handleShip}
                 disabled={shortfall}
                 title={shortfall ? "Short on stock — produce more before shipping" : undefined}
-                className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               >
                 <Truck className="w-3.5 h-3.5" /> Mark shipped
               </button>

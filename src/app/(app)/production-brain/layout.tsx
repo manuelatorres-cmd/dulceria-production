@@ -44,7 +44,7 @@ export default function ProductionBrainLayout({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      <nav className="flex flex-wrap gap-1 mb-5 p-1 rounded-full bg-muted w-fit">
+      <nav className="flex flex-wrap gap-1 mb-5 p-1 rounded-sm bg-muted w-fit">
         {TABS.map((tab) => {
           const active =
             pathname === tab.href || pathname.startsWith(tab.href + "/");
