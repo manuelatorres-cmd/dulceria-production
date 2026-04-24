@@ -1,4 +1,4 @@
-const CACHE_NAME = "dulceria-v1";
+const CACHE_NAME = "dulceria-v2-design";
 const PRECACHE_URLS = ["/", "/products", "/fillings", "/ingredients", "/moulds", "/calculator"];
 
 self.addEventListener("install", (event) => {
