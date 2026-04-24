@@ -69,18 +69,24 @@ export function FilterChipGroup(props: FilterChipGroupProps) {
 
   return (
     <div>
-      <p className="text-xs text-muted-foreground mb-1">{props.label}</p>
+      <p
+        className="text-[10px] text-muted-foreground mb-1.5 font-medium uppercase"
+        style={{ letterSpacing: "0.1em" }}
+      >
+        {props.label}
+      </p>
       <div className="flex flex-wrap gap-1">
         {props.options.map((opt) => (
           <button
             key={opt.value}
             type="button"
             onClick={() => handleClick(opt.value)}
-            className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+            className={`px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
               isActive(opt.value)
-                ? "bg-accent text-accent-foreground"
-                : "border border-border hover:bg-muted"
+                ? "bg-foreground text-background border border-foreground"
+                : "border border-border bg-card hover:border-foreground/40 hover:bg-muted"
             }`}
+            style={{ borderRadius: 3 }}
           >
             {opt.label}
           </button>

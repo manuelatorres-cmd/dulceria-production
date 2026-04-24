@@ -24,13 +24,17 @@ export function FilterPanel({
   onClearAll: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+    <div
+      className="border border-border bg-card p-4 space-y-3.5"
+      style={{ borderRadius: 4 }}
+    >
       {children}
       {activeFilterCount > 0 && (
         <button
           type="button"
           onClick={onClearAll}
-          className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+          className="text-[11px] text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors uppercase"
+          style={{ letterSpacing: "0.08em" }}
         >
           <X className="w-3 h-3" />
           Clear all filters
