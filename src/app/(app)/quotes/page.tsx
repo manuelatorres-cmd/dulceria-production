@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import { useCustomers } from "@/lib/hooks";
+import { useCustomers, saveQuote } from "@/lib/hooks";
 import { quoteFromRow } from "@/lib/hooks";
 import { QUOTE_STATUSES, QUOTE_STATUS_LABELS, type QuoteStatus } from "@/types";
 import { Plus, Search, FileText } from "lucide-react";
@@ -21,6 +21,25 @@ export default function QuotesPage() {
     queryFn: async () => assertOk(await supabase.from("quotes").select("*").order("createdAt", { ascending: false })) as Array<Record<string, unknown>>,
   });
   const quotes = useMemo(() => rawQuotes.map(quoteFromRow), [rawQuotes]);
+
+  // Auto-expire sent quotes whose expiresAt has passed. Runs once per
+  // page mount; keeps a ref of IDs already flipped so re-renders don't
+  // re-fire. No cron — the check runs any time Manuela opens this page.
+  const autoExpiredRef = useRef(new Set<string>());
+  useEffect(() => {
+    const now = Date.now();
+    const stale = quotes.filter(
+      (q) =>
+        q.id &&
+        q.status === "sent" &&
+        q.expiresAt &&
+        new Date(q.expiresAt).getTime() < now &&
+        !autoExpiredRef.current.has(q.id),
+    );
+    if (stale.length === 0) return;
+    for (const q of stale) autoExpiredRef.current.add(q.id!);
+    void Promise.all(stale.map((q) => saveQuote({ ...q, status: "expired" })));
+  }, [quotes]);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<QuoteStatus | "all">("all");
