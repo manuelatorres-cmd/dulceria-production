@@ -37,8 +37,26 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 - Migration `0052_production_brain_phase2.sql` (additive). New tables:
   `equipmentInstances`, `machineLoads`, `coldStorageUnits`,
   `mouldUsageLog`, `staffShifts`, `personAvailabilityExceptions`.
-  Hooks + backup/restore updated to match. UI for these lands in a
-  later phase.
+  Hooks + backup/restore updated to match.
+- Migration `0053_production_brain_phase3.sql` (additive). New tables:
+  `productStock`, `stockTransfers`, `temperatureReadings`,
+  `haccpIncidents`, `csvImports`, `externalSkuMapping`,
+  `locationStockMinimums`. Hooks + backup/restore updated to match.
+
+### Added (continued)
+- **Equipment dashboard** at `/production-brain/equipment` — live
+  machine cards (chocolate loaded, aging warning), mould-pool grid
+  coloured by state, cold-storage list with HACCP targets.
+- **Clock-in widget** (`src/components/clock-in-widget.tsx`) mounted
+  on the Daily view right rail. One-tap Start/Stop per person.
+  Shifts link to the selected batch's plan id so labor cost
+  attribution is automatic.
+- **Engine runner** (`src/lib/engineRunner.ts`) ties the pure
+  scheduling engines to live Supabase data. `Run scheduling engine`
+  button on the dashboard triggers replenishment + campaign cycles
+  and upserts resulting proposals.
+- Side-nav links to `/production-brain` under the Workshop section
+  (still flag-gated; hidden until enabled on each device).
 
 ## [0.1.0] — 2026-04-19
 
