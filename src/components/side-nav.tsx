@@ -58,11 +58,13 @@ const SECTIONS: SectionDef[] = [
   },
   {
     label: "The Observatory",
-    routes: ["/observatory", "/pricing", "/stats"],
+    routes: ["/observatory", "/pricing", "/stats", "/reports", "/imports"],
     items: [
+      { href: "/reports/monthly", label: "Monthly review", icon: StatsIcon },
       { href: "/pricing", label: "Pricing", icon: PricingIcon },
       { href: "/stats", label: "Stats", icon: StatsIcon },
       { href: "/observatory/product-cost", label: "Product Cost", icon: ProductCostIcon },
+      { href: "/imports", label: "CSV imports", icon: ProductCostIcon },
     ],
   },
   {
