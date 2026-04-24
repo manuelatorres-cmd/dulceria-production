@@ -22,12 +22,13 @@ type SectionDef = {
 const SECTIONS: SectionDef[] = [
   {
     label: "The Workshop",
-    routes: ["/workshop", "/orders", "/production", "/production-brain", "/plan", "/stock"],
+    routes: ["/workshop", "/orders", "/production", "/production-brain", "/plan", "/stock", "/calendar"],
     items: [
       { href: "/orders", label: "Orders", icon: OrdersIcon },
-      { href: "/plan", label: "Plan", icon: PlanIcon },
-      { href: "/production", label: "Production", icon: ProductionIcon },
-      { href: "/production-brain", label: "Brain", icon: PlanIcon },
+      { href: "/calendar", label: "Calendar", icon: PlanIcon },
+      { href: "/production-brain/planner", label: "Planner", icon: PlanIcon },
+      { href: "/production-brain/daily", label: "Daily", icon: ProductionIcon },
+      { href: "/production", label: "Production (legacy)", icon: ProductionIcon },
       { href: "/stock", label: "Stock", icon: StockIcon },
     ],
   },
