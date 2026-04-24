@@ -104,10 +104,10 @@ export function TemperatureLogModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
-      <div className="relative w-full max-w-xl mx-4 mb-4 sm:mb-0 rounded-2xl border border-border bg-card shadow-xl overflow-hidden max-h-[85vh] flex flex-col">
+      <div className="relative w-full max-w-xl mx-4 mb-4 sm:mb-0 rounded-sm border border-border bg-card shadow-xl overflow-hidden max-h-[85vh] flex flex-col">
         <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-sm bg-primary/10 flex items-center justify-center">
               <Thermometer className="w-5 h-5 text-primary" />
             </div>
             <div>
@@ -193,7 +193,7 @@ export function TemperatureLogModal({
               <button
                 onClick={handleSave}
                 disabled={!canSave || sorted.length === 0}
-                className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+                className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save readings"}
               </button>

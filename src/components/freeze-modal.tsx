@@ -59,11 +59,11 @@ export function FreezeModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
 
-      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-sm border border-border bg-card shadow-xl overflow-hidden">
         {/* Header — cool icy tint */}
         <div className="bg-gradient-to-b from-sky-50 to-card px-5 pt-5 pb-3">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-9 h-9 rounded-xl bg-sky-500/10 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-sm bg-sky-500/10 flex items-center justify-center">
               <Snowflake className="w-5 h-5 text-sky-600" />
             </div>
             <div>
@@ -128,7 +128,7 @@ export function FreezeModal({
         <div className="px-5 py-4 border-t border-border flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+            className="rounded-sm border border-border bg-card px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
           >
             Cancel
           </button>
@@ -178,7 +178,7 @@ export function DefrostConfirmModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
 
-      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-sm border border-border bg-card shadow-xl overflow-hidden">
         <div className="px-5 pt-5 pb-3">
           <h3 className="text-base font-bold text-foreground">Defrost {itemName}?</h3>
           <p className="text-xs text-muted-foreground mt-1">
@@ -202,13 +202,13 @@ export function DefrostConfirmModal({
         <div className="px-5 py-4 border-t border-border flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+            className="rounded-sm border border-border bg-card px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+            className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
           >
             Yes, defrost
           </button>

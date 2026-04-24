@@ -129,7 +129,7 @@ export function AllocationSplitModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
-      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
+      <div className="relative w-full max-w-lg rounded-sm border border-border bg-card shadow-xl overflow-hidden">
         <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3 border-b border-border">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-foreground">
@@ -265,7 +265,7 @@ export function AllocationSplitModal({
             type="button"
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             Save allocation
           </button>
