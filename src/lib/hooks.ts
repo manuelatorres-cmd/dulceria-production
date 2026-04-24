@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -10018,5 +10018,100 @@ export async function deletePriceListItem(id: string): Promise<void> {
   const { error } = await supabase.from("priceListItems").delete().eq("id", id);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["priceListItems"] });
+}
+
+// =====================================================================
+// Production Brain — subscriptions (templates + runs)
+// =====================================================================
+
+export function useSubscriptionTemplates(includeInactive = false): SubscriptionTemplate[] {
+  const { data } = useQuery({
+    queryKey: ["subscriptionTemplates", { includeInactive }],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("subscriptionTemplates").select("*"),
+      ) as SubscriptionTemplate[];
+      return rows
+        .filter((r) => includeInactive || r.active)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+  return data ?? [];
+}
+
+export function useSubscriptionTemplate(
+  id: string | undefined,
+): SubscriptionTemplate | undefined {
+  const { data } = useQuery({
+    queryKey: ["subscriptionTemplates", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const row = assertOkMaybe(
+        await supabase
+          .from("subscriptionTemplates")
+          .select("*")
+          .eq("id", id!)
+          .maybeSingle(),
+      );
+      return row as SubscriptionTemplate | null;
+    },
+  });
+  return data ?? undefined;
+}
+
+export async function saveSubscriptionTemplate(
+  row: Omit<SubscriptionTemplate, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("subscriptionTemplates")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["subscriptionTemplates"] });
+  return id;
+}
+
+export async function deleteSubscriptionTemplate(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("subscriptionTemplates")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["subscriptionTemplates"] });
+}
+
+export function useSubscriptionRuns(templateId?: string): SubscriptionRun[] {
+  const { data } = useQuery({
+    queryKey: ["subscriptionRuns", templateId ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("subscriptionRuns").select("*");
+      if (templateId) q = q.eq("templateId", templateId);
+      const rows = assertOk(await q) as SubscriptionRun[];
+      return rows.sort(
+        (a, b) => b.scheduledShipDate.localeCompare(a.scheduledShipDate),
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveSubscriptionRun(
+  row: Omit<SubscriptionRun, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("subscriptionRuns")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["subscriptionRuns"] });
+  return id;
+}
+
+export async function deleteSubscriptionRun(id: string): Promise<void> {
+  const { error } = await supabase.from("subscriptionRuns").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["subscriptionRuns"] });
 }
 

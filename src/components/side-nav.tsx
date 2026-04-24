@@ -59,11 +59,12 @@ const SECTIONS: SectionDef[] = [
   },
   {
     label: "Customers",
-    routes: ["/customers", "/quotes", "/pricing"],
+    routes: ["/customers", "/quotes", "/pricing", "/subscriptions"],
     items: [
       { href: "/customers", label: "Customer list", icon: CustomersIcon },
       { href: "/quotes", label: "Quotes", icon: QuotesIcon },
       { href: "/pricing/lists", label: "Price lists", icon: PricingIcon },
+      { href: "/subscriptions", label: "Subscriptions", icon: QuotesIcon },
     ],
   },
   {

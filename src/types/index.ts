@@ -2598,6 +2598,54 @@ export interface PriceList {
   updatedAt?: Date;
 }
 
+export const SUBSCRIPTION_FREQUENCIES = [
+  "monthly",
+  "bimonthly",
+  "quarterly",
+  "seasonal",
+] as const;
+export type SubscriptionFrequency = (typeof SUBSCRIPTION_FREQUENCIES)[number];
+
+export const SUBSCRIPTION_RUN_STATUSES = [
+  "planned",
+  "in-production",
+  "ready",
+  "shipped",
+  "cancelled",
+] as const;
+export type SubscriptionRunStatus = (typeof SUBSCRIPTION_RUN_STATUSES)[number];
+
+/** Recurring subscription box template. Each run (ship cycle)
+ *  references a template + has its own subscriber count + contents. */
+export interface SubscriptionTemplate {
+  id?: string;
+  name: string;
+  packagingId?: string;
+  pieceCount: number;
+  frequency: SubscriptionFrequency;
+  active: boolean;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** One cycle of a subscription — fixed ship date, subscriber count,
+ *  chosen contents. Brain schedules production backward from
+ *  scheduledShipDate using templateId + pieceCount × subscriberCount. */
+export interface SubscriptionRun {
+  id?: string;
+  templateId: string;
+  scheduledShipDate: string;
+  subscriberCount: number;
+  selectedProductIds: string[];
+  status: SubscriptionRunStatus;
+  alertSentAt?: Date;
+  productionPlanIds: string[];
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 /** One rule inside a price list — can scope by product, variant
  *  (collection), or tag. Discount % OR fixed price (mutually
  *  exclusive, enforced by DB check). The original questionnaire
