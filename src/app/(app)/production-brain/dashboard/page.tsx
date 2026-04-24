@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import {
   useReplenishmentProposals,
@@ -10,6 +10,7 @@ import {
   useProductsList,
   usePeople,
 } from "@/lib/hooks";
+import { runEngine, type EngineRunSummary } from "@/lib/engineRunner";
 import type { ReplenishmentProposal } from "@/types";
 
 /**
@@ -26,6 +27,23 @@ export default function ProductionBrainDashboardPage() {
   const plans = useProductionPlans();
   const products = useProductsList();
   const people = usePeople();
+
+  const [engineRunning, setEngineRunning] = useState(false);
+  const [engineSummary, setEngineSummary] = useState<EngineRunSummary | null>(null);
+  const [engineError, setEngineError] = useState<string | null>(null);
+
+  async function handleRunEngine() {
+    setEngineRunning(true);
+    setEngineError(null);
+    try {
+      const summary = await runEngine();
+      setEngineSummary(summary);
+    } catch (err) {
+      setEngineError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setEngineRunning(false);
+    }
+  }
 
   const productsById = useMemo(() => {
     const m = new Map<string, string>();
@@ -48,6 +66,28 @@ export default function ProductionBrainDashboardPage() {
         title="Production Brain — Dashboard"
         description="Strategic overview: pipeline, alerts, replenishment proposals, capacity outlook."
       />
+
+      {/* Engine controls */}
+      <section className="flex flex-wrap items-center gap-3 mb-5">
+        <button
+          type="button"
+          onClick={handleRunEngine}
+          disabled={engineRunning}
+          className="btn-primary"
+        >
+          {engineRunning ? "Running…" : "Run scheduling engine"}
+        </button>
+        {engineSummary ? (
+          <p className="text-xs text-muted-foreground">
+            Last run {engineSummary.ranAt} · {engineSummary.proposalsWritten}{" "}
+            new · {engineSummary.proposalsUpdated} updated ·{" "}
+            {engineSummary.campaignsContributed} from campaigns
+          </p>
+        ) : null}
+        {engineError ? (
+          <p className="text-xs text-status-alert">Engine error: {engineError}</p>
+        ) : null}
+      </section>
 
       {/* KPI strip */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
