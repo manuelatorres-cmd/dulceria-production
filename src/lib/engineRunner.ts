@@ -37,6 +37,10 @@ export interface EngineRunSummary {
   proposalsConsidered: number;
   proposalsWritten: number;
   proposalsUpdated: number;
+  /** Dismissed proposals revived because stock entered the critical
+   *  zone. Surfaced in the dashboard summary so the user knows the
+   *  engine overrode their silence for a good reason. */
+  proposalsRevived: number;
   campaignsContributed: number;
   ranAt: string;
 }
@@ -113,7 +117,7 @@ async function loadSnapshot() {
     supabase
       .from("replenishmentProposals")
       .select("*")
-      .eq("status", "pending")
+      .in("status", ["pending", "dismissed"])
       .then((r) => assertOk(r) as ReplenishmentProposal[]),
   ]);
 
@@ -210,50 +214,85 @@ function buildPendingDemand(
   return out;
 }
 
-/** Upsert-if-newer logic: if an existing pending proposal for the
- *  same (product, location) already exists we overwrite its
- *  suggestedBatchSize + earliestNeededDate + reason, otherwise
- *  create a new row. */
+/** Upsert-if-newer logic. For each computed proposal:
+ *    - If an existing row (pending or dismissed) for the same
+ *      (product, location) exists, update its fields.
+ *    - Dismissed rows get revived to 'pending' only when the projection
+ *      entered the critical zone (stock already below the minimum on
+ *      the earliest-needed date). Non-critical cases keep the dismiss
+ *      honoured until its 2-day quiet window expires.
+ *    - Otherwise insert a new row.
+ *
+ *  Return counts include a revived figure for the dashboard summary.
+ */
 async function upsertProposals(
   proposals: Array<Omit<ReplenishmentProposal, "id" | "createdAt" | "updatedAt">>,
   existing: ReplenishmentProposal[],
-): Promise<{ written: number; updated: number }> {
+  criticalKeys: Set<string>,
+): Promise<{ written: number; updated: number; revived: number }> {
   let written = 0;
   let updated = 0;
+  let revived = 0;
 
   const existingByKey = new Map<string, ReplenishmentProposal>();
   for (const p of existing) {
     existingByKey.set(`${p.productId}|${p.locationId ?? ""}`, p);
   }
 
-  const rowsToUpsert: ReplenishmentProposal[] = proposals.map((p) => {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const rowsToUpsert: ReplenishmentProposal[] = [];
+
+  for (const p of proposals) {
     const key = `${p.productId}|${p.locationId ?? ""}`;
     const existingRow = existingByKey.get(key);
+    const critical = criticalKeys.has(key);
+
     if (existingRow) {
+      // Dismissed rows stay dismissed unless critical override kicks in
+      // or their quiet window has expired. Respect that here.
+      if (existingRow.status === "dismissed") {
+        const expired =
+          !existingRow.dismissedUntil || existingRow.dismissedUntil <= todayIso;
+        if (!expired && !critical) continue;
+        revived++;
+        rowsToUpsert.push({
+          ...existingRow,
+          suggestedBatchSize: p.suggestedBatchSize,
+          earliestNeededDate: p.earliestNeededDate,
+          priorityTier: p.priorityTier,
+          reason: p.reason,
+          status: "pending",
+          dismissedUntil: undefined,
+        });
+        continue;
+      }
+
       updated++;
-      return {
+      rowsToUpsert.push({
         ...existingRow,
         suggestedBatchSize: p.suggestedBatchSize,
         earliestNeededDate: p.earliestNeededDate,
         priorityTier: p.priorityTier,
         reason: p.reason,
-        status: "pending" as const,
-      };
+        status: "pending",
+      });
+      continue;
     }
+
     written++;
-    return {
+    rowsToUpsert.push({
       id: newId(),
       ...p,
-    };
-  });
+    });
+  }
 
-  if (rowsToUpsert.length === 0) return { written, updated };
+  if (rowsToUpsert.length === 0) return { written, updated, revived };
 
   const { error } = await supabase
     .from("replenishmentProposals")
     .upsert(rowsToUpsert, { onConflict: "id" });
   if (error) throw error;
-  return { written, updated };
+  return { written, updated, revived };
 }
 
 /** Entry point — call this from a button handler. */
@@ -287,7 +326,24 @@ export async function runEngine(): Promise<EngineRunSummary> {
   });
 
   const all = [...replenProposals, ...campaignProposals];
-  const { written, updated } = await upsertProposals(all, snap.existingProposals);
+
+  // Flag (product, location) pairs where stock is already at or below
+  // zero on the earliest-needed date. Those cross the critical-stock
+  // override that un-dismisses a silenced proposal.
+  const criticalKeys = new Set<string>();
+  for (const p of replenProposals) {
+    const loc = p.locationId ?? "";
+    const currentStock = stockByKey.get(`${p.productId}|${loc}`) ?? 0;
+    if (currentStock <= 0) {
+      criticalKeys.add(`${p.productId}|${loc}`);
+    }
+  }
+
+  const { written, updated, revived } = await upsertProposals(
+    all,
+    snap.existingProposals,
+    criticalKeys,
+  );
 
   queryClient.invalidateQueries({ queryKey: ["replenishmentProposals"] });
 
@@ -295,6 +351,7 @@ export async function runEngine(): Promise<EngineRunSummary> {
     proposalsConsidered: all.length,
     proposalsWritten: written,
     proposalsUpdated: updated,
+    proposalsRevived: revived,
     campaignsContributed: campaignProposals.length,
     ranAt: todayISO(),
   };

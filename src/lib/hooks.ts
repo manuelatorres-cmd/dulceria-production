@@ -9067,14 +9067,22 @@ export async function markProposalScheduled(
 }
 
 /** Dismiss a proposal for N days. Engine will not re-propose the same
- *  product until dismissedUntil passes (or demand drops further). */
+ *  product until dismissedUntil passes — except when stock projection
+ *  enters critical zone, in which case the engine runner auto-revives
+ *  the proposal (see engineRunner.ts).
+ *
+ *  Default quiet period is 2 days per Manuela's spec (2026-04-24);
+ *  callers can pass an explicit date for snooze-for-week flows. */
 export async function dismissProposal(
   proposalId: string,
-  untilDate: string,
+  untilDate?: string,
 ): Promise<void> {
+  const resolvedUntil =
+    untilDate ??
+    new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const { error } = await supabase
     .from("replenishmentProposals")
-    .update({ status: "dismissed", dismissedUntil: untilDate })
+    .update({ status: "dismissed", dismissedUntil: resolvedUntil })
     .eq("id", proposalId);
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["replenishmentProposals"] });

@@ -80,7 +80,16 @@ export default function ProductionBrainDashboardPage() {
         {engineSummary ? (
           <p className="text-xs text-muted-foreground">
             Last run {engineSummary.ranAt} · {engineSummary.proposalsWritten}{" "}
-            new · {engineSummary.proposalsUpdated} updated ·{" "}
+            new · {engineSummary.proposalsUpdated} updated
+            {engineSummary.proposalsRevived > 0 ? (
+              <>
+                {" · "}
+                <span className="text-status-alert font-medium">
+                  {engineSummary.proposalsRevived} revived (critical stock)
+                </span>
+              </>
+            ) : null}
+            {" · "}
             {engineSummary.campaignsContributed} from campaigns
           </p>
         ) : null}
