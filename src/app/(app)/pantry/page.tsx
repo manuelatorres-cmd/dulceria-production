@@ -1,181 +1,353 @@
 "use client";
 
 import Link from "next/link";
-import { useProductsList, useFillings, useIngredients } from "@/lib/hooks";
+import { useMemo } from "react";
+import { PageHeader } from "@/components/page-header";
+import {
+  useProductsList,
+  useFillings,
+  useIngredients,
+  useMouldsList,
+  usePackagingList,
+  useMouldPool,
+  useAllIngredientStock,
+  useProductStockAlerts,
+} from "@/lib/hooks";
+import {
+  Package,
+  Layers,
+  Leaf,
+  Grid3x3,
+  Boxes,
+  ArrowRight,
+  AlertTriangle,
+} from "lucide-react";
 
-const CARDS = [
-  {
-    name: "Products",
-    description: "Your product catalog — shells, fillings, and design.",
-    href: "/products",
-    icon: BookIcon,
-    enabled: true,
-  },
-  {
-    name: "Fillings",
-    description: "Reusable fillings: ganaches, pralines, caramels, and more.",
-    href: "/fillings",
-    icon: FillingsIcon,
-    enabled: true,
-  },
-  {
-    name: "Ingredients",
-    description: "Your ingredient library with costs and composition.",
-    href: "/ingredients",
-    icon: LeafIcon,
-    enabled: true,
-  },
-  {
-    name: "Moulds",
-    description: "Polycarbonate moulds, cavity volumes, and quantities.",
-    href: "/moulds",
-    icon: GridIcon,
-    enabled: true,
-  },
-  {
-    name: "Packaging",
-    description: "Box sizes, inserts, and packaging materials.",
-    href: "/packaging",
-    icon: PackageIcon,
-    enabled: true,
-  },
-  {
-    name: "Variants",
-    description: "Curated sets of products for seasonal or themed boxes.",
-    href: "/variants",
-    icon: VariantIcon,
-    enabled: true,
-  },
-  {
-    name: "Decoration",
-    description: "Cocoa butters and lustre dusts for shell design.",
-    href: "/pantry/decoration",
-    icon: DecorationIcon,
-    enabled: true,
-  },
-] as const;
-
-function PantryHint() {
+export default function PantryPage() {
   const products = useProductsList();
   const fillings = useFillings();
   const ingredients = useIngredients();
-  if (products.length === 0 && fillings.length === 0) return null;
-  const parts: string[] = [];
-  if (products.length > 0) parts.push(`${products.length} product${products.length !== 1 ? "s" : ""}`);
-  if (fillings.length > 0) parts.push(`${fillings.length} filling${fillings.length !== 1 ? "s" : ""}`);
-  if (ingredients.length > 0) parts.push(`${ingredients.length} ingredient${ingredients.length !== 1 ? "s" : ""}`);
-  return <span>{parts.join(", ")} in your pantry</span>;
-}
+  const moulds = useMouldsList();
+  const packaging = usePackagingList();
+  const mouldPool = useMouldPool();
+  const ingredientStock = useAllIngredientStock();
+  const productStockAlerts = useProductStockAlerts();
 
-export default function PantryPage() {
+  const brokenMoulds = useMemo(
+    () => mouldPool.filter((m) => m.currentState === "broken"),
+    [mouldPool],
+  );
+  const needsWashMoulds = useMemo(
+    () =>
+      mouldPool.filter(
+        (m) =>
+          m.currentState === "needs-wash" || m.currentState === "in-deep-wash",
+      ),
+    [mouldPool],
+  );
+
+  const lowIngredients = useMemo(() => {
+    const thresholdG = new Map<string, number>();
+    const onHandG = new Map<string, number>();
+    for (const s of ingredientStock) {
+      onHandG.set(s.ingredientId, s.quantityG ?? 0);
+      if (s.lowStockThresholdG != null)
+        thresholdG.set(s.ingredientId, s.lowStockThresholdG);
+    }
+    return ingredients
+      .filter((ing) => {
+        if (!ing.id) return false;
+        const t = thresholdG.get(ing.id);
+        if (t == null) return false;
+        return (onHandG.get(ing.id) ?? 0) <= t;
+      })
+      .map((ing) => ({
+        ...ing,
+        thresholdG: thresholdG.get(ing.id!) ?? 0,
+      }));
+  }, [ingredients, ingredientStock]);
+
+  const lowProducts = useMemo(() => {
+    const out: Array<{ name: string; status: "low" | "gone"; id: string }> = [];
+    for (const p of products) {
+      if (!p.id) continue;
+      const alert = productStockAlerts.get(p.id);
+      if (alert) out.push({ id: p.id, name: p.name, status: alert });
+    }
+    return out.sort((a, b) =>
+      a.status === b.status ? a.name.localeCompare(b.name) : a.status === "gone" ? -1 : 1,
+    );
+  }, [products, productStockAlerts]);
+
   return (
-    <div className="p-6 max-w-2xl">
-      <h1 className="font-[family-name:var(--font-display)] text-2xl sm:text-3xl text-foreground mb-1">
-        The Pantry
-      </h1>
-      <p className="text-muted-foreground mb-2">
-        Your products, fillings, ingredients, and materials — all in one place.
-      </p>
-      <div className="text-xs text-muted-foreground/70 mb-8 min-h-[1.25rem]">
-        <PantryHint />
-      </div>
+    <div>
+      <PageHeader
+        title="Pantry"
+        description="Products, fillings, ingredients, moulds, packaging — the building blocks."
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {CARDS.map((card) => {
-          const Icon = card.icon;
-          const inner = (
-            <>
-              <div className="flex items-center gap-3 mb-3">
-                <Icon className="w-6 h-6 text-primary" />
-                <h2 className="font-[family-name:var(--font-display)] text-lg">{card.name}</h2>
-              </div>
-              <p className="text-sm text-muted-foreground flex-1">{card.description}</p>
-            </>
-          );
+      <div className="px-4 pb-10 space-y-5">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <Kpi
+            label="Products"
+            value={products.length}
+            sub={`${lowProducts.length} low / gone`}
+            href="/products"
+            icon={<Package className="w-4 h-4" />}
+            accent={lowProducts.length > 0 ? "warn" : undefined}
+          />
+          <Kpi
+            label="Fillings"
+            value={fillings.length}
+            sub="current versions"
+            href="/fillings"
+            icon={<Layers className="w-4 h-4" />}
+          />
+          <Kpi
+            label="Ingredients"
+            value={ingredients.length}
+            sub={`${lowIngredients.length} below reorder`}
+            href="/ingredients"
+            icon={<Leaf className="w-4 h-4" />}
+            accent={lowIngredients.length > 0 ? "warn" : undefined}
+          />
+          <Kpi
+            label="Moulds"
+            value={moulds.length}
+            sub={`${brokenMoulds.length} broken · ${needsWashMoulds.length} need wash`}
+            href="/moulds"
+            icon={<Grid3x3 className="w-4 h-4" />}
+            accent={brokenMoulds.length > 0 ? "alert" : needsWashMoulds.length > 0 ? "warn" : undefined}
+          />
+          <Kpi
+            label="Packaging"
+            value={packaging.length}
+            sub="SKUs"
+            href="/packaging"
+            icon={<Boxes className="w-4 h-4" />}
+          />
+        </div>
 
-          if (!card.enabled) {
-            return (
-              <div
-                key={card.name}
-                className="flex flex-col border border-border border-dashed rounded-sm p-5 opacity-50"
-              >
-                {inner}
-                <div className="text-xs text-muted-foreground/70 mt-4">Coming soon</div>
-              </div>
-            );
-          }
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <DashCard title="Stock alerts · products" href="/stock">
+            {lowProducts.length === 0 ? (
+              <EmptyLine text="Every product has stock. Nothing to worry about." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {lowProducts.slice(0, 7).map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      href={`/products/${p.id}`}
+                      className="flex items-center gap-3 px-1 py-2 hover:bg-muted/30 rounded-sm"
+                    >
+                      <AlertTriangle
+                        className={
+                          "w-4 h-4 shrink-0 " +
+                          (p.status === "gone"
+                            ? "text-status-alert"
+                            : "text-status-warn")
+                        }
+                      />
+                      <span className="text-[13px] flex-1 truncate">
+                        {p.name}
+                      </span>
+                      <span
+                        className={
+                          "text-[10.5px] uppercase tracking-wider " +
+                          (p.status === "gone"
+                            ? "text-status-alert"
+                            : "text-status-warn")
+                        }
+                      >
+                        {p.status}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+                {lowProducts.length > 7 && (
+                  <li className="pt-2 text-[11px] text-muted-foreground italic">
+                    +{lowProducts.length - 7} more
+                  </li>
+                )}
+              </ul>
+            )}
+          </DashCard>
 
-          return (
-            <Link
-              key={card.name}
-              href={card.href}
-              className="flex flex-col bg-card border border-border rounded-sm p-5 transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              {inner}
-            </Link>
-          );
-        })}
+          <DashCard title="Ingredients below reorder point" href="/ingredients">
+            {lowIngredients.length === 0 ? (
+              <EmptyLine text="Every ingredient above reorder threshold." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {lowIngredients.slice(0, 7).map((ing) => (
+                  <li key={ing.id}>
+                    <Link
+                      href={`/ingredients/${ing.id}`}
+                      className="flex items-center gap-3 px-1 py-2 hover:bg-muted/30 rounded-sm"
+                    >
+                      <Leaf className="w-4 h-4 text-status-warn shrink-0" />
+                      <span className="text-[13px] flex-1 truncate">
+                        {ing.name}
+                      </span>
+                      <span className="text-[10.5px] text-muted-foreground tabular-nums">
+                        threshold {(ing.thresholdG / 1000).toFixed(1)}kg
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+                {lowIngredients.length > 7 && (
+                  <li className="pt-2 text-[11px] text-muted-foreground italic">
+                    +{lowIngredients.length - 7} more
+                  </li>
+                )}
+              </ul>
+            )}
+          </DashCard>
+        </div>
+
+        <QuickActions />
       </div>
     </div>
   );
 }
 
-/* --- Icons --- */
-
-function BookIcon({ className }: { className?: string }) {
+function Kpi({
+  label,
+  value,
+  sub,
+  icon,
+  href,
+  accent,
+}: {
+  label: string;
+  value: number;
+  sub: string;
+  icon: React.ReactNode;
+  href: string;
+  accent?: "warn" | "alert";
+}) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-    </svg>
+    <Link
+      href={href}
+      className="block border border-border bg-card hover:border-foreground transition-colors px-3 py-3"
+      style={{ borderRadius: 4 }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span
+          className="text-[10px] uppercase text-muted-foreground"
+          style={{ letterSpacing: "0.12em" }}
+        >
+          {label}
+        </span>
+        <span
+          className={
+            accent === "alert"
+              ? "text-status-alert"
+              : accent === "warn"
+                ? "text-status-warn"
+                : "text-muted-foreground"
+          }
+        >
+          {icon}
+        </span>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span
+          className="text-[26px] leading-none tabular-nums"
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontWeight: 500,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {value}
+        </span>
+      </div>
+      <div className="text-[10.5px] text-muted-foreground mt-1 truncate">
+        {sub}
+      </div>
+    </Link>
   );
 }
 
-function FillingsIcon({ className }: { className?: string }) {
+function DashCard({
+  title,
+  href,
+  children,
+}: {
+  title: string;
+  href?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0L12 17.25 6.429 14.25m11.142 0 4.179 2.25L12 21.75l-9.75-5.25 4.179-2.25" />
-    </svg>
+    <section
+      className="border border-border bg-card"
+      style={{ borderRadius: 4 }}
+    >
+      <header className="px-4 pt-3 pb-2 flex items-center justify-between">
+        <h3
+          className="text-[13px]"
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontWeight: 500,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {title}
+        </h3>
+        {href && (
+          <Link
+            href={href}
+            className="text-[10.5px] uppercase text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            style={{ letterSpacing: "0.1em" }}
+          >
+            Open <ArrowRight className="w-3 h-3" />
+          </Link>
+        )}
+      </header>
+      <div className="px-4 pb-3">{children}</div>
+    </section>
   );
 }
 
-function LeafIcon({ className }: { className?: string }) {
+function EmptyLine({ text }: { text: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.468 5.99 5.99 0 0 0-1.925 3.547 5.975 5.975 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18Z" />
-    </svg>
+    <p
+      className="text-[12px] text-muted-foreground italic py-4"
+      style={{ fontFamily: "var(--font-serif)" }}
+    >
+      {text}
+    </p>
   );
 }
 
-function GridIcon({ className }: { className?: string }) {
+function QuickActions() {
+  const actions = [
+    { href: "/products", label: "Products" },
+    { href: "/fillings", label: "Fillings" },
+    { href: "/ingredients", label: "Ingredients" },
+    { href: "/moulds", label: "Moulds" },
+    { href: "/packaging", label: "Packaging" },
+    { href: "/variants", label: "Variants" },
+    { href: "/collections", label: "Collections" },
+    { href: "/pantry/decoration", label: "Decoration" },
+  ];
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z" />
-    </svg>
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {actions.map((a) => (
+        <Link
+          key={a.href}
+          href={a.href}
+          className="border border-border bg-muted hover:bg-card hover:border-foreground px-3 py-3 text-[12.5px]"
+          style={{
+            borderRadius: 3,
+            fontFamily: "var(--font-serif)",
+            fontWeight: 500,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {a.label}
+        </Link>
+      ))}
+    </div>
   );
 }
-
-function PackageIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-    </svg>
-  );
-}
-
-function VariantIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m0 0a2.246 2.246 0 0 0-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0 1 21 12v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6c0-1.243 1.007-2.25 2.25-2.25h13.5" />
-    </svg>
-  );
-}
-
-function DecorationIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
-    </svg>
-  );
-}
-
