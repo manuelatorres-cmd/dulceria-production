@@ -101,6 +101,12 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+/** Drop the poetic "The " prefix from section labels so the sidebar
+ *  reads tighter in small caps ("WORKSHOP" instead of "THE WORKSHOP"). */
+function stripThePrefix(label: string): string {
+  return label.replace(/^the\s+/i, "");
+}
+
 export function SideNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -123,9 +129,10 @@ export function SideNav() {
     }
   }, [collapsed]);
 
-  // When the user has collapsed the nav, force the narrow width even on sm+.
-  // Otherwise respect the responsive default (w-14 on mobile, w-44 on sm+).
-  const widthClass = collapsed ? "w-14" : "w-14 sm:w-44";
+  // Collapsed = icons only (w-14). Expanded = typography-led rail (w-56)
+  // to give the sidebar enough room for the serif wordmark + small-caps
+  // section labels without cramping.
+  const widthClass = collapsed ? "w-14" : "w-14 sm:w-56";
   const showLabels = !collapsed;
 
   const renderItem = (item: NavItem) => {
@@ -179,15 +186,23 @@ export function SideNav() {
       <Link
         href="/dashboard"
         title="Home"
-        className="flex items-center gap-2.5 px-3 py-4 shrink-0 rounded-sm hover:bg-card/60 transition-colors"
+        className="flex items-center gap-3 px-4 pt-6 pb-5 shrink-0 hover:bg-card/60 transition-colors border-b border-border/60"
       >
         <img src="/logo.png" alt="Dulceria — home" className="w-8 h-8 shrink-0 rounded-sm object-contain" />
-        <span
-          className={`${labelClass} text-[17px] text-foreground truncate tracking-tight`}
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 400, letterSpacing: "-0.01em" }}
-        >
-          Dulceria
-        </span>
+        <div className={`${labelClass} flex flex-col min-w-0`}>
+          <span
+            className="text-[18px] text-foreground truncate leading-none"
+            style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.015em" }}
+          >
+            Dulceria
+          </span>
+          <span
+            className="text-[9.5px] text-muted-foreground mt-1.5 truncate uppercase"
+            style={{ letterSpacing: "0.18em" }}
+          >
+            Chocolate · Vienna
+          </span>
+        </div>
       </Link>
 
       {/* Floating collapse toggle — half-overhangs the nav's right edge.
@@ -202,28 +217,38 @@ export function SideNav() {
         <ChevronIcon className={`w-3 h-3 transition-transform ${collapsed ? "rotate-180" : ""}`} />
       </button>
 
-      <div className="flex flex-col gap-1 p-2 pt-4 flex-1">
-        {activeSection ? (
-          <>
-            {/* Home — always available so testers can return to the main menu */}
-            <Link
-              href="/dashboard"
-              title="Dashboard"
-              className="flex items-center gap-3 px-3 py-2 rounded-sm transition-colors text-muted-foreground hover:text-foreground hover:bg-card/60"
+      <div className="flex flex-col gap-0.5 px-2 pt-3 pb-2 flex-1 overflow-y-auto">
+        {/* Always show Dashboard at the top. */}
+        <Link
+          href="/dashboard"
+          title="Dashboard"
+          className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
+            isActive(pathname, "/dashboard")
+              ? "text-foreground font-medium bg-card"
+              : "text-muted-foreground hover:text-foreground hover:bg-card/60"
+          }`}
+        >
+          {isActive(pathname, "/dashboard") ? (
+            <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
+          ) : null}
+          <HomeIcon className="w-[18px] h-[18px] shrink-0" />
+          <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Dashboard</span>
+        </Link>
+
+        {/* Flat, always-visible section list. No drill-down — every
+            section's items render under its label so navigation is one
+            click from anywhere. */}
+        {SECTIONS.map((section, idx) => (
+          <div key={section.label} className={idx === 0 ? "mt-4" : "mt-5"}>
+            <span
+              className={`${labelClass} block px-3 pb-2 text-[9.5px] font-medium text-muted-foreground/70 uppercase truncate`}
+              style={{ letterSpacing: "0.16em" }}
             >
-              <HomeIcon className="w-[18px] h-[18px] shrink-0" />
-              <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Dashboard</span>
-            </Link>
-            {/* Section label */}
-            <span className={`${labelClass} px-3 pt-4 pb-1 text-[10px] font-medium text-muted-foreground/70 uppercase truncate`} style={{ letterSpacing: "0.12em" }}>
-              {activeSection.label}
+              {stripThePrefix(section.label)}
             </span>
-            {/* Section sub-items */}
-            {activeSection.items.map(renderItem)}
-          </>
-        ) : (
-          HOME_ITEMS.map(renderItem)
-        )}
+            {section.items.map(renderItem)}
+          </div>
+        ))}
         {/* Shopping — always pinned at bottom of top block */}
         <div className="mt-auto pt-4">
           <Link

@@ -218,7 +218,7 @@
     --nav-w: 3.5rem;
   }
   @media (min-width: 640px) {
-    html { --nav-w: 11rem; }
+    html { --nav-w: 14rem; }
   }
   html[data-nav-collapsed="1"] { --nav-w: 3.5rem; }
 
