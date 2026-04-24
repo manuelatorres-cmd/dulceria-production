@@ -50,7 +50,8 @@ const SECTIONS: SectionDef[] = [
     label: "The Shop",
     routes: ["/shop", "/customers", "/quotes"],
     items: [
-      { href: "/shop", label: "Shop counter", icon: ShopIcon },
+      { href: "/shop", label: "Shop overview", icon: ShopIcon },
+      { href: "/shop/counter", label: "Counter", icon: ShopIcon },
       { href: "/customers", label: "Customers", icon: CustomersIcon },
       { href: "/quotes", label: "Quotes", icon: QuotesIcon },
     ],
