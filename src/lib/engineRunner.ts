@@ -345,7 +345,52 @@ export async function runEngine(): Promise<EngineRunSummary> {
     criticalKeys,
   );
 
+  // Surface tier-1 or revived proposals into the notification center
+  // so Manuela sees them in the bell without opening the planner.
+  // Deduped by (type, entityId) per the notifications primary key so
+  // re-runs don't spam.
+  const notifRows: Array<{
+    id: string;
+    type: "replenishment_proposal";
+    urgency: "critical" | "high" | "normal";
+    status: "open";
+    title: string;
+    body?: string;
+    entityType: "product";
+    entityId: string;
+    adminOnly: boolean;
+    actionLabel?: string;
+  }> = [];
+  const productsByIdMap = new Map<string, Product>();
+  for (const p of snap.products) if (p.id) productsByIdMap.set(p.id, p);
+  for (const p of all) {
+    const product = productsByIdMap.get(p.productId);
+    if (!product) continue;
+    const isTier1 = p.priorityTier === 1;
+    const isCritical = criticalKeys.has(`${p.productId}|${p.locationId ?? ""}`);
+    if (!isTier1 && !isCritical) continue;
+    notifRows.push({
+      id: newId(),
+      type: "replenishment_proposal",
+      urgency: isCritical ? "critical" : "high",
+      status: "open",
+      title: `${product.name} · restock needed`,
+      body: `Projected below min ${p.earliestNeededDate}. Suggested batch ${p.suggestedBatchSize} pcs.`,
+      entityType: "product",
+      entityId: p.productId,
+      adminOnly: false,
+      actionLabel: "Open planner",
+    });
+  }
+  if (notifRows.length > 0) {
+    const { error: notifErr } = await supabase
+      .from("notifications")
+      .insert(notifRows);
+    if (notifErr) console.warn("notification insert failed:", notifErr);
+  }
+
   queryClient.invalidateQueries({ queryKey: ["replenishmentProposals"] });
+  queryClient.invalidateQueries({ queryKey: ["notifications"] });
 
   return {
     proposalsConsidered: all.length,
