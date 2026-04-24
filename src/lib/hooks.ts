@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -9213,5 +9213,232 @@ export async function saveMouldPoolInstance(
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["mouldPool"] });
   return id;
+}
+
+// =====================================================================
+// Production Brain — equipment instances + machine loads
+// =====================================================================
+
+export function useEquipmentInstances(equipmentId?: string): EquipmentInstance[] {
+  const { data } = useQuery({
+    queryKey: ["equipmentInstances", equipmentId ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("equipmentInstances").select("*");
+      if (equipmentId) q = q.eq("equipmentId", equipmentId);
+      const rows = assertOk(await q) as EquipmentInstance[];
+      return rows
+        .filter((r) => !r.archived)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveEquipmentInstance(
+  row: Omit<EquipmentInstance, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("equipmentInstances")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["equipmentInstances"] });
+  return id;
+}
+
+export async function deleteEquipmentInstance(id: string): Promise<void> {
+  const { error } = await supabase.from("equipmentInstances").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["equipmentInstances"] });
+}
+
+export function useMachineLoads(
+  equipmentInstanceId?: string,
+): MachineLoad[] {
+  const { data } = useQuery({
+    queryKey: ["machineLoads", equipmentInstanceId ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("machineLoads").select("*");
+      if (equipmentInstanceId) q = q.eq("equipmentInstanceId", equipmentInstanceId);
+      const rows = assertOk(await q) as MachineLoad[];
+      return rows.sort(
+        (a, b) => new Date(b.loadedAt).getTime() - new Date(a.loadedAt).getTime(),
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveMachineLoad(
+  row: Omit<MachineLoad, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("machineLoads")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["machineLoads"] });
+  return id;
+}
+
+// =====================================================================
+// Production Brain — cold storage units
+// =====================================================================
+
+export function useColdStorageUnits(): ColdStorageUnit[] {
+  const { data } = useQuery({
+    queryKey: ["coldStorageUnits"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase.from("coldStorageUnits").select("*"),
+      ) as ColdStorageUnit[];
+      return rows
+        .filter((r) => !r.archived)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveColdStorageUnit(
+  row: Omit<ColdStorageUnit, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("coldStorageUnits")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["coldStorageUnits"] });
+  return id;
+}
+
+// =====================================================================
+// Production Brain — mould usage log
+// =====================================================================
+
+export function useMouldUsageLog(mouldPoolId?: string): MouldUsageLog[] {
+  const { data } = useQuery({
+    queryKey: ["mouldUsageLog", mouldPoolId ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("mouldUsageLog").select("*");
+      if (mouldPoolId) q = q.eq("mouldPoolId", mouldPoolId);
+      const rows = assertOk(await q) as MouldUsageLog[];
+      return rows.sort(
+        (a, b) =>
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveMouldUsageLog(
+  row: Omit<MouldUsageLog, "id" | "createdAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("mouldUsageLog")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["mouldUsageLog"] });
+  return id;
+}
+
+// =====================================================================
+// Production Brain — staff shifts (clock-in / clock-out)
+// =====================================================================
+
+export function useStaffShifts(
+  personId?: string,
+  fromDate?: string,
+  toDate?: string,
+): StaffShift[] {
+  const { data } = useQuery({
+    queryKey: ["staffShifts", personId ?? "all", fromDate, toDate],
+    queryFn: async () => {
+      let q = supabase.from("staffShifts").select("*");
+      if (personId) q = q.eq("personId", personId);
+      if (fromDate) q = q.gte("shiftDate", fromDate);
+      if (toDate) q = q.lte("shiftDate", toDate);
+      const rows = assertOk(await q) as StaffShift[];
+      return rows.sort(
+        (a, b) =>
+          b.shiftDate.localeCompare(a.shiftDate) ||
+          new Date(b.clockInAt).getTime() - new Date(a.clockInAt).getTime(),
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveStaffShift(
+  row: Omit<StaffShift, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("staffShifts")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["staffShifts"] });
+  return id;
+}
+
+/** Close an open shift — sets clockOutAt to now (or a supplied timestamp). */
+export async function clockOutShift(
+  shiftId: string,
+  clockOutAt: Date = new Date(),
+): Promise<void> {
+  const { error } = await supabase
+    .from("staffShifts")
+    .update({ clockOutAt })
+    .eq("id", shiftId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["staffShifts"] });
+}
+
+// =====================================================================
+// Production Brain — person availability exceptions (vacation / sick / etc)
+// =====================================================================
+
+export function usePersonAvailabilityExceptions(
+  personId?: string,
+): PersonAvailabilityException[] {
+  const { data } = useQuery({
+    queryKey: ["personAvailabilityExceptions", personId ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("personAvailabilityExceptions").select("*");
+      if (personId) q = q.eq("personId", personId);
+      const rows = assertOk(await q) as PersonAvailabilityException[];
+      return rows.sort((a, b) => a.dateFrom.localeCompare(b.dateFrom));
+    },
+  });
+  return data ?? [];
+}
+
+export async function savePersonAvailabilityException(
+  row: Omit<PersonAvailabilityException, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("personAvailabilityExceptions")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["personAvailabilityExceptions"] });
+  return id;
+}
+
+export async function deletePersonAvailabilityException(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("personAvailabilityExceptions")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["personAvailabilityExceptions"] });
 }
 

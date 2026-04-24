@@ -2205,3 +2205,161 @@ export interface MouldPoolInstance {
   retired: boolean;
   notes?: string;
 }
+
+// =============================================================
+// Production Brain — Phase 2 types (equipment + mould log + staff)
+// =============================================================
+
+export const EQUIPMENT_INSTANCE_STATUSES = [
+  "idle",
+  "running",
+  "maintenance",
+  "retired",
+] as const;
+export type EquipmentInstanceStatus = (typeof EQUIPMENT_INSTANCE_STATUSES)[number];
+
+export const EQUIPMENT_INSTANCE_LOCATIONS = [
+  "production",
+  "shop",
+  "storage",
+  "other",
+] as const;
+export type EquipmentInstanceLocation = (typeof EQUIPMENT_INSTANCE_LOCATIONS)[number];
+
+/** Physical copy of an equipment type the workshop owns. The
+ *  `equipment` table stays the type-level descriptor (e.g.
+ *  "Tempering machine, 15kg"); this table represents each actual
+ *  machine on the floor (brand, model, serial, current state). */
+export interface EquipmentInstance {
+  id?: string;
+  equipmentId: string;
+  name: string;
+  brand?: string;
+  model?: string;
+  serialNumber?: string;
+  capacityKg?: number;
+  location?: EquipmentInstanceLocation;
+  status: EquipmentInstanceStatus;
+  notes?: string;
+  archived: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const MACHINE_LOAD_STATUSES = [
+  "in_use",
+  "idle",
+  "draining",
+  "switched",
+] as const;
+export type MachineLoadStatus = (typeof MACHINE_LOAD_STATUSES)[number];
+
+/** What chocolate is currently loaded in which tempering machine /
+ *  melting pot. One row per active load. Aging is computed from
+ *  (now - loadedAt) and flagged once it exceeds
+ *  agingAlertThresholdDays. */
+export interface MachineLoad {
+  id?: string;
+  equipmentInstanceId: string;
+  ingredientId: string;
+  loadedQuantityG: number;
+  remainingQuantityG: number;
+  loadedAt: Date;
+  lastUsedAt?: Date;
+  status: MachineLoadStatus;
+  agingAlertThresholdDays: number;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const COLD_STORAGE_LOCATIONS = [
+  "production",
+  "shop",
+  "storage",
+  "other",
+] as const;
+export type ColdStorageLocation = (typeof COLD_STORAGE_LOCATIONS)[number];
+
+export const COLD_STORAGE_TYPES = ["fridge", "freezer", "ambient"] as const;
+export type ColdStorageType = (typeof COLD_STORAGE_TYPES)[number];
+
+/** A fridge, freezer, or ambient storage unit tracked for HACCP.
+ *  Temperature readings join on `coldStorageUnitId` (added by the
+ *  phase-3 migration). */
+export interface ColdStorageUnit {
+  id?: string;
+  name: string;
+  location: ColdStorageLocation;
+  type: ColdStorageType;
+  targetTempMinC?: number;
+  targetTempMaxC?: number;
+  requiresTempCheck: boolean;
+  checkFrequencyPerDay: number;
+  archived: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+/** One row per mould instance cycle. Written on phase-change
+ *  transitions so we keep full traceability history after the
+ *  batch is done. */
+export interface MouldUsageLog {
+  id?: string;
+  mouldPoolId: string;
+  planId?: string;
+  startedAt: Date;
+  freedAt?: Date;
+  cycleCompleted: boolean;
+  deepWashDone: boolean;
+  notes?: string;
+  createdAt?: Date;
+}
+
+export const SHIFT_LOCATIONS = ["production", "shop", "course", "other"] as const;
+export type ShiftLocation = (typeof SHIFT_LOCATIONS)[number];
+
+/** Per-person per-day shift record. Clock-in/out timestamps power
+ *  labor cost per batch and daily capacity consumption. */
+export interface StaffShift {
+  id?: string;
+  personId: string;
+  shiftDate: string;
+  clockInAt: Date;
+  clockOutAt?: Date;
+  breakMinutes: number;
+  location?: ShiftLocation;
+  linkedPlanIds: string[];
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const AVAILABILITY_EXCEPTION_TYPES = [
+  "vacation",
+  "sick",
+  "course-leading",
+  "training",
+  "partial",
+  "other",
+] as const;
+export type AvailabilityExceptionType =
+  (typeof AVAILABILITY_EXCEPTION_TYPES)[number];
+
+/** Richer alternative to the legacy `personUnavailability` table —
+ *  supports partial-day exceptions, course leading, training, etc.
+ *  Legacy table kept; new UI writes here. */
+export interface PersonAvailabilityException {
+  id?: string;
+  personId: string;
+  dateFrom: string;
+  dateTo: string;
+  type: AvailabilityExceptionType;
+  allDay: boolean;
+  hoursFrom?: string;
+  hoursTo?: string;
+  approved: boolean;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}

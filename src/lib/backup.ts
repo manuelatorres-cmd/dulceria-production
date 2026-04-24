@@ -43,6 +43,14 @@ export interface BackupData {
   dailySellEstimates?: unknown[];
   campaigns?: unknown[];
 
+  // --- Production brain (phase 2) ---
+  equipmentInstances?: unknown[];
+  machineLoads?: unknown[];
+  coldStorageUnits?: unknown[];
+  mouldUsageLog?: unknown[];
+  staffShifts?: unknown[];
+  personAvailabilityExceptions?: unknown[];
+
   // --- Legacy key compat (older backups written before the Product/Filling rename) ---
   // These are accepted on import and remapped to the new tables above.
   recipes?: unknown[];
@@ -92,6 +100,13 @@ const EXPORT_TABLES = [
   "campaigns",
   "replenishmentProposals",
   "dailySellEstimates",
+  // Production brain (phase 2)
+  "equipmentInstances",
+  "machineLoads",
+  "coldStorageUnits",
+  "mouldUsageLog",
+  "staffShifts",
+  "personAvailabilityExceptions",
 ] as const;
 
 export async function exportBackup(): Promise<void> {
@@ -141,6 +156,12 @@ export async function exportBackup(): Promise<void> {
     campaigns: rowsByName.campaigns,
     replenishmentProposals: rowsByName.replenishmentProposals,
     dailySellEstimates: rowsByName.dailySellEstimates,
+    equipmentInstances: rowsByName.equipmentInstances,
+    machineLoads: rowsByName.machineLoads,
+    coldStorageUnits: rowsByName.coldStorageUnits,
+    mouldUsageLog: rowsByName.mouldUsageLog,
+    staffShifts: rowsByName.staffShifts,
+    personAvailabilityExceptions: rowsByName.personAvailabilityExceptions,
   };
 
   const json = JSON.stringify(backup, (_key, value) => value ?? undefined);
@@ -196,6 +217,13 @@ const INSERT_ORDER = [
   "campaigns",
   "replenishmentProposals",
   "dailySellEstimates",
+  // Production brain (phase 2) — equipment/cold storage first (parents), then loads/logs (children).
+  "coldStorageUnits",
+  "equipmentInstances",
+  "machineLoads",
+  "mouldUsageLog",
+  "staffShifts",
+  "personAvailabilityExceptions",
 ] as const;
 
 /** Map of table name -> the imported rows for that table. */
@@ -367,6 +395,12 @@ export async function importBackup(file: File): Promise<void> {
   const rawCampaigns               = data.campaigns               ?? [];
   const rawReplenishmentProposals  = data.replenishmentProposals  ?? [];
   const rawDailySellEstimates      = data.dailySellEstimates      ?? [];
+  const rawEquipmentInstances      = data.equipmentInstances      ?? [];
+  const rawMachineLoads            = data.machineLoads            ?? [];
+  const rawColdStorageUnits        = data.coldStorageUnits        ?? [];
+  const rawMouldUsageLog           = data.mouldUsageLog           ?? [];
+  const rawStaffShifts             = data.staffShifts             ?? [];
+  const rawPersonAvailabilityExceptions = data.personAvailabilityExceptions ?? [];
 
   // Apply field-level migrations for backups written pre-rename.
   const payload: ImportPayload = {
@@ -402,6 +436,12 @@ export async function importBackup(file: File): Promise<void> {
     campaigns:                  passThrough(rawCampaigns),
     replenishmentProposals:     passThrough(rawReplenishmentProposals),
     dailySellEstimates:         passThrough(rawDailySellEstimates),
+    equipmentInstances:         passThrough(rawEquipmentInstances),
+    machineLoads:               passThrough(rawMachineLoads),
+    coldStorageUnits:           passThrough(rawColdStorageUnits),
+    mouldUsageLog:              passThrough(rawMouldUsageLog),
+    staffShifts:                passThrough(rawStaffShifts),
+    personAvailabilityExceptions: passThrough(rawPersonAvailabilityExceptions),
   };
 
   // 1. Atomic server-side wipe. Single round-trip, all-or-nothing.
