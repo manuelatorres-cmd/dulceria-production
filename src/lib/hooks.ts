@@ -9066,6 +9066,112 @@ export async function markProposalScheduled(
   queryClient.invalidateQueries({ queryKey: ["replenishmentProposals"] });
 }
 
+/** Drag-to-schedule helper. Creates a draft productionPlan, a
+ *  planProducts row for the proposed qty, ensures a productionDays
+ *  row exists for the target date, adds a productionDayLineItem
+ *  linking the plan to that day, and flips the proposal status.
+ *
+ *  Returns the new plan id so the caller can navigate to the batch
+ *  detail if needed.
+ */
+export async function scheduleProposalOnDay(
+  proposalId: string,
+  targetDateISO: string,
+): Promise<string> {
+  // 1) Load the proposal + the product so we can name the batch.
+  const proposalRow = assertOkMaybe(
+    await supabase
+      .from("replenishmentProposals")
+      .select("*")
+      .eq("id", proposalId)
+      .maybeSingle(),
+  );
+  if (!proposalRow) throw new Error("Proposal not found");
+  const proposal = proposalRow as ReplenishmentProposal;
+
+  const productRow = assertOkMaybe(
+    await supabase
+      .from("products")
+      .select("id, name")
+      .eq("id", proposal.productId)
+      .maybeSingle(),
+  );
+  const productName = (productRow as { name?: string } | null)?.name ?? "Product";
+
+  // 2) Create the productionPlan (draft). Batch number uses
+  //    YYYYMMDD-### derived from the target date + random suffix.
+  const now = new Date();
+  const isoDate = targetDateISO.slice(0, 10);
+  const compactDate = isoDate.replace(/-/g, "");
+  const batchNumber = `${compactDate}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+
+  const planId = newId();
+  const planPayload = {
+    id: planId,
+    batchNumber,
+    name: `${productName} × ${proposal.suggestedBatchSize}`,
+    status: "draft" as const,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const { error: planErr } = await supabase.from("productionPlans").insert(planPayload);
+  if (planErr) throw planErr;
+
+  // 3) planProducts row — ties plan to product + qty.
+  const planProductId = newId();
+  const planProductPayload = {
+    id: planProductId,
+    planId,
+    productId: proposal.productId,
+    quantity: proposal.suggestedBatchSize,
+  };
+  const { error: ppErr } = await supabase.from("planProducts").insert(planProductPayload);
+  if (ppErr) throw ppErr;
+
+  // 4) Ensure productionDays row exists for that date (re-use if already
+  //    there — HACCP or prior scheduling may have created it).
+  const dayRow = assertOkMaybe(
+    await supabase
+      .from("productionDays")
+      .select("id")
+      .eq("date", isoDate)
+      .maybeSingle(),
+  );
+  let productionDayId: string;
+  if (dayRow) {
+    productionDayId = (dayRow as { id: string }).id;
+  } else {
+    productionDayId = newId();
+    const { error: dayErr } = await supabase.from("productionDays").insert({
+      id: productionDayId,
+      date: isoDate,
+      status: "draft",
+    });
+    if (dayErr) throw dayErr;
+  }
+
+  // 5) productionDayLineItems — link plan to the day.
+  const lineItemId = newId();
+  const { error: liErr } = await supabase.from("productionDayLineItems").insert({
+    id: lineItemId,
+    productionDayId,
+    planId,
+    stepIds: [],
+    plannedMinutes: 0,
+    sortOrder: 0,
+  });
+  if (liErr) throw liErr;
+
+  // 6) Flip proposal status.
+  await markProposalScheduled(proposalId, planId);
+
+  queryClient.invalidateQueries({ queryKey: ["productionPlans"] });
+  queryClient.invalidateQueries({ queryKey: ["planProducts"] });
+  queryClient.invalidateQueries({ queryKey: ["productionDays"] });
+  queryClient.invalidateQueries({ queryKey: ["productionDayLineItems"] });
+  return planId;
+}
+
 /** Dismiss a proposal for N days. Engine will not re-propose the same
  *  product until dismissedUntil passes — except when stock projection
  *  enters critical zone, in which case the engine runner auto-revives
