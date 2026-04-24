@@ -34,6 +34,11 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
   `replenishmentProposals`, `dailySellEstimates`, `campaigns`. New
   columns on `products`, `orders`, `orderItems`, `mouldPool`, `people`.
   Default values keep legacy rows compatible.
+- Migration `0052_production_brain_phase2.sql` (additive). New tables:
+  `equipmentInstances`, `machineLoads`, `coldStorageUnits`,
+  `mouldUsageLog`, `staffShifts`, `personAvailabilityExceptions`.
+  Hooks + backup/restore updated to match. UI for these lands in a
+  later phase.
 
 ## [0.1.0] — 2026-04-19
 
