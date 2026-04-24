@@ -28,6 +28,7 @@ import {
   type OrderProductLine, type OrderPackagingRollupLine, type ProductStockState,
 } from "@/lib/orderRollup";
 import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
+import { OrderStepPipeline } from "@/components/order-step-pipeline";
 import {
   resolveUnitPrice, effectiveVatRate,
   aggregateVatByRate, computeOrderMargin,
@@ -479,6 +480,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
         )}
+
+        {/* Aggregated production pipeline — rolls up step progress
+            across every batch linked to this order. Empty state when
+            nothing is scheduled yet. */}
+        <OrderStepPipeline orderId={orderId} needByDate={order.deadline} />
 
         {/* Replenishment / borrow linkage banners */}
         {parentOrder && (
