@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import {
   useEquipmentInstances,
@@ -10,8 +10,10 @@ import {
   useMouldsList,
   useIngredients,
   useEquipment,
+  saveMouldPoolInstance,
 } from "@/lib/hooks";
-import type { MachineLoad, MouldPoolInstance } from "@/types";
+import { MachineLoadModal } from "@/components/machine-load-modal";
+import type { EquipmentInstance, MachineLoad, MouldPoolInstance } from "@/types";
 
 /**
  * Production Brain · Equipment dashboard (phase 2 UI)
@@ -28,6 +30,29 @@ export default function ProductionBrainEquipmentPage() {
   const equipment = useEquipment();
   const instances = useEquipmentInstances();
   const loads = useMachineLoads();
+  const [loadModal, setLoadModal] = useState<EquipmentInstance | null>(null);
+
+  async function handleMouldClick(inst: MouldPoolInstance) {
+    if (!inst.id) return;
+    const current = inst.currentState;
+    let nextState = current;
+    if (current === "available") nextState = "needs-wash";
+    else if (current === "needs-wash") nextState = "in-deep-wash";
+    else if (current === "in-deep-wash") nextState = "available";
+    else if (current === "loaded" || current === "filled" || current === "sealed") {
+      nextState = "needs-wash";
+    } else if (current === "retired") nextState = "available";
+    await saveMouldPoolInstance({
+      ...inst,
+      currentState: nextState,
+      stateChangedAt: new Date(),
+      usesSinceDeepWash:
+        nextState === "available" && current === "in-deep-wash"
+          ? 0
+          : inst.usesSinceDeepWash,
+      retired: nextState === "retired",
+    });
+  }
   const storage = useColdStorageUnits();
   const mouldPool = useMouldPool();
   const moulds = useMouldsList();
@@ -153,6 +178,14 @@ export default function ProductionBrainEquipmentPage() {
                     {inst.model ?? ""}
                     {inst.capacityKg ? ` · ${inst.capacityKg} kg` : ""}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setLoadModal(inst)}
+                    className="mt-2 text-[10px] uppercase text-muted-foreground hover:text-foreground"
+                    style={{ letterSpacing: "0.1em" }}
+                  >
+                    {load ? "Manage load →" : "Load chocolate →"}
+                  </button>
                 </li>
               );
             })}
@@ -184,15 +217,23 @@ export default function ProductionBrainEquipmentPage() {
                   </div>
                   <div className="grid grid-cols-10 sm:grid-cols-20 gap-1">
                     {list.map((inst) => (
-                      <span
+                      <button
                         key={inst.id}
-                        title={`#${inst.instanceIndex} · ${inst.currentState}`}
+                        type="button"
+                        onClick={() => handleMouldClick(inst)}
+                        title={`#${inst.instanceIndex} · ${inst.currentState} · used ${inst.usesSinceDeepWash}/${inst.deepWashThreshold}`}
                         className={
-                          "aspect-square rounded " + MOULD_STATE_CLASS[inst.currentState]
+                          "aspect-square rounded cursor-pointer hover:outline hover:outline-1 hover:outline-foreground " +
+                          MOULD_STATE_CLASS[inst.currentState]
                         }
                       />
                     ))}
                   </div>
+                  {list.some((i) => i.currentState === "needs-wash" || i.currentState === "in-deep-wash") ? (
+                    <p className="text-[10.5px] text-status-warn mt-1.5">
+                      Deep-wash due on {list.filter((i) => i.currentState === "needs-wash" || i.currentState === "in-deep-wash").length} instance(s) · click a square to update
+                    </p>
+                  ) : null}
                 </li>
               );
             })}
@@ -261,6 +302,14 @@ export default function ProductionBrainEquipmentPage() {
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {loadModal ? (
+        <MachineLoadModal
+          instance={loadModal}
+          activeLoad={activeLoadsByInstance.get(loadModal.id ?? "")}
+          onClose={() => setLoadModal(null)}
+        />
       ) : null}
     </div>
   );
