@@ -1,9 +1,11 @@
-@import "tailwindcss";
-
 /* Fraunces (serif display) + Inter (sans body) — loaded from Google Fonts.
    Fraunces is a variable serif with opsz + weight + italic axes, tuned for
-   the artisan / editorial direction Manuela picked. */
+   the artisan / editorial direction Manuela picked.
+   Must sit above @import "tailwindcss" — CSS spec requires every @import
+   rule to come before any other rule (except @charset / @layer). */
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@300;400;500;600&display=swap");
+
+@import "tailwindcss";
 
 @keyframes demo-ripple {
   from { transform: translate(-50%, -50%) scale(0); opacity: 0.8; }
