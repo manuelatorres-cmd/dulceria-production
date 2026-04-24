@@ -39,21 +39,22 @@ export function QuickAddForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="rounded-lg border border-border bg-card p-3 space-y-2"
+      className="border border-border bg-card p-4 space-y-2.5"
+      style={{ borderRadius: 4 }}
     >
       {children}
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={!canSubmit}
-          className="btn-primary flex-1 py-2"
+          className="btn-primary flex-1"
         >
           {submitLabel}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="btn-secondary px-4 py-2"
+          className="btn-secondary"
         >
           Cancel
         </button>

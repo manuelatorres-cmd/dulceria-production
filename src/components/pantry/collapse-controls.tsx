@@ -19,11 +19,19 @@ export function CollapseControls({
   onExpandAll: () => void;
 }) {
   return (
-    <div className="flex justify-end gap-3">
-      <button onClick={onCollapseAll} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+    <div className="flex justify-end gap-4">
+      <button
+        onClick={onCollapseAll}
+        className="text-[10.5px] text-muted-foreground hover:text-foreground transition-colors uppercase"
+        style={{ letterSpacing: "0.1em" }}
+      >
         Collapse all
       </button>
-      <button onClick={onExpandAll} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <button
+        onClick={onExpandAll}
+        className="text-[10.5px] text-muted-foreground hover:text-foreground transition-colors uppercase"
+        style={{ letterSpacing: "0.1em" }}
+      >
         Expand all
       </button>
     </div>

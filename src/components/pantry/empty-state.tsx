@@ -22,7 +22,10 @@ export function EmptyState({
   filteredMessage: string;
 }) {
   return (
-    <p className="text-muted-foreground text-sm py-8 text-center">
+    <p
+      className="text-muted-foreground text-[13px] py-12 text-center italic"
+      style={{ fontFamily: "var(--font-serif)", letterSpacing: "-0.01em", fontWeight: 400 }}
+    >
       {hasData ? filteredMessage : emptyMessage}
     </p>
   );
