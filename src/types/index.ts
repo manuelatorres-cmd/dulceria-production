@@ -2598,14 +2598,16 @@ export interface PriceList {
   updatedAt?: Date;
 }
 
-/** One rule inside a price list — can scope by product, collection,
- *  or tag. Discount % OR fixed price (mutually exclusive, enforced
- *  by DB check). */
+/** One rule inside a price list — can scope by product, variant
+ *  (collection), or tag. Discount % OR fixed price (mutually
+ *  exclusive, enforced by DB check). The original questionnaire
+ *  talked about 'collection' but the active schema calls them
+ *  variants since migration 0047. */
 export interface PriceListItem {
   id?: string;
   priceListId: string;
   productId?: string;
-  collectionId?: string;
+  variantId?: string;
   tag?: string;
   discountPercent?: number;
   fixedPrice?: number;

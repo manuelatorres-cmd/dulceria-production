@@ -69,7 +69,7 @@ export default function PriceListDetailPage({
     for (const p of products) if (p.id) m.set(p.id, p.name);
     return m;
   }, [products]);
-  const collectionsById = useMemo(() => {
+  const variantsById = useMemo(() => {
     const m = new Map<string, string>();
     for (const v of variants) if (v.id) m.set(v.id, v.name ?? v.id);
     return m;
@@ -239,7 +239,7 @@ export default function PriceListDetailPage({
             listId={listId}
             items={items}
             productsById={productsById}
-            collectionsById={collectionsById}
+            variantsById={variantsById}
           />
         </section>
 
@@ -306,7 +306,7 @@ export default function PriceListDetailPage({
             <ol className="text-[11.5px] text-muted-foreground list-decimal pl-5 space-y-1">
               <li>Per-customer product override</li>
               <li>This list's product rule</li>
-              <li>This list's collection rule</li>
+              <li>This list's variant rule</li>
               <li>This list's tag rule</li>
               <li>Blanket % from header</li>
               <li>Retail price on product</li>
@@ -325,14 +325,14 @@ function RulesPanel({
   listId,
   items,
   productsById,
-  collectionsById,
+  variantsById,
 }: {
   listId: string;
   items: PriceListItem[];
   productsById: Map<string, string>;
-  collectionsById: Map<string, string>;
+  variantsById: Map<string, string>;
 }) {
-  const [scope, setScope] = useState<"product" | "collection" | "tag">("product");
+  const [scope, setScope] = useState<"product" | "variant" | "tag">("product");
   const [scopeId, setScopeId] = useState("");
   const [tag, setTag] = useState("");
   const [mode, setMode] = useState<"discount" | "fixed">("discount");
@@ -343,7 +343,7 @@ function RulesPanel({
     const value = Number(amount);
     if (Number.isNaN(value)) return;
     if (scope === "product" && !scopeId) return;
-    if (scope === "collection" && !scopeId) return;
+    if (scope === "variant" && !scopeId) return;
     if (scope === "tag" && !tag.trim()) return;
     setBusy(true);
     try {
@@ -351,7 +351,7 @@ function RulesPanel({
         id: newId(),
         priceListId: listId,
         productId: scope === "product" ? scopeId : undefined,
-        collectionId: scope === "collection" ? scopeId : undefined,
+        variantId: scope === "variant" ? scopeId : undefined,
         tag: scope === "tag" ? tag.trim() : undefined,
         discountPercent: mode === "discount" ? value : undefined,
         fixedPrice: mode === "fixed" ? value : undefined,
@@ -398,12 +398,12 @@ function RulesPanel({
               className="input"
               value={scope}
               onChange={(e) => {
-                setScope(e.target.value as "product" | "collection" | "tag");
+                setScope(e.target.value as "product" | "variant" | "tag");
                 setScopeId("");
               }}
             >
               <option value="product">Product</option>
-              <option value="collection">Collection</option>
+              <option value="variant">Variant / collection</option>
               <option value="tag">Tag</option>
             </select>
           </div>
@@ -420,7 +420,7 @@ function RulesPanel({
           ) : (
             <div>
               <label className="label">
-                {scope === "product" ? "Product" : "Collection"}
+                {scope === "product" ? "Product" : "Variant"}
               </label>
               <select
                 className="input"
@@ -430,7 +430,7 @@ function RulesPanel({
                 <option value="">—</option>
                 {(scope === "product"
                   ? Array.from(productsById.entries())
-                  : Array.from(collectionsById.entries())
+                  : Array.from(variantsById.entries())
                 ).map(([id, name]) => (
                   <option key={id} value={id}>
                     {name}
@@ -502,8 +502,8 @@ function RulesPanel({
               >
                 {it.productId
                   ? productsById.get(it.productId) ?? it.productId.slice(0, 8)
-                  : it.collectionId
-                    ? `Collection: ${collectionsById.get(it.collectionId) ?? it.collectionId.slice(0, 8)}`
+                  : it.variantId
+                    ? `Variant: ${variantsById.get(it.variantId) ?? it.variantId.slice(0, 8)}`
                     : `Tag: ${it.tag}`}
               </span>
               <span className="tabular-nums text-muted-foreground">

@@ -31,7 +31,7 @@ create table if not exists public."priceListItems" (
   id uuid primary key default gen_random_uuid(),
   "priceListId" uuid not null references public."priceLists"(id) on delete cascade,
   "productId" uuid references public.products(id) on delete cascade,
-  "collectionId" uuid references public.collections(id) on delete cascade,
+  "variantId" uuid references public.variants(id) on delete cascade,
   tag text,
   "discountPercent" numeric(5, 2),
   "fixedPrice" numeric(12, 2),
@@ -42,7 +42,7 @@ create table if not exists public."priceListItems" (
   -- At least one scope must be set.
   check (
     "productId" is not null
-    or "collectionId" is not null
+    or "variantId" is not null
     or tag is not null
   ),
   -- Either discount OR fixed price, not both.
