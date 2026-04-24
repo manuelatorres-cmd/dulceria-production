@@ -80,13 +80,13 @@ const STATUS_LABEL: Record<VariantStatus, string> = {
 
 const STATUS_CLASS: Record<VariantStatus, string> = {
   permanent: "text-primary bg-primary/10",
-  active: "text-emerald-700 bg-emerald-50",
+  active: "text-status-ok bg-status-ok-bg",
   upcoming: "text-status-warn bg-status-warn-bg",
   past: "text-muted-foreground bg-muted",
 };
 
 const MARGIN_COLORS: Record<MarginHealth, { bar: string; text: string; bg: string }> = {
-  healthy: { bar: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50" },
+  healthy: { bar: "bg-status-ok", text: "text-status-ok", bg: "bg-status-ok-bg" },
   thin: { bar: "bg-status-warn", text: "text-status-warn", bg: "bg-status-warn-bg" },
   negative: { bar: "bg-status-alert", text: "text-status-alert", bg: "bg-status-alert-bg" },
 };
@@ -923,7 +923,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                           <span className="text-muted-foreground">Remove?</span>
                           <button
                             onClick={() => handleRemoveProduct(cr.id ?? "")}
-                            className="text-red-600 font-medium hover:underline"
+                            className="text-status-alert font-medium hover:underline"
                           >
                             Yes
                           </button>
@@ -1271,7 +1271,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                           <span className="text-muted-foreground">Remove?</span>
                           <button
                             onClick={() => handleRemoveBox(cpId)}
-                            className="text-red-600 font-medium hover:underline"
+                            className="text-status-alert font-medium hover:underline"
                           >
                             Yes
                           </button>
@@ -1577,7 +1577,7 @@ function BoxCard({
           {pendingRemove ? (
             <span className="flex items-center gap-1.5 text-xs">
               <span className="text-muted-foreground">Remove?</span>
-              <button onClick={onConfirmRemove} className="text-red-600 font-medium hover:underline">Yes</button>
+              <button onClick={onConfirmRemove} className="text-status-alert font-medium hover:underline">Yes</button>
               <button onClick={onCancelRemove} className="text-muted-foreground hover:underline">Cancel</button>
             </span>
           ) : (
@@ -1721,7 +1721,7 @@ function BoxCard({
                   {margins.length > 1 && (() => {
                     const delta = marginDelta(margins[margins.length - 1], margins[0]);
                     return (
-                      <p className={delta.improved ? "text-emerald-600" : "text-red-600"}>
+                      <p className={delta.improved ? "text-status-ok" : "text-status-alert"}>
                         {delta.label} overall
                       </p>
                     );
@@ -1744,7 +1744,7 @@ function BoxCard({
                       <div className="flex items-baseline justify-between gap-1">
                         <span className="font-medium tabular-nums">{formatMarginPercent(snap.marginPercent)}</span>
                         {delta && (
-                          <span className={`tabular-nums ${delta.improved ? "text-emerald-600" : "text-red-600"}`}>
+                          <span className={`tabular-nums ${delta.improved ? "text-status-ok" : "text-status-alert"}`}>
                             {delta.label}
                           </span>
                         )}

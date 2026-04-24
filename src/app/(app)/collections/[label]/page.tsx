@@ -27,7 +27,7 @@ const STATUS_LABEL: Record<VariantStatus, string> = {
 
 const STATUS_CLASS: Record<VariantStatus, string> = {
   permanent: "text-primary bg-primary/10",
-  active: "text-emerald-700 bg-emerald-50",
+  active: "text-status-ok bg-status-ok-bg",
   upcoming: "text-status-warn bg-status-warn-bg",
   past: "text-muted-foreground bg-muted",
 };

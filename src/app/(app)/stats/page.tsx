@@ -100,9 +100,9 @@ type Tooltip = { x: number; y: number; lines: string[] };
 function getTrend(recent: number, previous: number): Trend {
   if (recent === 0 && previous === 0) return { label: "—", className: "text-muted-foreground" };
   if (recent === 0 && previous > 0) return { label: "Dormant", className: "text-status-alert font-medium" };
-  if (recent > 0 && previous === 0) return { label: "New", className: "text-emerald-600 font-medium" };
+  if (recent > 0 && previous === 0) return { label: "New", className: "text-status-ok font-medium" };
   const ratio = recent / previous;
-  if (ratio >= 1.3) return { label: "↑ Rising", className: "text-emerald-600 font-medium" };
+  if (ratio >= 1.3) return { label: "↑ Rising", className: "text-status-ok font-medium" };
   if (ratio <= 0.7) return { label: "↓ Easing", className: "text-status-warn font-medium" };
   return { label: "→ Steady", className: "text-muted-foreground" };
 }

@@ -46,13 +46,13 @@ const STATUS_LABEL: Record<VariantStatus, string> = {
 
 const STATUS_CLASS: Record<VariantStatus, string> = {
   permanent: "text-primary bg-primary/10",
-  active: "text-emerald-700 bg-emerald-50",
+  active: "text-status-ok bg-status-ok-bg",
   upcoming: "text-status-warn bg-status-warn-bg",
   past: "text-muted-foreground bg-muted",
 };
 
 const MARGIN_COLORS: Record<MarginHealth, { bar: string; text: string; bg: string }> = {
-  healthy: { bar: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50" },
+  healthy: { bar: "bg-status-ok", text: "text-status-ok", bg: "bg-status-ok-bg" },
   thin: { bar: "bg-status-warn", text: "text-status-warn", bg: "bg-status-warn-bg" },
   negative: { bar: "bg-status-alert", text: "text-status-alert", bg: "bg-status-alert-bg" },
 };
@@ -229,7 +229,7 @@ export default function PricingPage() {
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Healthy</p>
-                <p className="text-lg font-semibold text-emerald-700 tabular-nums mt-0.5">{summary.healthyCount}</p>
+                <p className="text-lg font-semibold text-status-ok tabular-nums mt-0.5">{summary.healthyCount}</p>
               </div>
               <div>
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Thin</p>

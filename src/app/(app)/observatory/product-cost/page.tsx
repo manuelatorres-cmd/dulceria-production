@@ -918,7 +918,7 @@ export default function ProductCostPage() {
                               ? "text-muted-foreground"
                               : delta > 0
                               ? "text-rose-600"
-                              : "text-emerald-600"
+                              : "text-status-ok"
                           }`}
                         >
                           {delta >= 0 ? "+" : ""}{fmt(delta, sym)}
@@ -1189,13 +1189,13 @@ function CompareRow({ label, values, numericValues, highlightMin, dimEmpty }: Co
                 : isEmpty
                 ? "text-muted-foreground/50"
                 : isMin
-                ? "text-emerald-700 font-semibold"
+                ? "text-status-ok font-semibold"
                 : "text-foreground"
             }`}
           >
             {val}
             {isMin && !isEmpty && (
-              <span className="ml-1 text-[9px] text-emerald-600/60">↓</span>
+              <span className="ml-1 text-[9px] text-status-ok/60">↓</span>
             )}
           </td>
         );

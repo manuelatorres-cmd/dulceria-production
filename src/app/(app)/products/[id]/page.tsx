@@ -2715,7 +2715,7 @@ function ProductFillingRow({
               <span className="text-muted-foreground">Remove?</span>
               <button
                 onClick={() => { onRemove(); setPendingRemove(false); }}
-                className="text-red-600 font-medium hover:underline"
+                className="text-status-alert font-medium hover:underline"
               >
                 Yes
               </button>
@@ -2745,7 +2745,7 @@ function ProductFillingRow({
 const SEGMENT_COLORS = [
   "bg-primary",
   "bg-status-warn-edge",
-  "bg-emerald-400",
+  "bg-status-ok",
   "bg-violet-400",
   "bg-rose-400",
 ];
