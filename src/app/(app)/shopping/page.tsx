@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useIngredients, usePackagingList, useShoppingItems, setIngredientLowStock, markIngredientOrdered, unorderIngredient, setPackagingLowStock, markPackagingOrdered, unorderPackaging, saveShoppingItem, markShoppingItemOrdered, deleteShoppingItem, useDecorationMaterials, setDecorationMaterialLowStock, markDecorationMaterialOrdered, unorderDecorationMaterial, useOrders, useAllOrderItems, useProductsList, useMouldsList, useCapacityConfig, saveIngredient, useAllIngredientStock, useCampaigns, useProductionOrders, useAllProductionOrderItems } from "@/lib/hooks";
+import { useIngredients, usePackagingList, useShoppingItems, setIngredientLowStock, markIngredientOrdered, unorderIngredient, setPackagingLowStock, markPackagingOrdered, unorderPackaging, saveShoppingItem, markShoppingItemOrdered, deleteShoppingItem, useDecorationMaterials, setDecorationMaterialLowStock, markDecorationMaterialOrdered, unorderDecorationMaterial, useOrders, useAllOrderItems, useProductsList, useMouldsList, useCapacityConfig, saveIngredient, useAllIngredientStock, useCampaigns, useProductionOrders, useAllProductionOrderItems, receiveIngredientStock } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
@@ -779,6 +779,7 @@ function ShortageBySupplier({
               <span className="w-24 text-right">Buy</span>
               <span className="w-20 text-right">Unit €</span>
               <span className="w-20 text-right">Subtotal</span>
+              <span className="w-32 text-right">Received</span>
             </div>
             {rows.map((r) => (
               <div key={r.row.ingredientId} className="flex items-center px-3 py-1.5 text-sm border-b border-border last:border-b-0">
@@ -798,6 +799,9 @@ function ShortageBySupplier({
                 <span className="w-20 text-right tabular-nums font-medium">
                   {r.subtotal != null ? fmt(r.subtotal) : "—"}
                 </span>
+                <span className="w-32 flex justify-end">
+                  <ReceiveCell ingredientId={r.row.ingredientId} />
+                </span>
               </div>
             ))}
           </div>
@@ -808,6 +812,71 @@ function ShortageBySupplier({
         <span className="text-[14px] tabular-nums font-semibold">≈ {fmt(grandTotal)}</span>
       </div>
     </div>
+  );
+}
+
+/** Tiny inline "received" cell — operator types grams (or kg with a
+ *  k suffix), hits Add or Enter, the ingredient stock gets bumped via
+ *  `receiveIngredientStock`, queries invalidate, the shopping list
+ *  recomputes from fresh on-hand. If the new balance covers the
+ *  demand, the row drops off the list automatically. */
+function ReceiveCell({ ingredientId, defaultUnit }: {
+  ingredientId: string;
+  defaultUnit?: string;
+}) {
+  const [val, setVal] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const unitHint = defaultUnit ? ` ${defaultUnit}` : " g";
+
+  async function submit() {
+    if (saving) return;
+    const trimmed = val.trim().toLowerCase().replace(",", ".");
+    if (!trimmed) return;
+    // "1.5kg" / "1500g" / "1500" all accepted; default unit = grams.
+    let grams: number;
+    if (trimmed.endsWith("kg")) grams = parseFloat(trimmed.slice(0, -2)) * 1000;
+    else if (trimmed.endsWith("g")) grams = parseFloat(trimmed.slice(0, -1));
+    else grams = parseFloat(trimmed);
+    if (isNaN(grams) || grams <= 0) return;
+    setSaving(true);
+    try {
+      await receiveIngredientStock(ingredientId, grams, "Received via shopping list");
+      setVal("");
+      setFlash(`+${formatGrams(grams)}`);
+      setTimeout(() => setFlash(null), 1800);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Receive failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        type="text"
+        inputMode="decimal"
+        placeholder={`amount${unitHint}`}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+        className="input !w-16 text-[11px] !py-0.5 text-right"
+        disabled={saving}
+        title="Type the amount you bought (e.g. 1.5kg, 500g, 500)."
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={saving || !val.trim()}
+        className="text-[10px] px-1.5 py-0.5 rounded-sm bg-foreground text-background disabled:opacity-40"
+      >
+        Add
+      </button>
+      {flash && (
+        <span className="text-[10px] text-status-ok-ink">{flash}</span>
+      )}
+    </span>
   );
 }
 
@@ -916,14 +985,19 @@ function IngredientStockBelowThresholdSection() {
           <span className="w-24 text-right">On hand</span>
           <span className="w-28 text-right">Threshold</span>
           <span className="w-24 text-right">Short by</span>
+          <span className="w-32 text-right">Received</span>
         </div>
         {rows.map((row) => (
-          <Link
+          <div
             key={row.ingredientId}
-            href={`/ingredients/${encodeURIComponent(row.ingredientId)}?tab=stock`}
             className="flex items-center px-3 py-2 text-sm border-b border-border last:border-b-0 hover:bg-muted/20"
           >
-            <span className="flex-1 truncate">{row.name}</span>
+            <Link
+              href={`/ingredients/${encodeURIComponent(row.ingredientId)}?tab=stock`}
+              className="flex-1 truncate hover:underline"
+            >
+              {row.name}
+            </Link>
             <span className="w-24 text-right tabular-nums text-status-warn font-medium">
               {formatGrams(row.quantityG)}
             </span>
@@ -933,7 +1007,10 @@ function IngredientStockBelowThresholdSection() {
             <span className="w-24 text-right tabular-nums font-medium text-destructive">
               {formatGrams(row.shortageG)}
             </span>
-          </Link>
+            <span className="w-32 flex justify-end">
+              <ReceiveCell ingredientId={row.ingredientId} />
+            </span>
+          </div>
         ))}
       </div>
     </section>
