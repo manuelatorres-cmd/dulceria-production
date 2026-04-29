@@ -7,14 +7,14 @@ import { PageHeader } from "@/components/page-header";
 import {
   useOrders, useAllOrderItems, useProductsList, useMouldsList,
   useFillings, useFillingCategories, useCapacityConfig, useFillingStockItems,
-  useIngredients,
+  useIngredients, useAllIngredientStock,
 } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import type { ProductFilling, FillingIngredient } from "@/types";
 import { computeWeeklyFillingNeeds } from "@/lib/weeklyFilling";
-import { Flame, Snowflake, Users, ClipboardList, ArrowLeft } from "lucide-react";
+import { Flame, Snowflake, Users, ClipboardList, ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 
 const WINDOW_OPTIONS = [
   { label: "Next 7 days", days: 7 },
@@ -65,6 +65,50 @@ export default function FillingConsolidationPage() {
   }, [orders, orderItems, products, productFillings, fillingIngredients, fillings, fillingCategories, moulds, stockItems, config?.fillingBufferPercent, windowDays]);
 
   const ingredientById = useMemo(() => new Map(ingredients.map((i) => [i.id!, i])), [ingredients]);
+
+  // Live ingredient stock keyed by id (with currentStockG fallback for
+  // ingredients that don't yet have a row in the new ingredientStock
+  // table). Used by the per-filling cookable check below.
+  const ingredientStockRows = useAllIngredientStock();
+  const onHandG = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of ingredientStockRows) {
+      m.set(s.ingredientId, Number(s.quantityG));
+    }
+    for (const ing of ingredients) {
+      if (!m.has(ing.id!) && ing.currentStockG != null) {
+        m.set(ing.id!, Number(ing.currentStockG));
+      }
+    }
+    return m;
+  }, [ingredientStockRows, ingredients]);
+
+  // Per-filling cookable status. Walks scaledIngredients, converts to
+  // grams, checks against on-hand. Returns:
+  //   - "covered"  → nothing to cook (existing stock already enough)
+  //   - "ready"    → can cook with what's on hand (every ing has enough)
+  //   - "short"    → at least one ingredient is below the recipe need
+  // The expanded ingredient list also gets per-row short/ok flags.
+  type Cookable = "covered" | "ready" | "short";
+  type IngStatus = { ingredientId: string; need: number; onHand: number; ok: boolean };
+  function unitToGrams(amount: number, unit: string): number {
+    if (unit === "g" || unit === "ml") return amount;
+    if (unit === "kg" || unit === "L") return amount * 1000;
+    return amount; // unknown unit → trust the number
+  }
+  function statusFor(need: typeof result.needs[number]): { kind: Cookable; ingStatuses: IngStatus[] } {
+    if (need.toCookBufferedG === 0) return { kind: "covered", ingStatuses: [] };
+    const statuses: IngStatus[] = [];
+    let anyShort = false;
+    for (const si of need.scaledIngredients) {
+      const needG = unitToGrams(si.amount, si.unit);
+      const haveG = onHandG.get(si.ingredientId) ?? 0;
+      const ok = haveG >= needG;
+      if (!ok) anyShort = true;
+      statuses.push({ ingredientId: si.ingredientId, need: needG, onHand: haveG, ok });
+    }
+    return { kind: anyShort ? "short" : "ready", ingStatuses: statuses };
+  }
 
   const totalToCook = result.needs.reduce((acc, n) => acc + n.toCookBufferedG, 0);
   const bufferPct = Math.max(0, Math.min(100, config?.fillingBufferPercent ?? 0));
@@ -183,12 +227,27 @@ export default function FillingConsolidationPage() {
                     ? "text-status-warn"
                     : "text-muted-foreground";
                 const nothingToCook = need.toCookBufferedG === 0;
+                const { kind: cookable, ingStatuses } = statusFor(need);
+                const ingStatusById = new Map(ingStatuses.map((s) => [s.ingredientId, s]));
                 return (
                   <li
                     key={need.fillingId}
                     className={`rounded-sm border bg-card overflow-hidden ${
-                      nothingToCook ? "border-status-ok-edge" : "border-border"
+                      nothingToCook
+                        ? "border-status-ok-edge"
+                        : cookable === "short"
+                        ? "border-status-alert/40"
+                        : cookable === "ready"
+                        ? "border-status-ok/50"
+                        : "border-border"
                     }`}
+                    style={
+                      cookable === "short"
+                        ? { boxShadow: "inset 4px 0 0 #9b4f48" }
+                        : cookable === "ready"
+                        ? { boxShadow: "inset 4px 0 0 #4a7a5e" }
+                        : undefined
+                    }
                   >
                     <button
                       onClick={() => toggleExpanded(need.fillingId)}
@@ -197,6 +256,16 @@ export default function FillingConsolidationPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
+                            {!nothingToCook && cookable === "ready" && (
+                              <span title="Every ingredient on stock — ready to cook">
+                                <CheckCircle2 className="w-4 h-4 text-status-ok" />
+                              </span>
+                            )}
+                            {cookable === "short" && (
+                              <span title="At least one ingredient is short — buy first">
+                                <XCircle className="w-4 h-4 text-status-alert" />
+                              </span>
+                            )}
                             <p className="font-medium text-sm">{need.fillingName}</p>
                             {need.category && (
                               <span className="text-[10px] text-muted-foreground">· {need.category}</span>
@@ -255,10 +324,27 @@ export default function FillingConsolidationPage() {
                             <ul className="divide-y divide-border rounded-md border border-border bg-card">
                               {need.scaledIngredients.map((si, i) => {
                                 const ing = ingredientById.get(si.ingredientId);
+                                const st = ingStatusById.get(si.ingredientId);
+                                const ok = st?.ok ?? true;
+                                const haveLabel = st
+                                  ? (st.onHand >= 1000 ? `${(st.onHand / 1000).toFixed(2)} kg` : `${Math.round(st.onHand)} g`)
+                                  : "";
                                 return (
-                                  <li key={`${si.ingredientId}-${i}`} className="flex items-center justify-between px-2.5 py-1.5 text-xs">
-                                    <span>{ing?.name ?? si.ingredientId}</span>
-                                    <span className="tabular-nums text-muted-foreground">{si.amount}{si.unit}</span>
+                                  <li key={`${si.ingredientId}-${i}`} className="flex items-center justify-between px-2.5 py-1.5 text-xs gap-2">
+                                    <span className="flex items-center gap-1.5 min-w-0">
+                                      {ok
+                                        ? <CheckCircle2 className="w-3 h-3 text-status-ok shrink-0" />
+                                        : <XCircle className="w-3 h-3 text-status-alert shrink-0" />}
+                                      <span className="truncate">{ing?.name ?? si.ingredientId}</span>
+                                    </span>
+                                    <span className="tabular-nums text-muted-foreground shrink-0">
+                                      {si.amount}{si.unit}
+                                      {st && (
+                                        <span className={`ml-1.5 text-[10px] ${ok ? "text-status-ok" : "text-status-alert"}`}>
+                                          (have {haveLabel})
+                                        </span>
+                                      )}
+                                    </span>
                                   </li>
                                 );
                               })}
