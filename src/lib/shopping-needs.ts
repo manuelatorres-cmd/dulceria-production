@@ -17,6 +17,23 @@ import type {
   Mould, CapacityConfig, IngredientStock, Campaign, ProductionOrder, ProductionOrderItem,
 } from "@/types";
 
+export interface ShoppingDemandSource {
+  /** "order" | "campaign" | "po" — which kind of demand created the line. */
+  kind: "order" | "campaign" | "po";
+  /** Human-readable label (order ref, campaign name, PO name). */
+  source: string;
+  /** Product name that triggered this contribution. */
+  productName: string;
+  /** Grams of the ingredient this row contributes. */
+  grams: number;
+  /** Where in the product's recipe the grams come from — shell or
+   *  a specific filling layer. Helps the operator spot
+   *  configuration mistakes (e.g. wrong shell ingredient). */
+  via: "shell" | "filling";
+  /** Filling name when via === "filling", undefined otherwise. */
+  fillingName?: string;
+}
+
 export interface ShoppingNeedRow {
   ingredientId: string;
   name: string;
@@ -29,6 +46,10 @@ export interface ShoppingNeedRow {
   /** Ingredient's purchase unit (for display — "buy X kg" vs "X g"). */
   purchaseUnit?: string;
   gramsPerUnit?: number;
+  /** Per-source breakdown so the UI can answer "why am I 6 kg short
+   *  on white chocolate?" without the operator hunting through every
+   *  open order. */
+  breakdown?: ShoppingDemandSource[];
 }
 
 export interface ShoppingNeedsInput {
@@ -81,11 +102,25 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
 
   // ingredientId → grams needed across every order
   const needed = new Map<string, number>();
+  // ingredientId → list of contribution rows for the breakdown UI.
+  const breakdownByIng = new Map<string, ShoppingDemandSource[]>();
+  function addContribution(
+    ingredientId: string,
+    grams: number,
+    src: Omit<ShoppingDemandSource, "grams">,
+  ) {
+    if (grams <= 0) return;
+    needed.set(ingredientId, (needed.get(ingredientId) ?? 0) + grams);
+    const arr = breakdownByIng.get(ingredientId) ?? [];
+    arr.push({ ...src, grams });
+    breakdownByIng.set(ingredientId, arr);
+  }
 
   const activeOrders = orders.filter((o) => o.status === "pending" || o.status === "in_production");
 
   for (const order of activeOrders) {
     const lineItems = orderItems.filter((i) => i.orderId === order.id);
+    const orderLabel = order.sourceRef || order.customerName || order.eventName || (order.id ?? "").slice(0, 6);
     for (const item of lineItems) {
       const product = productMap.get(item.productId);
       if (!product) continue;
@@ -105,8 +140,6 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
         if (fillingGrams <= 0) continue;
 
         const lis = fillingIngredientsByFillingId.get(pf.fillingId) ?? [];
-        // Ingredient-only rows for shopping math. Nested sub-fillings are
-        // skipped here — recursion into them is a follow-up.
         const ingLis = lis.filter((li): li is typeof li & { ingredientId: string } => !!li.ingredientId);
         const totalRecipeG = ingLis.reduce((s, li) => s + toGrams(li.amount, li.unit, warnings, ingMap.get(li.ingredientId)?.name), 0);
         if (totalRecipeG <= 0) continue;
@@ -116,7 +149,13 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
           if (amountG <= 0) continue;
           const fraction = amountG / totalRecipeG;
           const ingredientGrams = fillingGrams * fraction * fillingBufferFactor;
-          needed.set(li.ingredientId, (needed.get(li.ingredientId) ?? 0) + ingredientGrams);
+          addContribution(li.ingredientId, ingredientGrams, {
+            kind: "order",
+            source: `Order ${orderLabel}`,
+            productName: product.name,
+            via: "filling",
+            fillingName: ingMap.get(li.ingredientId)?.name && pf.fillingId ? undefined : undefined,
+          });
         }
       }
 
@@ -125,7 +164,12 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
         const shellPct = (product.shellPercentage ?? 0) / 100;
         const shellG = mould.cavityWeightG * shellPct * item.quantity * fillingBufferFactor;
         if (shellG > 0) {
-          needed.set(product.shellIngredientId, (needed.get(product.shellIngredientId) ?? 0) + shellG);
+          addContribution(product.shellIngredientId, shellG, {
+            kind: "order",
+            source: `Order ${orderLabel}`,
+            productName: product.name,
+            via: "shell",
+          });
         }
       }
     }
@@ -135,7 +179,11 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
   // campaign productTargets + pending production-order items. Same
   // math as the order loop, just different demand source. Done as a
   // helper so the two callers reuse the exact same expansion.
-  function addInternalDemand(productId: string, units: number) {
+  function addInternalDemand(
+    productId: string,
+    units: number,
+    src: { kind: "campaign" | "po"; source: string },
+  ) {
     if (units <= 0) return;
     const product = productMap.get(productId);
     if (!product) return;
@@ -157,14 +205,22 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
         if (amountG <= 0) continue;
         const fraction = amountG / totalRecipeG;
         const ingredientGrams = fillingGrams * fraction * fillingBufferFactor;
-        needed.set(li.ingredientId, (needed.get(li.ingredientId) ?? 0) + ingredientGrams);
+        addContribution(li.ingredientId, ingredientGrams, {
+          ...src,
+          productName: product.name,
+          via: "filling",
+        });
       }
     }
     if (product.shellIngredientId) {
       const shellPct = (product.shellPercentage ?? 0) / 100;
       const shellG = mould.cavityWeightG * shellPct * units * fillingBufferFactor;
       if (shellG > 0) {
-        needed.set(product.shellIngredientId, (needed.get(product.shellIngredientId) ?? 0) + shellG);
+        addContribution(product.shellIngredientId, shellG, {
+          ...src,
+          productName: product.name,
+          via: "shell",
+        });
       }
     }
   }
@@ -175,7 +231,7 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
     if (c.status !== "planned" && c.status !== "active") continue;
     if (c.endDate && c.endDate < todayIso) continue;
     for (const [pid, units] of Object.entries(c.productTargets ?? {})) {
-      addInternalDemand(pid, units);
+      addInternalDemand(pid, units, { kind: "campaign", source: `Camp · ${c.name}` });
     }
   }
   // Production orders — only pending / in_production.
@@ -189,7 +245,7 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
     if (po.status !== "pending" && po.status !== "in_production") continue;
     const items = itemsByPo.get(po.id!) ?? [];
     for (const it of items) {
-      addInternalDemand(it.productId, it.targetUnits);
+      addInternalDemand(it.productId, it.targetUnits, { kind: "po", source: `PO · ${po.name ?? po.dueDate}` });
     }
   }
 
@@ -206,6 +262,9 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
     if (!ing) continue;
     const onHandG = stockMap.has(id) ? stockMap.get(id)! : (ing.currentStockG ?? 0);
     const shortageG = Math.max(0, neededG - onHandG);
+    const breakdown = (breakdownByIng.get(id) ?? [])
+      .map((b) => ({ ...b, grams: round(b.grams) }))
+      .sort((a, b) => b.grams - a.grams);
     rows.push({
       ingredientId: id,
       name: ing.name,
@@ -214,6 +273,7 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
       shortageG: round(shortageG),
       purchaseUnit: ing.purchaseUnit,
       gramsPerUnit: ing.gramsPerUnit,
+      breakdown,
     });
   }
   rows.sort((a, b) => b.shortageG - a.shortageG || a.name.localeCompare(b.name));

@@ -782,27 +782,7 @@ function ShortageBySupplier({
               <span className="w-32 text-right">Received</span>
             </div>
             {rows.map((r) => (
-              <div key={r.row.ingredientId} className="flex items-center px-3 py-1.5 text-sm border-b border-border last:border-b-0">
-                <Link
-                  href={`/ingredients/${encodeURIComponent(r.row.ingredientId)}`}
-                  className="flex-1 truncate hover:underline"
-                >
-                  {r.row.name}
-                </Link>
-                <span className="w-20 text-right tabular-nums text-muted-foreground">{formatGrams(r.row.shortageG)}</span>
-                <span className="w-24 text-right tabular-nums">
-                  {r.unitsToBuy != null ? `${r.unitsToBuy} ${r.unitLabel}` : "—"}
-                </span>
-                <span className="w-20 text-right tabular-nums text-muted-foreground">
-                  {r.unitPrice != null ? fmt(r.unitPrice) : "—"}
-                </span>
-                <span className="w-20 text-right tabular-nums font-medium">
-                  {r.subtotal != null ? fmt(r.subtotal) : "—"}
-                </span>
-                <span className="w-32 flex justify-end">
-                  <ReceiveCell ingredientId={r.row.ingredientId} />
-                </span>
-              </div>
+              <BuyRowWithBreakdown key={r.row.ingredientId} r={r} />
             ))}
           </div>
         );
@@ -812,6 +792,96 @@ function ShortageBySupplier({
         <span className="text-[14px] tabular-nums font-semibold">≈ {fmt(grandTotal)}</span>
       </div>
     </div>
+  );
+}
+
+/** Buy row with click-to-expand "why this much?" breakdown. Each
+ *  contribution shows its source (Order / Campaign / PO), the
+ *  product driving it, whether it's shell or filling, and grams. */
+function BuyRowWithBreakdown({ r }: {
+  r: {
+    row: { ingredientId: string; name: string; shortageG: number; neededG?: number; onHandG?: number; breakdown?: Array<{ kind: string; source: string; productName: string; grams: number; via: string }> };
+    unitsToBuy: number | null;
+    unitLabel: string;
+    unitPrice: number | null;
+    subtotal: number | null;
+  };
+}) {
+  const [open, setOpen] = useState(false);
+  const breakdown = r.row.breakdown ?? [];
+  const hasBreakdown = breakdown.length > 0;
+  const fmt = (v: number) => `€${v.toFixed(2).replace(/\.00$/, "")}`;
+  return (
+    <>
+      <div
+        className="flex items-center px-3 py-1.5 text-sm border-b border-border last:border-b-0 cursor-pointer hover:bg-muted/20"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="flex-1 flex items-baseline gap-1.5 min-w-0">
+          <span className="text-[10px] opacity-60 shrink-0 w-3">
+            {hasBreakdown ? (open ? "▾" : "▸") : ""}
+          </span>
+          <Link
+            href={`/ingredients/${encodeURIComponent(r.row.ingredientId)}`}
+            className="truncate hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {r.row.name}
+          </Link>
+        </span>
+        <span className="w-20 text-right tabular-nums text-muted-foreground">{formatGrams(r.row.shortageG)}</span>
+        <span className="w-24 text-right tabular-nums">
+          {r.unitsToBuy != null ? `${r.unitsToBuy} ${r.unitLabel}` : "—"}
+        </span>
+        <span className="w-20 text-right tabular-nums text-muted-foreground">
+          {r.unitPrice != null ? fmt(r.unitPrice) : "—"}
+        </span>
+        <span className="w-20 text-right tabular-nums font-medium">
+          {r.subtotal != null ? fmt(r.subtotal) : "—"}
+        </span>
+        <span className="w-32 flex justify-end" onClick={(e) => e.stopPropagation()}>
+          <ReceiveCell ingredientId={r.row.ingredientId} />
+        </span>
+      </div>
+      {open && hasBreakdown && (
+        <div className="px-3 py-2 bg-muted/20 border-b border-border text-[11.5px]">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground mb-1.5">
+            Where does this demand come from?
+          </p>
+          <p className="text-[10.5px] text-muted-foreground mb-2">
+            Total needed: <b>{formatGrams(r.row.neededG ?? 0)}</b> · on hand: <b>{formatGrams(r.row.onHandG ?? 0)}</b> · short: <b>{formatGrams(r.row.shortageG)}</b>
+          </p>
+          <ul className="space-y-0.5" style={{ listStyle: "none", padding: 0 }}>
+            {breakdown.map((b, i) => (
+              <li key={i} className="flex items-baseline gap-2">
+                <span
+                  className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background:
+                      b.kind === "order" ? "rgba(43,108,176,0.12)"
+                      : b.kind === "campaign" ? "rgba(106,58,140,0.12)"
+                      : "rgba(110,43,50,0.12)",
+                    color:
+                      b.kind === "order" ? "#2b6cb0"
+                      : b.kind === "campaign" ? "#6a3a8c"
+                      : "#6e2b32",
+                  }}
+                >
+                  {b.kind}
+                </span>
+                <span style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}>
+                  {b.source}
+                </span>
+                <span className="text-muted-foreground">·</span>
+                <span>{b.productName}</span>
+                <span className="text-[10px] text-muted-foreground">({b.via})</span>
+                <span className="ml-auto tabular-nums font-medium">{formatGrams(b.grams)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
   );
 }
 
