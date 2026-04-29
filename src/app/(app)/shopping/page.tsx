@@ -800,7 +800,7 @@ function ShortageBySupplier({
  *  product driving it, whether it's shell or filling, and grams. */
 function BuyRowWithBreakdown({ r }: {
   r: {
-    row: { ingredientId: string; name: string; shortageG: number; neededG?: number; onHandG?: number; breakdown?: Array<{ kind: string; source: string; productName: string; grams: number; via: string }> };
+    row: { ingredientId: string; name: string; shortageG: number; neededG?: number; onHandG?: number; purchaseUnit?: string; gramsPerUnit?: number; breakdown?: Array<{ kind: string; source: string; productName: string; grams: number; via: string }> };
     unitsToBuy: number | null;
     unitLabel: string;
     unitPrice: number | null;
@@ -840,7 +840,11 @@ function BuyRowWithBreakdown({ r }: {
           {r.subtotal != null ? fmt(r.subtotal) : "—"}
         </span>
         <span className="w-32 flex justify-end" onClick={(e) => e.stopPropagation()}>
-          <ReceiveCell ingredientId={r.row.ingredientId} />
+          <ReceiveCell
+            ingredientId={r.row.ingredientId}
+            purchaseUnit={r.row.purchaseUnit}
+            gramsPerUnit={r.row.gramsPerUnit}
+          />
         </span>
       </div>
       {open && hasBreakdown && (
@@ -885,30 +889,41 @@ function BuyRowWithBreakdown({ r }: {
   );
 }
 
-/** Tiny inline "received" cell — operator types grams (or kg with a
- *  k suffix), hits Add or Enter, the ingredient stock gets bumped via
- *  `receiveIngredientStock`, queries invalidate, the shopping list
- *  recomputes from fresh on-hand. If the new balance covers the
- *  demand, the row drops off the list automatically. */
-function ReceiveCell({ ingredientId, defaultUnit }: {
+/** Tiny inline "received" cell — operator types the amount in
+ *  whichever unit they bought it (purchase unit / kg / g), the
+ *  ingredient stock gets bumped in grams via `receiveIngredientStock`.
+ *
+ *  When the ingredient has a `purchaseUnit` + `gramsPerUnit` set
+ *  (e.g. strawberry puree: "pcs" × 3000 g per piece), that unit is
+ *  the default — type "2" → adds 6000 g. Operator can toggle to kg
+ *  or g for off-pack receives. */
+function ReceiveCell({ ingredientId, purchaseUnit, gramsPerUnit }: {
   ingredientId: string;
-  defaultUnit?: string;
+  purchaseUnit?: string;
+  gramsPerUnit?: number;
 }) {
+  const hasPack = !!purchaseUnit && !!gramsPerUnit && gramsPerUnit > 0;
+  type UnitMode = "pack" | "kg" | "g";
+  const [unitMode, setUnitMode] = useState<UnitMode>(hasPack ? "pack" : "g");
   const [val, setVal] = useState("");
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
-  const unitHint = defaultUnit ? ` ${defaultUnit}` : " g";
+
+  function unitLabel(m: UnitMode): string {
+    if (m === "pack") return purchaseUnit ?? "pcs";
+    return m;
+  }
 
   async function submit() {
     if (saving) return;
-    const trimmed = val.trim().toLowerCase().replace(",", ".");
+    const trimmed = val.trim().replace(",", ".");
     if (!trimmed) return;
-    // "1.5kg" / "1500g" / "1500" all accepted; default unit = grams.
+    const n = parseFloat(trimmed);
+    if (isNaN(n) || n <= 0) return;
     let grams: number;
-    if (trimmed.endsWith("kg")) grams = parseFloat(trimmed.slice(0, -2)) * 1000;
-    else if (trimmed.endsWith("g")) grams = parseFloat(trimmed.slice(0, -1));
-    else grams = parseFloat(trimmed);
-    if (isNaN(grams) || grams <= 0) return;
+    if (unitMode === "pack" && gramsPerUnit) grams = n * gramsPerUnit;
+    else if (unitMode === "kg") grams = n * 1000;
+    else grams = n;
     setSaving(true);
     try {
       await receiveIngredientStock(ingredientId, grams, "Received via shopping list");
@@ -922,19 +937,40 @@ function ReceiveCell({ ingredientId, defaultUnit }: {
     }
   }
 
+  // Cycle through the available unit modes when the unit chip is
+  // clicked. pack → kg → g → pack…
+  function cycleUnit() {
+    setUnitMode((m) => {
+      if (hasPack) return m === "pack" ? "kg" : m === "kg" ? "g" : "pack";
+      return m === "kg" ? "g" : "kg";
+    });
+  }
+
   return (
     <span className="inline-flex items-center gap-1">
       <input
         type="text"
         inputMode="decimal"
-        placeholder={`amount${unitHint}`}
+        placeholder={hasPack && unitMode === "pack" ? `# ${purchaseUnit}` : "amount"}
         value={val}
         onChange={(e) => setVal(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-        className="input !w-16 text-[11px] !py-0.5 text-right"
+        className="input !w-14 text-[11px] !py-0.5 text-right"
         disabled={saving}
-        title="Type the amount you bought (e.g. 1.5kg, 500g, 500)."
+        title={
+          hasPack && unitMode === "pack"
+            ? `Number of ${purchaseUnit} (1 ${purchaseUnit} = ${gramsPerUnit} g)`
+            : "Amount received"
+        }
       />
+      <button
+        type="button"
+        onClick={cycleUnit}
+        title="Click to switch unit"
+        className="text-[10px] px-1.5 py-0.5 rounded-sm border border-border bg-muted/40 hover:bg-muted/70 min-w-[28px]"
+      >
+        {unitLabel(unitMode)}
+      </button>
       <button
         type="button"
         onClick={submit}
@@ -1036,6 +1072,8 @@ function IngredientStockBelowThresholdSection() {
         quantityG: Number(s.quantityG),
         thresholdG: Number(s.lowStockThresholdG ?? 0),
         shortageG: Math.max(0, Number(s.lowStockThresholdG ?? 0) - Number(s.quantityG)),
+        purchaseUnit: byId.get(s.ingredientId)?.purchaseUnit,
+        gramsPerUnit: byId.get(s.ingredientId)?.gramsPerUnit,
       }))
       .sort((a, b) => (a.quantityG / a.thresholdG) - (b.quantityG / b.thresholdG));
   }, [stock, ingredients]);
@@ -1078,7 +1116,11 @@ function IngredientStockBelowThresholdSection() {
               {formatGrams(row.shortageG)}
             </span>
             <span className="w-32 flex justify-end">
-              <ReceiveCell ingredientId={row.ingredientId} />
+              <ReceiveCell
+                ingredientId={row.ingredientId}
+                purchaseUnit={row.purchaseUnit}
+                gramsPerUnit={row.gramsPerUnit}
+              />
             </span>
           </div>
         ))}
