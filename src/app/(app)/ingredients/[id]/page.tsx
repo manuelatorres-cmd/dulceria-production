@@ -756,15 +756,21 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
 
   return (
     <div className="space-y-5">
-      {/* Current balance */}
+      {/* Current balance — display in kg when ≥1000g so the en-GB
+          comma-thousands separator doesn't get misread as a decimal
+          (Austrian convention reads "25,000" as 25.000 = 25). Below
+          1kg we keep grams. */}
       <div className={`rounded-sm border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-border bg-card"}`}>
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">On hand</p>
         <p className={`text-3xl font-bold tabular-nums ${belowThreshold ? "text-status-warn" : "text-foreground"}`}>
-          {currentG.toLocaleString("en-GB", { maximumFractionDigits: 1 })} <span className="text-base font-normal text-muted-foreground">g</span>
+          {currentG >= 1000
+            ? <>{(currentG / 1000).toLocaleString("de-AT", { maximumFractionDigits: 2 })} <span className="text-base font-normal text-muted-foreground">kg</span></>
+            : <>{currentG.toLocaleString("de-AT", { maximumFractionDigits: 1 })} <span className="text-base font-normal text-muted-foreground">g</span></>
+          }
         </p>
         {threshold != null && (
           <p className="text-xs text-muted-foreground mt-1">
-            Low-stock threshold: {threshold} g{belowThreshold ? " — restock soon" : ""}
+            Low-stock threshold: {threshold >= 1000 ? `${(threshold / 1000).toLocaleString("de-AT", { maximumFractionDigits: 2 })} kg` : `${threshold} g`}{belowThreshold ? " — restock soon" : ""}
           </p>
         )}
       </div>
@@ -876,7 +882,11 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
               return (
                 <li key={m.id} className="px-4 py-2 flex items-center gap-3 text-xs">
                   <span className={`tabular-nums font-medium w-20 ${color}`}>
-                    {sign}{Number(m.deltaG).toLocaleString("en-GB", { maximumFractionDigits: 1 })} g
+                    {sign}
+                    {Math.abs(Number(m.deltaG)) >= 1000
+                      ? `${(Number(m.deltaG) / 1000).toLocaleString("de-AT", { maximumFractionDigits: 2 })} kg`
+                      : `${Number(m.deltaG).toLocaleString("de-AT", { maximumFractionDigits: 1 })} g`
+                    }
                   </span>
                   <span className="text-muted-foreground uppercase text-[10px] tracking-wide w-24 shrink-0">
                     {m.reason.replace(/_/g, " ")}
