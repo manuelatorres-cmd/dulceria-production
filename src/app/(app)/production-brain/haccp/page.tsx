@@ -9,8 +9,10 @@ import {
   useHaccpIncidents,
   saveHaccpIncident,
   usePeople,
+  saveColdStorageUnit,
 } from "@/lib/hooks";
 import type { ColdStorageUnit, TemperatureReading } from "@/types";
+import { COLD_STORAGE_LOCATIONS, COLD_STORAGE_TYPES } from "@/types";
 
 /**
  * Production Brain · HACCP (phase 3 UI)
@@ -31,12 +33,14 @@ export default function ProductionBrainHaccpPage() {
         description="Temperature logs per cold storage unit + open incidents."
       />
 
+      <section className="rounded-sm border border-border bg-card p-4 mb-4">
+        <NewUnitForm hasAny={units.length > 0} />
+      </section>
+
       {units.length === 0 ? (
         <section className="rounded-sm border border-border bg-card p-6 text-sm text-muted-foreground">
           <p>
-            No cold storage units configured yet. Insert rows into the
-            <code className="mx-1">coldStorageUnits</code>
-            table (name + location + target range) to start logging.
+            No cold storage units yet. Add your first one above (fridge, freezer, ambient room).
           </p>
         </section>
       ) : (
@@ -316,5 +320,157 @@ function Spark({ values }: { values: number[] }) {
         points={points}
       />
     </svg>
+  );
+}
+
+/** Inline form to add a new cold storage unit. Replaces the old
+ *  "go run SQL" empty state — the operator can spin up a fridge or
+ *  freezer entry directly from this page and start logging temps in
+ *  the same session. */
+function NewUnitForm({ hasAny }: { hasAny: boolean }) {
+  const [open, setOpen] = useState(!hasAny);
+  const [name, setName] = useState("");
+  const [location, setLocation] = useState<typeof COLD_STORAGE_LOCATIONS[number]>("production");
+  const [type, setType] = useState<typeof COLD_STORAGE_TYPES[number]>("fridge");
+  const [minC, setMinC] = useState("0");
+  const [maxC, setMaxC] = useState("4");
+  const [busy, setBusy] = useState(false);
+
+  function defaultsForType(t: typeof COLD_STORAGE_TYPES[number]) {
+    if (t === "freezer") return { min: -22, max: -18 };
+    if (t === "ambient") return { min: 16, max: 22 };
+    return { min: 0, max: 4 };
+  }
+
+  async function submit() {
+    if (!name.trim()) return;
+    setBusy(true);
+    try {
+      const min = parseFloat(minC.replace(",", "."));
+      const max = parseFloat(maxC.replace(",", "."));
+      await saveColdStorageUnit({
+        name: name.trim(),
+        location,
+        type,
+        targetTempMinC: isNaN(min) ? undefined : min,
+        targetTempMaxC: isNaN(max) ? undefined : max,
+        requiresTempCheck: true,
+        checkFrequencyPerDay: 1,
+        archived: false,
+      });
+      setName("");
+      const d = defaultsForType(type);
+      setMinC(String(d.min));
+      setMaxC(String(d.max));
+      setOpen(hasAny ? false : true);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to add unit");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-[12px] px-3 py-1.5 rounded-sm bg-foreground text-background"
+      >
+        + Add cold storage unit
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      <p className="text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground mb-2">
+        Add a fridge / freezer / ambient room
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+        <label className="block">
+          <span className="text-[11px] text-muted-foreground">Name</span>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Production fridge 1"
+            className="input w-full"
+            autoFocus
+          />
+        </label>
+        <label className="block">
+          <span className="text-[11px] text-muted-foreground">Type</span>
+          <select
+            value={type}
+            onChange={(e) => {
+              const t = e.target.value as typeof COLD_STORAGE_TYPES[number];
+              setType(t);
+              const d = defaultsForType(t);
+              setMinC(String(d.min));
+              setMaxC(String(d.max));
+            }}
+            className="input w-full"
+          >
+            {COLD_STORAGE_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-[11px] text-muted-foreground">Location</span>
+          <select
+            value={location}
+            onChange={(e) => setLocation(e.target.value as typeof COLD_STORAGE_LOCATIONS[number])}
+            className="input w-full"
+          >
+            {COLD_STORAGE_LOCATIONS.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+        </label>
+        <div className="flex gap-2">
+          <label className="block flex-1">
+            <span className="text-[11px] text-muted-foreground">Min °C</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={minC}
+              onChange={(e) => setMinC(e.target.value)}
+              className="input w-full"
+            />
+          </label>
+          <label className="block flex-1">
+            <span className="text-[11px] text-muted-foreground">Max °C</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={maxC}
+              onChange={(e) => setMaxC(e.target.value)}
+              className="input w-full"
+            />
+          </label>
+        </div>
+      </div>
+      <div className="flex gap-2 justify-end">
+        {hasAny && (
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="text-[12px] px-3 py-1.5 rounded-sm border border-border hover:bg-muted/40"
+          >
+            Cancel
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy || !name.trim()}
+          className="text-[12px] px-3 py-1.5 rounded-sm bg-foreground text-background disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Add unit"}
+        </button>
+      </div>
+    </div>
   );
 }
