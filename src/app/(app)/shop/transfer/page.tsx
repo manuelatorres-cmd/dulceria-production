@@ -7,6 +7,7 @@ import {
   useProductLocationTotals,
   useStockLocationMinimums,
   useStockTransfers,
+  useProductCategories,
   saveStockTransfer,
   DEFAULT_LOCATION_MINIMUM,
 } from "@/lib/hooks";
@@ -24,7 +25,19 @@ export default function ShopTransferPage() {
   const totals = useProductLocationTotals();
   const minimums = useStockLocationMinimums();
   const history = useStockTransfers("product");
+  const categories = useProductCategories(true);
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+
+  const categoryNameById = useMemo(
+    () => new Map(categories.map((c) => [c.id!, c.name])),
+    [categories],
+  );
+  const productById = useMemo(
+    () => new Map(products.map((p) => [p.id!, p])),
+    [products],
+  );
 
   const minByProductLoc = useMemo(() => {
     const m = new Map<string, number>();
@@ -72,6 +85,30 @@ export default function ShopTransferPage() {
     return out.sort((a, b) => b.suggestedQty - a.suggestedQty);
   }, [products, totals, minByProductLoc]);
 
+  const visibleSuggestions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return suggestions.filter((s) => {
+      const p = productById.get(s.productId);
+      if (activeCategories.size > 0) {
+        if (!p?.productCategoryId || !activeCategories.has(p.productCategoryId)) return false;
+      }
+      if (q && !s.productName.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [suggestions, activeCategories, search, productById]);
+
+  // Categories present in the current suggestion pool — chip pool.
+  const usedCategories = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of suggestions) {
+      const p = productById.get(s.productId);
+      if (p?.productCategoryId) ids.add(p.productCategoryId);
+    }
+    return [...ids]
+      .map((id) => ({ id, name: categoryNameById.get(id) ?? id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [suggestions, productById, categoryNameById]);
+
   async function doTransfer(productId: string, qty: number) {
     setPending((p) => ({ ...p, [productId]: true }));
     try {
@@ -114,10 +151,55 @@ export default function ShopTransferPage() {
             className="ml-2 text-[10px] uppercase text-muted-foreground font-normal"
             style={{ letterSpacing: "0.12em" }}
           >
-            {suggestions.length}
+            {visibleSuggestions.length}{visibleSuggestions.length !== suggestions.length ? ` of ${suggestions.length}` : ""}
           </span>
         </h3>
-        {suggestions.length === 0 ? (
+        {/* Category chip row + search — narrow the suggestion list. */}
+        {usedCategories.length > 0 && (
+          <div className="space-y-2 mb-3">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {usedCategories.map((c) => {
+                const active = activeCategories.has(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setActiveCategories((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(c.id)) next.delete(c.id);
+                        else next.add(c.id);
+                        return next;
+                      });
+                    }}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors capitalize ${
+                      active
+                        ? "bg-foreground text-background"
+                        : "bg-card text-muted-foreground border border-border hover:border-foreground"
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
+              {activeCategories.size > 0 && (
+                <button
+                  onClick={() => setActiveCategories(new Set())}
+                  className="text-[11px] text-muted-foreground hover:text-foreground underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products…"
+              className="input"
+            />
+          </div>
+        )}
+        {visibleSuggestions.length === 0 ? (
           <p
             className="text-muted-foreground italic text-[12.5px]"
             style={{ fontFamily: "var(--font-serif)" }}
@@ -126,7 +208,7 @@ export default function ShopTransferPage() {
           </p>
         ) : (
           <ul className="space-y-2">
-            {suggestions.map((s) => (
+            {visibleSuggestions.map((s) => (
               <li
                 key={s.productId}
                 className="flex flex-wrap items-center gap-3 border border-border bg-muted px-3 py-2"

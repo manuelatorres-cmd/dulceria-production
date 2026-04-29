@@ -153,7 +153,9 @@ export default function BatchPage({ params }: { params: Promise<{ id: string }> 
               <ScaledProductCard
                 title={companionFilling.name}
                 subtitle={`${companionTargetWeightG.toFixed(0)} g · ×${companionScaleFactor.toFixed(2)} scale`}
-                rows={companionIngredients.map((li) => {
+                rows={companionIngredients
+                  .filter((li): li is typeof li & { ingredientId: string } => !!li.ingredientId)
+                  .map((li) => {
                   const ing = ingredientMap.get(li.ingredientId);
                   return {
                     id: li.ingredientId,

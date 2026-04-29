@@ -319,6 +319,7 @@ export function calculateFillingNutrition(
   let ingredientsWithData = 0;
 
   for (const li of fillingIngredients) {
+    if (!li.ingredientId) continue; // sub-filling line — nutrition not recursed yet
     const ing = ingredientMap.get(li.ingredientId);
     if (!ing) continue;
     ingredientsTotal += 1;
@@ -449,6 +450,7 @@ export function calculateProductNutrition(input: ProductNutritionInput): Product
     const fillingTotalProductG = lis.reduce((s, li) => s + li.amount, 0);
 
     for (const li of lis) {
+      if (!li.ingredientId) continue; // sub-filling line — not recursed yet
       allIngredientIds.add(li.ingredientId);
       const ing = ingredientMap.get(li.ingredientId);
       if (!ing?.nutrition || !hasNutritionData(ing.nutrition)) {

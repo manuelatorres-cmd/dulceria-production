@@ -114,7 +114,31 @@ export default function ProductionPlanPage({ params }: { params: Promise<{ id: s
         if (!map.has(newKey)) map.set(newKey, true);
       }
     }
-    return map;
+    // Cross-view sync: when a higher-level row is marked done (a phase
+    // key like "polishing" or a per-product key like "polishing-<ppId>"),
+    // synthesise done state for every concrete sub-step that shares
+    // the same prefix. Keeps the wizard's checkboxes aligned with
+    // ticks made on /orders/<id>/production or /campaigns/<id>/production
+    // even though those views don't enumerate sub-steps. The sub-step
+    // rows in DB stay missing — saving them all there would require
+    // running the full generateSteps logic in the higher-level view.
+    const wrapped: Map<string, boolean> = new Map(map);
+    const get = (key: string): boolean => {
+      if (wrapped.get(key) === true) return true;
+      // Walk the dash-separated prefixes: "polish-X-Y" → check "polish-X" → check "polish".
+      const parts = key.split("-");
+      for (let i = parts.length - 1; i > 0; i--) {
+        const prefix = parts.slice(0, i).join("-");
+        if (wrapped.get(prefix) === true) return true;
+      }
+      return false;
+    };
+    return new Proxy(wrapped, {
+      get(target, prop, receiver) {
+        if (prop === "get") return (k: string) => get(k);
+        return Reflect.get(target, prop, receiver);
+      },
+    });
   }, [stepStatuses]);
 
   if (!plan) {
@@ -804,7 +828,8 @@ function PlanContent({
         batchNumber: plan.batchNumber ?? "",
         bestBeforeDate: bestBefore,
         allergens: Array.from(allergenSet).sort(),
-        vegan: product?.vegan ?? false,
+        // 100% vegan brand — leaf icon always on. Per-product flag retired.
+        vegan: true,
       };
     });
 
@@ -840,7 +865,7 @@ function PlanContent({
 
   const daysSinceCreated = Math.floor((Date.now() - new Date(plan.createdAt as Date).getTime()) / 86_400_000);
   const ageLabel = plan.status === "done"
-    ? `Completed · ${new Date((plan.completedAt ?? plan.createdAt) as Date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+    ? `Completed · ${new Date((plan.completedAt ?? plan.createdAt) as Date).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}`
     : daysSinceCreated === 0 ? "Started today"
     : daysSinceCreated === 1 ? "Started yesterday"
     : `Day ${daysSinceCreated + 1} of this batch`;
@@ -990,7 +1015,7 @@ function PlanContent({
                     <li key={issue.orderId}>
                       <span className="font-medium">{issue.orderName}</span>
                       {" · "}short {issue.shortfall}
-                      {" · "}needs {issue.required} by {new Date(issue.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      {" · "}needs {issue.required} by {new Date(issue.deadline).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
                     </li>
                   ))}
                 </ul>
@@ -1031,48 +1056,60 @@ function PlanContent({
         </p>
       ) : (
         <>
-          {/* Phase tab bar — each tab also shows the day(s) this phase is
-              scheduled on, pulled from the daily-production line items
-              for this batch. A phase that spans two days shows both. */}
-          <div className="flex gap-1.5 overflow-x-auto px-4 pb-1 mt-3" style={{ scrollbarWidth: "none" }}>
-            {PHASES.map(({ id, label }) => {
-              const phaseSteps = steps.filter((s) => s.group === id);
-              const phaseDone = phaseSteps.filter((s) => statusMap.get(s.key)).length;
-              const allPhaseDone = phaseSteps.length > 0 && phaseDone === phaseSteps.length;
-              const active = activePhase === id;
-              const days = phaseDaysById.get(id) ?? [];
-              const daysLabel = days.length === 0
-                ? null
-                : days.length === 1
-                  ? new Date(days[0] + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })
-                  : `${new Date(days[0] + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })} +${days.length - 1}`;
-              return (
-                <button
-                  key={id}
-                  onClick={() => setActivePhase(id)}
-                  className={`shrink-0 flex flex-col items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                    active
-                      ? "bg-accent text-accent-foreground"
-                      : allPhaseDone
-                        ? "bg-status-ok-bg text-status-ok"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                  title={days.length > 0 ? `Scheduled on ${days.map((d) => new Date(d + "T12:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })).join(", ")}` : undefined}
-                >
-                  <span>{label}</span>
-                  {phaseSteps.length > 0 && (
-                    <span className={`text-[10px] font-normal mt-0.5 ${active ? "opacity-70" : ""}`}>
-                      {phaseDone}/{phaseSteps.length}
-                    </span>
-                  )}
-                  {daysLabel && (
-                    <span className={`text-[9px] font-normal mt-0.5 tabular-nums ${active ? "opacity-80" : "opacity-60"}`}>
-                      {daysLabel}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          {/* Phase peek-card grid — 4 wide × 2 rows on most screens, 8 wide
+              on lg. Compact: label on top, count + date stacked under. */}
+          <div className="px-4 mt-3">
+            <ul className="grid grid-cols-4 lg:grid-cols-8 gap-1.5">
+              {PHASES.map(({ id, label }) => {
+                const phaseSteps = steps.filter((s) => s.group === id);
+                const phaseDone = phaseSteps.filter((s) => statusMap.get(s.key)).length;
+                const allPhaseDone = phaseSteps.length > 0 && phaseDone === phaseSteps.length;
+                const active = activePhase === id;
+                const days = phaseDaysById.get(id) ?? [];
+                const daysLabel = days.length === 0
+                  ? null
+                  : days.length === 1
+                    ? new Date(days[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })
+                    : `${new Date(days[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })} +${days.length - 1}`;
+                const palette = (() => {
+                  if (allPhaseDone) return { bg: "#f1faf4", ink: "#4a7a5e", bar: "#4a7a5e" };
+                  if (active)       return { bg: "#eff5fb", ink: "#4b6b8f", bar: "#4b6b8f" };
+                  return { bg: "rgba(245,243,239,0.7)", ink: "#1c1d1f", bar: "#bdbcc1" };
+                })();
+                const pct = phaseSteps.length === 0 ? 0 : Math.round((phaseDone / phaseSteps.length) * 100);
+                return (
+                  <li key={id}>
+                    <button
+                      onClick={() => setActivePhase(id)}
+                      className={
+                        "w-full text-left rounded-[10px] px-2 py-1.5 transition border " +
+                        (active ? "border-foreground/30" : "border-transparent hover:border-foreground/10")
+                      }
+                      style={{ background: palette.bg, color: palette.ink }}
+                    >
+                      <div
+                        className="leading-tight truncate"
+                        style={{
+                          fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 14,
+                          letterSpacing: "-0.012em",
+                        }}
+                      >
+                        {label}
+                      </div>
+                      <div className="text-[10px] tabular-nums opacity-75 leading-tight">
+                        {phaseSteps.length > 0 ? `${phaseDone}/${phaseSteps.length}` : "—"}
+                      </div>
+                      {daysLabel && (
+                        <div className="text-[9.5px] opacity-65 tabular-nums leading-tight">{daysLabel}</div>
+                      )}
+                      <div className="h-[2px] bg-white/45 rounded-sm overflow-hidden mt-1">
+                        <div className="h-full" style={{ background: palette.bar, width: `${pct}%` }} />
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
 
           {/* Active phase content */}

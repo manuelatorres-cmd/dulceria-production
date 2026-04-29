@@ -198,7 +198,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               {quote.expiresAt && (
                 <p className={`text-xs mt-1 ${expired ? "text-status-alert" : "text-muted-foreground"}`}>
                   {expired ? "Expired" : "Valid until"}{" "}
-                  {new Date(quote.expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+                  {new Date(quote.expiresAt).toLocaleDateString("de-AT", { day: "numeric", month: "long", year: "numeric" })}
                 </p>
               )}
             </div>

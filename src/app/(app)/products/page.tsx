@@ -349,6 +349,104 @@ function ProductsTab() {
           </button>
         </div>
 
+        {/* Quick filters — always visible below search. Most-used
+            filters (category + avoid-allergens) promoted out of the
+            filters panel so triage is one click. Full filter set
+            stays in the panel. Baseline pattern — see
+            feedback_filter_ux_pattern.md. */}
+        {(productCategories.filter((c) => !c.archived).length > 0 || presentAllergens.length > 0) && (
+          <div className="flex flex-col gap-1.5">
+            {productCategories.filter((c) => !c.archived).length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Category</span>
+                {productCategories.filter((c) => !c.archived).map((c) => {
+                  const active = f.filterCategoryId === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setF("filterCategoryId", active ? "" : (c.id ?? ""))}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
+                        active
+                          ? "bg-accent text-accent-foreground"
+                          : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {presentAllergens.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Avoid</span>
+                {presentAllergens.map((a) => {
+                  const active = filterExcludeAllergensSet.has(a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() => toggleExcludeAllergen(a.id)}
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                        active
+                          ? "bg-[var(--accent-blush-bg)] text-[var(--accent-blush-ink)]"
+                          : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                      }`}
+                    >
+                      {a.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {allTags.length > 0 && (
+              allTags.length > 8 ? (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Tags</span>
+                  <select
+                    value=""
+                    onChange={(e) => { if (e.target.value) toggleFilterTag(e.target.value); }}
+                    className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs"
+                  >
+                    <option value="">Add tag…</option>
+                    {allTags.filter((t) => !filterTagsSet.has(t)).map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  {[...filterTagsSet].map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => toggleFilterTag(tag)}
+                      className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-accent text-accent-foreground"
+                    >
+                      {tag} ×
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Tags</span>
+                  {allTags.map((tag) => {
+                    const active = filterTagsSet.has(tag);
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => toggleFilterTag(tag)}
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                          active
+                            ? "bg-accent text-accent-foreground"
+                            : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              )
+            )}
+          </div>
+        )}
+
         {f.showFilters && (
           <div className="rounded-sm border border-border bg-card p-3 space-y-3">
             {/* Min stars */}

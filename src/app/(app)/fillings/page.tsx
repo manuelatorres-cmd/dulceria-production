@@ -255,6 +255,77 @@ function FillingsTab() {
         activeFilterCount={activeFilterCount}
       />
 
+      {/* Quick filters under search — most-used dimensions always
+          visible. Full set stays in the panel below. See
+          feedback_filter_ux_pattern.md. */}
+      {(categoryOptions.length > 0 || statusOptions.length > 0) && (
+        <div className="flex flex-col gap-1.5">
+          {statusOptions.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Status</span>
+              {statusOptions.map(({ value, label }) => {
+                const active = f.filterStatus === value;
+                return (
+                  <button
+                    key={value || "any"}
+                    onClick={() => setF("filterStatus", active ? "" : value)}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {categoryOptions.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Category</span>
+              {categoryOptions.map(({ value, label }) => {
+                const active = filterCategoriesSet.has(value);
+                return (
+                  <button
+                    key={value}
+                    onClick={() => toggleFilterCategory(value)}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
+                      active
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {presentAllergenIds.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Avoid</span>
+              {presentAllergenIds.map((id) => {
+                const active = filterAllergensSet.has(id);
+                return (
+                  <button
+                    key={id}
+                    onClick={() => toggleFilterAllergen(id)}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-[var(--accent-blush-bg)] text-[var(--accent-blush-ink)]"
+                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    }`}
+                  >
+                    {allergenLabel(id)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {f.showFilters && (
         <FilterPanel activeFilterCount={activeFilterCount} onClearAll={clearFilters}>
           <FilterChipGroup

@@ -46,14 +46,19 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-      <form onSubmit={onSubmit} className="max-w-sm w-full space-y-6">
-        <div className="space-y-2 text-center">
-          <h1 className="text-3xl text-primary" style={{ fontFamily: "var(--font-display)" }}>
+      <form onSubmit={onSubmit} className="w-full max-w-sm">
+        <div className="flex flex-col items-center mb-10">
+          <img
+            src="/logo.png"
+            alt="Dulceria"
+            className="w-28 h-28 object-contain mb-6"
+          />
+          <h1
+            className="text-2xl text-foreground"
+            style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}
+          >
             Dulceria
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to continue.
-          </p>
         </div>
         <div className="space-y-3">
           <input
@@ -63,7 +68,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-sm border border-border bg-card px-4 py-2 text-sm"
+            className="w-full rounded-sm border border-border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           <input
             type="password"
@@ -72,18 +77,18 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-sm border border-border bg-card px-4 py-2 text-sm"
+            className="w-full rounded-sm border border-border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
         {error && (
-          <p className="text-xs text-destructive">{error}</p>
+          <p className="mt-3 text-xs text-destructive">{error}</p>
         )}
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-sm bg-primary text-primary-foreground py-3 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          className="mt-5 w-full rounded-sm bg-primary text-primary-foreground py-3 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {submitting ? "Signing in…" : "Sign in"}
+          {submitting ? "Signing in…" : "Log in to enter"}
         </button>
       </form>
     </div>

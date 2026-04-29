@@ -54,6 +54,7 @@ export default function VariantsPage() {
     search: "",
     showFilters: false,
     filterStatuses: [] as string[],
+    filterLabels: [] as string[],
   });
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
@@ -64,11 +65,28 @@ export default function VariantsPage() {
   useNShortcut(() => setShowAdd(true), showAdd);
 
   const filterStatusesSet = useMemo(() => new Set(f.filterStatuses), [f.filterStatuses]);
+  const filterLabelsSet = useMemo(
+    () => new Set(f.filterLabels.map((l) => l.toLowerCase())),
+    [f.filterLabels],
+  );
 
-  const activeFilterCount = filterStatusesSet.size > 0 ? 1 : 0;
+  // Pool of all labels currently in use, sorted, deduped (case-insensitive).
+  const knownLabels = useMemo(() => {
+    const seen = new Map<string, string>(); // lower → original-cased
+    for (const v of variants) for (const l of v.labels ?? []) {
+      const key = l.toLowerCase().trim();
+      if (key && !seen.has(key)) seen.set(key, l.trim());
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [variants]);
+
+  const activeFilterCount =
+    (filterStatusesSet.size > 0 ? 1 : 0) +
+    (filterLabelsSet.size > 0 ? 1 : 0);
 
   function clearFilters() {
     setF("filterStatuses", []);
+    setF("filterLabels", []);
   }
 
   function toggleFilterStatus(status: string) {
@@ -77,13 +95,25 @@ export default function VariantsPage() {
     setF("filterStatuses", Array.from(next));
   }
 
+  function toggleFilterLabel(label: string) {
+    const key = label.toLowerCase();
+    const arr = f.filterLabels.filter((l) => l.toLowerCase() !== key);
+    if (!filterLabelsSet.has(key)) arr.push(label);
+    setF("filterLabels", arr);
+  }
+
   const filtered = useMemo(() => {
     return variants.filter((c) => {
       if (f.search && !c.name.toLowerCase().includes(f.search.toLowerCase())) return false;
       if (filterStatusesSet.size > 0 && !filterStatusesSet.has(getStatus(c))) return false;
+      if (filterLabelsSet.size > 0) {
+        const labels = (c.labels ?? []).map((l) => l.toLowerCase());
+        const anyMatch = labels.some((l) => filterLabelsSet.has(l));
+        if (!anyMatch) return false;
+      }
       return true;
     });
-  }, [variants, f.search, filterStatusesSet]);
+  }, [variants, f.search, filterStatusesSet, filterLabelsSet]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -129,6 +159,50 @@ export default function VariantsPage() {
           activeFilterCount={activeFilterCount}
         />
 
+        {/* Quick filters under search — baseline pattern. */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Status</span>
+          {STATUS_FILTER_OPTIONS.map((opt) => {
+            const active = filterStatusesSet.has(opt.value);
+            return (
+              <button
+                key={opt.value}
+                onClick={() => toggleFilterStatus(opt.value)}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tag chip row — labels in use across variants. Multi-select OR. */}
+        {knownLabels.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Tags</span>
+            {knownLabels.map((label) => {
+              const active = filterLabelsSet.has(label.toLowerCase());
+              return (
+                <button
+                  key={label}
+                  onClick={() => toggleFilterLabel(label)}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors capitalize ${
+                    active
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {f.showFilters && (
           <FilterPanel activeFilterCount={activeFilterCount} onClearAll={clearFilters}>
             <FilterChipGroup
@@ -138,6 +212,15 @@ export default function VariantsPage() {
               selected={filterStatusesSet}
               onToggle={toggleFilterStatus}
             />
+            {knownLabels.length > 0 && (
+              <FilterChipGroup
+                label="Tags"
+                options={knownLabels.map((l) => ({ value: l.toLowerCase(), label: l }))}
+                multi
+                selected={filterLabelsSet}
+                onToggle={toggleFilterLabel}
+              />
+            )}
           </FilterPanel>
         )}
 

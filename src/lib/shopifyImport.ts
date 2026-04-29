@@ -19,7 +19,7 @@
  * the product list and get back a preview.
  */
 
-import type { Product } from "@/types";
+import type { Product, Variant, VariantPackaging } from "@/types";
 
 export interface ShopifyLineItem {
   /** Product name as it appeared in the Shopify storefront. */
@@ -32,8 +32,15 @@ export interface ShopifyLineItem {
   /** Fulfillment status for this line item (Shopify's `Lineitem fulfillment status`). */
   fulfillmentStatus?: string;
   /** Which internal product the importer resolved this line to.
-   *  undefined = unresolved (user must pick or skip). */
+   *  undefined = unresolved (user must pick or skip). Mutually
+   *  exclusive with `resolvedVariantId` — a line is either a single
+   *  product or a variant SKU. */
   resolvedProductId?: string;
+  /** Resolved variant + size when the line maps to a curated SKU
+   *  (e.g. "8-piece Try It All"). Triggers addVariantToOrder on
+   *  import → spawns derived production-demand orderItems. */
+  resolvedVariantId?: string;
+  resolvedVariantPackagingId?: string | null;
   /** Why we couldn't resolve the line — shown in the preview. */
   resolutionNote?: string;
 }
@@ -198,6 +205,12 @@ const REQUIRED_COLUMNS = ["Name", "Lineitem name", "Lineitem quantity"];
 
 export interface ParseShopifyOptions {
   products: Product[];
+  /** Variants + their sizes available for matching. When a Lineitem
+   *  name matches a variant alias / canonical name first, we resolve
+   *  to a variant instead of a product. Pre-built sizes keep the
+   *  match O(1). */
+  variants?: Variant[];
+  variantPackagings?: VariantPackaging[];
   /** Order names (Shopify "Name" field) already in the database — rows
    *  whose Name matches are still parsed (so the user sees them) but
    *  flagged as duplicates so the import step skips them. */
@@ -227,13 +240,45 @@ export function parseShopifyCsv(text: string, opts: ParseShopifyOptions): Shopif
   };
 
   // Build product lookup maps up-front so match is O(1) per lineitem.
+  // Aliases (Shopify storefront titles, German labels, etc.) are
+  // matched alongside the canonical name — auto-built from prior
+  // manual mappings.
   const byName = new Map<string, Product>();
   const bySku = new Map<string, Product>();
   for (const p of opts.products) {
     if (!p.archived) {
       byName.set(p.name.toLowerCase().trim(), p);
+      for (const alias of p.aliases ?? []) {
+        if (alias.trim()) byName.set(alias.toLowerCase().trim(), p);
+      }
       const sku = (p as unknown as { sku?: string }).sku;
       if (sku) bySku.set(sku.toLowerCase().trim(), p);
+    }
+  }
+
+  // Variant lookup: canonical name + aliases → variant (default to
+  // the variant's only / first size). Variants take precedence over
+  // products when both could match — Shopify SKUs typically map to
+  // bundled boxes, not individual chocolates.
+  const variants = opts.variants ?? [];
+  const variantPackagings = opts.variantPackagings ?? [];
+  const vpsByVariant = new Map<string, VariantPackaging[]>();
+  for (const vp of variantPackagings) {
+    const arr = vpsByVariant.get(vp.variantId) ?? [];
+    arr.push(vp);
+    vpsByVariant.set(vp.variantId, arr);
+  }
+  const byVariantName = new Map<string, { variant: Variant; packagingId: string | null }>();
+  for (const v of variants) {
+    if (!v.id) continue;
+    const sizes = vpsByVariant.get(v.id) ?? [];
+    // Default size pick = the only size, or undefined if multiple
+    // (user picks the size in the preview).
+    const defaultSize = sizes.length === 1 ? (sizes[0].id ?? null) : null;
+    const entry = { variant: v, packagingId: defaultSize };
+    byVariantName.set(v.name.toLowerCase().trim(), entry);
+    for (const alias of v.aliases ?? []) {
+      if (alias.trim()) byVariantName.set(alias.toLowerCase().trim(), entry);
     }
   }
 
@@ -289,27 +334,38 @@ export function parseShopifyCsv(text: string, opts: ParseShopifyOptions): Shopif
     const liPrice = liPriceStr ? parseFloat(liPriceStr) : undefined;
     const liFulfillStatus = get(row, "Lineitem fulfillment status").trim() || undefined;
 
-    // Resolve against products.
-    let resolved: Product | undefined;
+    // Resolve against variants first (curated SKUs), then products.
+    let resolvedProduct: Product | undefined;
+    let resolvedVariantEntry: { variant: Variant; packagingId: string | null } | undefined;
     let resolutionNote: string | undefined;
-    if (liSku) {
-      resolved = bySku.get(liSku.toLowerCase());
-      if (!resolved) resolutionNote = `No product with SKU "${liSku}"`;
-    }
-    if (!resolved) {
-      // Shopify exports line items as "Product name - Variant name". Try the
-      // full string first, then strip the " - variant" suffix.
-      const normalized = liName.toLowerCase().trim();
-      resolved = byName.get(normalized);
-      if (!resolved) {
-        const dashIdx = normalized.indexOf(" - ");
-        if (dashIdx > 0) {
-          const base = normalized.slice(0, dashIdx).trim();
-          resolved = byName.get(base);
-        }
+
+    const normalized = liName.toLowerCase().trim();
+    resolvedVariantEntry = byVariantName.get(normalized);
+    if (!resolvedVariantEntry) {
+      const dashIdx = normalized.indexOf(" - ");
+      if (dashIdx > 0) {
+        const base = normalized.slice(0, dashIdx).trim();
+        resolvedVariantEntry = byVariantName.get(base);
       }
-      if (!resolved && !resolutionNote) {
-        resolutionNote = `No product named "${liName}"`;
+    }
+
+    if (!resolvedVariantEntry) {
+      if (liSku) {
+        resolvedProduct = bySku.get(liSku.toLowerCase());
+        if (!resolvedProduct) resolutionNote = `No product with SKU "${liSku}"`;
+      }
+      if (!resolvedProduct) {
+        resolvedProduct = byName.get(normalized);
+        if (!resolvedProduct) {
+          const dashIdx = normalized.indexOf(" - ");
+          if (dashIdx > 0) {
+            const base = normalized.slice(0, dashIdx).trim();
+            resolvedProduct = byName.get(base);
+          }
+        }
+        if (!resolvedProduct && !resolutionNote) {
+          resolutionNote = `No product or variant named "${liName}"`;
+        }
       }
     }
 
@@ -319,8 +375,10 @@ export function parseShopifyCsv(text: string, opts: ParseShopifyOptions): Shopif
       sku: liSku,
       unitPrice: liPrice != null && Number.isFinite(liPrice) ? liPrice : undefined,
       fulfillmentStatus: liFulfillStatus,
-      resolvedProductId: resolved?.id,
-      resolutionNote: resolved ? undefined : resolutionNote,
+      resolvedProductId: resolvedProduct?.id,
+      resolvedVariantId: resolvedVariantEntry?.variant.id,
+      resolvedVariantPackagingId: resolvedVariantEntry?.packagingId,
+      resolutionNote: (resolvedProduct || resolvedVariantEntry) ? undefined : resolutionNote,
     });
   }
 

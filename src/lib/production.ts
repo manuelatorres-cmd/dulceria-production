@@ -59,6 +59,73 @@ export const STEP_GROUP_ORDER: StepGroup[] = [
   "polishing", "colour", "shell", "filling", "fill", "cap", "unmould", "packing",
 ];
 
+/**
+ * Map a free-text productionStep.name down to the canonical phase
+ * key that the wizard writes into planStepStatus rows.
+ *
+ * Single source of truth — every read surface (orders list, plan
+ * day/week/pivot views, /production-brain/daily, dashboard, order +
+ * campaign detail pages, etc.) must funnel step-done lookups through
+ * this so a tick on /production reflects everywhere instantly.
+ */
+export function phaseKeyFromStepName(name: string | null | undefined): StepGroup | null {
+  const n = (name ?? "").toLowerCase().trim();
+  if (n.includes("polish")) return "polishing";
+  if (n.includes("paint") || n.includes("colour") || n.includes("color")) return "colour";
+  if (n.includes("shell") || n.includes("temper")) return "shell";
+  if (n.includes("filling prep") || n === "prep" || n.startsWith("prep")) return "filling";
+  if (n.includes("fill")) return "fill";
+  if (n.includes("cap")) return "cap";
+  if (n.includes("unmould") || n.includes("unmold")) return "unmould";
+  if (n.includes("pack")) return "packing";
+  return null;
+}
+
+/**
+ * Is the phase produced by `stepName` already ticked done for `planId`?
+ *
+ * `doneKeysByPlan` is the per-plan set of `stepKey` strings (each
+ * either bare phase like "polishing" or per-product like
+ * "polishing-<planProductId>"). Prefix-match on the resolved phase
+ * covers both forms.
+ *
+ * The colour phase is doubly aliased: phase key is "colour" but
+ * `generateSteps` writes step keys with the American spelling
+ * ("color-<ppId>-<idx>"). Both prefixes count as ticked.
+ */
+export function planStepDoneByName(
+  stepName: string,
+  planId: string,
+  doneKeysByPlan: Map<string, Set<string>>,
+): boolean {
+  const phase = phaseKeyFromStepName(stepName);
+  if (!phase) return false;
+  const set = doneKeysByPlan.get(planId);
+  if (!set) return false;
+  const aliases = phase === "colour" ? ["colour", "color"] : [phase];
+  for (const k of set) {
+    for (const a of aliases) {
+      if (k === a || k.startsWith(`${a}-`)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Same as `planStepDoneByName` but takes a step id; resolves the step
+ * row via `stepsById` first to find its name.
+ */
+export function planStepDoneById(
+  stepId: string,
+  planId: string,
+  stepsById: Map<string, { name: string }>,
+  doneKeysByPlan: Map<string, Set<string>>,
+): boolean {
+  const step = stepsById.get(stepId);
+  if (!step) return false;
+  return planStepDoneByName(step.name, planId, doneKeysByPlan);
+}
+
 export type ProductionStep = {
   key: string;
   label: string;
@@ -406,16 +473,20 @@ export function calculateFillingAmounts(
         weightG = Math.round(fillWeightG * fillPct);
       }
 
-      // Scale each ingredient from product weight to required weight
-      const scaledIngredients: ScaledIngredient[] = lw.ingredients.map((li) => {
-        const scaleFactor = lw.totalWeight > 0 ? weightG / lw.totalWeight : 1;
-        return {
-          ingredientId: li.ingredientId,
-          amount: Math.round(li.amount * scaleFactor * 10) / 10,
-          unit: li.unit,
-          note: li.note,
-        };
-      });
+      // Scale each ingredient from product weight to required weight.
+      // Skip sub-filling lines (no `ingredientId`) — production-list
+      // expansion doesn't yet flatten them.
+      const scaledIngredients: ScaledIngredient[] = lw.ingredients
+        .filter((li): li is typeof li & { ingredientId: string } => !!li.ingredientId)
+        .map((li) => {
+          const scaleFactor = lw.totalWeight > 0 ? weightG / lw.totalWeight : 1;
+          return {
+            ingredientId: li.ingredientId,
+            amount: Math.round(li.amount * scaleFactor * 10) / 10,
+            unit: li.unit,
+            note: li.note,
+          };
+        });
 
       results.push({
         fillingId: lw.fillingId,
@@ -490,7 +561,7 @@ export function generateBatchSummary(params: {
   const { batchNumber, planName, completedAt, planProducts, productNames, moulds, fillingAmounts, ingredients, previousBatches, productsMap, productFillingsMap } = params;
   const ingredientMap = new Map(ingredients.map((i) => [i.id, i]));
 
-  const dateStr = completedAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const dateStr = completedAt.toLocaleDateString("de-AT", { day: "numeric", month: "long", year: "numeric" });
   const lines: string[] = [];
 
   lines.push("BATCH SUMMARY");
@@ -591,7 +662,7 @@ export function generateBatchSummary(params: {
     lines.push("FILLINGS FROM PREVIOUS BATCH");
     lines.push("─".repeat(48));
     for (const [, prev] of prevEntries) {
-      const madeDate = new Date(prev.madeAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+      const madeDate = new Date(prev.madeAt).toLocaleDateString("de-AT", { day: "numeric", month: "long", year: "numeric" });
       const fillingLabel = prev.fillingName ?? "Filling";
       lines.push(`  ${fillingLabel}`);
       if (prev.shelfLifeWeeks) {
@@ -642,7 +713,7 @@ export function generateBatchSummary(params: {
   }
 
   lines.push("");
-  lines.push(`Generated: ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`);
+  lines.push(`Generated: ${new Date().toLocaleDateString("de-AT", { day: "numeric", month: "long", year: "numeric" })}`);
 
   return lines.join("\n");
 }
@@ -793,7 +864,7 @@ export function generateSteps(
     const prevBatch = fillingPreviousBatches[cl.fillingId];
 
     if (prevBatch) {
-      const madeDate = new Date(prevBatch.madeAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+      const madeDate = new Date(prevBatch.madeAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" });
       const weightDetail = `${cl.totalWeightG}g needed`;
       const productList = cl.shared
         ? cl.usedBy.map((u) => u.productName).join(", ")

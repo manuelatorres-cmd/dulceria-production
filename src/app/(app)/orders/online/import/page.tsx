@@ -5,21 +5,58 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import {
-  useProductsList, useOrders, importOnlineOrders,
+  useProductsList, useOrders, importOnlineOrders, appendProductAliases,
+  appendVariantAliases,
+  useVariants, useAllVariantPackagings,
+  usePackagingList, useProductLocationTotals,
 } from "@/lib/hooks";
 import { parseShopifyCsv, type ShopifyParseResult, type ShopifyParsedOrder } from "@/lib/shopifyImport";
 import { ArrowLeft, Upload, FileWarning, CheckCircle } from "lucide-react";
 
 const DEFAULT_LEAD_DAYS = 3;
 
+/** Encoded picker value: "product:<id>" or "variant:<variantId>:<vpId|->" */
+type PickerValue = string;
+
+function encodeProduct(productId: string): PickerValue {
+  return `product:${productId}`;
+}
+function encodeVariant(variantId: string, vpId: string | null): PickerValue {
+  return `variant:${variantId}:${vpId ?? "-"}`;
+}
+function decodePicker(v: PickerValue):
+  | { kind: "product"; productId: string }
+  | { kind: "variant"; variantId: string; variantPackagingId: string | null }
+  | null {
+  if (!v) return null;
+  const [kind, a, b] = v.split(":");
+  if (kind === "product" && a) return { kind: "product", productId: a };
+  if (kind === "variant" && a) {
+    return { kind: "variant", variantId: a, variantPackagingId: b && b !== "-" ? b : null };
+  }
+  return null;
+}
+
 export default function ShopifyImportPage() {
   const router = useRouter();
   const products = useProductsList(true);
+  const variants = useVariants();
+  const variantPackagings = useAllVariantPackagings();
+  const packagingList = usePackagingList(true);
   const orders = useOrders();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [parsed, setParsed] = useState<ShopifyParseResult | null>(null);
-  const [manualAssignments, setManualAssignments] = useState<Map<string, string>>(new Map());
+  const [manualAssignments, setManualAssignments] = useState<Map<string, PickerValue>>(new Map());
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  /** Per-line fulfilment mode picked by the operator on the preview.
+   *  Default = produce (new batch). Switching to "borrow" makes the
+   *  brain skip new production and ship from existing stock. */
+  const [borrowSet, setBorrowSet] = useState<Set<string>>(new Set());
+  const productLocationTotals = useProductLocationTotals();
+  /** Lines where the user clicked "Different variant…" to broaden the
+   *  dropdown beyond the matched variant's sizes. Keyed by lineKey. */
+  const [expandedPickers, setExpandedPickers] = useState<Set<string>>(new Set());
   const [leadDays, setLeadDays] = useState<number>(DEFAULT_LEAD_DAYS);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
@@ -28,6 +65,10 @@ export default function ShopifyImportPage() {
   const existingRefs = useMemo(
     () => new Set(orders.map((o) => o.sourceRef).filter((x): x is string => !!x)),
     [orders],
+  );
+  const packagingById = useMemo(
+    () => new Map(packagingList.map((p) => [p.id!, p])),
+    [packagingList],
   );
 
   function lineKey(orderName: string, idx: number): string {
@@ -40,50 +81,127 @@ export default function ShopifyImportPage() {
     setError("");
     try {
       const text = await file.text();
-      const p = parseShopifyCsv(text, { products, existingOrderNames: existingRefs });
+      const p = parseShopifyCsv(text, {
+        products,
+        variants,
+        variantPackagings,
+        existingOrderNames: existingRefs,
+      });
       setParsed(p);
       setManualAssignments(new Map());
+      setExcluded(new Set());
       setResult(null);
     } catch (ex) {
       setError(ex instanceof Error ? ex.message : "Failed to read file");
     }
   }
 
-  function getResolvedProductId(orderName: string, idx: number, line: ShopifyParsedOrder["lineItems"][number]): string | undefined {
-    return manualAssignments.get(lineKey(orderName, idx)) ?? line.resolvedProductId;
+  function autoPicker(line: ShopifyParsedOrder["lineItems"][number]): PickerValue | undefined {
+    if (line.resolvedVariantId) {
+      // Variant matched — but if no size was decided AND sizes exist
+      // we leave the picker empty so the user explicitly picks one.
+      // Surfacing a `variant:UUID:-` value when no matching <option>
+      // exists silently shows blank in the dropdown and hides the
+      // match.
+      const sizes = variantSizesFor(line.resolvedVariantId);
+      if (sizes.length > 1 && !line.resolvedVariantPackagingId) {
+        return undefined;
+      }
+      return encodeVariant(line.resolvedVariantId, line.resolvedVariantPackagingId ?? null);
+    }
+    if (line.resolvedProductId) {
+      return encodeProduct(line.resolvedProductId);
+    }
+    return undefined;
   }
 
-  function setAssignment(orderName: string, idx: number, productId: string) {
+  function getPick(orderName: string, idx: number, line: ShopifyParsedOrder["lineItems"][number]): PickerValue | undefined {
+    return manualAssignments.get(lineKey(orderName, idx)) ?? autoPicker(line);
+  }
+
+  function setAssignment(orderName: string, idx: number, value: PickerValue) {
     setManualAssignments((prev) => {
       const next = new Map(prev);
-      if (!productId) next.delete(lineKey(orderName, idx));
-      else next.set(lineKey(orderName, idx), productId);
+      if (!value) next.delete(lineKey(orderName, idx));
+      else next.set(lineKey(orderName, idx), value);
       return next;
     });
   }
 
+  // Helper: variant size needs explicit pick if multiple sizes exist.
+  function variantSizesFor(variantId: string) {
+    return variantPackagings.filter((vp) => vp.variantId === variantId);
+  }
+
   const importable = useMemo(() => {
-    if (!parsed) return { orders: [] as ShopifyParsedOrder[], unresolvedCount: 0, skippedCount: 0 };
+    if (!parsed) return { orders: [] as ShopifyParsedOrder[], unresolvedCount: 0, skippedCount: 0, excludedCount: 0 };
     const duplicates = new Set(parsed.duplicateNames);
     let unresolved = 0;
+    let excludedActive = 0;
     const readyOrders: ShopifyParsedOrder[] = [];
     for (const o of parsed.orders) {
       if (duplicates.has(o.name)) continue;
-      const allResolved = o.lineItems.every((li, i) => !!getResolvedProductId(o.name, i, li));
+      if (excluded.has(o.name)) { excludedActive++; continue; }
+      const allResolved = o.lineItems.every((li, i) => {
+        const v = getPick(o.name, i, li);
+        if (!v) return false;
+        const dec = decodePicker(v);
+        if (!dec) return false;
+        if (dec.kind === "variant") {
+          // Variant must have a size if any sizes exist for it.
+          const sizes = variantSizesFor(dec.variantId);
+          if (sizes.length > 0 && !dec.variantPackagingId) return false;
+        }
+        return true;
+      });
       if (!allResolved) {
         unresolved++;
         continue;
       }
       readyOrders.push(o);
     }
-    return { orders: readyOrders, unresolvedCount: unresolved, skippedCount: duplicates.size };
-  }, [parsed, manualAssignments]); // eslint-disable-line react-hooks/exhaustive-deps
+    return { orders: readyOrders, unresolvedCount: unresolved, skippedCount: duplicates.size, excludedCount: excludedActive };
+  }, [parsed, manualAssignments, variantPackagings, excluded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleImport() {
     if (!parsed) return;
     setImporting(true);
     setError("");
     try {
+      // Persist manual mappings as aliases. Track separately for
+      // products and variants so each lands on the right table.
+      const productAliasAdds = new Map<string, Set<string>>();
+      const variantAliasAdds = new Map<string, Set<string>>();
+      for (const o of importable.orders) {
+        for (let i = 0; i < o.lineItems.length; i++) {
+          const li = o.lineItems[i];
+          const manualRaw = manualAssignments.get(lineKey(o.name, i));
+          if (!manualRaw) continue;
+          const dec = decodePicker(manualRaw);
+          if (!dec) continue;
+          // Was the parser's auto-pick the same? If yes, no manual
+          // correction → skip.
+          if (autoPicker(li) === manualRaw) continue;
+          if (dec.kind === "product") {
+            const set = productAliasAdds.get(dec.productId) ?? new Set();
+            set.add(li.name);
+            productAliasAdds.set(dec.productId, set);
+          } else {
+            const set = variantAliasAdds.get(dec.variantId) ?? new Set();
+            set.add(li.name);
+            variantAliasAdds.set(dec.variantId, set);
+          }
+        }
+      }
+      for (const [productId, names] of productAliasAdds) {
+        try { await appendProductAliases(productId, [...names]); }
+        catch (e) { console.warn("product alias save failed", e); }
+      }
+      for (const [variantId, names] of variantAliasAdds) {
+        try { await appendVariantAliases(variantId, [...names]); }
+        catch (e) { console.warn("variant alias save failed", e); }
+      }
+
       const payload = importable.orders.map((o) => {
         const placed = o.placedAt ? new Date(o.placedAt) : new Date();
         const deadline = new Date(placed.getTime() + leadDays * 86_400_000);
@@ -95,18 +213,41 @@ export default function ShopifyImportPage() {
           shippingAddress: o.shippingAddress,
           phone: o.phone,
           deadline: deadline.toISOString(),
-          items: o.lineItems.map((li, i) => ({
-            productId: getResolvedProductId(o.name, i, li)!,
-            quantity: li.quantity,
-            unitPrice: li.unitPrice,
-            notes: li.sku ? `SKU ${li.sku}` : undefined,
-          })),
+          items: o.lineItems.map((li, i) => {
+            const dec = decodePicker(getPick(o.name, i, li)!)!;
+            const fulfilmentMode = borrowSet.has(lineKey(o.name, i)) ? "borrow" as const : "produce" as const;
+            if (dec.kind === "product") {
+              return {
+                kind: "product" as const,
+                productId: dec.productId,
+                quantity: li.quantity,
+                unitPrice: li.unitPrice,
+                notes: li.sku ? `SKU ${li.sku}` : undefined,
+                fulfilmentMode,
+              };
+            }
+            return {
+              kind: "variant" as const,
+              variantId: dec.variantId,
+              variantPackagingId: dec.variantPackagingId,
+              quantity: li.quantity,
+              unitPrice: li.unitPrice,
+              notes: li.sku ? `SKU ${li.sku}` : undefined,
+              fulfilmentMode,
+            };
+          }),
         };
       });
       const imported = await importOnlineOrders(payload);
       setResult({ imported, skipped: (parsed.orders.length - importable.orders.length) });
     } catch (ex) {
-      setError(ex instanceof Error ? ex.message : "Import failed");
+      const raw: { message?: string; code?: string; details?: string; hint?: string } =
+        ex instanceof Error ? { message: ex.message } : ((ex as Record<string, string>) ?? {});
+      const code = raw.code ? ` (${raw.code})` : "";
+      const hint = raw.hint ? ` — ${raw.hint}` : "";
+      const details = raw.details ? ` — ${raw.details}` : "";
+      setError(`${raw.message ?? "Import failed"}${code}${hint}${details}`);
+      console.error("import failed:", ex);
     } finally {
       setImporting(false);
     }
@@ -199,7 +340,25 @@ export default function ShopifyImportPage() {
                     {parsed.orders.length} order{parsed.orders.length === 1 ? "" : "s"} found
                     {parsed.duplicateNames.length > 0 && ` · ${parsed.duplicateNames.length} already imported`}
                     {importable.unresolvedCount > 0 && ` · ${importable.unresolvedCount} need product mapping`}
+                    {importable.excludedCount > 0 && ` · ${importable.excludedCount} unchecked`}
                   </p>
+                  {(() => {
+                    const selectableNames = parsed.orders
+                      .filter((o) => !parsed.duplicateNames.includes(o.name))
+                      .map((o) => o.name);
+                    const allSelected = selectableNames.every((n) => !excluded.has(n));
+                    return (
+                      <button
+                        onClick={() => {
+                          if (allSelected) setExcluded(new Set(selectableNames));
+                          else setExcluded(new Set());
+                        }}
+                        className="text-[11px] text-primary hover:underline mt-1"
+                      >
+                        {allSelected ? "Uncheck all" : "Check all"}
+                      </button>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="text-xs text-muted-foreground">
@@ -237,31 +396,62 @@ export default function ShopifyImportPage() {
                 return (
                   <li
                     key={o.name}
-                    className={`rounded-sm border bg-card p-3 space-y-2 ${isDup ? "border-border/60 opacity-60" : "border-border"}`}
+                    className={`rounded-sm border bg-card p-3 space-y-2 ${isDup ? "border-border/60 opacity-60" : excluded.has(o.name) ? "border-border/60 opacity-50" : "border-border"}`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={!isDup && !excluded.has(o.name)}
+                        disabled={isDup}
+                        onChange={(e) => {
+                          setExcluded((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.delete(o.name);
+                            else next.add(o.name);
+                            return next;
+                          });
+                        }}
+                        className="mt-1 w-4 h-4 cursor-pointer"
+                        aria-label={`Include ${o.name} in import`}
+                      />
+                      <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold">
                           {o.name}
                           {isDup && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">already imported</span>}
+                          {!isDup && excluded.has(o.name) && (
+                            <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">skipped</span>
+                          )}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {[o.shippingName, o.email, o.placedAt ? new Date(o.placedAt).toLocaleDateString("en-GB") : null]
+                          {[o.shippingName, o.email, o.placedAt ? new Date(o.placedAt).toLocaleDateString("de-AT") : null]
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
                       </div>
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-[11px] text-muted-foreground shrink-0">
                         {o.lineItems.length} item{o.lineItems.length === 1 ? "" : "s"}
                       </span>
                     </div>
                     <ul className="divide-y divide-border rounded-md border border-border">
                       {o.lineItems.map((li, i) => {
-                        const resolved = getResolvedProductId(o.name, i, li);
-                        const issue = !resolved;
+                        const pick = getPick(o.name, i, li);
+                        const dec = pick ? decodePicker(pick) : null;
+                        const issue = !pick || (dec?.kind === "variant" && variantSizesFor(dec.variantId).length > 0 && !dec.variantPackagingId);
+                        // When the parser matched a variant by alias /
+                        // canonical name, narrow the dropdown to that
+                        // variant's sizes only — clicking "Different
+                        // variant…" broadens to the full list.
+                        const lk = lineKey(o.name, i);
+                        const broadened = expandedPickers.has(lk);
+                        const matchedVariantId = li.resolvedVariantId
+                          ?? (dec?.kind === "variant" ? dec.variantId : undefined);
+                        const narrowed = !!matchedVariantId && !broadened;
+                        const matchedVariant = matchedVariantId
+                          ? variants.find((v) => v.id === matchedVariantId)
+                          : undefined;
                         return (
                           <li key={i} className={`px-3 py-2 text-sm ${issue ? "bg-status-warn-bg/40" : ""}`}>
-                            <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start justify-between gap-2 flex-wrap">
                               <div className="flex-1 min-w-0">
                                 <p className="truncate">
                                   {li.name}
@@ -271,20 +461,150 @@ export default function ShopifyImportPage() {
                                   × {li.quantity}
                                   {li.unitPrice != null && ` · €${li.unitPrice.toFixed(2)} each`}
                                 </p>
+                                {narrowed && (
+                                  <button
+                                    onClick={() => {
+                                      setExpandedPickers((p) => {
+                                        const n = new Set(p);
+                                        n.add(lk);
+                                        return n;
+                                      });
+                                    }}
+                                    className="mt-1 text-[10.5px] text-muted-foreground hover:text-foreground underline"
+                                  >
+                                    Different variant…
+                                  </button>
+                                )}
                               </div>
                               <select
-                                value={resolved ?? ""}
+                                value={pick ?? ""}
                                 onChange={(e) => setAssignment(o.name, i, e.target.value)}
-                                className="input text-xs !py-1 !w-56"
+                                className="input text-xs !py-1 !w-64"
                                 disabled={isDup}
                               >
-                                <option value="">— pick product —</option>
-                                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                <option value="">— pick {narrowed ? "size" : "variant or product"} —</option>
+                                {narrowed && matchedVariant ? (
+                                  <optgroup label={`Sizes — ${matchedVariant.name}`}>
+                                    {(() => {
+                                      const sizes = variantSizesFor(matchedVariant.id!);
+                                      if (sizes.length === 0) {
+                                        return (
+                                          <option key={matchedVariant.id} value={encodeVariant(matchedVariant.id!, null)}>
+                                            {matchedVariant.name} (loose)
+                                          </option>
+                                        );
+                                      }
+                                      return sizes.map((vp) => {
+                                        const pkgName = vp.packagingId
+                                          ? packagingById.get(vp.packagingId)?.name ?? "size"
+                                          : "loose";
+                                        return (
+                                          <option key={vp.id} value={encodeVariant(matchedVariant.id!, vp.id ?? null)}>
+                                            {pkgName} (€{(vp.price ?? vp.sellPrice ?? 0).toFixed(2)})
+                                          </option>
+                                        );
+                                      });
+                                    })()}
+                                  </optgroup>
+                                ) : (
+                                  <>
+                                    {variants.length > 0 && (
+                                      <optgroup label="Variants (curated boxes)">
+                                        {variants.map((v) => {
+                                          const sizes = variantSizesFor(v.id!);
+                                          if (sizes.length === 0) {
+                                            return (
+                                              <option key={v.id} value={encodeVariant(v.id!, null)}>
+                                                {v.name}
+                                              </option>
+                                            );
+                                          }
+                                          return sizes.map((vp) => {
+                                            const pkgName = vp.packagingId
+                                              ? packagingById.get(vp.packagingId)?.name ?? "size"
+                                              : "loose";
+                                            return (
+                                              <option key={vp.id} value={encodeVariant(v.id!, vp.id ?? null)}>
+                                                {v.name} — {pkgName} (€{(vp.price ?? vp.sellPrice ?? 0).toFixed(2)})
+                                              </option>
+                                            );
+                                          });
+                                        })}
+                                      </optgroup>
+                                    )}
+                                    <optgroup label="Single products">
+                                      {products
+                                        .filter((p) => !p.archived)
+                                        .map((p) => (
+                                          <option key={p.id} value={encodeProduct(p.id!)}>
+                                            {p.name}
+                                          </option>
+                                        ))}
+                                    </optgroup>
+                                  </>
+                                )}
                               </select>
                             </div>
-                            {issue && li.resolutionNote && (
-                              <p className="mt-1 text-[11px] text-status-warn">{li.resolutionNote}</p>
+                            {issue && (
+                              <p className="mt-1 text-[11px] text-status-warn">
+                                {matchedVariantId && narrowed
+                                  ? `Matched variant "${matchedVariant?.name ?? "?"}" — pick a size`
+                                  : li.resolutionNote ?? "Pick a variant size or product."}
+                              </p>
                             )}
+                            {/* Stock + Produce/Borrow toggle. Only meaningful for
+                                resolved single-product picks. Variant lines
+                                aggregate stock per composition product, so the
+                                toggle there applies the choice to all derived
+                                lines on import. */}
+                            {dec && (() => {
+                              const isBorrow = borrowSet.has(lk);
+                              let stockLabel: string;
+                              let stockClass: string;
+                              if (dec.kind === "product") {
+                                const t = productLocationTotals.get(dec.productId);
+                                const avail = t?.production ?? 0;
+                                const enough = avail >= li.quantity;
+                                stockLabel = `${avail} in stock`;
+                                stockClass = enough ? "text-[#4a7a5e]" : "text-[#9b4f48]";
+                              } else {
+                                stockLabel = "stock varies per chocolate";
+                                stockClass = "text-muted-foreground";
+                              }
+                              return (
+                                <div className="mt-1.5 flex items-center gap-2">
+                                  <span className={`text-[10.5px] tabular-nums ${stockClass}`}>
+                                    {stockLabel}
+                                  </span>
+                                  <div className="ml-auto inline-flex rounded-full border border-border bg-card overflow-hidden text-[10.5px]">
+                                    <button
+                                      type="button"
+                                      onClick={() => setBorrowSet((p) => { const n = new Set(p); n.delete(lk); return n; })}
+                                      className={
+                                        "px-2.5 py-0.5 transition " +
+                                        (!isBorrow
+                                          ? "bg-foreground text-background"
+                                          : "text-muted-foreground hover:text-foreground")
+                                      }
+                                    >
+                                      Produce
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setBorrowSet((p) => { const n = new Set(p); n.add(lk); return n; })}
+                                      className={
+                                        "px-2.5 py-0.5 transition " +
+                                        (isBorrow
+                                          ? "bg-[#f6c6cb] text-[#6e2b32]"
+                                          : "text-muted-foreground hover:text-foreground")
+                                      }
+                                    >
+                                      Borrow
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </li>
                         );
                       })}

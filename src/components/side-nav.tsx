@@ -22,10 +22,12 @@ type SectionDef = {
 const SECTIONS: SectionDef[] = [
   {
     label: "The Workshop",
-    routes: ["/workshop", "/orders", "/production", "/production-brain", "/plan", "/stock", "/calendar", "/campaigns"],
+    routes: ["/workshop", "/orders", "/production-orders", "/production", "/production-brain", "/plan", "/stock", "/calendar", "/campaigns"],
     items: [
       { href: "/orders", label: "Orders", icon: OrdersIcon },
+      { href: "/production-orders", label: "Production orders", icon: PlanIcon },
       { href: "/calendar", label: "Calendar", icon: PlanIcon },
+      { href: "/plan", label: "Plan", icon: PlanIcon },
       { href: "/production-brain/planner", label: "Planner", icon: PlanIcon },
       { href: "/production-brain/daily", label: "Daily", icon: ProductionIcon },
       { href: "/campaigns", label: "Campaigns", icon: PlanIcon },
@@ -51,9 +53,10 @@ const SECTIONS: SectionDef[] = [
     routes: ["/shop"],
     items: [
       { href: "/shop", label: "Overview", icon: ShopIcon },
-      { href: "/shop/counter", label: "Counter", icon: ShopIcon },
+      { href: "/shop/counter", label: "Counter (custom box)", icon: ShopIcon },
+      { href: "/shop/daily-count", label: "Daily count", icon: ShopIcon },
       { href: "/shop/transfer", label: "Transfer in", icon: ShopIcon },
-      { href: "/shop/breakage", label: "Breakage · tastings", icon: ShopIcon },
+      { href: "/shop/breakage", label: "Stock out", icon: ShopIcon },
       { href: "/shop/count", label: "Monthly count", icon: ShopIcon },
     ],
   },
@@ -71,6 +74,7 @@ const SECTIONS: SectionDef[] = [
     label: "The Observatory",
     routes: ["/observatory", "/pricing", "/stats", "/reports", "/imports"],
     items: [
+      { href: "/reports/sales", label: "Sales (weekly)", icon: StatsIcon },
       { href: "/reports/monthly", label: "Monthly review", icon: StatsIcon },
       { href: "/pricing", label: "Pricing", icon: PricingIcon },
       { href: "/stats", label: "Stats", icon: StatsIcon },
@@ -80,9 +84,10 @@ const SECTIONS: SectionDef[] = [
   },
   {
     label: "The Lab",
-    routes: ["/lab", "/calculator"],
+    routes: ["/lab", "/calculator", "/audit"],
     items: [
-      { href: "/lab", label: "Product Lab", icon: FlaskIcon, disabled: true },
+      { href: "/audit", label: "Data audit", icon: FlaskIcon },
+      { href: "/lab", label: "Product Lab", icon: FlaskIcon },
     ],
   },
 ];
@@ -93,7 +98,7 @@ const HOME_ITEMS: NavItem[] = [
   { href: "/shop", label: "Shop", icon: ShopIcon },
   { href: "/customers", label: "Customers", icon: CustomersIcon },
   { href: "/observatory", label: "Observatory", icon: ObservatoryIcon },
-  { href: "/lab", label: "Lab", icon: FlaskIcon, disabled: true },
+  { href: "/audit", label: "Lab", icon: FlaskIcon },
 ];
 
 /** Map each top-level section href to its SectionDef so the drill-down
@@ -104,7 +109,7 @@ const SECTION_BY_HOME_HREF: Record<string, string> = {
   "/pantry": "The Pantry",
   "/shop": "The Shop",
   "/customers": "Customers",
-  "/lab": "The Lab",
+  "/audit": "The Lab",
   "/observatory": "The Observatory",
 };
 
@@ -176,7 +181,7 @@ export function SideNav() {
       return (
         <span
           key={item.href}
-          className="relative flex items-center gap-3 px-3 py-2 rounded-sm text-muted-foreground/40 cursor-not-allowed"
+          className="relative flex items-center gap-3 px-3 py-2 rounded-sm text-[#5b6076] cursor-not-allowed"
         >
           <item.icon className="w-[18px] h-[18px] shrink-0" />
           <span className={`${showLabels ? "hidden sm:block" : "hidden"} text-[13px] truncate`}>{item.label}</span>
@@ -191,17 +196,17 @@ export function SideNav() {
         href={item.href}
         className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
           active
-            ? "text-foreground font-medium bg-card"
-            : "text-muted-foreground hover:text-foreground hover:bg-card/60"
+            ? "bg-[#f6c6cb] text-[#6e2b32] font-medium"
+            : "text-[#cfd2dc] hover:text-white hover:bg-white/5"
         }`}
       >
         {active ? (
-          <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
+          <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#f6c6cb]" />
         ) : null}
         <div className="relative shrink-0">
           <item.icon className="w-[18px] h-[18px]" />
           {badge > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[color:var(--accent-terracotta-ink)] text-white text-[9px] font-semibold flex items-center justify-center leading-none">
+            <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[#f6c6cb] text-[#6e2b32] text-[9px] font-semibold flex items-center justify-center leading-none">
               {badge > 9 ? "9+" : badge}
             </span>
           )}
@@ -215,29 +220,24 @@ export function SideNav() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 h-full z-40 flex flex-col transition-[width] duration-200 ${widthClass}`}
-      style={{ backgroundColor: "var(--color-nav)" }}
+      className={`fixed top-0 left-0 h-full z-40 flex flex-col transition-[width] duration-200 text-[#cfd2dc] ${widthClass}`}
+      style={{
+        backgroundColor: "#1f2230",
+        borderRight: "1px solid rgba(255, 255, 255, 0.06)",
+      }}
     >
       <Link
         href="/dashboard"
         title="Home"
-        className="flex items-center gap-3 px-4 pt-6 pb-5 shrink-0 hover:bg-card/60 transition-colors border-b border-border/60"
+        className="flex items-center justify-center gap-3 px-3 pt-7 pb-6 shrink-0 hover:bg-white/5 transition-colors border-b border-white/[0.06]"
       >
-        <img src="/logo.png" alt="Dulceria — home" className="w-8 h-8 shrink-0 rounded-sm object-contain" />
-        <div className={`${labelClass} flex flex-col min-w-0`}>
-          <span
-            className="text-[18px] text-foreground truncate leading-none"
-            style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.015em" }}
-          >
-            Dulceria
-          </span>
-          <span
-            className="text-[9.5px] text-muted-foreground mt-1.5 truncate uppercase"
-            style={{ letterSpacing: "0.18em" }}
-          >
-            Chocolate · Vienna
-          </span>
-        </div>
+        <img src="/logo.png" alt="" className="w-9 h-9 shrink-0 rounded-sm object-contain" />
+        <img
+          src="/dulceria-wordmark.png"
+          alt="Dulceria"
+          className={`${labelClass} h-11 w-auto object-contain`}
+          style={{ filter: "brightness(0) invert(1)" }}
+        />
       </Link>
 
       {/* Floating collapse toggle — half-overhangs the nav's right edge.
@@ -247,7 +247,7 @@ export function SideNav() {
         onClick={() => setCollapsed((c) => !c)}
         title={collapsed ? "Expand nav" : "Collapse nav"}
         aria-label={collapsed ? "Expand nav" : "Collapse nav"}
-        className="hidden sm:flex absolute top-5 -right-3 z-50 w-6 h-6 items-center justify-center rounded-full bg-card border border-border text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
+        className="hidden sm:flex absolute top-5 -right-3 z-50 w-6 h-6 items-center justify-center rounded-full bg-[#1f2230] border border-white/15 text-[#cfd2dc] hover:text-white hover:border-white/40 transition-colors"
       >
         <ChevronIcon className={`w-3 h-3 transition-transform ${collapsed ? "rotate-180" : ""}`} />
       </button>
@@ -259,7 +259,7 @@ export function SideNav() {
             <Link
               href="/dashboard"
               title="Back to dashboard"
-              className="flex items-center gap-2 px-3 py-2 rounded-sm transition-colors text-muted-foreground hover:text-foreground hover:bg-card/60"
+              className="flex items-center gap-2 px-3 py-2 rounded-sm transition-colors text-[#cfd2dc] hover:text-white hover:bg-white/5"
             >
               <ChevronIcon className="w-3 h-3 rotate-180 shrink-0" />
               <span className={`${labelClass} text-[11px] uppercase truncate`} style={{ letterSpacing: "0.1em" }}>
@@ -267,15 +267,28 @@ export function SideNav() {
               </span>
             </Link>
 
-            {/* Section title — editorial serif, sits above the sub-nav */}
-            <div className={`${labelClass} px-3 pt-5 pb-2`}>
-              <span
-                className="block text-[17px] text-foreground leading-tight"
-                style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.015em" }}
-              >
-                {stripThePrefix(activeSection.label)}
-              </span>
-            </div>
+            {/* Section title — editorial serif, sits above the sub-nav.
+                Click navigates back to the section's own dashboard so
+                you can always get out of a detail page. */}
+            {(() => {
+              const homeHref = Object.entries(SECTION_BY_HOME_HREF)
+                .find(([, label]) => label === activeSection.label)?.[0]
+                ?? activeSection.routes[0];
+              return (
+                <Link
+                  href={homeHref}
+                  className={`${labelClass} block px-3 pt-5 pb-2 hover:opacity-80 transition-opacity`}
+                  title={`${stripThePrefix(activeSection.label)} dashboard`}
+                >
+                  <span
+                    className="block text-[17px] text-white leading-tight"
+                    style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.015em" }}
+                  >
+                    {stripThePrefix(activeSection.label)}
+                  </span>
+                </Link>
+              );
+            })()}
 
             {activeSection.items.map(renderItem)}
           </>
@@ -287,19 +300,19 @@ export function SideNav() {
               title="Dashboard"
               className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
                 isActive(pathname, "/dashboard")
-                  ? "text-foreground font-medium bg-card"
-                  : "text-muted-foreground hover:text-foreground hover:bg-card/60"
+                  ? "bg-[#f6c6cb] text-[#6e2b32] font-medium"
+                  : "text-[#cfd2dc] hover:text-white hover:bg-white/5"
               }`}
             >
               {isActive(pathname, "/dashboard") ? (
-                <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
+                <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#f6c6cb]" />
               ) : null}
               <HomeIcon className="w-[18px] h-[18px] shrink-0" />
               <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Dashboard</span>
             </Link>
 
             <span
-              className={`${labelClass} block px-3 pt-6 pb-2 text-[9.5px] font-medium text-muted-foreground/70 uppercase truncate`}
+              className={`${labelClass} block px-3 pt-6 pb-2 text-[9.5px] font-medium text-[#5b6076] uppercase truncate`}
               style={{ letterSpacing: "0.16em" }}
             >
               Spaces
@@ -314,17 +327,17 @@ export function SideNav() {
             href="/shopping"
             className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
               isActive(pathname, "/shopping")
-                ? "text-foreground font-medium bg-card"
-                : "text-muted-foreground hover:text-foreground hover:bg-card/60"
+                ? "bg-[#f6c6cb] text-[#6e2b32] font-medium"
+                : "text-[#cfd2dc] hover:text-white hover:bg-white/5"
             }`}
           >
             {isActive(pathname, "/shopping") ? (
-              <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
+              <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#f6c6cb]" />
             ) : null}
             <div className="relative shrink-0">
               <ShoppingIcon className="w-[18px] h-[18px]" />
               {pendingShoppingCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[color:var(--accent-terracotta-ink)] text-white text-[9px] font-semibold flex items-center justify-center leading-none">
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[#f6c6cb] text-[#6e2b32] text-[9px] font-semibold flex items-center justify-center leading-none">
                   {pendingShoppingCount > 9 ? "9+" : pendingShoppingCount}
                 </span>
               )}
@@ -339,12 +352,12 @@ export function SideNav() {
           href="/settings"
           className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
             pathname.startsWith("/settings")
-              ? "text-foreground font-medium bg-card"
-              : "text-muted-foreground hover:text-foreground hover:bg-card/60"
+              ? "bg-[#f6c6cb] text-[#6e2b32] font-medium"
+              : "text-[#cfd2dc] hover:text-white hover:bg-white/5"
           }`}
         >
           {pathname.startsWith("/settings") ? (
-            <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[color:var(--accent-terracotta-ink)]" />
+            <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#f6c6cb]" />
           ) : null}
           <SettingsIcon className="w-[18px] h-[18px] shrink-0" />
           <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Settings</span>
@@ -380,7 +393,7 @@ function SyncStatusLink({ labelClass }: { labelClass: string }) {
       type="button"
       onClick={() => supabase.auth.signOut()}
       title={`Signed in as ${email} — click to sign out`}
-      className="flex items-center gap-3 px-2 py-2.5 rounded-sm transition-colors text-muted-foreground hover:text-foreground hover:bg-muted w-full text-left"
+      className="flex items-center gap-3 px-2 py-2.5 rounded-sm transition-colors text-[#cfd2dc] hover:text-white hover:bg-white/5 w-full text-left"
     >
       <LogOutIcon className="w-5 h-5 shrink-0" />
       <span className={`${labelClass} text-sm truncate`}>{email}</span>

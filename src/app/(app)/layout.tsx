@@ -7,6 +7,8 @@ import { IosInstallBanner } from "@/components/ios-install-banner";
 import { SectionAccent } from "@/components/section-accent";
 import { UndoAffordance } from "@/components/undo-affordance";
 import { NotificationBell } from "@/components/notification-bell";
+import { DatePickerAutoOpen } from "@/components/date-picker-auto-open";
+import { EnterAdvancesFocus } from "@/components/enter-advances-focus";
 
 export default function AppLayout({
   children,
@@ -25,7 +27,7 @@ export default function AppLayout({
             <SideNav />
           </Suspense>
           <main
-            className="flex-1 min-w-0 min-h-screen transition-[margin-left] duration-200 relative"
+            className="flex-1 min-w-0 min-h-screen transition-[margin-left] duration-200 relative pl-2 sm:pl-4"
             style={{ marginLeft: "var(--nav-w)" }}
           >
             {/* Global top-right utilities — notification bell. Lives in
@@ -40,6 +42,8 @@ export default function AppLayout({
       </AuthGate>
       <SeedLoader />
       <DemoModeOverlay />
+      <DatePickerAutoOpen />
+      <EnterAdvancesFocus />
     </>
   );
 }

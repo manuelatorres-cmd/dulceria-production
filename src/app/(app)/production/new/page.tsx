@@ -44,7 +44,7 @@ function NewPlanContent() {
   const [fillingPreviousBatches, setFillingPreviousBatches] = useState<Record<string, FillingPreviousBatch>>({});
   const [planName, setPlanName] = useState(() => {
     const d = new Date();
-    return `Batch — ${d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+    return `Batch — ${d.toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}`;
   });
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(!fromPlanId);
@@ -113,18 +113,20 @@ function NewPlanContent() {
       for (const rl of fillings) {
         const fillingIngredients = allProductsIngredientMap.get(rl.fillingId) ?? [];
         for (const li of fillingIngredients) {
-          if (seen.has(li.ingredientId)) continue;
-          const ing = ingredientById.get(li.ingredientId);
+          if (!li.ingredientId) continue; // sub-filling line — not expanded here
+          const ingredientId = li.ingredientId;
+          if (seen.has(ingredientId)) continue;
+          const ing = ingredientById.get(ingredientId);
           if (!ing) continue;
           if (ing.outOfStock) {
-            seen.add(li.ingredientId);
-            issues.push({ ingredientId: li.ingredientId, name: ing.name, status: "outOfStock" });
+            seen.add(ingredientId);
+            issues.push({ ingredientId, name: ing.name, status: "outOfStock" });
           } else if (ing.lowStock && ing.lowStockOrdered) {
-            seen.add(li.ingredientId);
-            issues.push({ ingredientId: li.ingredientId, name: ing.name, status: "ordered" });
+            seen.add(ingredientId);
+            issues.push({ ingredientId, name: ing.name, status: "ordered" });
           } else if (ing.lowStock) {
-            seen.add(li.ingredientId);
-            issues.push({ ingredientId: li.ingredientId, name: ing.name, status: "lowStock" });
+            seen.add(ingredientId);
+            issues.push({ ingredientId, name: ing.name, status: "lowStock" });
           }
         }
       }
@@ -1017,7 +1019,7 @@ function BatchSizesPhase({
                       <span className="text-sky-700">❄ {Math.round(frozenG)}g frozen</span>
                     )}
                     <span className="text-muted-foreground font-normal ml-1">
-                      · made {new Date(stock.oldestMadeAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      · made {new Date(stock.oldestMadeAt).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
                     </span>
                     {remaining !== null && (
                       <span className={`ml-1 font-normal ${expired ? "text-status-alert" : remaining <= 1 ? "text-status-warn" : "text-muted-foreground"}`}>
@@ -1089,7 +1091,7 @@ function BatchSizesPhase({
                       )}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      Made {new Date(stock.oldestMadeAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      Made {new Date(stock.oldestMadeAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
                       {remaining !== null && (
                         <span className={`ml-1 ${expired ? "text-status-alert font-medium" : remaining <= 1 ? "text-status-warn" : ""}`}>
                           · {expired ? "Expired — consider making fresh" : `${remaining} wk${remaining !== 1 ? "s" : ""} left`}

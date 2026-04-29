@@ -17,6 +17,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import { resolveUnitPrice } from "@/lib/pricing";
+import { planStepDoneById } from "@/lib/production";
 import { ProductPicker } from "@/components/product-picker";
 import {
   ORDER_CHANNELS, ORDER_CHANNEL_LABELS,
@@ -92,14 +93,14 @@ export default function OrdersPage() {
       set.add(s.stepKey);
       doneKeysByPlan.set(s.planId, set);
     }
-    const stepDoneForPlan = (planId: string, stepId: string): boolean => {
-      const done = doneKeysByPlan.get(planId);
-      if (!done) return false;
-      for (const k of done) {
-        if (k === stepId || k.startsWith(`${stepId}-`)) return true;
-      }
-      return false;
-    };
+    // Single source of truth for "step done?" — maps the step row's
+    // free-text name down to the wizard's canonical phase key, then
+    // prefix-matches against done keys. Comparing the bare stepId
+    // (UUID) against keys like "polishing-<ppId>" never matched, so
+    // the orders list previously kept reporting steps as pending even
+    // after the operator ticked them on /production.
+    const stepDoneForPlan = (planId: string, stepId: string): boolean =>
+      planStepDoneById(stepId, planId, stepById, doneKeysByPlan);
 
     const result = new Map<string, { label: string; when: string } | null>();
     for (const order of orders) {
@@ -149,7 +150,7 @@ export default function OrdersPage() {
       })();
       const dDate = new Date(best.date + "T00:00:00");
       const diffDays = Math.round((dDate.getTime() - new Date(todayIso + "T00:00:00").getTime()) / 86_400_000);
-      const dateLabel = dDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+      const dateLabel = dDate.toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" });
       const when =
         diffDays < 0 ? `overdue — was ${dateLabel}` :
         diffDays === 0 ? "today" :
@@ -179,7 +180,14 @@ export default function OrdersPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return orders.filter((o) => {
-      if (filterStatus !== "all" && o.status !== filterStatus) return false;
+      // Hide done + cancelled orders by default — they clutter the
+      // active list. Only show them when the user explicitly picks
+      // "All" or the matching status filter.
+      if (filterStatus === "all") {
+        if (o.status === "done" || o.status === "cancelled") return false;
+      } else if (o.status !== filterStatus) {
+        return false;
+      }
       if (!q) return true;
       const name = `${o.customerName ?? ""} ${o.eventName ?? ""}`.toLowerCase();
       return name.includes(q);
@@ -248,9 +256,34 @@ export default function OrdersPage() {
           <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-sm">
             {orders.length === 0 ? "No orders yet." : "No orders match the filters."}
           </p>
-        ) : (
-          <ul className="space-y-2">
-            {filtered.map((order) => {
+        ) : (() => {
+          // Section orders by channel so online / b2b / event / shop
+          // each read as their own block. Within each, sorted by
+          // deadline ascending.
+          const byChannel = new Map<OrderChannel, typeof filtered>();
+          for (const o of filtered) {
+            const arr = byChannel.get(o.channel) ?? [];
+            arr.push(o);
+            byChannel.set(o.channel, arr);
+          }
+          const sections = ORDER_CHANNELS
+            .filter((c) => byChannel.has(c))
+            .map((c) => ({
+              channel: c,
+              orders: byChannel.get(c)!.sort((a, b) =>
+                a.deadline.localeCompare(b.deadline),
+              ),
+            }));
+          return sections.map(({ channel, orders: chOrders }) => (
+            <section key={channel} className="space-y-2 mb-5">
+              <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold flex items-baseline gap-2">
+                {ORDER_CHANNEL_LABELS[channel]}
+                <span className="opacity-60 tabular-nums normal-case font-normal">
+                  · {chOrders.length}
+                </span>
+              </h2>
+              <ul className="space-y-2">
+            {chOrders.map((order) => {
               const items = itemsByOrder.get(order.id!) ?? [];
               const lineCount = items.length;
               const totalQty = items.reduce((s, i) => s + i.quantity, 0);
@@ -335,8 +368,10 @@ export default function OrdersPage() {
                 </li>
               );
             })}
-          </ul>
-        )}
+              </ul>
+            </section>
+          ));
+        })()}
       </div>
     </div>
   );
@@ -513,14 +548,14 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
     // gross scale — the order-item vat pipeline stays as-is.)
     const perPieceUnitPrice = capacity > 0 ? boxPrice / capacity : undefined;
 
-    if (variant.kind === "curated") {
-      const comp = allVariantPackagingProducts
-        .filter((vpp) => vpp.variantPackagingId === pickedSizeId)
-        .sort((a, b) => a.sortOrder - b.sortOrder);
-      if (comp.length === 0) {
-        alert("This curated size has no product composition. Edit the variant first.");
-        return;
-      }
+    // Always pull composition rows if present — works for curated AND
+    // free-pick variants where the user pre-set a default composition.
+    // Free-pick with no composition still falls back to the
+    // single-stamped-line flow so the user can pick chocolates manually.
+    const comp = allVariantPackagingProducts
+      .filter((vpp) => vpp.variantPackagingId === pickedSizeId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    if (comp.length > 0) {
       const newLines: DraftLine[] = comp.map((vpp) => {
         const prod = products.find((p) => p.id === vpp.productId);
         return {
@@ -540,9 +575,15 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
         const trimmed = prev.filter((l) => l.productId || l.variantPackagingId);
         return [...trimmed, ...newLines, makeEmptyLine()];
       });
+    } else if (variant.kind === "curated") {
+      alert(
+        `"${variant.name}" — this size has no product composition yet. Open the variant page and set the chocolates that go in this box, then re-add it.`,
+      );
+      return;
     } else {
-      // free-pick: add a single empty line stamped with the variant so
-      // the user's next product pick is attributed to this size.
+      // free-pick with no composition: add a single empty line stamped
+      // with the variant so the user's next product pick is attributed
+      // to this size.
       const freePickLine: DraftLine = {
         key: newDraftLineKey(),
         productId: "",
@@ -1034,7 +1075,7 @@ function DraftLineRow({
               onPatch({ unitPrice: isNaN(n) || n < 0 ? undefined : n });
             }}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onEnterFromLastField(); } }}
-            placeholder="Unit price"
+            placeholder="Unit price, net"
             className="input"
           />
         </div>
@@ -1200,5 +1241,5 @@ function PartialStockPrompt({ lines, onApply, onCancel }: {
 
 function formatDeadline(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" });
 }

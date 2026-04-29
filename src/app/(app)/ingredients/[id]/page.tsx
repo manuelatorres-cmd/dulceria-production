@@ -10,6 +10,7 @@ import { COMPOSITION_FIELDS, allergenLabel, type Ingredient } from "@/types";
 import { ArrowLeft, Pencil, Layers, Trash2, ChevronDown, X, AlertTriangle, Archive, ArchiveRestore } from "lucide-react";
 import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";
+import { DetailNav } from "@/components/detail-nav";
 import { StockStatusPanel } from "@/components/stock-status-panel";
 import { getNutrientsByMarket, getNutritionPanelTitle, hasNutritionData, formatNutrientValue, percentDailyValue, getMissingMandatoryNutrients, fillDerivedNutrition } from "@/lib/nutrition";
 import { useMarketRegion } from "@/lib/hooks";
@@ -95,10 +96,16 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div>
-      <div className="px-4 pt-6 pb-2">
-        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-3">
+      <div className="px-4 pt-6 pb-2 space-y-2">
+        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
           <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
         </button>
+        <DetailNav
+          items={[...allIngredients].sort((a, b) => a.name.localeCompare(b.name))}
+          currentId={ingredient.id ?? ""}
+          hrefFor={(i) => `/ingredients/${encodeURIComponent(i.id!)}`}
+          labelFor={(i) => i.name}
+        />
       </div>
 
       <div className="px-4 pb-4">
@@ -356,7 +363,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
                               </span>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-muted-foreground">
-                                  {new Date(entry.recordedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                                  {new Date(entry.recordedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
                                 </span>
                                 {pendingRemovePriceEntry === entry.id ? (
                                   <span className="flex items-center gap-1.5 text-xs">

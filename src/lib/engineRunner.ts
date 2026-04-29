@@ -7,7 +7,7 @@
  * Runner is conservative:
  *   - Only writes proposals for products with a positive minimum
  *     (either a row in `locationStockMinimums`, or the legacy
- *     `stockLocationMinimums`, or a non-zero `lowStockThreshold`).
+ *     `stockLocationMinimums`).
  *   - Upserts on (productId, status='pending', locationId) so re-running
  *     doesn't create duplicates.
  *   - Leaves `scheduled` / `dismissed` proposals untouched.

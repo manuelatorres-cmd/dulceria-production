@@ -77,15 +77,41 @@ export function OrderStepPipeline({ orderId, needByDate }: Props) {
   // Take first 8 production steps as the canonical pipeline.
   const canonicalSteps = useMemo(() => steps.slice(0, 8), [steps]);
 
-  // Per-step status across all linked plans.
+  // Map productionStep.name → semantic phase key used inside
+  // planStepStatus rows. Wizard writes keys like "polishing-<ppId>",
+  // "colour-<ppId>-0", etc. We match by phase prefix here.
+  function phaseKeyForStep(name: string): string | null {
+    const n = name.toLowerCase().trim();
+    if (n.includes("polish")) return "polishing";
+    if (n.includes("paint") || n.includes("colour") || n.includes("color")) return "colour";
+    if (n.includes("shell") || n.includes("temper")) return "shell";
+    if (n.includes("filling prep") || n === "prep" || n.startsWith("prep")) return "filling";
+    if (n.includes("fill")) return "fill";
+    if (n.includes("cap")) return "cap";
+    if (n.includes("unmould") || n.includes("unmold")) return "unmould";
+    if (n.includes("pack")) return "packing";
+    return null;
+  }
+
+  // Per-step status across all linked plans. We accept either the
+  // exact phase key ("polishing") or any per-product variant
+  // ("polishing-<ppId>", "color-<ppId>-1") — that way ticks made on
+  // the wizard or on this page's higher-level views all roll up here.
   type StepRollup = "done" | "in-progress" | "pending";
   const stepRollup = useMemo<StepRollup[]>(() => {
     if (linkedPlans.length === 0) return canonicalSteps.map(() => "pending");
     return canonicalSteps.map((step) => {
-      if (!step.id) return "pending";
+      const phaseKey = phaseKeyForStep(step.name ?? "");
+      if (!phaseKey) return "pending";
       let doneCount = 0;
       for (const plan of linkedPlans) {
-        if (plan.id && statusesByPlan.get(plan.id)?.has(step.id)) doneCount++;
+        if (!plan.id) continue;
+        const doneSet = statusesByPlan.get(plan.id);
+        if (!doneSet) continue;
+        const anyMatch = [...doneSet].some(
+          (k) => k === phaseKey || k.startsWith(`${phaseKey}-`),
+        );
+        if (anyMatch) doneCount++;
       }
       if (doneCount === 0) return "pending";
       if (doneCount === linkedPlans.length) return "done";

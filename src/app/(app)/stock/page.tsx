@@ -52,7 +52,7 @@ function batchSellBy(
 function sellByInfo(sellBefore: Date | null): { text: string; cls: string } {
   if (!sellBefore) return { text: "No shelf life set", cls: "text-muted-foreground" };
   const diff = sellBefore.getTime() - Date.now();
-  const fmt = sellBefore.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const fmt = sellBefore.toLocaleDateString("de-AT", { day: "numeric", month: "short" });
   if (diff < 0) return { text: `Sell by ${fmt} — expired`, cls: "text-status-alert" };
   if (diff < 7 * 24 * 60 * 60 * 1000) return { text: `Sell by ${fmt} — soon`, cls: "text-status-warn" };
   return { text: `Sell by ${fmt}`, cls: "text-muted-foreground" };
@@ -80,7 +80,7 @@ type Group = {
   /** Sum of frozen pieces across batches (informational). */
   frozenProducts: number;
   earliestSellBefore: Date | null;
-  isLow: boolean; // totalProducts < product.lowStockThreshold (only when threshold is set)
+  isLow: boolean; // totalProducts < sum of stockLocationMinimums for this product
 };
 
 /** Format a last-counted timestamp in the user's local timezone.
@@ -170,6 +170,17 @@ function ProductStockTab() {
       map.get(`${productId}:${location}`) ?? DEFAULT_LOCATION_MINIMUM;
   }, [locationMinimums]);
 
+  /** Sum of all `minimumUnits` for a product across configured locations.
+   *  Replaces the old `product.lowStockThreshold` for the page-wide
+   *  "low stock" indicator. Zero / no rows → no minimum configured. */
+  const minimumSumByProduct = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const row of locationMinimums) {
+      m.set(row.productId, (m.get(row.productId) ?? 0) + row.minimumUnits);
+    }
+    return m;
+  }, [locationMinimums]);
+
   const distributionByBatch = useMemo(() => {
     const map = new Map<string, Record<StockLocation, number>>();
     for (const row of allStockLocations) {
@@ -253,7 +264,7 @@ function ProductStockTab() {
         const batchMatch = plan.batchNumber?.toLowerCase().includes(q) ||
           plan.name.toLowerCase().includes(q) ||
           (plan.completedAt
-            ? new Date(plan.completedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }).toLowerCase().includes(q)
+            ? new Date(plan.completedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" }).toLowerCase().includes(q)
             : false);
         if (!productMatch && !batchMatch) return false;
       }
@@ -291,21 +302,54 @@ function ProductStockTab() {
         const bT = b.sellBefore?.getTime() ?? Infinity;
         return aT - bT;
       });
-      const t = g.product?.lowStockThreshold;
-      g.isLow = typeof t === "number" && g.totalProducts < t;
+      const t = minimumSumByProduct.get(g.productId);
+      g.isLow = typeof t === "number" && t > 0 && g.totalProducts < t;
+    }
+
+    // Add "ghost" groups for non-archived products that have NO in-stock
+    // batch yet — so the operator can see every product, even when stock
+    // is zero. Skipped when sell-by/freezer/notes filters are active
+    // (those filters only make sense against existing batch data) or
+    // when a search is typed and the product name doesn't match.
+    const ghostsAllowed =
+      !filterSellBy && !filterHasNotes && filterFreezer === "all";
+    if (ghostsAllowed) {
+      for (const p of products) {
+        if (!p.id || p.archived) continue;
+        if (map.has(p.id)) continue;
+        if (q && !p.name.toLowerCase().includes(q)) continue;
+        const t = minimumSumByProduct.get(p.id);
+        map.set(p.id, {
+          productId: p.id,
+          product: p,
+          batches: [],
+          totalProducts: 0,
+          frozenProducts: 0,
+          earliestSellBefore: null,
+          // Out-of-stock product is always low when any minimum is set;
+          // when no minimum is set, still flag as low so the user notices.
+          isLow: typeof t === "number" ? t > 0 : true,
+        });
+      }
     }
 
     const groupsOut = Array.from(map.values());
     const filteredGroups = filterLowOnly ? groupsOut.filter((g) => g.isLow) : groupsOut;
 
     return filteredGroups.sort((a, b) => {
+      // Out-of-stock groups (no batches) sink to the bottom so live stock
+      // stays at the top.
+      const aEmpty = a.batches.length === 0;
+      const bEmpty = b.batches.length === 0;
+      if (aEmpty !== bEmpty) return aEmpty ? 1 : -1;
       // Low-stock groups float to the top so users see what needs producing first
       if (a.isLow !== b.isLow) return a.isLow ? -1 : 1;
       const aT = a.earliestSellBefore?.getTime() ?? Infinity;
       const bT = b.earliestSellBefore?.getTime() ?? Infinity;
-      return aT - bT;
+      if (aT !== bT) return aT - bT;
+      return (a.product?.name ?? "").localeCompare(b.product?.name ?? "");
     });
-  }, [inStockRows, search, filterLowOnly, filterSellBy, filterHasNotes, filterFreezer]);
+  }, [inStockRows, search, filterLowOnly, filterSellBy, filterHasNotes, filterFreezer, products, minimumSumByProduct]);
 
   async function handleSetStatus(pbId: string, status: "low" | "gone" | undefined) {
     await setPlanProductStockStatus(pbId, status);
@@ -374,6 +418,60 @@ function ProductStockTab() {
             </span>
           )}
         </button>
+      </div>
+
+      {/* Quick filters under search — baseline pattern. */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Stock</span>
+          <button
+            onClick={() => setFilterLowOnly((v) => !v)}
+            className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+              filterLowOnly
+                ? "bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)]"
+                : "bg-card text-muted-foreground border border-border hover:bg-muted"
+            }`}
+          >
+            Low only
+          </button>
+          {(["all", "available", "frozen"] as const).map((opt) => {
+            const active = filterFreezer === opt;
+            const label = opt === "all" ? "All" : opt === "available" ? "Available" : "Frozen";
+            return (
+              <button
+                key={opt}
+                onClick={() => setFilterFreezer(opt)}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Sell-by</span>
+          {(["expired", "7d", "30d"] as const).map((opt) => {
+            const label = opt === "expired" ? "Expired" : opt === "7d" ? "≤ 7 days" : "≤ 30 days";
+            const active = filterSellBy === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => setFilterSellBy(active ? "" : opt)}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-[var(--accent-blush-bg)] text-[var(--accent-blush-ink)]"
+                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {showFilters && (
@@ -477,9 +575,8 @@ function ProductStockTab() {
                     </button>
                     {group.product?.name ?? "Unknown product"}
                     {(() => {
-                      const belowThreshold =
-                        group.product?.lowStockThreshold != null &&
-                        group.totalProducts < group.product.lowStockThreshold;
+                      const minSum = minimumSumByProduct.get(group.productId);
+                      const belowThreshold = typeof minSum === "number" && minSum > 0 && group.totalProducts < minSum;
                       const pillCls = belowThreshold
                         ? "border-status-warn-edge bg-status-warn-bg text-status-warn"
                         : "border-border bg-background text-foreground";
@@ -502,14 +599,18 @@ function ProductStockTab() {
                     )}
                   </p>
                   <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                    {group.product?.lowStockThreshold != null && (
-                      <span className={`text-[11px] tabular-nums ${group.totalProducts < group.product.lowStockThreshold ? "text-status-warn" : "text-muted-foreground"}`}>
-                        threshold {group.product.lowStockThreshold}
-                      </span>
-                    )}
+                    {(() => {
+                      const minSum = minimumSumByProduct.get(group.productId);
+                      if (typeof minSum !== "number" || minSum <= 0) return null;
+                      return (
+                        <span className={`text-[11px] tabular-nums ${group.totalProducts < minSum ? "text-status-warn" : "text-muted-foreground"}`}>
+                          min {minSum}
+                        </span>
+                      );
+                    })()}
                     {group.product?.stockCountedAt && (
                       <span className="text-[11px] text-muted-foreground">
-                        {group.product?.lowStockThreshold != null ? "· " : ""}Last count {formatCountedAt(group.product.stockCountedAt)}
+                        {minimumSumByProduct.get(group.productId) ? "· " : ""}Last count {formatCountedAt(group.product.stockCountedAt)}
                       </span>
                     )}
                   </div>
@@ -659,7 +760,7 @@ function ProductStockTab() {
             {expandedProductIds.has(group.productId) && group.batches.map(({ pb, plan, productCount, frozenCount, originalCount, sellBefore }, i) => {
               const { text: sellByText, cls: sellByCls } = sellByInfo(sellBefore);
               const completedDate = plan.completedAt
-                ? new Date(plan.completedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                ? new Date(plan.completedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })
                 : null;
               const isLast = i === group.batches.length - 1;
               const availableCount = productCount ?? 0;
@@ -740,7 +841,7 @@ function ProductStockTab() {
                           )}
                           {pb.frozenAt && (
                             <span className="text-[10px] text-muted-foreground">
-                              · frozen since {new Date(pb.frozenAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                              · frozen since {new Date(pb.frozenAt).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
                             </span>
                           )}
                         </div>
@@ -1130,7 +1231,7 @@ function FillingStockTab() {
 
             {/* Stock entries */}
             {group.entries.map((entry, i) => {
-              const madeDate = new Date(entry.madeAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+              const madeDate = new Date(entry.madeAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" });
               const isLast = i === group.entries.length - 1;
 
               // Freshness based on filling shelf life. Frozen entries pause

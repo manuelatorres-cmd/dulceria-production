@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import {
   useOrders, useAllOrderItems, useProductsList, useMouldsList,
@@ -22,6 +23,7 @@ const WINDOW_OPTIONS = [
 ] as const;
 
 export default function FillingConsolidationPage() {
+  const router = useRouter();
   const orders = useOrders();
   const orderItems = useAllOrderItems();
   const products = useProductsList(true);
@@ -82,9 +84,9 @@ export default function FillingConsolidationPage() {
       />
 
       <div className="px-4 pb-8 space-y-5">
-        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to plan
-        </Link>
+        <button onClick={() => router.back()} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-3.5 h-3.5" /> Back
+        </button>
 
         {/* Window selector + summary */}
         <section className="rounded-sm border border-border bg-card p-4 space-y-3">
@@ -172,8 +174,8 @@ export default function FillingConsolidationPage() {
             <ul className="space-y-2">
               {result.needs.map((need) => {
                 const isOpen = expanded.has(need.fillingId);
-                const cookBy = need.cookByDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-                const deadline = need.earliestDeadline.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+                const cookBy = need.cookByDate.toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" });
+                const deadline = need.earliestDeadline.toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" });
                 const daysToCook = Math.round((need.cookByDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
                 const cookCls = daysToCook <= 0
                   ? "text-status-alert"
@@ -277,7 +279,7 @@ export default function FillingConsolidationPage() {
                                     <span className="text-muted-foreground"> · {u.productName}</span>
                                   </p>
                                   <p className="text-[10px] text-muted-foreground">
-                                    due {u.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                                    due {u.deadline.toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
                                   </p>
                                 </div>
                                 <span className="tabular-nums text-muted-foreground shrink-0">{formatGrams(u.weightG)}</span>

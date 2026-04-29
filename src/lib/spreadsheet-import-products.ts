@@ -22,7 +22,6 @@ export const PRODUCT_TEMPLATE_COLUMNS = [
   "defaultMould",       // mould name — resolved to defaultMouldId
   "defaultBatchQty",
   "shelfLifeWeeks",
-  "lowStockThreshold",
   "vegan",
   "popularity",         // 1–5
   "tags",               // pipe-separated
@@ -211,7 +210,6 @@ export function buildProductImportConfig(lookups: ProductImportLookups): ImportC
       defaultMouldId,
       defaultBatchQty: toNumOpt(row.defaultBatchQty),
       shelfLifeWeeks: toStrOpt(row.shelfLifeWeeks),
-      lowStockThreshold: toNumOpt(row.lowStockThreshold),
       vegan: toBoolOpt(row.vegan),
       popularity: toNumOpt(row.popularity),
       tags: toList(row.tags).length > 0 ? toList(row.tags) : undefined,

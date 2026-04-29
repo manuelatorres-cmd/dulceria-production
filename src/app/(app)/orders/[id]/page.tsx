@@ -1,12 +1,14 @@
 "use client";
 
-import { use, useState, useMemo, useRef } from "react";
+import { use, useState, useMemo, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   useOrder, useOrderItems, useProductsList, saveOrder, deleteOrder,
   saveOrderItem, deleteOrderItem, useCustomers, useCustomer, saveCustomer,
+  useVariants, useVariantPackagings, useVariantPackagingProducts,
+  useOrderVariantLines, addVariantToOrder, removeVariantFromOrder,
   usePackagingList, useOrderPackagingLines, saveOrderPackagingLine, deleteOrderPackagingLine,
   useProductActiveMinutesMap, useCapacityConfig,
   usePeople, usePersonUnavailability, useBlockedDays,
@@ -20,6 +22,7 @@ import {
   type ReassignmentProposal,
 } from "@/lib/hooks";
 import { batchPhaseProgress } from "@/lib/batch-progress";
+import { planStepDoneById } from "@/lib/production";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import { latestPackagingUnitCost } from "@/lib/variantPricing";
@@ -59,6 +62,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const order = useOrder(orderId);
   const items = useOrderItems(orderId);
+  const variantLines = useOrderVariantLines(orderId);
+  const allVariants = useVariants();
   const products = useProductsList(true);
   const packaging = usePackagingList(true);
   const replenishmentOrder = useReplenishmentOrderFor(orderId);
@@ -344,8 +349,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   });
   const productsSubtotalNet = productLineTotals.reduce((s, l) => s + l.net, 0);
   const packagingSubtotalNet = packagingLineTotals.reduce((s, l) => s + l.net, 0);
-  const totalNet = productsSubtotalNet + packagingSubtotalNet;
-  const vatBreakdown = aggregateVatByRate([...productLineTotals, ...packagingLineTotals]);
+  // Variant lines (migration 0068) carry the customer-facing price.
+  // The unitPrice is GROSS (what customer pays); split to net using
+  // the app default VAT rate. Future enhancement: per-variant VAT.
+  const variantLineTotals = variantLines.map((vl) => {
+    const rate = effectiveVatRate(undefined, undefined);
+    const gross = vl.unitPrice * vl.quantity;
+    const net = gross / (1 + rate / 100);
+    return { net, rate };
+  });
+  const variantsSubtotalNet = variantLineTotals.reduce((s, l) => s + l.net, 0);
+  const totalNet = productsSubtotalNet + packagingSubtotalNet + variantsSubtotalNet;
+  const vatBreakdown = aggregateVatByRate([...productLineTotals, ...packagingLineTotals, ...variantLineTotals]);
   const totalVat = vatBreakdown.reduce((s, b) => s + b.vat, 0);
   const totalGross = Math.round((totalNet + totalVat) * 100) / 100;
   const marginResult = computeOrderMargin(totalNet, calculatedCost.totalCost);
@@ -383,14 +398,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       const sb = stepById.get(b)?.sortOrder ?? 0;
       return sa - sb;
     });
-    const doneSet = doneKeysByPlan.get(li.planId) ?? new Set<string>();
     // Minutes split evenly across the steps for display only.
     const perStepMin = orderedSteps.length > 0
       ? Math.max(1, Math.round(li.plannedMinutes / orderedSteps.length))
       : 0;
     for (const stepId of orderedSteps) {
       const step = stepById.get(stepId);
-      const done = [...doneSet].some((k) => k === stepId || k.startsWith(`${stepId}-`));
+      // Phase-key prefix match — bare stepId UUID lookups never match
+      // the wizard's `polishing-<ppId>` style keys.
+      const done = planStepDoneById(stepId, li.planId, stepById, doneKeysByPlan);
       orderScheduleRows.push({
         id: `${li.id ?? li.planId}-${stepId}`,
         date,
@@ -415,9 +431,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <div>
       <div className="px-4 pt-6 pb-2">
-        <Link href="/orders" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="w-4 h-4" /> Orders
-        </Link>
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
       </div>
 
       <div className="px-4 pb-8 space-y-6">
@@ -431,9 +450,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {ORDER_CHANNEL_LABELS[order.channel]}
               {order.eventName && order.customerName && ` · ${order.eventName}`}
               {" · "}
-              Deadline {deadlineDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              Deadline {deadlineDate.toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
               {" "}
-              {deadlineDate.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+              {deadlineDate.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })}
               {order.isApproxDeadline ? (
                 <span
                   className="ml-2 text-[9.5px] uppercase border border-[color:var(--color-status-warn-edge)] bg-[color:var(--color-status-warn-bg)] text-[color:var(--color-status-warn)] px-1.5 py-0.5 align-middle"
@@ -497,6 +516,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             nothing is scheduled yet. */}
         <OrderStepPipeline orderId={orderId} needByDate={order.deadline} />
 
+        {/* Open the daily-style scoped production view for this order. */}
+        {orderPlanLinks.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/orders/${encodeURIComponent(orderId)}/production`}
+              className="inline-flex items-center gap-2 rounded-[14px] bg-foreground text-background px-4 py-2.5 text-sm font-medium hover:opacity-90"
+            >
+              <Calendar className="w-4 h-4" /> Production schedule →
+            </Link>
+            <Link
+              href={`/plan?focus=order:${encodeURIComponent(orderId)}`}
+              className="inline-flex items-center gap-2 rounded-[14px] bg-[#f6c6cb] text-[#6e2b32] px-4 py-2.5 text-sm font-medium hover:bg-[#f0b3ba]"
+            >
+              Plan this in /plan →
+            </Link>
+          </div>
+        )}
+
         {/* Replenishment / borrow linkage banners */}
         {parentOrder && (
           <Link
@@ -519,7 +556,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <Package className="w-4 h-4 text-status-ok" />
             <span className="flex-1">
               Linked replenishment order (deadline{" "}
-              {new Date(replenishmentOrder.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })})
+              {new Date(replenishmentOrder.deadline).toLocaleDateString("de-AT", { day: "numeric", month: "short" })})
               {" · "}{replenishmentOrder.status}
             </span>
             <span className="text-xs text-muted-foreground">View →</span>
@@ -639,6 +676,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {/* Line items — "Add product" lives on the LEFT of the header
             to match the new-order flow; the old right-side placement
             hid below longer headers on narrow screens. */}
+        {/* Variant lines — what the customer pays for. Each row spawns
+            derived production-demand orderItems behind the scenes. */}
+        <VariantLinesSection
+          orderId={orderId}
+          variantLines={variantLines}
+          allVariants={allVariants}
+        />
+
         <section>
           <div className="flex items-center gap-3 mb-2">
             {!addingLine && (
@@ -724,12 +769,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             and deducts this order's packaging. */}
         <OrderReadyToPackSection orderId={orderId} />
 
-        {/* Inline production schedule */}
-        <OrderScheduleSection
-          scheduleByDay={scheduleByDay}
-          productNameById={productMap}
-          hasAnySchedule={orderScheduleRows.length > 0}
-        />
+        {/* Production schedule moved to /orders/[id]/production — a daily-style
+            scoped view. Linked from the Production schedule button up top. */}
 
         {/* Replace + Delete */}
         <section className="pt-4 border-t border-border flex items-center gap-5">
@@ -1704,7 +1745,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
               });
               const stepLabel = ordered.map((sid) => stepById.get(sid)?.name ?? sid).join("/");
               const dateLabel = new Date(x.date + "T12:00:00")
-                .toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                .toLocaleDateString("de-AT", { day: "numeric", month: "short" });
               return `${stepLabel} on ${dateLabel}`;
             });
             return (
@@ -2575,7 +2616,7 @@ function OrderScheduleSection({
               <div key={day} className="rounded-sm border border-border bg-card p-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium">
-                    {new Date(day + "T12:00:00").toLocaleDateString("en-GB", {
+                    {new Date(day + "T12:00:00").toLocaleDateString("de-AT", {
                       weekday: "short", day: "numeric", month: "short",
                     })}
                   </p>
@@ -2874,6 +2915,238 @@ function ReplaceAndCreditModal({
             {busy ? "…" : "Create replacement"}
           </button>
         </footer>
+      </div>
+    </div>
+  );
+}
+
+// ─── Variant lines (migration 0068) ──────────────────────────────────
+
+function VariantLinesSection({
+  orderId, variantLines, allVariants,
+}: {
+  orderId: string;
+  variantLines: import("@/types").OrderVariantLine[];
+  allVariants: ReturnType<typeof useVariants>;
+}) {
+  const [adding, setAdding] = useState(false);
+  return (
+    <section className="mb-3">
+      <div className="flex items-center gap-3 mb-2">
+        {!adding && (
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add variant (gift box)
+          </button>
+        )}
+        <h2 className="text-sm font-semibold text-primary">
+          Variants ({variantLines.length})
+        </h2>
+      </div>
+      {adding && (
+        <AddVariantForm
+          orderId={orderId}
+          allVariants={allVariants}
+          onDone={() => setAdding(false)}
+        />
+      )}
+      {variantLines.length > 0 && (
+        <ul className="rounded-sm border border-border bg-card divide-y divide-border">
+          {variantLines.map((line) => (
+            <VariantLineRow key={line.id} line={line} allVariants={allVariants} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function VariantLineRow({
+  line, allVariants,
+}: {
+  line: import("@/types").OrderVariantLine;
+  allVariants: ReturnType<typeof useVariants>;
+}) {
+  const variant = allVariants.find((v) => v.id === line.variantId);
+  const vps = useVariantPackagings(line.variantId);
+  const vp = vps.find((p) => p.id === line.variantPackagingId);
+  const composition = useVariantPackagingProducts(line.variantPackagingId ?? "");
+  const total = line.quantity * line.unitPrice;
+  const [pendingRemove, setPendingRemove] = useState(false);
+  return (
+    <li className="px-3 py-2.5">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">
+            {line.quantity} × {variant?.name ?? "Variant"}
+            {vp && (
+              <span className="ml-1.5 text-[11px] text-muted-foreground font-normal">
+                · size {vp.id?.slice(0, 4)}
+              </span>
+            )}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            @ €{line.unitPrice.toFixed(2)} = €{total.toFixed(2)}
+          </p>
+        </div>
+        {pendingRemove ? (
+          <span className="flex items-center gap-2 text-[11px]">
+            <span className="text-muted-foreground">Remove?</span>
+            <button
+              onClick={async () => { await removeVariantFromOrder(line.id!); setPendingRemove(false); }}
+              className="text-destructive font-medium hover:underline"
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => setPendingRemove(false)}
+              className="text-muted-foreground hover:underline"
+            >
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button
+            onClick={() => setPendingRemove(true)}
+            className="text-[11px] text-muted-foreground hover:text-destructive"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      {composition.length > 0 && (
+        <p className="text-[10.5px] text-muted-foreground mt-1">
+          ↳ {composition.length} product{composition.length === 1 ? "" : "s"} auto-added to production
+        </p>
+      )}
+    </li>
+  );
+}
+
+function AddVariantForm({
+  orderId, allVariants, onDone,
+}: {
+  orderId: string;
+  allVariants: ReturnType<typeof useVariants>;
+  onDone: () => void;
+}) {
+  const [variantId, setVariantId] = useState("");
+  const [vpId, setVpId] = useState("");
+  const [qty, setQty] = useState("1");
+  const [price, setPrice] = useState("");
+  const [saving, setSaving] = useState(false);
+  const vps = useVariantPackagings(variantId);
+  const composition = useVariantPackagingProducts(vpId);
+  // Auto-fill price from chosen variantPackaging.
+  useEffect(() => {
+    const vp = vps.find((p) => p.id === vpId);
+    if (vp) setPrice(String(vp.price ?? vp.sellPrice ?? ""));
+  }, [vpId, vps]);
+
+  async function handleAdd() {
+    if (!variantId) { alert("Pick a variant first."); return; }
+    const q = parseInt(qty, 10);
+    const p = parseFloat(price);
+    if (!Number.isFinite(q) || q <= 0) { alert("Qty must be > 0."); return; }
+    if (!Number.isFinite(p) || p < 0) { alert("Price required."); return; }
+    if (composition.length === 0 && vpId) {
+      if (!confirm("This variant size has no curated composition. Add anyway? No products will be auto-added.")) return;
+    }
+    setSaving(true);
+    try {
+      await addVariantToOrder({
+        orderId,
+        variantId,
+        variantPackagingId: vpId || null,
+        quantity: q,
+        unitPrice: p,
+        composition: composition.map((c) => ({ productId: c.productId, qty: c.qty })),
+      });
+      onDone();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-sm border border-border bg-card p-3 mb-2 space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="label">Variant</label>
+          <select
+            value={variantId}
+            onChange={(e) => { setVariantId(e.target.value); setVpId(""); }}
+            className="input"
+          >
+            <option value="">— pick one —</option>
+            {allVariants.map((v) => (
+              <option key={v.id} value={v.id}>{v.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">Size</label>
+          <select
+            value={vpId}
+            onChange={(e) => setVpId(e.target.value)}
+            disabled={!variantId}
+            className="input"
+          >
+            <option value="">— pick a size —</option>
+            {vps.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.packagingId ? `Packaging #${p.id?.slice(0, 4)}` : "Loose / no packaging"} · €{Number(p.price ?? p.sellPrice ?? 0).toFixed(2)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Quantity</label>
+          <input
+            type="number"
+            min="1"
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="label">Unit price, net (€)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="input"
+          />
+        </div>
+      </div>
+      {composition.length > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          Will auto-add {composition.length} product line{composition.length === 1 ? "" : "s"} to production demand.
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          onClick={handleAdd}
+          disabled={saving}
+          className="rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+        >
+          {saving ? "Adding…" : "Add variant"}
+        </button>
+        <button
+          onClick={onDone}
+          className="rounded-sm border border-border px-3 py-1.5 text-xs"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );

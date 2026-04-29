@@ -61,6 +61,7 @@ export default function MouldsPage() {
     showFilters: false,
     showArchived: false,
     filterBrands: [] as string[],
+    filterTags: [] as string[],
     filterCavityWeight: "" as string,
     filterCavityCount: "" as string,
     filterOwned: "" as string,
@@ -72,10 +73,17 @@ export default function MouldsPage() {
   useNShortcut(() => setShowAdd(true), showAdd);
 
   const filterBrandsSet = useMemo(() => new Set(f.filterBrands), [f.filterBrands]);
+  const filterTagsSet = useMemo(() => new Set(f.filterTags), [f.filterTags]);
 
   const allBrands = useMemo(() => {
     const set = new Set<string>();
     for (const m of moulds) if (m.brand) set.add(m.brand);
+    return Array.from(set).sort();
+  }, [moulds]);
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of moulds) for (const t of m.tags ?? []) set.add(t);
     return Array.from(set).sort();
   }, [moulds]);
 
@@ -86,6 +94,7 @@ export default function MouldsPage() {
 
   const activeFilterCount =
     (filterBrandsSet.size > 0 ? 1 : 0) +
+    (filterTagsSet.size > 0 ? 1 : 0) +
     (f.filterCavityWeight ? 1 : 0) +
     (f.filterCavityCount ? 1 : 0) +
     (f.filterOwned ? 1 : 0) +
@@ -93,6 +102,7 @@ export default function MouldsPage() {
 
   function clearFilters() {
     setF("filterBrands", []);
+    setF("filterTags", []);
     setF("filterCavityWeight", "");
     setF("filterCavityCount", "");
     setF("filterOwned", "");
@@ -105,16 +115,28 @@ export default function MouldsPage() {
     setF("filterBrands", Array.from(next));
   }
 
+  function toggleFilterTag(tag: string) {
+    const next = new Set(filterTagsSet);
+    if (next.has(tag)) next.delete(tag); else next.add(tag);
+    setF("filterTags", Array.from(next));
+  }
+
   const filtered = useMemo(() => {
     return moulds.filter((m) => {
       if (f.search && !m.name.toLowerCase().includes(f.search.toLowerCase()) && !(m.brand ?? "").toLowerCase().includes(f.search.toLowerCase())) return false;
       if (filterBrandsSet.size > 0 && !filterBrandsSet.has(m.brand ?? "")) return false;
+      if (filterTagsSet.size > 0) {
+        const tags = new Set(m.tags ?? []);
+        let any = false;
+        for (const t of filterTagsSet) if (tags.has(t)) { any = true; break; }
+        if (!any) return false;
+      }
       if (f.filterCavityWeight && !matchesCavityWeight(m.cavityWeightG, f.filterCavityWeight)) return false;
       if (f.filterCavityCount && !matchesCavityCount(m.numberOfCavities, f.filterCavityCount)) return false;
       if (f.filterOwned && !matchesOwned(m.quantityOwned, f.filterOwned)) return false;
       return true;
     });
-  }, [moulds, f.search, filterBrandsSet, f.filterCavityWeight, f.filterCavityCount, f.filterOwned]);
+  }, [moulds, f.search, filterBrandsSet, filterTagsSet, f.filterCavityWeight, f.filterCavityCount, f.filterOwned]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -144,6 +166,74 @@ export default function MouldsPage() {
           onToggleFilters={() => setF("showFilters", !f.showFilters)}
           activeFilterCount={activeFilterCount}
         />
+
+        {/* Quick filters under search — baseline pattern. */}
+        {allTags.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+            <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Tag</span>
+            {allTags.map((t) => {
+              const active = filterTagsSet.has(t);
+              return (
+                <button
+                  key={t}
+                  onClick={() => toggleFilterTag(t)}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    active
+                      ? "bg-[var(--accent-lilac-bg)] text-[var(--accent-lilac-ink)]"
+                      : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                  }`}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {(brandOptions.length > 0) && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Brand</span>
+            {brandOptions.length > 8 ? (
+              <>
+                <select
+                  value=""
+                  onChange={(e) => { if (e.target.value) toggleFilterBrand(e.target.value); }}
+                  className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs"
+                >
+                  <option value="">Add brand…</option>
+                  {brandOptions.filter((b) => !filterBrandsSet.has(b.value)).map((b) => (
+                    <option key={b.value} value={b.value}>{b.label}</option>
+                  ))}
+                </select>
+                {[...filterBrandsSet].map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => toggleFilterBrand(b)}
+                    className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-accent text-accent-foreground"
+                  >
+                    {b} ×
+                  </button>
+                ))}
+              </>
+            ) : (
+              brandOptions.map((b) => {
+                const active = filterBrandsSet.has(b.value);
+                return (
+                  <button
+                    key={b.value}
+                    onClick={() => toggleFilterBrand(b.value)}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    }`}
+                  >
+                    {b.label}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
 
         {f.showFilters && (
           <FilterPanel activeFilterCount={activeFilterCount} onClearAll={clearFilters}>

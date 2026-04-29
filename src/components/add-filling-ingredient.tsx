@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, type SyntheticEvent } from "react";
-import { useIngredients, saveFillingIngredient, saveIngredient } from "@/lib/hooks";
+import { useState, useEffect, useRef, useMemo, type SyntheticEvent } from "react";
+import { useIngredients, useFillings, saveFillingIngredient, saveIngredient } from "@/lib/hooks";
 import { Plus } from "lucide-react";
 
 interface AddFillingIngredientProps {
@@ -9,29 +9,48 @@ interface AddFillingIngredientProps {
   onAdded: () => void;
 }
 
+type ComponentKind = "ingredient" | "filling";
+
 export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredientProps) {
   const ingredients = useIngredients();
+  const fillings = useFillings();
   const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<ComponentKind>("ingredient");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | "">("");
   const [amount, setAmount] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const listRef = useRef<HTMLUListElement>(null);
 
+  // Sub-filling catalogue — exclude the current filling so it can't
+  // include itself (DB also blocks direct self-reference; deep cycles
+  // would still slip past without app-side detection, which is a
+  // future hardening step).
+  const sourceList = useMemo(() => {
+    if (kind === "ingredient") return ingredients;
+    return fillings.filter((f) => f.id !== fillingId);
+  }, [kind, ingredients, fillings, fillingId]);
+
   const filtered = (search
-    ? ingredients.filter(
-        (i) =>
-          i.name.toLowerCase().includes(search.toLowerCase()) ||
-          i.manufacturer.toLowerCase().includes(search.toLowerCase())
-      )
-    : ingredients
+    ? sourceList.filter((i) => {
+        const q = search.toLowerCase();
+        if (kind === "ingredient") {
+          const ing = i as typeof ingredients[number];
+          return ing.name.toLowerCase().includes(q) ||
+            (ing.manufacturer?.toLowerCase().includes(q) ?? false);
+        }
+        return (i as typeof fillings[number]).name.toLowerCase().includes(q);
+      })
+    : sourceList
   ).slice(0, 10);
 
   const trimmedSearch = search.trim();
   const exactMatch = trimmedSearch
-    ? ingredients.some((i) => i.name.toLowerCase() === trimmedSearch.toLowerCase())
+    ? sourceList.some((i) => i.name.toLowerCase() === trimmedSearch.toLowerCase())
     : false;
-  const showCreateOption = !!trimmedSearch && !selectedId && !exactMatch;
+  // Inline "create new" only applies to ingredients — creating a new
+  // filling from here is out-of-scope (would require more fields).
+  const showCreateOption = kind === "ingredient" && !!trimmedSearch && !selectedId && !exactMatch;
 
   // Total navigable items = filtered results + optional create row
   const totalItems = filtered.length + (showCreateOption ? 1 : 0);
@@ -57,6 +76,12 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
   function selectIngredient(ing: (typeof ingredients)[0]) {
     setSelectedId(ing.id!);
     setSearch(ing.manufacturer ? `${ing.name} (${ing.manufacturer})` : ing.name);
+    setHighlightedIndex(-1);
+  }
+
+  function selectFilling(f: (typeof fillings)[0]) {
+    setSelectedId(f.id!);
+    setSearch(f.name);
     setHighlightedIndex(-1);
   }
 
@@ -97,7 +122,8 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
       if (highlightedIndex >= 0) {
         e.preventDefault();
         if (highlightedIndex < filtered.length) {
-          selectIngredient(filtered[highlightedIndex]);
+          if (kind === "ingredient") selectIngredient(filtered[highlightedIndex] as (typeof ingredients)[0]);
+          else selectFilling(filtered[highlightedIndex] as (typeof fillings)[0]);
         } else {
           handleCreateNew();
         }
@@ -121,7 +147,8 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
     if (!selectedId || !amount) return;
     await saveFillingIngredient({
       fillingId,
-      ingredientId: selectedId as string,
+      ingredientId: kind === "ingredient" ? (selectedId as string) : null,
+      componentFillingId: kind === "filling" ? (selectedId as string) : null,
       amount: parseFloat(amount) || 0,
       unit: "g",
     });
@@ -145,7 +172,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
         onClick={() => setOpen(true)}
         className="flex items-center gap-1 text-xs text-primary font-medium mt-1"
       >
-        <Plus className="w-3.5 h-3.5" /> Add ingredient
+        <Plus className="w-3.5 h-3.5" /> Add component
         <kbd className="ml-1 rounded border border-border bg-muted px-1 py-0.5 font-sans text-muted-foreground" style={{fontSize: "0.65rem"}}>n</kbd>
       </button>
     );
@@ -153,31 +180,59 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
 
   return (
     <form onSubmit={handleAdd} className="mt-2 p-2 rounded-md border border-border bg-muted/50 space-y-2">
+      {/* Kind toggle — ingredient OR an existing filling used as a
+          sub-component. Flipping resets the current selection so the
+          search behaves sensibly for the new source. */}
+      <div className="flex items-center gap-1">
+        {(["ingredient", "filling"] as ComponentKind[]).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => {
+              if (kind !== k) {
+                setKind(k);
+                setSearch("");
+                setSelectedId("");
+                setHighlightedIndex(-1);
+              }
+            }}
+            className={`rounded-full px-3 py-0.5 text-xs font-medium transition-colors ${
+              kind === k
+                ? "bg-accent text-accent-foreground"
+                : "bg-card text-muted-foreground border border-border hover:bg-muted"
+            }`}
+          >
+            {k === "ingredient" ? "Ingredient" : "Another filling"}
+          </button>
+        ))}
+      </div>
       <div>
         <input
           type="text"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setSelectedId(""); }}
           onKeyDown={handleSearchKeyDown}
-          placeholder="Search ingredient…"
-          aria-label="Search ingredient"
+          placeholder={kind === "ingredient" ? "Search ingredient…" : "Search existing filling…"}
+          aria-label="Search component"
           autoFocus
           className="input"
         />
         {trimmedSearch && !selectedId && (filtered.length > 0 || showCreateOption) && (
           <ul ref={listRef} className="mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-card">
-            {filtered.map((ing, idx) => (
-              <li key={ing.id}>
+            {filtered.map((item, idx) => (
+              <li key={item.id}>
                 <button
                   type="button"
-                  onClick={() => selectIngredient(ing)}
+                  onClick={() => kind === "ingredient"
+                    ? selectIngredient(item as (typeof ingredients)[0])
+                    : selectFilling(item as (typeof fillings)[0])}
                   className={`w-full text-left px-2 py-1.5 text-sm transition-colors ${
                     idx === highlightedIndex ? "bg-primary/10 text-primary" : "hover:bg-muted"
                   }`}
                 >
-                  {ing.name}
-                  {ing.manufacturer && (
-                    <span className="text-muted-foreground"> ({ing.manufacturer})</span>
+                  {item.name}
+                  {kind === "ingredient" && (item as (typeof ingredients)[0]).manufacturer && (
+                    <span className="text-muted-foreground"> ({(item as (typeof ingredients)[0]).manufacturer})</span>
                   )}
                 </button>
               </li>

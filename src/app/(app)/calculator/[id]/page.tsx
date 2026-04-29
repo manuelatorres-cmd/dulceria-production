@@ -280,14 +280,16 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
     if (!cloneFillingId || cloned || sourceFillingIngredients.length === 0) return;
     setCloned(true);
     Promise.all(
-      sourceFillingIngredients.map((li, idx) =>
-        saveExperimentIngredient({
-          experimentId: id,
-          ingredientId: li.ingredientId,
-          amount: li.amount,
-          sortOrder: idx,
-        })
-      )
+      sourceFillingIngredients
+        .filter((li): li is typeof li & { ingredientId: string } => !!li.ingredientId)
+        .map((li, idx) =>
+          saveExperimentIngredient({
+            experimentId: id,
+            ingredientId: li.ingredientId,
+            amount: li.amount,
+            sortOrder: idx,
+          })
+        )
     );
   }, [cloneFillingId, cloned, sourceFillingIngredients, id]);
 

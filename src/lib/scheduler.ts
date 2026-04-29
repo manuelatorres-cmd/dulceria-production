@@ -76,6 +76,10 @@ export interface DailyScheduleInput {
   /** Existing step-status rows used for session locks. Optional —
    *  empty array behaves as "no locks". */
   planStepStatus?: PlanStepStatus[];
+  /** Synthetic deadlines for plans that have NO orderPlanLinks (e.g.
+   *  campaign-driven drafts). Mapped as planId → epoch ms. Merged
+   *  with link-derived deadlines; the earlier of the two wins. */
+  extraDeadlineByPlanId?: Map<string, number>;
 }
 
 export interface ProposedProductionDay {
@@ -179,6 +183,15 @@ export function buildDailySchedule(input: DailyScheduleInput): DailyScheduleResu
     const t = new Date(order.deadline).getTime();
     const cur = planDeadline.get(link.planId);
     if (cur === undefined || t < cur) planDeadline.set(link.planId, t);
+  }
+  // Merge in synthetic deadlines for non-order plans (campaigns).
+  // Earlier deadline wins so a plan that's both linked AND in a
+  // campaign uses whichever comes first.
+  if (input.extraDeadlineByPlanId) {
+    for (const [planId, t] of input.extraDeadlineByPlanId) {
+      const cur = planDeadline.get(planId);
+      if (cur === undefined || t < cur) planDeadline.set(planId, t);
+    }
   }
 
   // Per-batch total pieces (tiebreak on sort).

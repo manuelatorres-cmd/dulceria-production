@@ -116,6 +116,27 @@ export default function PackagingPage() {
           activeFilterCount={activeFilterCount}
         />
 
+        {/* Quick filters under search — baseline pattern. */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Stock</span>
+          {STOCK_OPTIONS.filter((o) => o.value !== "all").map(({ value, label }) => {
+            const active = f.filterStock === value;
+            return (
+              <button
+                key={value}
+                onClick={() => setF("filterStock", active ? "all" : value as StockFilter)}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
         {f.showFilters && (
           <FilterPanel activeFilterCount={activeFilterCount} onClearAll={clearFilters}>
             <FilterChipGroup

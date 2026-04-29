@@ -4,13 +4,16 @@ import { useRef, useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { exportBackup, importBackup, clearAllData } from "@/lib/backup";
 import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry, usePeople, savePerson, deletePerson, archivePerson, usePersonUnavailability, savePersonUnavailability, deletePersonUnavailability, useEquipment, saveEquipment, deleteEquipment, archiveEquipment, useProductionSteps, saveProductionStep, deleteProductionStep, reorderProductionSteps } from "@/lib/hooks";
-import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, EQUIPMENT_KINDS, EQUIPMENT_KIND_LABELS, EQUIPMENT_LOCATIONS, EQUIPMENT_LOCATION_LABELS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability, type Equipment, type EquipmentKind, type ProductionStep } from "@/types";
+import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, EQUIPMENT_KINDS, EQUIPMENT_KIND_LABELS, EQUIPMENT_LOCATIONS, EQUIPMENT_LOCATION_LABELS, PRIMARY_ROLES, ABSENCE_TYPES, ABSENCE_TYPE_LABELS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability, type Equipment, type EquipmentKind, type ProductionStep, type PrimaryRole, type AbsenceType } from "@/types";
 import { capacityConfigStatus, sortWeekdays, collectRoles } from "@/lib/capacity";
 import { equipmentAvailability, equipmentReadiness, EQUIPMENT_AVAILABILITY_LABEL } from "@/lib/equipment";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import { loadDemoData, isDemoDataLoaded } from "@/lib/seed-demo";
 import { isCloudConfigured } from "@/lib/supabase";
-import { Download, AlertTriangle, CheckCircle, FlaskConical, Video, Printer, Pencil, Trash2, Plus, X, Clock, Archive, ArchiveRestore, ChevronDown, ChevronRight } from "lucide-react";
+import { Download, AlertTriangle, CheckCircle, FlaskConical, Video, Printer, Pencil, Trash2, Plus, X, Clock, Archive, ArchiveRestore, ChevronDown, ChevronRight, Copy, GripVertical } from "lucide-react";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { SpreadsheetImport } from "@/components/spreadsheet-import";
 import { ingredientImportConfig, getExistingIngredientKeys } from "@/lib/spreadsheet-import-ingredients";
 import { mouldImportConfig, getExistingMouldKeys } from "@/lib/spreadsheet-import-moulds";
@@ -23,8 +26,35 @@ import type { Ingredient } from "@/types";
 type ImportState = "idle" | "confirm" | "importing" | "done" | "error";
 type Tab = "backup" | "import" | "capacity" | "equipment" | "steps" | "market" | "printing" | "demo";
 
+/** Default skill catalogue — mirrors /settings/skills. Union'd with
+ *  whatever skills already live on any person so new ones added via
+ *  the dedicated skills page still show up in the editor. */
+const DEFAULT_SKILLS = [
+  "tempering",
+  "shelling",
+  "decoration",
+  "filling-cook",
+  "packing",
+  "teaching",
+  "cleaning",
+  "shop-counter",
+];
+
+const PRIMARY_ROLE_LABELS: Record<PrimaryRole, string> = {
+  production: "Production",
+  shop: "Shop",
+  both: "Both",
+  other: "Other",
+};
+
+const CONTRACT_TYPE_LABELS: Record<NonNullable<Person["contractType"]>, string> = {
+  full_time: "Full-time",
+  part_time: "Part-time",
+  contractor: "Contractor",
+};
+
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("backup");
+  const [activeTab, setActiveTab] = useState<Tab>("capacity");
   const [marketDirty, setMarketDirty] = useState(false);
   const marketRegion = useMarketRegion();
   const currency = useCurrency();
@@ -91,20 +121,11 @@ export default function SettingsPage() {
     <div>
       <PageHeader title="Settings" description="Backup, restore, and preferences" />
 
-      {/* Tab strip */}
+      {/* Tab strip — order reflects frequency of use (2026-04-24 per
+          Manuela): capacity/steps/equipment are the daily/weekly knobs,
+          market/printing change rarely, import/backup are maintenance,
+          demo mode is development-only. */}
       <div className="flex border-b border-border px-4 mb-6">
-        <button
-          onClick={() => switchTab("backup")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "backup" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
-        >
-          Backup & Restore
-        </button>
-        <button
-          onClick={() => switchTab("import")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "import" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
-        >
-          Import
-        </button>
         <button
           onClick={() => switchTab("capacity")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "capacity" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
@@ -112,16 +133,16 @@ export default function SettingsPage() {
           Capacity &amp; People
         </button>
         <button
-          onClick={() => switchTab("equipment")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "equipment" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
-        >
-          Equipment
-        </button>
-        <button
           onClick={() => switchTab("steps")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "steps" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
         >
           Production Steps
+        </button>
+        <button
+          onClick={() => switchTab("equipment")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "equipment" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+        >
+          Equipment
         </button>
         <button
           onClick={() => switchTab("market")}
@@ -134,6 +155,18 @@ export default function SettingsPage() {
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "printing" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
         >
           Printing
+        </button>
+        <button
+          onClick={() => switchTab("import")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "import" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+        >
+          Import
+        </button>
+        <button
+          onClick={() => switchTab("backup")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "backup" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+        >
+          Backup & Restore
         </button>
         <button
           onClick={() => switchTab("demo")}
@@ -555,7 +588,12 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
     setExpiryWarnDays(config?.stockExpiryWarnDays != null ? String(config.stockExpiryWarnDays) : "");
     setLabourRate(config?.labourHourlyRate != null ? String(config.labourHourlyRate) : "");
     setSyncedAt(configKey);
-    onDirtyChange(false);
+    // onDirtyChange(false) used to live here but that ran during render
+    // of CapacityTab, which React warns about (setState in render of
+    // parent). The useEffect below already pushes the current isDirty
+    // to the parent whenever it flips — and the post-sync state is
+    // equal-to-config, so isDirty becomes false naturally on the next
+    // commit. No extra call needed.
   }
 
   const isDirty = syncedAt !== null && (
@@ -860,6 +898,12 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
 }) {
   const [pendingRemove, setPendingRemove] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  // Always return to view mode when a card is re-opened.
+  useEffect(() => {
+    if (!expanded) setEditing(false);
+  }, [expanded]);
 
   async function handleArchive(archived: boolean) {
     if (!person.id) return;
@@ -879,6 +923,8 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
     ? sortWeekdays(person.workingDays!).map((d) => WEEKDAY_LABELS[d]).join(", ")
     : "—";
 
+  const missing = missingPersonFields(person);
+
   return (
     <li className={`rounded-sm border bg-card overflow-hidden ${person.archived ? "border-border opacity-70" : "border-border"}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
@@ -889,14 +935,25 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
         >
           {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {person.name}
-              {person.archived && <span className="ml-2 text-xs text-muted-foreground">(archived)</span>}
+            <p className="text-sm font-medium truncate flex items-center gap-2">
+              <span className="truncate">{person.name}</span>
+              {!person.archived && missing.length > 0 && (
+                <span
+                  title={`Missing for calculations: ${missing.join(", ")}`}
+                  className="inline-flex items-center gap-1 rounded-sm bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)] text-[10px] font-medium px-1.5 py-0.5"
+                >
+                  <AlertTriangle className="w-3 h-3" /> {missing.length} missing
+                </span>
+              )}
+              {person.archived && <span className="text-xs text-muted-foreground">(archived)</span>}
             </p>
             <p className="text-xs text-muted-foreground truncate">
               {(person.roles ?? []).join(", ") || "no roles"}
+              {person.primaryRole && person.primaryRole !== "other" && ` · ${PRIMARY_ROLE_LABELS[person.primaryRole]}`}
+              {person.isAdmin && " · admin"}
               {person.defaultHoursPerDay != null && ` · ${person.defaultHoursPerDay}h/day`}
               {` · ${workingDaysLabel}`}
+              {(person.skills ?? []).length > 0 && ` · ${(person.skills ?? []).length} skill${(person.skills ?? []).length === 1 ? "" : "s"}`}
               {unavailability.length > 0 && ` · ${unavailability.length} unavailable period${unavailability.length > 1 ? "s" : ""}`}
             </p>
           </div>
@@ -905,11 +962,37 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
 
       {expanded && (
         <div className="border-t border-border px-3 py-3 space-y-3">
-          <PersonEditor
-            person={person}
-            knownRoles={knownRoles}
-            onSaved={() => { /* stays expanded so you can continue editing */ }}
-          />
+          {editing ? (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Editing</p>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
+              <PersonEditor
+                person={person}
+                knownRoles={knownRoles}
+                onSaved={() => setEditing(false)}
+              />
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Details</p>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1 text-xs hover:border-foreground/30"
+                >
+                  <Pencil className="w-3 h-3" /> Edit
+                </button>
+              </div>
+              <PersonView person={person} />
+            </>
+          )}
 
           <PersonUnavailabilityEditor personId={person.id!} unavailability={unavailability} />
 
@@ -956,6 +1039,52 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
   );
 }
 
+/** Read-only summary of a person, shown on the expanded card before
+ *  the user clicks Edit. Mirrors the fields PersonEditor can set —
+ *  blanks display as "—" so it's obvious what's missing. */
+function PersonView({ person }: { person: Person }) {
+  const windowLabel =
+    person.startTimeOfDay && person.endTimeOfDay
+      ? `${person.startTimeOfDay.slice(0, 5)} – ${person.endTimeOfDay.slice(0, 5)}`
+      : person.defaultHoursPerDay != null
+      ? `${person.defaultHoursPerDay} h / day`
+      : "—";
+  const workingDays = (person.workingDays ?? []).length > 0
+    ? sortWeekdays(person.workingDays!).map((d) => WEEKDAY_LABELS[d]).join(", ")
+    : "—";
+  const skills = (person.skills ?? []).length > 0 ? (person.skills ?? []).join(", ") : "—";
+  const roles = (person.roles ?? []).length > 0 ? (person.roles ?? []).join(", ") : "—";
+  const primaryRole = person.primaryRole ? PRIMARY_ROLE_LABELS[person.primaryRole] : "—";
+  const contract = person.contractType ? CONTRACT_TYPE_LABELS[person.contractType] : "—";
+  const labour = person.hourlyCostEuros != null ? `€${Number(person.hourlyCostEuros).toFixed(2)} / h` : "—";
+  const breakMin = person.breakMinutesPerDay != null ? `${person.breakMinutesPerDay} min` : "—";
+
+  return (
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-sm">
+      <ViewRow label="Working hours" value={windowLabel} />
+      <ViewRow label="Working days" value={workingDays} />
+      <ViewRow label="Break" value={breakMin} />
+      <ViewRow label="Primary role" value={primaryRole} />
+      <ViewRow label="Skills" value={skills} />
+      <ViewRow label="Roles" value={roles} />
+      <ViewRow label="Contract" value={contract} />
+      <ViewRow label="Labour cost" value={labour} />
+      <ViewRow label="Email" value={person.contactEmail || "—"} />
+      <ViewRow label="Phone" value={person.contactPhone || "—"} />
+      <ViewRow label="Admin" value={person.isAdmin ? "Yes" : "No"} />
+    </dl>
+  );
+}
+
+function ViewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt className="text-xs text-muted-foreground uppercase tracking-[0.05em] pt-0.5">{label}</dt>
+      <dd className="text-sm">{value}</dd>
+    </>
+  );
+}
+
 function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
   person?: Person;
   knownRoles: string[];
@@ -970,6 +1099,14 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
   const [startTime, setStartTime] = useState(normaliseTimeInput(person?.startTimeOfDay));
   const [endTime, setEndTime] = useState(normaliseTimeInput(person?.endTimeOfDay));
   const [workingDays, setWorkingDays] = useState<Set<Weekday>>(new Set(person?.workingDays ?? []));
+  const [skills, setSkills] = useState<Set<string>>(new Set(person?.skills ?? []));
+  const [primaryRole, setPrimaryRole] = useState<PrimaryRole | "">((person?.primaryRole as PrimaryRole | undefined) ?? "");
+  const [isAdmin, setIsAdmin] = useState<boolean>(!!person?.isAdmin);
+  const [hourlyCost, setHourlyCost] = useState(person?.hourlyCostEuros != null ? String(person.hourlyCostEuros) : "");
+  const [breakMinutes, setBreakMinutes] = useState(person?.breakMinutesPerDay != null ? String(person.breakMinutesPerDay) : "");
+  const [contactEmail, setContactEmail] = useState(person?.contactEmail ?? "");
+  const [contactPhone, setContactPhone] = useState(person?.contactPhone ?? "");
+  const [contractType, setContractType] = useState<NonNullable<Person["contractType"]> | "">(person?.contractType ?? "");
   const [saving, setSaving] = useState(false);
 
   // Derived preview of the window duration — keeps the user honest
@@ -1019,6 +1156,14 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         startTimeOfDay: startTime || undefined,
         endTimeOfDay: endTime || undefined,
         workingDays: workingDays.size > 0 ? sortWeekdays([...workingDays]) : undefined,
+        skills: skills.size > 0 ? [...skills].sort() : undefined,
+        primaryRole: primaryRole || undefined,
+        isAdmin,
+        hourlyCostEuros: parsePositiveNum(hourlyCost) ?? null,
+        breakMinutesPerDay: parsePositiveNum(breakMinutes) ?? null,
+        contactEmail: contactEmail.trim() || null,
+        contactPhone: contactPhone.trim() || null,
+        contractType: contractType || null,
         archived: person?.archived,
       });
       if (isNew) {
@@ -1028,11 +1173,28 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         setStartTime("");
         setEndTime("");
         setWorkingDays(new Set());
+        setSkills(new Set());
+        setPrimaryRole("");
+        setIsAdmin(false);
+        setHourlyCost("");
+        setBreakMinutes("");
+        setContactEmail("");
+        setContactPhone("");
+        setContractType("");
       }
       onSaved();
     } finally {
       setSaving(false);
     }
+  }
+
+  function toggleSkill(skill: string) {
+    setSkills((prev) => {
+      const next = new Set(prev);
+      if (next.has(skill)) next.delete(skill);
+      else next.add(skill);
+      return next;
+    });
   }
 
   const availableRoleSuggestions = knownRoles.filter(
@@ -1169,6 +1331,149 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         </div>
       </div>
 
+      <div>
+        <label className="label">Break / lunch</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min="0"
+            max="240"
+            step="5"
+            value={breakMinutes}
+            onChange={(e) => setBreakMinutes(e.target.value)}
+            placeholder="e.g. 30"
+            className="input w-24"
+          />
+          <span className="text-xs text-muted-foreground">minutes/day (subtracted from capacity)</span>
+        </div>
+      </div>
+
+      <div>
+        <label className="label">Skills</label>
+        <div className="flex flex-wrap gap-2 mt-1">
+          {Array.from(new Set([...DEFAULT_SKILLS, ...(person?.skills ?? [])])).sort().map((skill) => {
+            const active = skills.has(skill);
+            return (
+              <button
+                key={skill}
+                type="button"
+                onClick={() => toggleSkill(skill)}
+                className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                }`}
+              >
+                {skill}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Scheduler only assigns a step to people who have the relevant skill.
+        </p>
+      </div>
+
+      <div>
+        <label className="label">Primary role</label>
+        <div className="flex flex-wrap gap-2 mt-1">
+          {PRIMARY_ROLES.map((pr) => {
+            const active = primaryRole === pr;
+            return (
+              <button
+                key={pr}
+                type="button"
+                onClick={() => setPrimaryRole(active ? "" : pr)}
+                className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                }`}
+              >
+                {PRIMARY_ROLE_LABELS[pr]}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Where this person mostly works. Shop-only hours are excluded from production capacity.
+        </p>
+      </div>
+
+      <div>
+        <label className="label">Labour cost</label>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">€</span>
+          <input
+            type="number"
+            min="0"
+            max="200"
+            step="0.5"
+            value={hourlyCost}
+            onChange={(e) => setHourlyCost(e.target.value)}
+            placeholder="e.g. 18"
+            className="input w-28"
+          />
+          <span className="text-xs text-muted-foreground">per hour · leave blank if this person isn&apos;t costed</span>
+        </div>
+      </div>
+
+      <div>
+        <label className="label">Contract</label>
+        <div className="flex flex-wrap gap-2 mt-1">
+          {(["full_time", "part_time", "contractor"] as const).map((c) => {
+            const active = contractType === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setContractType(active ? "" : c)}
+                className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                }`}
+              >
+                {CONTRACT_TYPE_LABELS[c]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="label">Email</label>
+          <input
+            type="email"
+            value={contactEmail}
+            onChange={(e) => setContactEmail(e.target.value)}
+            placeholder="optional"
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="label">Phone</label>
+          <input
+            type="tel"
+            value={contactPhone}
+            onChange={(e) => setContactPhone(e.target.value)}
+            placeholder="optional"
+            className="input"
+          />
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={isAdmin}
+          onChange={(e) => setIsAdmin(e.target.checked)}
+          className="w-4 h-4 rounded-sm border-border"
+        />
+        <span>Admin — unlocks analytics, full cost breakdown, HACCP incident writes</span>
+      </label>
+
       <div className="flex gap-2 pt-1">
         <button
           onClick={handleSave}
@@ -1188,6 +1493,20 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
       </div>
     </div>
   );
+}
+
+/** Field list a person needs for the scheduler / capacity maths to
+ *  work correctly. Archived people are exempt (they don't contribute
+ *  to plans anyway). */
+function missingPersonFields(person: Person): string[] {
+  const miss: string[] = [];
+  const hasWindow = !!person.startTimeOfDay && !!person.endTimeOfDay;
+  const hasFallback = person.defaultHoursPerDay != null && person.defaultHoursPerDay > 0;
+  if (!hasWindow && !hasFallback) miss.push("working hours");
+  if (!person.workingDays || person.workingDays.length === 0) miss.push("working days");
+  if (!person.primaryRole) miss.push("primary role");
+  if (!person.skills || person.skills.length === 0) miss.push("skills");
+  return miss;
 }
 
 // Strip optional seconds ("07:00:00" → "07:00") so <input type="time">
@@ -1215,6 +1534,7 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
   const [adding, setAdding] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [absenceType, setAbsenceType] = useState<AbsenceType | "">("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1223,10 +1543,17 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
   async function handleAdd() {
     setSaving(true);
     try {
-      await savePersonUnavailability({ personId, startDate, endDate, notes: notes.trim() || undefined });
+      await savePersonUnavailability({
+        personId,
+        startDate,
+        endDate,
+        absenceType: absenceType || null,
+        notes: notes.trim() || undefined,
+      });
       setAdding(false);
       setStartDate("");
       setEndDate("");
+      setAbsenceType("");
       setNotes("");
     } finally {
       setSaving(false);
@@ -1260,6 +1587,28 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
             </div>
           </div>
           <div>
+            <label className="label">Reason</label>
+            <div className="flex flex-wrap gap-1.5">
+              {ABSENCE_TYPES.map((t) => {
+                const active = absenceType === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setAbsenceType(active ? "" : t)}
+                    className={`rounded-sm border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {ABSENCE_TYPE_LABELS[t]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
             <label className="label">Notes (optional)</label>
             <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Summer holiday" className="input" />
           </div>
@@ -1272,7 +1621,7 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
               {saving ? "Adding…" : "Add"}
             </button>
             <button
-              onClick={() => { setAdding(false); setStartDate(""); setEndDate(""); setNotes(""); }}
+              onClick={() => { setAdding(false); setStartDate(""); setEndDate(""); setAbsenceType(""); setNotes(""); }}
               className="rounded-sm border border-border px-3 py-1 text-xs"
             >
               Cancel
@@ -1530,6 +1879,17 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
   onSaved: () => void;
   onCancel?: () => void;
 }) {
+  const allEquipment = useEquipment(true);
+  const knownManufacturers = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of allEquipment) if (e.manufacturer) s.add(e.manufacturer.trim());
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [allEquipment]);
+  const knownModels = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of allEquipment) if (e.model) s.add(e.model.trim());
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [allEquipment]);
   const isNew = !equipment?.id;
   const [name, setName] = useState(equipment?.name ?? "");
   const [kind, setKind] = useState<EquipmentKind>(equipment?.kind ?? "tempering");
@@ -1655,21 +2015,29 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
           <label className="label">Manufacturer (optional)</label>
           <input
             type="text"
+            list="known-manufacturers"
             value={manufacturer}
             onChange={(e) => setManufacturer(e.target.value)}
             placeholder="e.g. Selmi"
             className="input"
           />
+          <datalist id="known-manufacturers">
+            {knownManufacturers.map((m) => <option key={m} value={m} />)}
+          </datalist>
         </div>
         <div>
           <label className="label">Model (optional)</label>
           <input
             type="text"
+            list="known-models"
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder="e.g. Top EX"
             className="input"
           />
+          <datalist id="known-models">
+            {knownModels.map((m) => <option key={m} value={m} />)}
+          </datalist>
         </div>
       </div>
 
@@ -1767,6 +2135,8 @@ function ProductionStepsTab() {
   const steps = useProductionSteps();
   const [selectedType, setSelectedType] = useState<string>("");
   const [adding, setAdding] = useState(false);
+  const [copyFrom, setCopyFrom] = useState<string>("");
+  const [copyBusy, setCopyBusy] = useState(false);
 
   // Sync selection when categories load — default to the first active category
   useEffect(() => {
@@ -1788,6 +2158,42 @@ function ProductionStepsTab() {
     for (const s of steps) set.add(s.name);
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [steps]);
+
+  // Product types that already have at least one step — valid copy sources.
+  const typesWithSteps = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of steps) if (s.productType !== selectedType) set.add(s.productType);
+    return [...set].sort();
+  }, [steps, selectedType]);
+
+  async function handleCopyFrom() {
+    if (!copyFrom || !selectedType) return;
+    const source = steps
+      .filter((s) => s.productType === copyFrom)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    if (source.length === 0) return;
+    const targetBase = stepsForType.length;
+    setCopyBusy(true);
+    try {
+      // Save sequentially so sortOrder stays stable even if the server
+      // reorders on write. Each copy lands at the end of the target list.
+      for (let i = 0; i < source.length; i++) {
+        const src = source[i];
+        await saveProductionStep({
+          productType: selectedType,
+          name: src.name,
+          activeMinutes: src.activeMinutes,
+          waitingMinutes: src.waitingMinutes,
+          isPackingStep: src.isPackingStep,
+          perBatch: src.perBatch,
+          sortOrder: targetBase + i,
+        });
+      }
+      setCopyFrom("");
+    } finally {
+      setCopyBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -1822,18 +2228,44 @@ function ProductionStepsTab() {
 
           {selectedType && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <p className="text-xs text-muted-foreground">
                   {stepsForType.length} step{stepsForType.length !== 1 ? "s" : ""} for <strong>{selectedType}</strong>
                 </p>
-                {!adding && (
-                  <button
-                    onClick={() => setAdding(true)}
-                    className="flex items-center gap-1.5 text-xs text-primary hover:underline"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add step
-                  </button>
-                )}
+                <div className="flex items-center gap-3 flex-wrap">
+                  {typesWithSteps.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[11px] text-muted-foreground">Copy all from</label>
+                      <select
+                        value={copyFrom}
+                        onChange={(e) => setCopyFrom(e.target.value)}
+                        disabled={copyBusy}
+                        className="rounded-sm border border-border bg-card px-2 py-1 text-xs disabled:opacity-50"
+                      >
+                        <option value="">choose type…</option>
+                        {typesWithSteps.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleCopyFrom}
+                        disabled={!copyFrom || copyBusy}
+                        className="flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-1 text-xs hover:border-foreground/30 disabled:opacity-50"
+                        title="Append every step from the chosen type into this one. You can then edit times here without touching the source."
+                      >
+                        <Copy className="w-3 h-3" /> {copyBusy ? "Copying…" : "Copy"}
+                      </button>
+                    </div>
+                  )}
+                  {!adding && (
+                    <button
+                      onClick={() => setAdding(true)}
+                      className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add step
+                    </button>
+                  )}
+                </div>
               </div>
 
               {adding && (
@@ -1851,27 +2283,11 @@ function ProductionStepsTab() {
                   No steps yet for {selectedType}. Click Add step to start.
                 </p>
               ) : (
-                <ul className="space-y-2">
-                  {stepsForType.map((step, i) => (
-                    <ProductionStepRow
-                      key={step.id}
-                      step={step}
-                      knownStepNames={knownStepNames}
-                      index={i}
-                      total={stepsForType.length}
-                      onMoveUp={async () => {
-                        const next = [...stepsForType];
-                        [next[i - 1], next[i]] = [next[i], next[i - 1]];
-                        await reorderProductionSteps(selectedType, next.map((s) => s.id!));
-                      }}
-                      onMoveDown={async () => {
-                        const next = [...stepsForType];
-                        [next[i], next[i + 1]] = [next[i + 1], next[i]];
-                        await reorderProductionSteps(selectedType, next.map((s) => s.id!));
-                      }}
-                    />
-                  ))}
-                </ul>
+                <SortableStepList
+                  steps={stepsForType}
+                  knownStepNames={knownStepNames}
+                  productType={selectedType}
+                />
               )}
             </div>
           )}
@@ -1881,17 +2297,67 @@ function ProductionStepsTab() {
   );
 }
 
-function ProductionStepRow({ step, knownStepNames, index, total, onMoveUp, onMoveDown }: {
+/** Drag-and-drop wrapper around the per-type step list. Uses dnd-kit
+ *  (already in the repo for the planner). Persists the new order via
+ *  `reorderProductionSteps` which rewrites sortOrder per step. */
+function SortableStepList({
+  steps, knownStepNames, productType,
+}: {
+  steps: ProductionStep[];
+  knownStepNames: string[];
+  productType: string;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+  const ids = steps.map((s) => s.id!);
+
+  async function onDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIdx = ids.indexOf(String(active.id));
+    const newIdx = ids.indexOf(String(over.id));
+    if (oldIdx < 0 || newIdx < 0) return;
+    const next = arrayMove(steps, oldIdx, newIdx);
+    await reorderProductionSteps(productType, next.map((s) => s.id!));
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        <ul className="space-y-2">
+          {steps.map((step, i) => (
+            <ProductionStepRow
+              key={step.id}
+              step={step}
+              knownStepNames={knownStepNames}
+              index={i}
+            />
+          ))}
+        </ul>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+function ProductionStepRow({ step, knownStepNames, index }: {
   step: ProductionStep;
   knownStepNames: string[];
   index: number;
-  total: number;
-  onMoveUp: () => Promise<void>;
-  onMoveDown: () => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [pendingRemove, setPendingRemove] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: step.id!,
+  });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
 
   async function handleDelete() {
     if (!step.id) return;
@@ -1900,27 +2366,39 @@ function ProductionStepRow({ step, knownStepNames, index, total, onMoveUp, onMov
     finally { setBusy(false); setPendingRemove(false); }
   }
 
+  async function handleDuplicate() {
+    if (!step.id) return;
+    setBusy(true);
+    try {
+      // Copy every field except the row identity + sort order. Append
+      // with a fresh sortOrder at the end of the list — user can drag
+      // it into place after.
+      await saveProductionStep({
+        productType: step.productType,
+        name: `${step.name} copy`,
+        activeMinutes: step.activeMinutes,
+        waitingMinutes: step.waitingMinutes,
+        isPackingStep: step.isPackingStep,
+        perBatch: step.perBatch,
+        sortOrder: step.sortOrder + 0.5, // reorderProductionSteps will renumber integers
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <li className="rounded-sm border border-border bg-card overflow-hidden">
+    <li ref={setNodeRef} style={style} className="rounded-sm border border-border bg-card overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2.5">
-        <div className="flex flex-col shrink-0">
-          <button
-            disabled={index === 0}
-            onClick={onMoveUp}
-            aria-label="Move up"
-            className="px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground leading-none"
-          >
-            ↑
-          </button>
-          <button
-            disabled={index === total - 1}
-            onClick={onMoveDown}
-            aria-label="Move down"
-            className="px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground leading-none"
-          >
-            ↓
-          </button>
-        </div>
+        <button
+          {...attributes}
+          {...listeners}
+          aria-label="Drag to reorder"
+          className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+          type="button"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-2 flex-1 min-w-0 text-left"
@@ -1957,7 +2435,15 @@ function ProductionStepRow({ step, knownStepNames, index, total, onMoveUp, onMov
             knownStepNames={knownStepNames}
             onSaved={() => { /* stays expanded */ }}
           />
-          <div className="border-t border-border pt-3">
+          <div className="border-t border-border pt-3 flex items-center gap-4">
+            <button
+              onClick={handleDuplicate}
+              disabled={busy}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              title="Create a copy of this step — same times, name suffixed with 'copy'"
+            >
+              <Copy className="w-3.5 h-3.5" /> Duplicate
+            </button>
             {pendingRemove ? (
               <span className="flex items-center gap-1.5 text-xs">
                 <span className="text-muted-foreground">Delete this step?</span>

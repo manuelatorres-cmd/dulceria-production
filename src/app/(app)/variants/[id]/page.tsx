@@ -4,6 +4,7 @@ import { use, useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   useVariant,
+  useVariants,
   useVariantProducts,
   useVariantPackagings,
   useVariantPackagingProducts,
@@ -12,6 +13,7 @@ import {
   useAllVariantLabels,
   saveVariant,
   deleteVariant,
+  duplicateVariant,
   addProductToVariant,
   removeProductFromVariant,
   saveVariantPackaging,
@@ -36,8 +38,9 @@ import { deriveShellPercentageFromGrams } from "@/lib/costCalculation";
 import { DENSITY_G_PER_ML } from "@/lib/production";
 import { calculateProductNutrition, calculateVariantNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
 import { buildVariantIngredientList, type ProductIngredientListInput } from "@/lib/ingredientList";
-import { ArrowLeft, Plus, Search, X, Trash2, Pencil, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Plus, Search, X, Trash2, Pencil, Copy, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
 import { InlineNameEditor } from "@/components/inline-name-editor";
+import { DetailNav } from "@/components/detail-nav";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import Link from "next/link";
 import type { ProductCostSnapshot, Packaging, PackagingOrder, VariantPricingSnapshot, VariantPackaging, Ingredient, VariantKind, OrderChannel } from "@/types";
@@ -125,6 +128,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   const sym = useCurrencySymbol();
 
   const variant = useVariant(variantId);
+  const allVariants = useVariants();
   const variantProducts = useVariantProducts(variantId);
   const variantPackagings = useVariantPackagings(variantId);
   // Include archived so the name lookup map still resolves names for
@@ -175,6 +179,8 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   const [notes, setNotes] = useState("");
   const [labels, setLabels] = useState<string[]>([]);
   const [labelInput, setLabelInput] = useState("");
+  const [aliases, setAliases] = useState<string[]>([]);
+  const [aliasInput, setAliasInput] = useState("");
   const [kind, setKind] = useState<VariantKind>("curated");
   const [vatRateStr, setVatRateStr] = useState("10");
 
@@ -225,6 +231,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     setEndDate(variant.endDate || "");
     setNotes(variant.notes || "");
     setLabels(variant.labels ?? []);
+    setAliases(variant.aliases ?? []);
     setKind(variant.kind ?? "curated");
     setVatRateStr(String(variant.vatRatePercent ?? 10));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -250,6 +257,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     setEndDate(variant.endDate || "");
     setNotes(variant.notes || "");
     setLabels(variant.labels ?? []);
+    setAliases(variant.aliases ?? []);
     setLabelInput("");
     setKind(variant.kind ?? "curated");
     setVatRateStr(String(variant.vatRatePercent ?? 10));
@@ -288,6 +296,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
       endDate: endDate || undefined,
       notes: notes.trim() || undefined,
       labels,
+      aliases: aliases.length > 0 ? aliases : undefined,
       kind,
       vatRatePercent: Number.isFinite(vatN) && vatN >= 0 ? vatN : 10,
     });
@@ -343,13 +352,18 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function handleAddBox() {
-    if (!selectedPackagingId || !sellPriceStr) return;
-    const price = parseFloat(sellPriceStr);
+    // Loose variant (no packaging) = packagingId left blank. Allowed
+    // when channel sales include single-piece counter / market.
+    if (!sellPriceStr) return;
+    // Accept both "2.50" (en) and "2,50" (de/AT) — strip thousand
+    // separators, swap comma for dot before parseFloat.
+    const price = parseFloat(sellPriceStr.replace(/\./g, "").replace(",", "."));
     if (isNaN(price) || price < 0) return;
+    const isLoose = !selectedPackagingId;
 
     // Curated: qty rows come from the variant's Products list; sum must
-    // equal packaging.capacity.
-    const pkg = packagingMap.get(selectedPackagingId);
+    // equal packaging.capacity. Loose variants skip composition.
+    const pkg = isLoose ? undefined : packagingMap.get(selectedPackagingId);
     const capacity = pkg?.capacity ?? 0;
     const compEntries = variantProducts
       .map((vp, i) => ({
@@ -359,8 +373,12 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
       }))
       .filter((e) => e.qty > 0);
     const compSum = compEntries.reduce((s, x) => s + x.qty, 0);
-    if (kind === "curated" && compSum !== capacity) {
+    if (!isLoose && kind === "curated" && compSum !== capacity) {
       alert(`Box composition must sum to ${capacity} (packaging capacity). Currently: ${compSum}.`);
+      return;
+    }
+    if (isLoose && kind === "curated" && (compEntries.length !== 1 || compEntries[0].qty !== 1)) {
+      alert("Pick exactly one product (qty 1) for a loose / single-piece variant size.");
       return;
     }
 
@@ -368,7 +386,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     const channelPrices: Partial<Record<OrderChannel, number>> = {};
     const pushChannel = (c: OrderChannel, raw: string) => {
       if (!raw.trim()) return;
-      const n = parseFloat(raw);
+      const n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
       if (Number.isFinite(n) && n >= 0) channelPrices[c] = n;
     };
     pushChannel("b2b", channelPriceB2B);
@@ -378,7 +396,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
 
     const newVpId = await saveVariantPackaging({
       variantId,
-      packagingId: selectedPackagingId,
+      packagingId: isLoose ? null : selectedPackagingId,
       price,
       channelPrices,
       sellPrice: price, // mirror for legacy consumers
@@ -390,7 +408,9 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
       await replaceVariantPackagingProducts(newVpId, compEntries);
     }
 
-    await recordPricingSnapshot(selectedPackagingId, price, "sell_price_change", `Box pricing configured at ${formatPrice(price, sym)}`);
+    if (!isLoose) {
+      await recordPricingSnapshot(selectedPackagingId, price, "sell_price_change", `Box pricing configured at ${formatPrice(price, sym)}`);
+    }
     setSelectedPackagingId("");
     setSellPriceStr("");
     setChannelPriceB2B("");
@@ -402,17 +422,22 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function handleUpdateSellPrice(cpId: string) {
-    const price = parseFloat(editSellPriceStr);
+    const price = parseFloat(editSellPriceStr.replace(/\./g, "").replace(",", "."));
     if (isNaN(price) || price < 0) return;
     const existing = variantPackagings.find((cp) => cp.id === cpId);
     if (!existing) return;
-    await saveVariantPackaging({ ...existing, id: cpId, sellPrice: price });
-    await recordPricingSnapshot(existing.packagingId, price, "sell_price_change", `Sell price updated to ${formatPrice(price, sym)}`);
+    // Update BOTH price and sellPrice so the canonical column reflects
+    // the new value (display reads price first when positive).
+    await saveVariantPackaging({ ...existing, id: cpId, price, sellPrice: price });
+    if (existing.packagingId) {
+      await recordPricingSnapshot(existing.packagingId, price, "sell_price_change", `Sell price updated to ${formatPrice(price, sym)}`);
+    }
     setEditingSellPrice(null);
     setEditSellPriceStr("");
   }
 
-  async function handleRecalculate(cp: { id?: string; packagingId: string; sellPrice: number }) {
+  async function handleRecalculate(cp: { id?: string; packagingId?: string | null; sellPrice: number }) {
+    if (!cp.packagingId) return;
     await recordPricingSnapshot(cp.packagingId, cp.sellPrice, "manual", "Manual recalculation");
   }
 
@@ -425,8 +450,8 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     if (!cp.id) return;
     setShowAddBox(false);
     setEditingBoxId(cp.id);
-    setSelectedPackagingId(cp.packagingId);
-    setSellPriceStr(String(cp.price ?? cp.sellPrice ?? ""));
+    setSelectedPackagingId(cp.packagingId ?? "");
+    setSellPriceStr(String((cp.price && cp.price > 0) ? cp.price : (cp.sellPrice ?? "")));
     const ch = cp.channelPrices ?? {};
     setChannelPriceB2B(   ch.b2b    != null ? String(ch.b2b)    : "");
     setChannelPriceShop(  ch.shop   != null ? String(ch.shop)   : "");
@@ -455,10 +480,11 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     const existing = variantPackagings.find((cp) => cp.id === editingBoxId);
     if (!existing) return;
 
-    const price = parseFloat(sellPriceStr);
+    const price = parseFloat(sellPriceStr.replace(/\./g, "").replace(",", "."));
     if (isNaN(price) || price < 0) return;
 
-    const pkg = packagingMap.get(existing.packagingId);
+    const isLooseEdit = !existing.packagingId;
+    const pkg = existing.packagingId ? packagingMap.get(existing.packagingId) : undefined;
     const capacity = pkg?.capacity ?? 0;
     const compEntries = variantProducts
       .map((vp, i) => ({
@@ -468,15 +494,19 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
       }))
       .filter((e) => e.qty > 0);
     const compSum = compEntries.reduce((s, x) => s + x.qty, 0);
-    if (kind === "curated" && compSum !== capacity) {
+    if (!isLooseEdit && kind === "curated" && compSum !== capacity) {
       alert(`Box composition must sum to ${capacity} (packaging capacity). Currently: ${compSum}.`);
+      return;
+    }
+    if (isLooseEdit && kind === "curated" && (compEntries.length !== 1 || compEntries[0].qty !== 1)) {
+      alert("Pick exactly one product (qty 1) for a loose / single-piece variant size.");
       return;
     }
 
     const channelPrices: Partial<Record<OrderChannel, number>> = {};
     const pushChannel = (c: OrderChannel, raw: string) => {
       if (!raw.trim()) return;
-      const n = parseFloat(raw);
+      const n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
       if (Number.isFinite(n) && n >= 0) channelPrices[c] = n;
     };
     pushChannel("b2b", channelPriceB2B);
@@ -496,7 +526,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
       await replaceVariantPackagingProducts(editingBoxId, compEntries);
     }
 
-    if (price !== (existing.price ?? existing.sellPrice)) {
+    if (price !== (existing.price ?? existing.sellPrice) && existing.packagingId) {
       await recordPricingSnapshot(
         existing.packagingId,
         price,
@@ -569,11 +599,16 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   const boxPricings = useMemo(() => {
     if (!avgCost) return [];
     return variantPackagings.map((cp) => {
-      const pkg = packagingMap.get(cp.packagingId);
-      const orders = ordersByPackaging.get(cp.packagingId) ?? [];
+      const isLoose = !cp.packagingId;
+      const pkg = cp.packagingId ? packagingMap.get(cp.packagingId) : undefined;
+      const orders = cp.packagingId ? (ordersByPackaging.get(cp.packagingId) ?? []) : [];
       const unitCost = latestPackagingUnitCost(orders) ?? 0;
-      const capacity = pkg?.capacity ?? 0;
-      const pricing = calculateBoxPricing(avgCost.avg, capacity, unitCost, cp.sellPrice);
+      // Loose / single-piece variants have no box capacity — but they
+      // still package one product per "unit", so cost math expects
+      // capacity = 1 to multiply the avg product cost correctly.
+      const capacity = isLoose ? 1 : (pkg?.capacity ?? 0);
+      const sellPrice = (cp.price && cp.price > 0) ? cp.price : (cp.sellPrice ?? 0);
+      const pricing = calculateBoxPricing(avgCost.avg, capacity, unitCost, sellPrice);
       const health = marginHealth(pricing.marginPercent);
       return { cp, pkg, pricing, health, unitCost };
     });
@@ -595,7 +630,9 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     kind !== (variant.kind ?? "curated") ||
     vatRateStr !== String(variant.vatRatePercent ?? 10) ||
     JSON.stringify([...labels].map((l) => l.toLowerCase()).sort()) !==
-      JSON.stringify([...(variant.labels ?? [])].map((l) => l.toLowerCase()).sort())
+      JSON.stringify([...(variant.labels ?? [])].map((l) => l.toLowerCase()).sort()) ||
+    JSON.stringify([...aliases].map((l) => l.toLowerCase()).sort()) !==
+      JSON.stringify([...(variant.aliases ?? [])].map((l) => l.toLowerCase()).sort())
   );
   const isDirty = (isNew && !savedOnce) || formDirty;
 
@@ -619,13 +656,19 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div>
       {/* Back */}
-      <div className="px-4 pt-6 pb-2">
-        <Link
-          href={backHref}
+      <div className="px-4 pt-6 pb-2 space-y-2">
+        <button
+          onClick={() => router.back()}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> {backLabel}
-        </Link>
+          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
+        </button>
+        <DetailNav
+          items={[...allVariants].sort((a, b) => a.name.localeCompare(b.name))}
+          currentId={variantId}
+          hrefFor={(v) => `/variants/${encodeURIComponent(v.id!)}`}
+          labelFor={(v) => v.name}
+        />
       </div>
 
       <div className="px-4 space-y-6 pb-10">
@@ -637,13 +680,31 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
             className="text-xl font-bold"
           />
           {!editing && (
-            <button
-              onClick={enterEdit}
-              className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
-              aria-label="Edit variant"
-            >
-              <Pencil className="w-4 h-4 text-muted-foreground" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={async () => {
+                  if (!variant.id) return;
+                  try {
+                    const id = await duplicateVariant(variant.id);
+                    router.push(`/variants/${encodeURIComponent(id)}?new=1`);
+                  } catch (err) {
+                    alert(`Duplicate failed: ${err instanceof Error ? err.message : String(err)}`);
+                  }
+                }}
+                className="p-1.5 rounded-full hover:bg-muted transition-colors"
+                aria-label="Duplicate variant"
+                title="Duplicate this variant — sizes, composition, packaging components all carry over"
+              >
+                <Copy className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <button
+                onClick={enterEdit}
+                className="p-1.5 rounded-full hover:bg-muted transition-colors"
+                aria-label="Edit variant"
+              >
+                <Pencil className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
           )}
         </div>
 
@@ -818,6 +879,65 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 Labels group this variant into Collections. Case-insensitive — &quot;B2B&quot; and &quot;b2b&quot; are the same label.
               </p>
             </div>
+
+            {/* Aliases — alt names used by external systems (Shopify, etc.) */}
+            <div>
+              <label className="label">Aliases · names used externally</label>
+              <p className="text-[11px] text-muted-foreground mb-2">
+                Shopify storefront title, German label, etc. Importers match these against incoming line items so future imports auto-resolve.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {aliases.map((a) => (
+                  <span
+                    key={a}
+                    className="inline-flex items-center gap-1 rounded-sm bg-muted text-foreground px-2.5 py-0.5 text-xs"
+                  >
+                    {a}
+                    <button
+                      type="button"
+                      onClick={() => setAliases(aliases.filter((x) => x !== a))}
+                      aria-label={`Remove alias ${a}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={aliasInput}
+                  onChange={(e) => setAliasInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const v = aliasInput.trim();
+                      if (v && !aliases.some((x) => x.toLowerCase() === v.toLowerCase())) {
+                        setAliases([...aliases, v]);
+                      }
+                      setAliasInput("");
+                    }
+                  }}
+                  placeholder="Add alias (e.g. Custom Box - Standard)"
+                  className="input"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const v = aliasInput.trim();
+                    if (v && !aliases.some((x) => x.toLowerCase() === v.toLowerCase())) {
+                      setAliases([...aliases, v]);
+                    }
+                    setAliasInput("");
+                  }}
+                  disabled={!aliasInput.trim()}
+                  className="btn-primary px-3 py-1.5"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
             <div className="flex gap-2 pt-1">
               <button
                 onClick={handleSave}
@@ -1047,8 +1167,20 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               0,
             );
             const hasVariantProducts = variantProducts.length > 0;
+            // Loose variants (no packaging) skip the curated-composition
+            // gate entirely — qty is implicitly 1, no box to fill.
+            // Curated readiness — for packaged sizes we need composition
+            // summing to capacity; for loose sizes we need exactly one
+            // product picked with qty=1 so production / cost / stock can
+            // still resolve which chocolate the size sells.
+            const looseLockedProductId = !selectedPackagingId
+              ? Object.entries(newBoxQtys).find(([, q]) => q === 1)?.[0]
+              : undefined;
             const curatedReady = kind !== "curated"
-              || (capacityForForm > 0 && compSum === capacityForForm && hasVariantProducts);
+              ? true
+              : selectedPackagingId
+                ? (capacityForForm > 0 && compSum === capacityForForm && hasVariantProducts)
+                : (hasVariantProducts && !!looseLockedProductId && compSum === 1);
             const vatN = parseFloat(vatRateStr) || 0;
             const priceGross = parseFloat(sellPriceStr);
             const priceNet = Number.isFinite(priceGross) && vatN >= 0
@@ -1064,13 +1196,21 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 <select
                   value={selectedPackagingId}
                   onChange={(e) => {
-                    setSelectedPackagingId(e.target.value);
-                    setNewBoxQtys({}); // reset qtys on packaging change
+                    const next = e.target.value;
+                    setSelectedPackagingId(next);
+                    // Loose + curated + exactly one variant product →
+                    // auto-fill the composition (productId, qty=1) so
+                    // the user doesn't have to pick again.
+                    if (!next && kind === "curated" && variantProducts.length === 1) {
+                      setNewBoxQtys({ [variantProducts[0].productId]: 1 });
+                    } else {
+                      setNewBoxQtys({});
+                    }
                   }}
                   disabled={isEdit}
                   className="input disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select packaging...</option>
+                  <option value="">Loose / no packaging</option>
                   {allPackaging
                     .filter((p) => p.id && (isEdit || !usedPackagingIds.has(p.id)))
                     .map((p) => (
@@ -1079,24 +1219,37 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       </option>
                     ))}
                 </select>
-                {isEdit && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Packaging can&apos;t be changed on an existing box. Remove and re-add to switch packaging.
-                  </p>
-                )}
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {!selectedPackagingId
+                    ? "Sold individually, no box. Just a price for the loose item."
+                    : isEdit
+                      ? "Packaging can't be changed on an existing box. Remove and re-add to switch."
+                      : ""}
+                </p>
               </div>
               <div>
                 <label className="label">Default price (gross, VAT-incl)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">&euro;</span>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={sellPriceStr}
-                    onChange={(e) => setSellPriceStr(e.target.value)}
+                    onChange={(e) => {
+                      // Accept "2,50" or "2.50" — keep raw for display,
+                      // parsing happens at save with a comma→dot swap.
+                      const next = e.target.value;
+                      const prev = sellPriceStr;
+                      setSellPriceStr(next);
+                      const sync = (cur: string, set: (v: string) => void) => {
+                        if (cur === "" || cur === prev) set(next);
+                      };
+                      sync(channelPriceShop, setChannelPriceShop);
+                      sync(channelPriceEvent, setChannelPriceEvent);
+                      sync(channelPriceOnline, setChannelPriceOnline);
+                    }}
                     className="input !pl-7"
-                    placeholder="24.95"
+                    placeholder="24.95 or 24,95"
                   />
                 </div>
                 {priceNet !== null && priceNet > 0 && (
@@ -1104,6 +1257,9 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     Net at {vatN}% VAT: {formatPrice(priceNet, sym)}
                   </p>
                 )}
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Auto-fills Shop / Event / Online. B2B stays separate.
+                </p>
               </div>
 
               <div>
@@ -1130,9 +1286,8 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                         <div className="relative">
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">&euro;</span>
                           <input
-                            type="number"
-                            step="0.01"
-                            min="0"
+                            type="text"
+                            inputMode="decimal"
                             value={val}
                             onChange={(e) => setter(e.target.value)}
                             className="input text-sm !pl-6 py-1.5"
@@ -1144,6 +1299,41 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                   })}
                 </div>
               </div>
+
+              {kind === "curated" && !selectedPackagingId && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                    Which chocolate is sold loose?
+                  </p>
+                  {!hasVariantProducts ? (
+                    <p className="text-[11px] text-status-warn border border-dashed border-status-warn-edge rounded-md px-2 py-2">
+                      Add at least one product to this variant first (use the <strong>Products</strong> section above).
+                    </p>
+                  ) : (
+                    <select
+                      value={looseLockedProductId ?? ""}
+                      onChange={(e) => {
+                        const pid = e.target.value;
+                        setNewBoxQtys(pid ? { [pid]: 1 } : {});
+                      }}
+                      className="input"
+                    >
+                      <option value="">— pick one product —</option>
+                      {variantProducts.map((vp) => {
+                        const name = productMap.get(vp.productId) ?? vp.productId;
+                        return (
+                          <option key={vp.id ?? vp.productId} value={vp.productId}>
+                            {name}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
+                  <p className="text-[10.5px] text-muted-foreground mt-1">
+                    Loose = one piece sold individually. The picked product drives production, costing and stock.
+                  </p>
+                </div>
+              )}
 
               {kind === "curated" && selectedPackagingId && (
                 <div>
@@ -1194,7 +1384,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               <div className="flex gap-2">
                 <button
                   onClick={isEdit ? handleSaveBoxEdit : handleAddBox}
-                  disabled={!selectedPackagingId || !sellPriceStr || !curatedReady}
+                  disabled={!sellPriceStr || !curatedReady}
                   className="btn-primary px-3 py-1.5 text-sm disabled:opacity-40"
                 >
                   {isEdit ? "Save" : "Add"}
@@ -1249,12 +1439,13 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               </div>
               {variantPackagings.map((cp) => {
                 const cpId = cp.id ?? "";
-                const pkg = packagingMap.get(cp.packagingId);
-                const defaultPrice = cp.price ?? cp.sellPrice ?? 0;
+                const pkg = cp.packagingId ? packagingMap.get(cp.packagingId) : undefined;
+                const defaultPrice = (cp.price && cp.price > 0) ? cp.price : (cp.sellPrice ?? 0);
                 return (
                   <div
                     key={cpId}
-                    className="rounded-sm border border-border bg-card p-3"
+                    id={`vp-${cpId}`}
+                    className="rounded-sm border border-border bg-card p-3 scroll-mt-24"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
@@ -1318,7 +1509,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               {boxPricings.map(({ cp, pkg, pricing, health, unitCost }) => {
                 const cpId = cp.id ?? "";
                 // Only show snapshots where packaging was actually priced — filter out initialisation entries
-                const history = (snapshotsByPackaging.get(cp.packagingId) ?? []).filter((s) => s.packagingUnitCost > 0);
+                const history = (cp.packagingId ? (snapshotsByPackaging.get(cp.packagingId) ?? []) : []).filter((s) => s.packagingUnitCost > 0);
                 return (
                   <div key={cpId}>
                     <BoxCard
@@ -1339,7 +1530,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       pendingRemove={pendingRemoveBox === cpId}
                       onStartEditSellPrice={() => {
                         setEditingSellPrice(cpId);
-                        setEditSellPriceStr(String(cp.sellPrice));
+                        setEditSellPriceStr(String((cp.price && cp.price > 0) ? cp.price : (cp.sellPrice ?? 0)));
                       }}
                       onEditSellPriceChange={setEditSellPriceStr}
                       onSaveSellPrice={() => handleUpdateSellPrice(cpId)}
@@ -1354,7 +1545,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       variantPackagingId={cpId}
                       kind={variant?.kind ?? "curated"}
                       channelPrices={cp.channelPrices ?? {}}
-                      defaultPrice={cp.price ?? cp.sellPrice}
+                      defaultPrice={(cp.price && cp.price > 0) ? cp.price : (cp.sellPrice ?? 0)}
                       productMap={productMap}
                       sym={sym}
                     />

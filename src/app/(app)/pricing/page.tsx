@@ -157,9 +157,9 @@ export default function PricingPage() {
         const cps = cpsByVariant.get(cId) ?? [];
 
         const boxes = avg
-          ? cps.map((cp) => {
-              const pkg = packagingMap.get(cp.packagingId);
-              const orders = ordersByPackaging.get(cp.packagingId) ?? [];
+          ? cps.filter((cp) => !!cp.packagingId).map((cp) => {
+              const pkg = packagingMap.get(cp.packagingId!);
+              const orders = ordersByPackaging.get(cp.packagingId!) ?? [];
               const unitCost = latestPackagingUnitCost(orders) ?? 0;
               const capacity = pkg?.capacity ?? 0;
               const pricing = calculateBoxPricing(avg.avg, capacity, unitCost, cp.sellPrice);

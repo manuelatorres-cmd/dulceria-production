@@ -168,7 +168,7 @@ function wrapTextLines(
 }
 
 function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-GB", {
+  return date.toLocaleDateString("de-AT", {
     day: "numeric",
     month: "short",
     year: "numeric",

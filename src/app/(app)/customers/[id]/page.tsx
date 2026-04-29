@@ -2,15 +2,17 @@
 
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import {
-  useCustomer, saveCustomer, setCustomerArchived,
+  useCustomer, useCustomers, saveCustomer, setCustomerArchived,
   useCustomerContacts, saveCustomerContact, deleteCustomerContact,
   useCustomerFollowups, saveCustomerFollowup, completeCustomerFollowup, deleteCustomerFollowup,
   useOrders, useAllOrderItems, useProductsList, useQuotes,
   useVariants,
   useCustomerProductPrices, saveCustomerProductPrice, deleteCustomerProductPrice,
 } from "@/lib/hooks";
+import { DetailNav } from "@/components/detail-nav";
 import { computeCustomerAnalytics } from "@/lib/customerAnalytics";
 import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
 import {
@@ -28,7 +30,9 @@ import {
 
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const customer = useCustomer(id);
+  const allCustomers = useCustomers(false);
   const contacts = useCustomerContacts(id);
   const followups = useCustomerFollowups(id);
   const orders = useOrders();
@@ -128,9 +132,9 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   if (customer === null) {
     return (
       <div className="p-6">
-        <Link href="/customers" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to customers
-        </Link>
+        <button onClick={() => router.back()} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+          <ArrowLeft className="w-3.5 h-3.5" /> Back
+        </button>
         <p className="mt-6 text-sm text-muted-foreground">Customer not found.</p>
       </div>
     );
@@ -194,6 +198,12 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     <div>
       <PageHeader title={customer.companyName} description={customer.contactName ?? "B2B customer"} />
       <div className="px-4 pb-10 space-y-5">
+        <DetailNav
+          items={[...allCustomers].sort((a, b) => a.companyName.localeCompare(b.companyName))}
+          currentId={customer.id ?? ""}
+          hrefFor={(c) => `/customers/${encodeURIComponent(c.id!)}`}
+          labelFor={(c) => c.companyName}
+        />
         <div className="flex items-center justify-between">
           <Link href="/customers" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
             <ArrowLeft className="w-3.5 h-3.5" /> All customers
@@ -491,7 +501,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                         <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">{CUSTOMER_CONTACT_LABELS[c.kind]}</span>
                         <span className="text-[10px] text-muted-foreground">·</span>
                         <span className="text-[10px] text-muted-foreground">
-                          {new Date(c.contactedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                          {new Date(c.contactedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
                         </span>
                       </div>
                       <p className="text-sm mt-0.5">{c.summary}</p>
@@ -566,7 +576,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm ${f.completedAt ? "line-through text-muted-foreground" : ""}`}>{f.subject}</p>
                       <p className={`text-[11px] ${overdue && !f.completedAt ? "text-status-alert" : "text-muted-foreground"}`}>
-                        due {new Date(f.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        due {new Date(f.dueDate).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
                         {f.origin === "seasonal" && " · seasonal"}
                       </p>
                     </div>
@@ -609,7 +619,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                         <p className="text-[11px] text-muted-foreground">
                           {ORDER_STATUS_LABELS[o.status]}
                           {" · "}
-                          deadline {new Date(o.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                          deadline {new Date(o.deadline).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
                         </p>
                       </div>
                       {value > 0 && <span className="text-xs tabular-nums shrink-0">€{value.toFixed(2)}</span>}

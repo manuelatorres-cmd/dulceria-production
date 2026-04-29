@@ -179,7 +179,7 @@ export function TransferModal({
                   <option key={o.id} value={o.id!}>
                     {(o.customerName || o.eventName || "Order")}
                     {" · "}
-                    {new Date(o.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    {new Date(o.deadline).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
                   </option>
                 ))}
               </select>

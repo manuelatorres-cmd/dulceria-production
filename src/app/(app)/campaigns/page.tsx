@@ -47,7 +47,7 @@ export default function CampaignsPage() {
   };
 
   return (
-    <div>
+    <div className="px-6 sm:px-10 pt-2 pb-12 max-w-[1400px] mx-auto">
       <PageHeader
         title="Campaigns"
         description="Seasonal boxes, limited editions, collaborations, and launches. The brain auto-proposes ramp-up batches between productionStartDate and startDate."

@@ -179,8 +179,16 @@ export interface Product {
   popularity?: number; // 1–5 stars
   productCategoryId?: string; // FK → ProductCategory.id (replaces the old free-text productType)
   /** Direct FK to the shell chocolate ingredient (must have shellCapable=true).
-   *  Replaces the old `coating` string + CoatingChocolateMapping lookup. */
-  shellIngredientId?: string;
+   *  Replaces the old `coating` string + CoatingChocolateMapping lookup.
+   *  Mutually exclusive with `shellFillingId` (DB check
+   *  `products_shell_source_exclusive`, migration 0062). */
+  shellIngredientId?: string | null;
+  /** Alternative shell source: use a filling's recipe as the shell.
+   *  For self-made chocolates (pistachio, strawberry, single-origin
+   *  blends) where the shell is itself a recipe, not a single
+   *  ingredient. Cost / nutrition / allergens derive from the
+   *  filling's own ingredient list. */
+  shellFillingId?: string | null;
   /** Shell as a percentage of total cavity weight (0–100). Bounded by the product
    *  category's [shellPercentMin, shellPercentMax]. Defaults to the category's
    *  defaultShellPercent. When 0 → no shell (e.g. bean-to-bar). When 100 → shell only. */
@@ -194,10 +202,13 @@ export interface Product {
   tags?: string[]; // user-defined labels e.g. "christmas", "spring"
   notes?: string;
   shelfLifeWeeks?: string;
-  /** Threshold below which the product is flagged as "low stock" in the production wizard.
-   *  Compared against the sum of `currentStock` across in-stock batches. When unset,
-   *  the wizard falls back to the legacy per-batch `stockStatus` flag. */
-  lowStockThreshold?: number;
+  /** Alternative names this product is known by externally (Shopify
+   *  storefront title, German label, abbreviation, etc.). Importers
+   *  match Lineitem name against this list before falling back to
+   *  manual assignment. Built up automatically: when the user picks
+   *  a product for an unresolved import line, the source name lands
+   *  here so future imports auto-resolve. */
+  aliases?: string[];
   /** Timestamp (ms) of the most recent manual stock count. Set by `updateProductStockCount`. */
   stockCountedAt?: number;
   defaultMouldId?: string;
@@ -214,6 +225,11 @@ export interface Product {
    *  appears on an order line and the line hasn't overridden it. Null →
    *  app-level food default (10%). */
   defaultVatRate?: number;
+  /** Skip this product from automatic replenishment seeding (mig 0079).
+   *  When true, the replen brain ignores under-min gaps for this product.
+   *  Used for limited-edition / campaign-only chocolates whose
+   *  production should only be hand-driven via Production Orders. */
+  excludeFromReplen?: boolean;
   archived?: boolean; // soft-delete: hidden from lists, preserved for production history
   // --- Production brain additions (phase 1) ---
   /** Replenishment + displacement ladder. 1 = top-seller (never displace),
@@ -368,10 +384,19 @@ export interface ProductFilling {
   fillGrams?: number;
 }
 
+/** One component in a filling's recipe — either a raw ingredient or
+ *  another filling used as a pre-made sub-component. Exactly one of
+ *  `ingredientId` / `componentFillingId` is set (DB check constraint
+ *  `fillingIngredients_component_exclusive`, migration 0061). */
 export interface FillingIngredient {
   id?: string;
   fillingId: string;
-  ingredientId: string;
+  /** Raw-ingredient row. Set when the line is an ingredient. */
+  ingredientId?: string | null;
+  /** Sub-filling row. Set when the line reuses another filling as a
+   *  component (e.g. a praline filling that includes a caramel
+   *  filling as one of its layers). */
+  componentFillingId?: string | null;
   amount: number;
   unit: string;
   sortOrder?: number;
@@ -398,6 +423,9 @@ export interface UserPreferences {
   defaultFillMode: FillMode;
   facilityMayContain: string[];
   coatings: string[];
+  /** Stamped after every successful `regenerateAllPlansAndSchedule`.
+   *  Surfaced near the Regenerate button so she sees freshness. */
+  lastRegenAt?: Date | null;
   updatedAt: Date;
 }
 
@@ -412,6 +440,9 @@ export interface Mould {
   quantityOwned?: number; // how many physical copies of this mould the user owns
   photo?: string; // base64 encoded image
   notes?: string;
+  /** Free-text labels for organising the catalogue: "Christmas",
+   *  "Easter", "seasonal", "bars-only", "special-order", … (mig 0069) */
+  tags?: string[];
   archived?: boolean;
 }
 
@@ -451,6 +482,11 @@ export interface ProductionPlan {
    *  Currently informational — the stock-rewrite task will read this
    *  and issue the corresponding stockMovement. */
   surplusDestination?: "store" | "freezer" | "waste";
+  /** Manual day pin (mig 0078). When set, regenerate forces this
+   *  plan's lineItems onto this exact date instead of recomputing.
+   *  Set by the user via drag-drop in /plan week view + "Lock"
+   *  confirmation. Cleared by the "Unpin" button on the same row. */
+  pinnedDate?: string | null;
 }
 
 /**
@@ -918,6 +954,42 @@ export function allergenLabel(id: string): string {
   return id;
 }
 
+/** Short EU-FIC letter codes used on German/Austrian food labels:
+ *  A = Gluten, B = Crustaceans, C = Eggs, D = Fish, E = Peanuts,
+ *  F = Soy, G = Milk, H = Tree nuts, L = Celery, M = Mustard,
+ *  N = Sesame, O = Sulphites, P = Lupin, R = Molluscs.
+ *  Alcohol flag is an extra "ALK" badge — not an EU FIC letter. */
+export function allergenShortCode(id: string): string | null {
+  // Any tree-nut variant collapses to H.
+  if (id.startsWith("nuts_")) return "H";
+  switch (id) {
+    case "gluten":      return "A";
+    case "crustaceans": return "B";
+    case "eggs":        return "C";
+    case "fish":        return "D";
+    case "peanuts":     return "E";
+    case "soybeans":    return "F";
+    case "milk":        return "G";
+    case "lactose":     return "G"; // legacy → maps to milk
+    case "nuts":        return "H"; // legacy → tree nuts
+    case "celery":      return "L";
+    case "mustard":     return "M";
+    case "sesame":      return "N";
+    case "sulphites":   return "O";
+    case "lupin":       return "P";
+    case "molluscs":    return "R";
+    case "alcohol":     return "ALK";
+    default:            return null; // unknown / diet / custom tag
+  }
+}
+
+/** True if `id` is a real EU/US allergen (not a diet tag like "vegan",
+ *  not a free-form label). Used to gate "bold allergen" styling so only
+ *  actual allergens show emphasised. */
+export function isRealAllergen(id: string): boolean {
+  return allergenShortCode(id) !== null;
+}
+
 /** Migrate legacy allergen IDs to new EU IDs. Deduplicates. */
 export function migrateAllergens(allergens: string[]): string[] {
   const result = new Set<string>();
@@ -1142,6 +1214,10 @@ export interface Variant {
   /** Free-form labels — each unique label (case-insensitive) becomes a
    *  "collection" on the Collections page. */
   labels: string[];
+  /** Alternative names this variant is known by externally (Shopify
+   *  storefront title, German name, abbreviation). Used by importers
+   *  to match Lineitem names against the catalogue. */
+  aliases?: string[];
   /** 'curated' = products fixed per size, locked on orders.
    *  'free-pick' = no stored product list; user picks on each order. */
   kind: VariantKind;
@@ -1168,11 +1244,13 @@ export interface VariantProduct {
 /** One "size" of a variant — a packaging + its gross sell price + any
  *  per-channel overrides. A variant has one row per size it is sold in
  *  (e.g. Easter Box → 4, 8, 16). Curated variants also have a product
- *  list per size via {@link VariantPackagingProduct}. */
+ *  list per size via {@link VariantPackagingProduct}. `packagingId`
+ *  is nullable so a variant can also be sold loose / without packaging
+ *  (single bonbon at counter, market event sales). Migration 0067. */
 export interface VariantPackaging {
   id?: string;
   variantId: string;
-  packagingId: string;
+  packagingId?: string | null;
   /** Default gross price (VAT-inc). Used when the order's channel has
    *  no override in {@link channelPrices}. */
   price: number;
@@ -1183,9 +1261,30 @@ export interface VariantPackaging {
   /** Legacy single-price column kept for backwards-compat with live
    *  rows pre-0049. Mirrors {@link price} on write. */
   sellPrice: number;
+  /** On-hand count of pre-assembled boxes of this size. Mother's Day
+   *  / signature edition variants are typically packed in advance and
+   *  sold off the shelf — this number tracks how many are ready.
+   *  Decremented at sale (daily count → variants tab); incremented at
+   *  pack-out time. Migration 0076. */
+  quantityOnHand?: number;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** A packaging component on a variant size — box + cushion + paper
+ *  liners + sticker, etc. Each row points at a `packaging` entry that
+ *  carries its own stock + purchase history. `isPrimary` marks the
+ *  outer container that drives display + shelf-life. Migration 0064. */
+export interface VariantPackagingComponent {
+  id?: string;
+  variantPackagingId: string;
+  packagingId: string;
+  qtyPerVariant: number;
+  sortOrder: number;
+  isPrimary: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 /** A curated variant's product-in-size composition. For each variant
@@ -1278,12 +1377,13 @@ export interface CapacityConfig {
 // --- Stock adjustments (opening balance + corrections) ---
 
 export const STOCK_ADJUSTMENT_ITEM_TYPES = [
-  "product", "filling", "packaging", "ingredient",
+  "product", "variant", "filling", "packaging", "ingredient",
 ] as const;
 export type StockAdjustmentItemType = (typeof STOCK_ADJUSTMENT_ITEM_TYPES)[number];
 
 export const STOCK_ADJUSTMENT_ITEM_TYPE_LABELS: Record<StockAdjustmentItemType, string> = {
   product: "Finished product",
+  variant: "Box / variant",
   filling: "Filling",
   packaging: "Packaging",
   ingredient: "Ingredient",
@@ -1583,6 +1683,20 @@ export interface Person {
   /** Admin-role flag. True for owners / managers — unlocks analytics,
    *  full cost breakdown, contamination + HACCP incident writes. */
   isAdmin?: boolean;
+  /** Labour rate used for per-batch / per-day cost calculations. Null
+   *  means the person doesn't feed into labour cost (volunteer, owner
+   *  who doesn't self-invoice). Euros per hour. */
+  hourlyCostEuros?: number | null;
+  /** Unpaid break / lunch subtracted from the daily working window
+   *  when computing capacity. Minutes. */
+  breakMinutesPerDay?: number | null;
+  /** Optional contact fields — surfaced on the team card, not required
+   *  for scheduling. */
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  /** Contract classification — affects nothing automatic today, useful
+   *  for reports and quick-glance labels on the people list. */
+  contractType?: "full_time" | "part_time" | "contractor" | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -1590,6 +1704,25 @@ export interface Person {
 /** A person-specific unavailability window (vacation, doctor's appointment,
  *  sick day). Workshop-wide closures live on `EventCalendarEntry` with
  *  kind='blocked' so they apply to everyone at once. */
+export const ABSENCE_TYPES = [
+  "vacation",
+  "sick",
+  "appointment",
+  "course_taught",
+  "personal",
+  "other",
+] as const;
+export type AbsenceType = (typeof ABSENCE_TYPES)[number];
+
+export const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
+  vacation: "Vacation",
+  sick: "Sick",
+  appointment: "Appointment",
+  course_taught: "Teaching a course",
+  personal: "Personal",
+  other: "Other",
+};
+
 export interface PersonUnavailability {
   id?: string;
   personId: string;
@@ -1597,6 +1730,13 @@ export interface PersonUnavailability {
   startDate: string;
   /** Inclusive end date, ISO-date string. Must be ≥ startDate. */
   endDate: string;
+  /** What kind of absence — drives colouring in the calendar and the
+   *  reason in scheduler warnings. Optional so existing rows stay
+   *  valid until an editor visits them. */
+  absenceType?: AbsenceType | null;
+  /** Approval state — false for "requested, pending sign-off". Default
+   *  true because most entries are recorded after the fact. */
+  approved?: boolean;
   notes?: string;
   createdAt?: Date;
 }
@@ -1758,6 +1898,25 @@ export interface OrderPackagingLine {
 
 export const FULFILMENT_MODES = ["produce", "borrow"] as const;
 export type FulfilmentMode = (typeof FULFILMENT_MODES)[number];
+
+/** Customer-facing variant line on an order. The price the customer
+ *  sees per unit. Brain ignores this — production demand still flows
+ *  via `orderItems`. Saving a variant line auto-creates derived
+ *  orderItems (one per product in the variant's composition) so the
+ *  scheduler/shopping picks them up. Migration 0068. */
+export interface OrderVariantLine {
+  id?: string;
+  orderId: string;
+  variantId: string;
+  variantPackagingId?: string | null;
+  quantity: number;
+  /** Gross unit price as customer pays — what shows on the invoice. */
+  unitPrice: number;
+  sortOrder: number;
+  notes?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
 export interface OrderItem {
   id?: string;
@@ -2150,6 +2309,11 @@ export const CAMPAIGN_TYPES = [
   "limited",
   "collaboration",
   "launch",
+  /** Market booth / fair / pop-up where Manuela sells in person.
+   *  Drives a target stock-on-hand by the event date, then sales come
+   *  in via the counter on the day. Distinct from a customer-event
+   *  order (which has a committed €). */
+  "market_event",
 ] as const;
 export type CampaignType = (typeof CAMPAIGN_TYPES)[number];
 
@@ -2166,6 +2330,51 @@ export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
  *  new limited bonbon launch. Engine auto-proposes ramp-up
  *  replenishment batches (reason='campaign-prep') between
  *  `productionStartDate` and `startDate`. */
+export const PRODUCTION_ORDER_CHANNELS = ["restock", "campaign_run"] as const;
+export type ProductionOrderChannel = (typeof PRODUCTION_ORDER_CHANNELS)[number];
+
+export const PRODUCTION_ORDER_STATUSES = [
+  "pending",
+  "in_production",
+  "done",
+  "cancelled",
+] as const;
+export type ProductionOrderStatus = (typeof PRODUCTION_ORDER_STATUSES)[number];
+
+/** Internal production order — sibling to customer `Order` but the
+ *  demand source is the workshop itself: restocking minimums, market
+ *  events, campaign runs, launches. Drives the brain alongside
+ *  customer orders. Migration 0066. */
+export interface ProductionOrder {
+  id?: string;
+  name?: string;
+  /** ISO date 'YYYY-MM-DD' — when these pieces need to be ready. */
+  dueDate: string;
+  status: ProductionOrderStatus;
+  channel: ProductionOrderChannel;
+  /** Optional link to a campaign for context + roll-up. Required when
+   *  channel = 'campaign_run' (DB check). */
+  campaignId?: string | null;
+  /** Where produced pieces should land — 'store' / 'production' /
+   *  'storage'. Optional; app defaults: restock → triggering location,
+   *  campaign_run → production. */
+  targetLocation?: string | null;
+  notes?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface ProductionOrderItem {
+  id?: string;
+  productionOrderId: string;
+  productId: string;
+  targetUnits: number;
+  sortOrder: number;
+  notes?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface Campaign {
   id?: string;
   name: string;
@@ -2177,8 +2386,13 @@ export interface Campaign {
   /** ISO date 'YYYY-MM-DD' — first day production ramp-up should start.
    *  Null = use a default lead based on targetTotalUnits. */
   productionStartDate?: string;
-  /** Aggregate unit target across all included products. */
+  /** Aggregate unit target across all included products. Optional —
+   *  use `productTargets` for per-product breakdown when each item
+   *  needs its own target quantity. */
   targetTotalUnits?: number;
+  /** Per-product target units. Map of `productId → units`. Drives
+   *  campaign-replenishment scheduling per product. Migration 0063. */
+  productTargets?: Record<string, number>;
   /** Product IDs belonging to this campaign. Stored as array so a
    *  single read pulls the full set. */
   productIds: string[];
@@ -2431,8 +2645,26 @@ export const STOCK_TRANSFER_REASONS = [
   "waste",
   "gift",
   "tasting",
+  "event_sample",
+  "staff",
+  "sold",
+  "custom_box",
 ] as const;
 export type StockTransferReason = (typeof STOCK_TRANSFER_REASONS)[number];
+
+export const STOCK_TRANSFER_REASON_LABELS: Record<StockTransferReason, string> = {
+  "auto-replenish": "Auto replenish",
+  "shop-request":   "Shop request",
+  manual:           "Manual",
+  return:           "Return",
+  waste:            "Waste",
+  gift:             "Gift / giveaway",
+  tasting:          "Tasting",
+  event_sample:     "Event sample",
+  staff:            "Staff / owner",
+  sold:             "Sold (counter walk-in)",
+  custom_box:       "Used in custom box",
+};
 
 /** Movement of any stock entity between two locations. */
 export interface StockTransfer {
@@ -2445,6 +2677,10 @@ export interface StockTransfer {
   transferredAt: Date;
   transferredByPersonId?: string;
   reason: StockTransferReason;
+  /** Per-piece sale price in euros, captured for sold rows so the
+   *  weekly sales report can roll up revenue without joining orders.
+   *  Null for non-revenue movements (waste, transfer, etc). */
+  unitPrice?: number | null;
   notes?: string;
   createdAt?: Date;
 }

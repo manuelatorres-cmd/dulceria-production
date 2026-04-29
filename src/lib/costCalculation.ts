@@ -123,6 +123,7 @@ export function calculateProductCost(input: CostCalculationInput): CostCalculati
     const fillingTotalG = lis.reduce((s, li) => s + li.amount, 0);
 
     for (const li of lis) {
+      if (!li.ingredientId) continue; // sub-filling line — not yet recursed into
       const ingredientFraction = fillingTotalG > 0 ? li.amount / fillingTotalG : 0;
       const ingredientGrams = fillingWeightG * ingredientFraction;
       const cpg = ingredientCostMap.get(li.ingredientId) ?? null;
@@ -208,6 +209,7 @@ export function calculateFillingCost(
   let nonMassUnits = 0;
 
   for (const li of fillingIngredients) {
+    if (!li.ingredientId) continue; // sub-filling line — not yet recursed into
     const ing = ingredientMap.get(li.ingredientId);
     if (!ing) continue;
 

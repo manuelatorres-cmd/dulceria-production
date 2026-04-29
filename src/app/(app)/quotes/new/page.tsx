@@ -545,7 +545,7 @@ function NewQuotePageInner() {
             </div>
           ) : (
             <div>
-              <label className="label">Total sell price (€)</label>
+              <label className="label">Total sell price, net (€)</label>
               <input
                 type="number"
                 min="0"

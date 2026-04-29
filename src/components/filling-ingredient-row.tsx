@@ -1,15 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { FillingIngredient, Ingredient } from "@/types";
+import type { Filling, FillingIngredient, Ingredient } from "@/types";
 import { deleteFillingIngredient, saveFillingIngredient } from "@/lib/hooks";
-import { GripVertical, Trash2, Lock } from "lucide-react";
+import { GripVertical, Trash2, Lock, Layers } from "lucide-react";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
 
 interface FillingIngredientRowProps {
   li: FillingIngredient;
   ingredient: Ingredient | undefined;
+  /** When the row points at another filling (sub-component) rather
+   *  than a raw ingredient, pass the resolved Filling so the row can
+   *  label and link correctly. */
+  componentFilling?: Filling;
   pct?: number;
   onChanged: () => void;
   dragHandleListeners?: SyntheticListenerMap;
@@ -21,6 +25,7 @@ interface FillingIngredientRowProps {
 export function FillingIngredientRow({
   li,
   ingredient,
+  componentFilling,
   pct,
   onChanged,
   dragHandleListeners,
@@ -28,6 +33,7 @@ export function FillingIngredientRow({
   isDragging,
   readonly,
 }: FillingIngredientRowProps) {
+  const isSubFilling = !!li.componentFillingId;
   const [amount, setAmount] = useState(String(li.amount));
   const [note, setNote] = useState(li.note ?? "");
   const [pendingRemove, setPendingRemove] = useState(false);
@@ -70,11 +76,21 @@ export function FillingIngredientRow({
           <GripVertical className="w-4 h-4" />
         </button>
       )}
-      <span className="flex-1 text-sm truncate">
-        {ingredient?.name ?? "Unknown"}
-        {ingredient?.manufacturer && (
-          <span className="text-muted-foreground"> ({ingredient.manufacturer})</span>
+      <span className="flex-1 text-sm truncate flex items-center gap-1.5">
+        {isSubFilling && (
+          <Layers
+            className="w-3.5 h-3.5 text-[var(--accent-lilac-ink)] shrink-0"
+            aria-label="Sub-filling"
+          />
         )}
+        <span className="truncate">
+          {isSubFilling
+            ? (componentFilling?.name ?? "Unknown filling")
+            : (ingredient?.name ?? "Unknown")}
+          {!isSubFilling && ingredient?.manufacturer && (
+            <span className="text-muted-foreground"> ({ingredient.manufacturer})</span>
+          )}
+        </span>
       </span>
       {pct != null && (
         <span className="text-xs text-muted-foreground w-10 text-right shrink-0">

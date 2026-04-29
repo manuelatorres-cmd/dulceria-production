@@ -158,7 +158,7 @@ export function computeCustomerAnalytics(
     seasonalSuggestion = {
       referenceOrderAt: orderAt,
       suggestedFollowupOn: suggested,
-      note: `Customer ordered on ${orderAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} — follow up ~2 weeks before the anniversary (${suggested.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}).`,
+      note: `Customer ordered on ${orderAt.toLocaleDateString("de-AT", { day: "numeric", month: "long", year: "numeric" })} — follow up ~2 weeks before the anniversary (${suggested.toLocaleDateString("de-AT", { day: "numeric", month: "short" })}).`,
     };
   }
 

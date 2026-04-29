@@ -14,7 +14,7 @@
 
 import type {
   Order, OrderItem, Product, ProductFilling, FillingIngredient, Ingredient,
-  Mould, CapacityConfig,
+  Mould, CapacityConfig, IngredientStock, Campaign, ProductionOrder, ProductionOrderItem,
 } from "@/types";
 
 export interface ShoppingNeedRow {
@@ -40,6 +40,17 @@ export interface ShoppingNeedsInput {
   fillingIngredientsByFillingId: Map<string, FillingIngredient[]>;
   ingredients: Ingredient[];
   config: CapacityConfig | null;
+  /** New stock-of-truth (migration 0044). When passed, overrides
+   *  the legacy `ingredient.currentStockG` mirror so shopping
+   *  always sees the same number as the Stock tab. Optional for
+   *  backward compat — fall back to currentStockG when omitted. */
+  ingredientStock?: IngredientStock[];
+  /** Internal production demand sources to add into the needed-grams
+   *  total: campaign productTargets and pending production orders.
+   *  All optional — omit for the legacy "orders only" calc. */
+  campaigns?: Campaign[];
+  productionOrders?: ProductionOrder[];
+  productionOrderItems?: ProductionOrderItem[];
 }
 
 export interface ShoppingNeedsResult {
@@ -94,10 +105,13 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
         if (fillingGrams <= 0) continue;
 
         const lis = fillingIngredientsByFillingId.get(pf.fillingId) ?? [];
-        const totalRecipeG = lis.reduce((s, li) => s + toGrams(li.amount, li.unit, warnings, ingMap.get(li.ingredientId)?.name), 0);
+        // Ingredient-only rows for shopping math. Nested sub-fillings are
+        // skipped here — recursion into them is a follow-up.
+        const ingLis = lis.filter((li): li is typeof li & { ingredientId: string } => !!li.ingredientId);
+        const totalRecipeG = ingLis.reduce((s, li) => s + toGrams(li.amount, li.unit, warnings, ingMap.get(li.ingredientId)?.name), 0);
         if (totalRecipeG <= 0) continue;
 
-        for (const li of lis) {
+        for (const li of ingLis) {
           const amountG = toGrams(li.amount, li.unit, warnings, ingMap.get(li.ingredientId)?.name);
           if (amountG <= 0) continue;
           const fraction = amountG / totalRecipeG;
@@ -117,11 +131,80 @@ export function computeShoppingNeeds(input: ShoppingNeedsInput): ShoppingNeedsRe
     }
   }
 
+  // Internal-demand pass: walk each (productId, units) coming from
+  // campaign productTargets + pending production-order items. Same
+  // math as the order loop, just different demand source. Done as a
+  // helper so the two callers reuse the exact same expansion.
+  function addInternalDemand(productId: string, units: number) {
+    if (units <= 0) return;
+    const product = productMap.get(productId);
+    if (!product) return;
+    const mould = product.defaultMouldId ? mouldMap.get(product.defaultMouldId) : undefined;
+    if (!mould) return;
+    const fillingsWeightPerProduct = mould.fillingGramsPerCavity ?? mould.cavityWeightG;
+    const totalFillingsG = fillingsWeightPerProduct * units;
+    const pfs = pfByProduct.get(product.id!) ?? [];
+    for (const pf of pfs) {
+      const pct = (pf.fillPercentage ?? 0) / 100;
+      const fillingGrams = pf.fillGrams != null ? pf.fillGrams * units : totalFillingsG * pct;
+      if (fillingGrams <= 0) continue;
+      const lis = fillingIngredientsByFillingId.get(pf.fillingId) ?? [];
+      const ingLis = lis.filter((li): li is typeof li & { ingredientId: string } => !!li.ingredientId);
+      const totalRecipeG = ingLis.reduce((s, li) => s + toGrams(li.amount, li.unit, warnings, ingMap.get(li.ingredientId)?.name), 0);
+      if (totalRecipeG <= 0) continue;
+      for (const li of ingLis) {
+        const amountG = toGrams(li.amount, li.unit, warnings, ingMap.get(li.ingredientId)?.name);
+        if (amountG <= 0) continue;
+        const fraction = amountG / totalRecipeG;
+        const ingredientGrams = fillingGrams * fraction * fillingBufferFactor;
+        needed.set(li.ingredientId, (needed.get(li.ingredientId) ?? 0) + ingredientGrams);
+      }
+    }
+    if (product.shellIngredientId) {
+      const shellPct = (product.shellPercentage ?? 0) / 100;
+      const shellG = mould.cavityWeightG * shellPct * units * fillingBufferFactor;
+      if (shellG > 0) {
+        needed.set(product.shellIngredientId, (needed.get(product.shellIngredientId) ?? 0) + shellG);
+      }
+    }
+  }
+  // Campaign productTargets — only count campaigns that are still
+  // open (planned/active) and whose endDate is today or future.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  for (const c of input.campaigns ?? []) {
+    if (c.status !== "planned" && c.status !== "active") continue;
+    if (c.endDate && c.endDate < todayIso) continue;
+    for (const [pid, units] of Object.entries(c.productTargets ?? {})) {
+      addInternalDemand(pid, units);
+    }
+  }
+  // Production orders — only pending / in_production.
+  const itemsByPo = new Map<string, ProductionOrderItem[]>();
+  for (const it of input.productionOrderItems ?? []) {
+    const arr = itemsByPo.get(it.productionOrderId) ?? [];
+    arr.push(it);
+    itemsByPo.set(it.productionOrderId, arr);
+  }
+  for (const po of input.productionOrders ?? []) {
+    if (po.status !== "pending" && po.status !== "in_production") continue;
+    const items = itemsByPo.get(po.id!) ?? [];
+    for (const it of items) {
+      addInternalDemand(it.productId, it.targetUnits);
+    }
+  }
+
+  // Stock map keyed by ingredientId for the new ingredientStock table.
+  // Falls back to ingredients.currentStockG when no row exists yet.
+  const stockMap = new Map<string, number>();
+  for (const s of input.ingredientStock ?? []) {
+    stockMap.set(s.ingredientId, Number(s.quantityG));
+  }
+
   const rows: ShoppingNeedRow[] = [];
   for (const [id, neededG] of needed.entries()) {
     const ing = ingMap.get(id);
     if (!ing) continue;
-    const onHandG = ing.currentStockG ?? 0;
+    const onHandG = stockMap.has(id) ? stockMap.get(id)! : (ing.currentStockG ?? 0);
     const shortageG = Math.max(0, neededG - onHandG);
     rows.push({
       ingredientId: id,

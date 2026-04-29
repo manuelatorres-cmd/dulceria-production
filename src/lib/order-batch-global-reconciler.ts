@@ -161,35 +161,54 @@ export function reconcileGlobalProduceDemand(
   // page (see markOrderAsPacked in hooks.ts). This reconciler only
   // cares about produce-fresh demand.
 
-  // Per-item: how much is already committed to an active batch? That
-  // portion is already in production and shouldn't double-book into a
-  // new batch.
+  // Per-item: how much is already committed to an in-flight or
+  // already-completed batch. Active batches are mid-production. Done
+  // batches have already shipped their allocations. Both count as
+  // "fulfilled" so the reconciler doesn't spawn a fresh batch when
+  // the demand is in fact already covered.
+  const donePlanIds = new Set(plans.filter((p) => p.status === "done").map((p) => p.id!));
+  const fulfilledPlanIds = new Set([...activePlanIds, ...donePlanIds]);
   const activeAllocByItem = new Map<string, number>();
   for (const link of links) {
-    if (!activePlanIds.has(link.planId)) continue;
+    if (!fulfilledPlanIds.has(link.planId)) continue;
     activeAllocByItem.set(
       link.orderItemId,
       (activeAllocByItem.get(link.orderItemId) ?? 0) + link.allocatedQuantity,
     );
   }
 
-  // Group eligible items by productId, accumulating remaining demand.
-  const demandByProduct = new Map<string, Array<{ itemId: string; remaining: number }>>();
+  // Group eligible items by productId, accumulating remaining demand
+  // alongside each contributing item's deadline. Deadline drives the
+  // shelf-life-aware clustering below — items whose order deadlines
+  // are too far apart can't share a batch (the chocolates would expire
+  // before the latest order is fulfilled).
+  const orderById = new Map(openOrders.map((o) => [o.id!, o]));
+  const demandByProduct = new Map<
+    string,
+    Array<{ itemId: string; remaining: number; deadlineMs: number }>
+  >();
   for (const item of eligibleItems) {
     const alreadyInActive = activeAllocByItem.get(item.id!) ?? 0;
     const remaining = Math.max(0, item.quantity - alreadyInActive);
     if (remaining <= 0) continue;
+    const order = orderById.get(item.orderId);
+    const deadlineMs = order?.deadline ? new Date(order.deadline).getTime() : 0;
     const arr = demandByProduct.get(item.productId) ?? [];
-    arr.push({ itemId: item.id!, remaining });
+    arr.push({ itemId: item.id!, remaining, deadlineMs });
     demandByProduct.set(item.productId, arr);
   }
 
-  // Existing DRAFT batches indexed by productId — at most one per
-  // product in the steady state, but we tolerate >1 by keeping the
-  // first and cancelling the rest.
+  // Existing DRAFT batches indexed by productId. Campaign-driven and
+  // PO-driven plans are EXCLUDED — they're owned by their respective
+  // seeders (`seedCampaignDrivenPlans`, `seedProductionOrderDrivenPlans`)
+  // and carry deadlines tied to their source. Without this filter the
+  // reconciler would repurpose a campaign plan as the home for an
+  // online order's demand, polluting the campaign plan's deadline.
   const draftBatchesByProduct = new Map<string, Array<ProductionPlan & { planProductId: string; productId: string; mouldId: string }>>();
   for (const plan of plans) {
     if (plan.status !== "draft") continue;
+    const name = plan.name ?? "";
+    if (name.startsWith("Campaign:") || name.startsWith("PO:")) continue;
     const pp = planProductByPlan.get(plan.id!);
     if (!pp) continue;
     const arr = draftBatchesByProduct.get(pp.productId) ?? [];
@@ -208,6 +227,17 @@ export function reconcileGlobalProduceDemand(
 
   let tempCounter = 0;
 
+  // Hard cap: orders only consolidate into one batch when their
+  // deadlines are within MAX_CLUSTER_GAP_DAYS of each other. Beyond
+  // that, the chocolates would either expire before the latest order
+  // or be uncomfortably old at delivery. Operator preference: keep
+  // batches deadline-tight; surplus drift to shop store via the
+  // surplusDestination at unmould-time. Default 3 days — explicit,
+  // not derived from shelf life, so the rule reads the same regardless
+  // of which product variant is involved.
+  const MAX_CLUSTER_GAP_DAYS = 3;
+  const MAX_CLUSTER_GAP_MS = MAX_CLUSTER_GAP_DAYS * 86_400_000;
+
   for (const [productId, demands] of demandByProduct) {
     const product = productById.get(productId);
     if (!product) {
@@ -222,54 +252,91 @@ export function reconcileGlobalProduceDemand(
       continue;
     }
 
-    const totalDemand = demands.reduce((s, d) => s + d.remaining, 0);
-    const moulds = Math.ceil(totalDemand / mould.numberOfCavities);
-    const totalPieces = moulds * mould.numberOfCavities;
-    const allocations = demands.map((d) => ({ orderItemId: d.itemId, allocatedQuantity: d.remaining }));
-
-    // Pick an existing draft batch for this product if one exists;
-    // cancel any siblings to enforce one-draft-per-product.
-    const existingDrafts = draftBatchesByProduct.get(productId) ?? [];
-    const primary = existingDrafts[0];
-    for (let i = 1; i < existingDrafts.length; i++) {
-      const extra = existingDrafts[i];
-      decision.plansToCancel.push(extra.id!);
-      for (const link of links) {
-        if (link.planId === extra.id && link.id) decision.linksToDelete.push(link.id);
+    // Sort items by deadline ascending then split into clusters where
+    // consecutive deadline gap exceeds the freshness window. Each
+    // cluster becomes its own consolidated batch.
+    // For clustering, clamp every past-deadline item to "today" so
+    // multiple overdue orders all merge into one ASAP batch instead of
+    // splitting into separate-day batches. The scheduler still reads
+    // the real (past) deadline for ASAP placement; this is purely a
+    // grouping rule.
+    const todayMs = (() => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    })();
+    const clusterKey = (d: { deadlineMs: number }) => Math.max(d.deadlineMs, todayMs);
+    const sorted = demands.slice().sort((a, b) => clusterKey(a) - clusterKey(b));
+    const clusters: Array<typeof sorted> = [];
+    for (const d of sorted) {
+      const last = clusters[clusters.length - 1];
+      if (!last) { clusters.push([d]); continue; }
+      const earliest = clusterKey(last[0]);
+      if (clusterKey(d) - earliest <= MAX_CLUSTER_GAP_MS) {
+        last.push(d);
+      } else {
+        clusters.push([d]);
       }
     }
 
-    if (primary) {
-      // Queue link replacement for the primary draft — old links go,
-      // new consolidated set will be inserted.
-      for (const link of links) {
-        if (link.planId === primary.id && link.id) decision.linksToDelete.push(link.id);
+    // Match clusters to existing draft batches by best-fit on deadline:
+    // sort drafts by their earliest linked-deadline (or creation time
+    // as fallback) and pair index-by-index. Surplus drafts (no cluster)
+    // are cancelled; surplus clusters spawn new batches.
+    const existingDrafts = (draftBatchesByProduct.get(productId) ?? [])
+      .slice()
+      .sort((a, b) => {
+        const da = earliestDraftDeadlineMs(a.id!, links, openOrderItems, orderById);
+        const db = earliestDraftDeadlineMs(b.id!, links, openOrderItems, orderById);
+        return da - db;
+      });
+
+    for (let i = 0; i < Math.max(clusters.length, existingDrafts.length); i++) {
+      const cluster = clusters[i];
+      const draft = existingDrafts[i];
+
+      if (cluster && draft) {
+        // Update existing draft with this cluster's allocations.
+        const totalDemand = cluster.reduce((s, d) => s + d.remaining, 0);
+        const moulds = Math.ceil(totalDemand / mould.numberOfCavities);
+        const totalPieces = moulds * mould.numberOfCavities;
+        const allocations = cluster.map((d) => ({ orderItemId: d.itemId, allocatedQuantity: d.remaining }));
+        for (const link of links) {
+          if (link.planId === draft.id && link.id) decision.linksToDelete.push(link.id);
+        }
+        decision.updateBatches.push({
+          tempId: `__update_${tempCounter++}`,
+          planId: draft.id!,
+          planProductId: draft.planProductId,
+          productId,
+          productName: product.name,
+          mouldId: mould.id!,
+          moulds, totalPieces, totalDemand,
+          surplus: totalPieces - totalDemand,
+          allocations,
+        });
+      } else if (cluster) {
+        // No matching draft → spawn a new batch for this cluster.
+        const totalDemand = cluster.reduce((s, d) => s + d.remaining, 0);
+        const moulds = Math.ceil(totalDemand / mould.numberOfCavities);
+        const totalPieces = moulds * mould.numberOfCavities;
+        const allocations = cluster.map((d) => ({ orderItemId: d.itemId, allocatedQuantity: d.remaining }));
+        decision.newBatches.push({
+          tempId: `__new_${tempCounter++}`,
+          productId,
+          productName: product.name,
+          mouldId: mould.id!,
+          moulds, totalPieces, totalDemand,
+          surplus: totalPieces - totalDemand,
+          allocations,
+        });
+      } else if (draft) {
+        // Surplus draft with no cluster → cancel.
+        decision.plansToCancel.push(draft.id!);
+        for (const link of links) {
+          if (link.planId === draft.id && link.id) decision.linksToDelete.push(link.id);
+        }
       }
-      decision.updateBatches.push({
-        tempId: `__update_${tempCounter++}`,
-        planId: primary.id!,
-        planProductId: primary.planProductId,
-        productId,
-        productName: product.name,
-        mouldId: mould.id!,
-        moulds,
-        totalPieces,
-        totalDemand,
-        surplus: totalPieces - totalDemand,
-        allocations,
-      });
-    } else {
-      decision.newBatches.push({
-        tempId: `__new_${tempCounter++}`,
-        productId,
-        productName: product.name,
-        mouldId: mould.id!,
-        moulds,
-        totalPieces,
-        totalDemand,
-        surplus: totalPieces - totalDemand,
-        allocations,
-      });
     }
 
     draftBatchesByProduct.delete(productId); // consumed
@@ -310,6 +377,29 @@ export function reconcileGlobalProduceDemand(
   decision.plansToDelete = [...new Set(decision.plansToDelete)];
 
   return decision;
+}
+
+/** Earliest deadline among all order items currently linked to a
+ *  draft plan. Returned as an epoch-ms number so callers can sort
+ *  drafts cheaply. Plans with no live links return Infinity. */
+function earliestDraftDeadlineMs(
+  planId: string,
+  links: OrderPlanLink[],
+  openOrderItems: OrderItem[],
+  orderById: Map<string, Order>,
+): number {
+  const itemById = new Map(openOrderItems.map((i) => [i.id!, i]));
+  let best = Number.POSITIVE_INFINITY;
+  for (const link of links) {
+    if (link.planId !== planId) continue;
+    const item = itemById.get(link.orderItemId);
+    if (!item) continue;
+    const order = orderById.get(item.orderId);
+    if (!order?.deadline) continue;
+    const t = new Date(order.deadline).getTime();
+    if (t < best) best = t;
+  }
+  return best;
 }
 
 /**

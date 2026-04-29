@@ -51,11 +51,11 @@ export default function WallDisplayPage() {
     return m;
   }, [readings]);
 
-  const nowTime = new Date().toLocaleTimeString("en-GB", {
+  const nowTime = new Date().toLocaleTimeString("de-AT", {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const nowDate = new Date().toLocaleDateString("en-GB", {
+  const nowDate = new Date().toLocaleDateString("de-AT", {
     weekday: "long",
     day: "numeric",
     month: "long",

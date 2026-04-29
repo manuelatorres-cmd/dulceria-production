@@ -3,9 +3,9 @@
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { useIngredients, saveIngredient, setIngredientLowStock, useIngredientCategories, useIngredientCategoryUsageCounts, saveIngredientCategory, useIngredientCategoryNames } from "@/lib/hooks";
-import { ALLERGEN_LIST, DIET_LIST, costPerGram, allergenLabel, type Ingredient } from "@/types";
-import { Plus, Search, ChevronRight, ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { useIngredients, saveIngredient, setIngredientLowStock, useIngredientCategories, useIngredientCategoryUsageCounts, saveIngredientCategory, useIngredientCategoryNames, useAllIngredientStock, adjustIngredientStock } from "@/lib/hooks";
+import { ALLERGEN_LIST, DIET_LIST, costPerGram, allergenLabel, allergenShortCode, isRealAllergen, type Ingredient } from "@/types";
+import { Plus, Search, ChevronRight, ChevronDown, SlidersHorizontal, X, Package, Minus } from "lucide-react";
 import Link from "next/link";
 import { ListToolbar, FilterPanel, ArchiveFilterChip, QuickAddForm, EmptyState, ListItemCard, MultiSelectDropdown, LowStockFlagButton, StockBadge, GroupStockBadge } from "@/components/pantry";
 import { usePersistedFilters } from "@/lib/use-persisted-filters";
@@ -36,9 +36,10 @@ function getStockStatus(ing: { lowStock?: boolean; lowStockOrdered?: boolean; ou
   return "in-stock";
 }
 
-type IngredientsMainTab = "ingredients" | "categories";
+type IngredientsMainTab = "ingredients" | "stock" | "categories";
 const TABS: { id: IngredientsMainTab; label: string }[] = [
   { id: "ingredients", label: "Ingredients" },
+  { id: "stock", label: "Stock" },
   { id: "categories", label: "Categories" },
 ];
 
@@ -57,7 +58,7 @@ function IngredientsPageInner() {
 
   // URL param wins over sessionStorage (so "Back" links from a category detail land on the right tab)
   useEffect(() => {
-    if (tabParam === "ingredients" || tabParam === "categories") {
+    if (tabParam === "ingredients" || tabParam === "stock" || tabParam === "categories") {
       if (tab.activeTab !== tabParam) setTab("activeTab", tabParam);
     }
   }, [tabParam]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -87,6 +88,7 @@ function IngredientsPageInner() {
       </div>
 
       {activeTab === "ingredients" && <IngredientsTab />}
+      {activeTab === "stock" && <IngredientsStockTab />}
       {activeTab === "categories" && <IngredientCategoriesTab />}
     </div>
   );
@@ -288,6 +290,53 @@ function IngredientsTab() {
           <Plus className="w-5 h-5" />
         </button>
       </div>
+
+      {/* Quick filters — most-used dimensions under the search bar.
+          Per baseline pattern (feedback_filter_ux_pattern.md). */}
+      {(categoryNames.length > 0) && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Stock</span>
+            {STOCK_OPTIONS.filter((o) => o.value !== "all").map(({ value, label }) => {
+              const active = f.filterStock === value;
+              return (
+                <button
+                  key={value}
+                  onClick={() => setF("filterStock", active ? "all" : value)}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    active
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {categoryNames.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Category</span>
+              {categoryNames.map((c) => {
+                const active = filterCategoriesSet.has(c);
+                return (
+                  <button
+                    key={c}
+                    onClick={() => toggleFilterCategory(c)}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
+                      active
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {f.showFilters && (
         <div className="rounded-sm border border-border bg-card p-3 space-y-3">
@@ -543,15 +592,24 @@ function IngredientsTab() {
                                     </>
                                   )}
                                 </div>
-                                {ing.allergens.filter((a) => VALID_TAGS.has(a)).length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {ing.allergens.filter((a) => VALID_TAGS.has(a)).map((a) => (
-                                      <span key={a} className="rounded-sm bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold">
-                                        {allergenLabel(a)}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
+                                {/* Allergen codes — EU-FIC short letters
+                                    (A=Gluten, G=Milk, H=Tree nuts, …).
+                                    Only real allergens are bold; diet
+                                    tags (vegan) are skipped. */}
+                                {(() => {
+                                  const realAllergens = ing.allergens.filter((a) => isRealAllergen(a));
+                                  if (realAllergens.length === 0) return null;
+                                  // De-dup short codes (several tree-nut
+                                  // IDs all collapse to "H", etc.).
+                                  const codes = [
+                                    ...new Set(realAllergens.map((a) => allergenShortCode(a)).filter(Boolean) as string[]),
+                                  ];
+                                  return (
+                                    <p className="mt-1 text-[11px] font-bold tracking-[0.08em] text-primary">
+                                      {codes.join(", ")}
+                                    </p>
+                                  );
+                                })()}
                               </div>
                               <ChevronRight aria-hidden="true" className="w-4 h-4 text-muted-foreground shrink-0" />
                             </Link>
@@ -698,4 +756,257 @@ function IngredientCategoriesTab() {
       )}
     </div>
   );
+}
+
+// ─── Stock tab ─────────────────────────────────────────────────────────
+// Per-ingredient stock view. Shows grams on hand, low-stock threshold,
+// last movement, plus inline receive / recount / waste quick-adjust
+// buttons. Goes through `adjustIngredientStock` so every change writes
+// an audit row in ingredientStockMovements. Search + low-stock-only
+// filter for fast triage.
+
+type StockTabFilter = "all" | "low" | "zero";
+
+function IngredientsStockTab() {
+  const ingredients = useIngredients(false);
+  const stockRows = useAllIngredientStock();
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<StockTabFilter>("all");
+
+  const stockByIngredient = useMemo(() => {
+    const m = new Map<string, typeof stockRows[number]>();
+    for (const s of stockRows) m.set(s.ingredientId, s);
+    return m;
+  }, [stockRows]);
+
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return ingredients
+      .filter((ing) => !q || ing.name.toLowerCase().includes(q))
+      .map((ing) => {
+        const stock = stockByIngredient.get(ing.id!);
+        const qty = Number(stock?.quantityG ?? 0);
+        const threshold = stock?.lowStockThresholdG != null ? Number(stock.lowStockThresholdG) : null;
+        const level: "zero" | "low" | "ok" =
+          qty <= 0 ? "zero" :
+          threshold != null && qty < threshold ? "low" :
+          "ok";
+        return { ing, qty, threshold, level };
+      })
+      .filter((r) => {
+        if (filter === "low") return r.level === "low" || r.level === "zero";
+        if (filter === "zero") return r.level === "zero";
+        return true;
+      })
+      .sort((a, b) => {
+        // zero first, then low, then alpha.
+        const score: Record<typeof a.level, number> = { zero: 0, low: 1, ok: 2 };
+        if (score[a.level] !== score[b.level]) return score[a.level] - score[b.level];
+        return a.ing.name.localeCompare(b.ing.name);
+      });
+  }, [ingredients, stockByIngredient, search, filter]);
+
+  const lowCount = rows.filter((r) => r.level === "low" || r.level === "zero").length;
+
+  return (
+    <div className="px-4 pb-8 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search ingredients"
+            className="input pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          {(["all", "low", "zero"] as StockTabFilter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                filter === f ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {f === "all" ? "All" : f === "low" ? `Low / out (${lowCount})` : "Out only"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="rounded-[14px] border border-dashed border-border bg-card/50 px-6 py-10 text-center">
+          <Package className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm font-medium">{search ? "No matches" : "No ingredients"}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {search ? "Try a different search term." : "Add ingredients first, then receive stock here."}
+          </p>
+        </div>
+      ) : (
+        <ul className="rounded-[14px] border border-border bg-card divide-y divide-border overflow-hidden">
+          {rows.map((r) => (
+            <StockRow
+              key={r.ing.id}
+              ingredientId={r.ing.id!}
+              name={r.ing.name}
+              qty={r.qty}
+              threshold={r.threshold}
+              level={r.level}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function StockRow({
+  ingredientId, name, qty, threshold, level,
+}: {
+  ingredientId: string;
+  name: string;
+  qty: number;
+  threshold: number | null;
+  level: "zero" | "low" | "ok";
+}) {
+  const [openAdjust, setOpenAdjust] = useState<null | "receive" | "waste" | "recount">(null);
+  const [input, setInput] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function close() {
+    setOpenAdjust(null);
+    setInput("");
+    setNotes("");
+  }
+
+  async function handleSubmit() {
+    const n = parseFloat(input);
+    if (!Number.isFinite(n)) return;
+    setSaving(true);
+    try {
+      if (openAdjust === "receive") {
+        await adjustIngredientStock({
+          ingredientId,
+          deltaG: n, // grams — matches the unit used everywhere else in the app
+          reason: "receive",
+          notes: notes || undefined,
+        });
+      } else if (openAdjust === "waste") {
+        await adjustIngredientStock({
+          ingredientId,
+          deltaG: -Math.abs(n),
+          reason: "waste",
+          notes: notes || undefined,
+        });
+      } else if (openAdjust === "recount") {
+        // set absolute — delta = target - current
+        await adjustIngredientStock({
+          ingredientId,
+          deltaG: n - qty,
+          reason: "recount",
+          notes: notes || undefined,
+        });
+      }
+      close();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const qtyLabel = formatGrams(qty);
+  const thresholdLabel = threshold != null ? `threshold ${formatGrams(threshold)}` : "no threshold";
+  const levelPill =
+    level === "zero" ? "bg-[var(--accent-blush-bg)] text-[var(--accent-blush-ink)]" :
+    level === "low"  ? "bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)]" :
+                       "bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)]";
+  const levelLabel = level === "zero" ? "out" : level === "low" ? "low" : "ok";
+
+  return (
+    <li className="px-3 py-2.5">
+      <div className="flex items-center gap-3">
+        <Link
+          href={`/ingredients/${encodeURIComponent(ingredientId)}`}
+          className="flex-1 min-w-0 hover:underline-offset-2 hover:underline"
+        >
+          <p className="text-sm font-medium truncate">{name}</p>
+          <p className="text-[11px] text-muted-foreground">{thresholdLabel}</p>
+        </Link>
+        <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium ${levelPill}`}>{levelLabel}</span>
+        <span className="tabular-nums text-sm font-semibold w-24 text-right">{qtyLabel}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => setOpenAdjust(openAdjust === "receive" ? null : "receive")}
+            className="flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-1 text-[11px] hover:border-foreground/30"
+            title="Receive / intake"
+          >
+            <Plus className="w-3 h-3" /> Receive
+          </button>
+          <button
+            onClick={() => setOpenAdjust(openAdjust === "recount" ? null : "recount")}
+            className="flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-1 text-[11px] hover:border-foreground/30"
+            title="Set exact stock (from a physical count)"
+          >
+            Recount
+          </button>
+          <button
+            onClick={() => setOpenAdjust(openAdjust === "waste" ? null : "waste")}
+            className="flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-1 text-[11px] hover:border-foreground/30"
+            title="Log waste / disposal"
+          >
+            <Minus className="w-3 h-3" /> Waste
+          </button>
+        </div>
+      </div>
+      {openAdjust && (
+        <div className="mt-2 flex flex-wrap items-end gap-2 rounded-[10px] border border-border bg-muted/30 p-2">
+          <div className="flex flex-col">
+            <label className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+              {openAdjust === "recount" ? "New total (g)" : openAdjust === "receive" ? "Amount (g)" : "Waste (g)"}
+            </label>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              className="input w-28"
+              autoFocus
+            />
+          </div>
+          <div className="flex flex-col flex-1 min-w-[160px]">
+            <label className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">Notes (optional)</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={openAdjust === "receive" ? "supplier / batch" : openAdjust === "waste" ? "reason" : "physical count"}
+              className="input"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleSubmit}
+              disabled={saving || !input}
+              className="rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              onClick={close}
+              className="rounded-sm border border-border px-3 py-1.5 text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function formatGrams(g: number): string {
+  if (g >= 1000) return `${(g / 1000).toFixed(g >= 10_000 ? 1 : 2)} kg`;
+  return `${Math.round(g)} g`;
 }

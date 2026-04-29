@@ -86,12 +86,12 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
   return (
     <div>
       <div className="px-4 pt-6 pb-2">
-        <Link
-          href="/ingredients?tab=categories"
+        <button
+          onClick={() => router.back()}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
-        </Link>
+        </button>
       </div>
 
       <div className="px-4 pb-6 space-y-6 max-w-lg">

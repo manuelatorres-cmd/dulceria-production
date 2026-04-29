@@ -2,13 +2,14 @@
 
 import { useState, useCallback, useEffect, use } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useFilling, useFillingIngredients, useIngredients, saveFilling, deleteFilling, deleteFillingWithCleanup, archiveFillingWithCleanup, unarchiveFilling, updateFillingAllergens, useFillingUsage, reorderFillingIngredients, useFillingVersionHistory, forkFillingVersion, getFillingForkImpact, getFillingDeleteImpact, hasProductBeenProduced, hasFillingBeenProduced, getFillingArchiveImpact, useProductsList, saveProduct, addFillingToProduct, duplicateFilling, useAllFillingStatuses, useMarketRegion } from "@/lib/hooks";
+import { useFilling, useFillingIngredients, useIngredients, useFillings, saveFilling, deleteFilling, deleteFillingWithCleanup, archiveFillingWithCleanup, unarchiveFilling, updateFillingAllergens, useFillingUsage, reorderFillingIngredients, useFillingVersionHistory, forkFillingVersion, getFillingForkImpact, getFillingDeleteImpact, hasProductBeenProduced, hasFillingBeenProduced, getFillingArchiveImpact, useProductsList, saveProduct, addFillingToProduct, duplicateFilling, useAllFillingStatuses, useMarketRegion } from "@/lib/hooks";
 import { calculateFillingNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
 import { buildFillingIngredientList } from "@/lib/ingredientList";
 import { calculateFillingCost, formatCost } from "@/lib/costCalculation";
 import { useCurrencySymbol } from "@/lib/hooks";
 import type { FillingArchiveImpact, FillingDeleteImpact } from "@/lib/hooks";
 import { SortableFillingIngredientRow } from "@/components/sortable-filling-ingredient-row";
+import { DetailNav } from "@/components/detail-nav";
 import { AddFillingIngredient } from "@/components/add-filling-ingredient";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -125,6 +126,12 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
     if (ing.id != null) ingredientMap.set(ing.id, ing);
   }
 
+  const allFillings = useFillings();
+  const fillingMap = new Map<string, typeof allFillings[number]>();
+  for (const f of allFillings) {
+    if (f.id != null) fillingMap.set(f.id, f);
+  }
+
   function toGrams(amount: number, unit: string): number | null {
     if (unit === "g" || unit === "ml") return amount;
     if (unit === "kg" || unit === "L") return amount * 1000;
@@ -227,13 +234,19 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div>
-      <div className="px-4 pt-6 pb-2">
+      <div className="px-4 pt-6 pb-2 space-y-2">
         <button
           onClick={() => safeBack()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-3"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground"
         >
           <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
         </button>
+        <DetailNav
+          items={[...allFillings].sort((a, b) => a.name.localeCompare(b.name))}
+          currentId={fillingId}
+          hrefFor={(f) => `/fillings/${encodeURIComponent(f.id!)}`}
+          labelFor={(f) => f.name}
+        />
       </div>
 
       <div className="px-4 pb-4 space-y-4">
@@ -474,7 +487,8 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                       <SortableFillingIngredientRow
                         key={li.id}
                         li={li}
-                        ingredient={ingredientMap.get(li.ingredientId)}
+                        ingredient={li.ingredientId ? ingredientMap.get(li.ingredientId) : undefined}
+                        componentFilling={li.componentFillingId ? fillingMap.get(li.componentFillingId) : undefined}
                         pct={pct}
                         onChanged={handleIngredientChanged}
                         readonly={!editing || (filling.status === "confirmed" && !unlocked)}
@@ -1259,7 +1273,7 @@ function FillingVersionHistoryTab({ versions, currentId }: { versions: import("@
       {sorted.map((v) => {
         const isCurrent = v.id === currentId;
         const dateStr = v.createdAt
-          ? new Date(v.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+          ? new Date(v.createdAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })
           : null;
         return (
           <li
@@ -1286,7 +1300,7 @@ function FillingVersionHistoryTab({ versions, currentId }: { versions: import("@
               <p className="text-xs text-muted-foreground mt-1">
                 Archived
                 {v.supersededAt
-                  ? ` · ${new Date(v.supersededAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+                  ? ` · ${new Date(v.supersededAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}`
                   : ""}
               </p>
             )}

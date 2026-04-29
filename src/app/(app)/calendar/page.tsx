@@ -1,39 +1,67 @@
 "use client";
 
-import { useMemo } from "react";
-import { PageHeader } from "@/components/page-header";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   useCampaigns,
   useBlockedDays,
   useProductionDays,
+  useOrders,
 } from "@/lib/hooks";
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalIcon } from "lucide-react";
 
 /**
- * Master calendar — 12-month yearly overview.
+ * Master calendar — focused month view with a side panel showing the
+ * selected day's items and quick-create routes.
  *
- * Aggregates every scheduled signal the brain cares about:
- *   - Campaigns (seasonal + limited + launches)
- *   - Workshop closures / blocked days (legacy EventCalendarEntry)
- *   - Austrian public holidays (hard-coded preset)
- *   - Production days that have batches scheduled (pulled
- *     transparently so the master view matches the planner view)
- *
- * One screen, zoomable by scrolling. Click a month to jump to the
- * planner for that window.
+ * Data aggregated: campaigns, workshop closures, Austrian public holidays,
+ * event-channel orders, and production days (from the scheduler). Each
+ * surfaces as a coloured dot on the day; clicking a day populates the
+ * side panel. No new "events" type — the panel routes to the existing
+ * creation flows (orders / campaigns / settings → blocked days).
  */
-export default function MasterCalendarPage() {
+
+const CARD = "bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+const INNER = "rounded-[12px] border border-border";
+
+type MarkerKind = "campaign" | "closure" | "holiday" | "production" | "order";
+interface Marker {
+  kind: MarkerKind;
+  label: string;
+  href?: string;
+}
+
+const MARKER_COLOR: Record<MarkerKind, string> = {
+  campaign:   "var(--accent-terracotta-ink)",
+  closure:    "var(--accent-butter-ink)",
+  holiday:    "var(--accent-blush-ink)",
+  production: "var(--accent-sage-ink)",
+  order:      "var(--accent-peach-ink)",
+};
+
+const MARKER_LABEL: Record<MarkerKind, string> = {
+  campaign: "Campaign",
+  closure: "Closure",
+  holiday: "Holiday",
+  production: "Production",
+  order: "Event order",
+};
+
+export default function CalendarPage() {
   const campaigns = useCampaigns();
   const blocked = useBlockedDays();
   const productionDays = useProductionDays(400);
+  const orders = useOrders();
 
-  const year = new Date().getUTCFullYear();
-  const months = useMemo(() => buildYearGrid(year), [year]);
-
-  const holidays = useMemo(() => AUSTRIAN_HOLIDAYS(year), [year]);
+  // Focused month — starts at today's month. Arrows shift ±1.
+  const today = new Date();
+  const todayIso = toIsoDate(today);
+  const [focusYear, setFocusYear] = useState(today.getFullYear());
+  const [focusMonth, setFocusMonth] = useState(today.getMonth()); // 0-indexed
+  const [selectedIso, setSelectedIso] = useState<string>(todayIso);
 
   const markersByDate = useMemo(() => {
     const m = new Map<string, Marker[]>();
-    // Campaigns — add a marker every day from start to end.
     for (const c of campaigns) {
       if (!c.startDate || !c.endDate) continue;
       const cursor = new Date(c.startDate + "T00:00:00Z");
@@ -41,12 +69,11 @@ export default function MasterCalendarPage() {
       while (cursor.getTime() <= end.getTime()) {
         const iso = cursor.toISOString().slice(0, 10);
         const list = m.get(iso) ?? [];
-        list.push({ kind: "campaign", label: c.name });
+        list.push({ kind: "campaign", label: c.name, href: c.id ? `/campaigns/${c.id}` : "/campaigns" });
         m.set(iso, list);
         cursor.setUTCDate(cursor.getUTCDate() + 1);
       }
     }
-    // Blocked days (legacy eventCalendar rows marked `blocked`).
     for (const b of blocked) {
       if (!b.startDate) continue;
       const cursor = new Date(b.startDate + "T00:00:00Z");
@@ -54,95 +81,281 @@ export default function MasterCalendarPage() {
       while (cursor.getTime() <= end.getTime()) {
         const iso = cursor.toISOString().slice(0, 10);
         const list = m.get(iso) ?? [];
-        list.push({ kind: "closure", label: b.name ?? "Closed" });
+        list.push({ kind: "closure", label: b.name ?? "Closed", href: "/settings" });
         m.set(iso, list);
         cursor.setUTCDate(cursor.getUTCDate() + 1);
       }
     }
-    // Production days with at least one batch.
     for (const d of productionDays) {
       if (!d.date) continue;
       const iso = d.date.slice(0, 10);
       const list = m.get(iso) ?? [];
-      list.push({ kind: "production", label: "Production" });
+      list.push({ kind: "production", label: "Production day", href: "/plan" });
       m.set(iso, list);
     }
-    // Austrian holidays.
-    for (const h of holidays) {
+    for (const o of orders) {
+      if (o.channel !== "event") continue;
+      if (!o.deadline) continue;
+      const iso = o.deadline.slice(0, 10);
+      const list = m.get(iso) ?? [];
+      list.push({
+        kind: "order",
+        label: o.customerName || o.eventName || "(event order)",
+        href: o.id ? `/orders/${o.id}` : "/orders",
+      });
+      m.set(iso, list);
+    }
+    const year = focusYear;
+    for (const h of AUSTRIAN_HOLIDAYS(year)) {
+      const list = m.get(h.date) ?? [];
+      list.push({ kind: "holiday", label: h.name });
+      m.set(h.date, list);
+    }
+    // Adjacent years — holidays spanning Jan/Dec views.
+    for (const h of AUSTRIAN_HOLIDAYS(year - 1)) {
+      const list = m.get(h.date) ?? [];
+      list.push({ kind: "holiday", label: h.name });
+      m.set(h.date, list);
+    }
+    for (const h of AUSTRIAN_HOLIDAYS(year + 1)) {
       const list = m.get(h.date) ?? [];
       list.push({ kind: "holiday", label: h.name });
       m.set(h.date, list);
     }
     return m;
-  }, [campaigns, blocked, productionDays, holidays]);
+  }, [campaigns, blocked, productionDays, orders, focusYear]);
+
+  function shiftMonth(delta: number) {
+    const d = new Date(focusYear, focusMonth + delta, 1);
+    setFocusYear(d.getFullYear());
+    setFocusMonth(d.getMonth());
+  }
+
+  const focusMonthLabel = new Date(focusYear, focusMonth, 1)
+    .toLocaleDateString("de-AT", { month: "long", year: "numeric" });
+
+  const focusedGrid = useMemo(() => buildMonthGrid(focusYear, focusMonth), [focusYear, focusMonth]);
+  const nextGrid = useMemo(() => {
+    const n = new Date(focusYear, focusMonth + 1, 1);
+    return buildMonthGrid(n.getFullYear(), n.getMonth());
+  }, [focusYear, focusMonth]);
+  const next2Grid = useMemo(() => {
+    const n = new Date(focusYear, focusMonth + 2, 1);
+    return buildMonthGrid(n.getFullYear(), n.getMonth());
+  }, [focusYear, focusMonth]);
+
+  const selectedMarkers = markersByDate.get(selectedIso) ?? [];
+  const selectedDate = new Date(selectedIso + "T12:00:00");
+  const selectedLabel = selectedDate.toLocaleDateString("de-AT", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
 
   return (
-    <div>
-      <PageHeader
-        title={`Calendar · ${year}`}
-        description="Campaigns, closures, public holidays, production days. Click a day to jump to the planner for that window."
-      />
+    <div className="px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto">
+      {/* Header */}
+      <div className="mb-4 flex flex-wrap items-baseline gap-3">
+        <h1
+          className="text-[26px] tracking-[-0.025em]"
+          style={{ fontFamily: "var(--font-serif)", fontWeight: 400 }}
+        >
+          Calendar
+        </h1>
+        <span className="text-[12px] text-muted-foreground">
+          Campaigns · event orders · closures · holidays · production days
+        </span>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={() => shiftMonth(-1)}
+            className="rounded-full border border-border bg-card w-8 h-8 flex items-center justify-center hover:border-foreground/30"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => { setFocusYear(today.getFullYear()); setFocusMonth(today.getMonth()); setSelectedIso(todayIso); }}
+            className="rounded-full border border-border bg-card px-3 h-8 text-[12px] hover:border-foreground/30"
+          >
+            Today
+          </button>
+          <button
+            onClick={() => shiftMonth(1)}
+            className="rounded-full border border-border bg-card w-8 h-8 flex items-center justify-center hover:border-foreground/30"
+            aria-label="Next month"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {months.map((month) => (
-          <MonthBlock
-            key={month.monthNumber}
-            month={month}
+      {/* Main: focused month + side panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-3 mb-3">
+        <section className={CARD}>
+          <h2
+            className="text-[20px] mb-3 tracking-[-0.02em]"
+            style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}
+          >
+            {focusMonthLabel}
+          </h2>
+          <MonthGrid
+            grid={focusedGrid}
             markers={markersByDate}
+            selectedIso={selectedIso}
+            onSelect={setSelectedIso}
+            large
           />
-        ))}
-      </section>
+          <LegendRow />
+        </section>
 
-      <footer className="mt-6 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-        <Legend colour="bg-[color:var(--accent-terracotta-ink)]">Campaign</Legend>
-        <Legend colour="bg-[color:var(--color-status-warn)]">Closure</Legend>
-        <Legend colour="bg-[color:var(--accent-blue-ink)]">Holiday</Legend>
-        <Legend colour="bg-[color:var(--accent-sage-ink)]">Production day</Legend>
-      </footer>
+        <section className={CARD}>
+          <h3 className="text-[10px] tracking-[0.08em] uppercase text-muted-foreground font-semibold mb-2">
+            Selected day
+          </h3>
+          <p
+            className="text-[17px] mb-3 tracking-[-0.02em]"
+            style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}
+          >
+            {selectedLabel}
+            {selectedIso === todayIso && (
+              <span className="ml-2 text-[11px] text-muted-foreground font-normal">· today</span>
+            )}
+          </p>
+
+          {selectedMarkers.length === 0 ? (
+            <div className={`${INNER} bg-muted/40 px-3 py-5 text-center text-sm text-muted-foreground mb-3`}>
+              Nothing scheduled.
+            </div>
+          ) : (
+            <ul className="space-y-1.5 mb-3">
+              {selectedMarkers.map((mk, i) => (
+                <li key={i} className={`${INNER} bg-muted/40 px-3 py-2 flex items-start gap-2`}>
+                  <span
+                    className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
+                    style={{ background: MARKER_COLOR[mk.kind] }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium">
+                      {MARKER_LABEL[mk.kind]}
+                    </p>
+                    {mk.href ? (
+                      <Link href={mk.href} className="text-[13px] truncate block hover:underline-offset-2 hover:underline">
+                        {mk.label}
+                      </Link>
+                    ) : (
+                      <p className="text-[13px] truncate">{mk.label}</p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="space-y-1.5">
+            <p className="text-[10px] tracking-[0.08em] uppercase text-muted-foreground font-semibold mb-1">
+              Add for this day
+            </p>
+            <QuickAdd
+              href="/orders"
+              label="Event order"
+              sub="For a customer gig on this date"
+            />
+            <QuickAdd
+              href="/campaigns"
+              label="Campaign"
+              sub="Seasonal push (Easter, Mother's Day…)"
+            />
+            <QuickAdd
+              href="/settings"
+              label="Block this day"
+              sub="Workshop closed / teaching / vacation"
+            />
+          </div>
+        </section>
+      </div>
+
+      {/* Strip of next 2 months */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <MiniMonth grid={nextGrid} markers={markersByDate} onPick={(iso) => { setSelectedIso(iso); setFocusYear(new Date(iso).getFullYear()); setFocusMonth(new Date(iso).getMonth()); }} />
+        <MiniMonth grid={next2Grid} markers={markersByDate} onPick={(iso) => { setSelectedIso(iso); setFocusYear(new Date(iso).getFullYear()); setFocusMonth(new Date(iso).getMonth()); }} />
+      </div>
     </div>
   );
 }
 
-function MonthBlock({
-  month,
-  markers,
-}: {
-  month: MonthGrid;
-  markers: Map<string, Marker[]>;
-}) {
+function QuickAdd({ href, label, sub }: { href: string; label: string; sub: string }) {
   return (
-    <div
-      className="border border-border bg-card p-4"
-      style={{ borderRadius: 4 }}
+    <Link
+      href={href}
+      className={`${INNER} flex items-center gap-3 px-3 py-2 bg-card hover:bg-muted/40 transition-colors`}
     >
-      <h3
-        className="text-[13px] mb-3"
-        style={{
-          fontFamily: "var(--font-serif)",
-          fontWeight: 500,
-          letterSpacing: "-0.015em",
-        }}
-      >
-        {month.label}
-      </h3>
-      <div className="grid grid-cols-7 gap-0.5 text-[10px]">
-        {["M", "T", "W", "T", "F", "S", "S"].map((l, i) => (
+      <Plus className="w-3.5 h-3.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-[12.5px] font-medium">{label}</p>
+        <p className="text-[10.5px] text-muted-foreground">{sub}</p>
+      </div>
+    </Link>
+  );
+}
+
+function MonthGrid({
+  grid, markers, selectedIso, onSelect, large,
+}: {
+  grid: BuiltMonth;
+  markers: Map<string, Marker[]>;
+  selectedIso: string;
+  onSelect: (iso: string) => void;
+  large?: boolean;
+}) {
+  const cellSize = large ? "min-h-[62px]" : "min-h-[38px]";
+  const dayFont = large ? "text-[13px]" : "text-[11px]";
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((l) => (
           <span
-            key={i}
-            className="text-center text-muted-foreground uppercase"
-            style={{ letterSpacing: "0.05em" }}
+            key={l}
+            className="text-[10px] tracking-[0.06em] uppercase text-muted-foreground text-center font-medium"
           >
             {l}
           </span>
         ))}
-        {month.days.map((day, idx) => {
-          const key = day.iso ?? "blank-" + idx;
-          if (!day.iso) {
-            return <span key={key} />;
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {grid.cells.map((cell, idx) => {
+          if (!cell.iso) {
+            return <div key={"b" + idx} className={`${cellSize}`} />;
           }
-          const list = markers.get(day.iso) ?? [];
+          const list = markers.get(cell.iso) ?? [];
+          const isSelected = cell.iso === selectedIso;
+          const isToday = cell.iso === toIsoDate(new Date());
+          const kinds = [...new Set(list.map((m) => m.kind))];
           return (
-            <DayBox key={key} day={day.day} markers={list} />
+            <button
+              key={cell.iso}
+              onClick={() => onSelect(cell.iso!)}
+              className={`${cellSize} rounded-[8px] border text-left flex flex-col items-stretch px-1.5 py-1 transition-colors ${
+                isSelected
+                  ? "border-foreground bg-card"
+                  : isToday
+                  ? "border-[var(--accent-terracotta-ink)]/60 bg-card"
+                  : "border-border bg-muted/30 hover:bg-muted/50"
+              }`}
+              title={list.map((m) => `${MARKER_LABEL[m.kind]}: ${m.label}`).join(" · ") || undefined}
+            >
+              <span className={`${dayFont} ${isToday ? "font-semibold" : "font-medium"} ${isSelected ? "text-foreground" : ""}`}>
+                {cell.day}
+              </span>
+              {kinds.length > 0 && (
+                <span className="mt-auto flex gap-1 pt-1">
+                  {kinds.map((k) => (
+                    <span
+                      key={k}
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ background: MARKER_COLOR[k] }}
+                    />
+                  ))}
+                </span>
+              )}
+            </button>
           );
         })}
       </div>
@@ -150,81 +363,75 @@ function MonthBlock({
   );
 }
 
-function DayBox({ day, markers }: { day: number; markers: Marker[] }) {
-  const hasCampaign = markers.some((m) => m.kind === "campaign");
-  const hasClosure = markers.some((m) => m.kind === "closure");
-  const hasHoliday = markers.some((m) => m.kind === "holiday");
-  const hasProduction = markers.some((m) => m.kind === "production");
-  const title = markers.map((m) => m.label).join(" · ");
+function MiniMonth({
+  grid, markers, onPick,
+}: {
+  grid: BuiltMonth;
+  markers: Map<string, Marker[]>;
+  onPick: (iso: string) => void;
+}) {
   return (
-    <span
-      className="aspect-square flex flex-col items-center justify-center border border-border bg-background relative"
-      title={title}
-      style={{ borderRadius: 2 }}
-    >
-      <span className="text-[10px] text-foreground">{day}</span>
-      {markers.length > 0 ? (
-        <span className="absolute bottom-0.5 left-0.5 right-0.5 flex gap-[1px] justify-center">
-          {hasCampaign ? <DotInline colour="bg-[color:var(--accent-terracotta-ink)]" /> : null}
-          {hasClosure ? <DotInline colour="bg-[color:var(--color-status-warn)]" /> : null}
-          {hasHoliday ? <DotInline colour="bg-[color:var(--accent-blue-ink)]" /> : null}
-          {hasProduction ? <DotInline colour="bg-[color:var(--accent-sage-ink)]" /> : null}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-function DotInline({ colour }: { colour: string }) {
-  return <span className={"w-1 h-1 " + colour} style={{ borderRadius: 1 }} />;
-}
-
-function Legend({ colour, children }: { colour: string; children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={"w-2 h-2 " + colour} style={{ borderRadius: 1 }} />
-      <span
-        className="uppercase"
-        style={{ letterSpacing: "0.08em", fontWeight: 500 }}
+    <section className={CARD}>
+      <h3
+        className="text-[13px] mb-2 tracking-[-0.015em]"
+        style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}
       >
-        {children}
-      </span>
-    </span>
+        {grid.label}
+      </h3>
+      <MonthGrid
+        grid={grid}
+        markers={markers}
+        selectedIso=""
+        onSelect={onPick}
+      />
+    </section>
   );
 }
 
-interface MonthGrid {
-  label: string;
-  monthNumber: number;
-  days: Array<{ iso: string | null; day: number }>;
+function LegendRow() {
+  return (
+    <div className="mt-3 flex flex-wrap gap-3 text-[10.5px] text-muted-foreground">
+      {(["campaign", "order", "production", "closure", "holiday"] as MarkerKind[]).map((k) => (
+        <span key={k} className="inline-flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full" style={{ background: MARKER_COLOR[k] }} />
+          <span>{MARKER_LABEL[k]}</span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
-interface Marker {
-  kind: "campaign" | "closure" | "holiday" | "production";
+// ─── grid helpers ───────────────────────────────────────────────────
+
+interface BuiltMonth {
   label: string;
+  cells: Array<{ iso: string | null; day: number }>;
 }
 
-function buildYearGrid(year: number): MonthGrid[] {
-  const months: MonthGrid[] = [];
-  for (let m = 0; m < 12; m++) {
-    const first = new Date(Date.UTC(year, m, 1));
-    const label = first.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-    const dow = first.getUTCDay(); // 0 = Sun
-    const leadingBlanks = (dow + 6) % 7;
-    const daysInMonth = new Date(Date.UTC(year, m + 1, 0)).getUTCDate();
-    const days: MonthGrid["days"] = [];
-    for (let i = 0; i < leadingBlanks; i++) days.push({ iso: null, day: 0 });
-    for (let d = 1; d <= daysInMonth; d++) {
-      const iso = new Date(Date.UTC(year, m, d)).toISOString().slice(0, 10);
-      days.push({ iso, day: d });
-    }
-    months.push({ label, monthNumber: m, days });
+function buildMonthGrid(year: number, monthIdx: number): BuiltMonth {
+  const first = new Date(year, monthIdx, 1);
+  const label = first.toLocaleDateString("de-AT", { month: "long", year: "numeric" });
+  const dow = first.getDay(); // 0 = Sun
+  const leadingBlanks = (dow + 6) % 7; // Monday-start
+  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  const cells: BuiltMonth["cells"] = [];
+  for (let i = 0; i < leadingBlanks; i++) cells.push({ iso: null, day: 0 });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = toIsoDate(new Date(year, monthIdx, d));
+    cells.push({ iso, day: d });
   }
-  return months;
+  return { label, cells };
 }
 
-// Austrian public holidays — computed per year. Easter-derived days use
-// the standard ecclesiastical algorithm so they stay accurate across years.
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Austrian public holidays — keyed per year. Easter-derived days use
+// the Gregorian algorithm so they stay accurate year-to-year.
 function AUSTRIAN_HOLIDAYS(year: number): Array<{ date: string; name: string }> {
   const easter = easterSunday(year);
   const addDays = (base: Date, n: number) => {
@@ -250,7 +457,6 @@ function AUSTRIAN_HOLIDAYS(year: number): Array<{ date: string; name: string }> 
 }
 
 function easterSunday(year: number): Date {
-  // Anonymous Gregorian algorithm.
   const a = year % 19;
   const b = Math.floor(year / 100);
   const c = year % 100;
@@ -263,7 +469,10 @@ function easterSunday(year: number): Date {
   const k = c % 4;
   const l = (32 + 2 * e + 2 * i - h - k) % 7;
   const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1; // 0-indexed
+  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
   const day = ((h + l - 7 * m + 114) % 31) + 1;
   return new Date(Date.UTC(year, month, day));
 }
+
+// Lucide CalIcon reserved for a future "today" pill variant.
+void CalIcon;

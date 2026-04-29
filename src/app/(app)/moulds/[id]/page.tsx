@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMould, useMoulds, saveMould, deleteMould, archiveMould, unarchiveMould, isMouldInUse, useMouldUsage } from "@/lib/hooks";
 import { UsedInPanel } from "@/components/pantry";
 import { ArrowLeft, Camera, Pencil, Trash2, Archive, ArchiveRestore } from "lucide-react";
+import { DetailNav } from "@/components/detail-nav";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { FILL_FACTOR } from "@/lib/production";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
@@ -43,6 +44,8 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
   const [fillingGramsPerCavity, setFillingGramsPerCavity] = useState("");
   const [quantityOwned, setQuantityOwned] = useState("");
   const [notes, setNotes] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formSyncedRef = useRef(false);
@@ -63,6 +66,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
     );
     setQuantityOwned(m.quantityOwned != null ? String(m.quantityOwned) : "");
     setNotes(m.notes ?? "");
+    setTags(m.tags ?? []);
     setPhoto(m.photo);
   }
 
@@ -131,6 +135,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
       quantityOwned: !isNaN(qtyOwned) && qtyOwned > 0 ? qtyOwned : undefined,
       photo,
       notes: notes.trim() || undefined,
+      tags: tags.length > 0 ? tags : undefined,
     });
     setSavedOnce(true);
     setEditing(false);
@@ -147,10 +152,16 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div>
-      <div className="px-4 pt-6 pb-2">
-        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-3">
+      <div className="px-4 pt-6 pb-2 space-y-2">
+        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
           <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
         </button>
+        <DetailNav
+          items={[...allMoulds].filter((m) => !m.archived).sort((a, b) => a.name.localeCompare(b.name))}
+          currentId={mouldId}
+          hrefFor={(m) => `/moulds/${encodeURIComponent(m.id!)}`}
+          labelFor={(m) => m.name}
+        />
       </div>
 
       <div className="px-4 pb-6 space-y-4">
@@ -342,6 +353,56 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
               <p className="text-xs text-muted-foreground mt-0.5">How many copies of this mould you own</p>
             </div>
 
+            <div>
+              <label className="label">Tags</label>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {tags.map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 rounded-sm bg-[var(--accent-lilac-bg)] text-[var(--accent-lilac-ink)] text-xs font-medium px-2 py-0.5"
+                    >
+                      {t}
+                      <button
+                        type="button"
+                        onClick={() => setTags((prev) => prev.filter((x) => x !== t))}
+                        aria-label={`Remove ${t}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const v = tagDraft.trim();
+                      if (v && !tags.includes(v)) setTags([...tags, v]);
+                      setTagDraft("");
+                    }
+                  }}
+                  placeholder="e.g. christmas, easter, seasonal, bars-only…"
+                  className="input flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const v = tagDraft.trim();
+                    if (v && !tags.includes(v)) setTags([...tags, v]);
+                    setTagDraft("");
+                  }}
+                  className="rounded-sm border border-border px-3 text-sm"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
             <div>
               <label className="label">Notes</label>
               <textarea

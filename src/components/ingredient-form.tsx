@@ -63,7 +63,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
   const [purchaseCost, setPurchaseCost] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [purchaseQty, setPurchaseQty] = useState("1");
-  const [purchaseUnit, setPurchaseUnit] = useState("g");
+  const [purchaseUnit, setPurchaseUnit] = useState("pcs");
   // Default "1000" only for new ingredients; existing values are loaded via useEffect below
   const [gramsPerUnit, setGramsPerUnit] = useState(() => (ingredient?.gramsPerUnit != null ? String(ingredient.gramsPerUnit) : "1000"));
   // Track whether the user has manually edited gramsPerUnit — if so, don't auto-fill on unit change
@@ -105,7 +105,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
       setPurchaseCost(ingredient.purchaseCost != null ? String(ingredient.purchaseCost) : "");
       setPurchaseDate(ingredient.purchaseDate ?? new Date().toISOString().split("T")[0]);
       setPurchaseQty(ingredient.purchaseQty != null ? String(ingredient.purchaseQty) : "1");
-      setPurchaseUnit(ingredient.purchaseUnit ?? "g");
+      setPurchaseUnit(ingredient.purchaseUnit ?? "pcs");
       setGramsPerUnit(ingredient.gramsPerUnit != null ? String(ingredient.gramsPerUnit) : "");
       setGramsPerUnitTouched(ingredient.gramsPerUnit != null);
       setDefaultVatRate(ingredient.defaultVatRate != null ? String(ingredient.defaultVatRate) : "");
@@ -373,16 +373,27 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
 
           <div>
             <label className="label">Category</label>
-            <select
+            {/* Datalist combobox (same as manufacturer / brand / vendor
+                above) — opens downward consistently, supports arrow-
+                keys + Enter-to-select, lets the user type a new
+                category to create it on save. Replaces the native
+                <select> which opened upward near viewport edges and
+                didn't share UX with the other pantry fields. */}
+            <input
+              type="text"
+              list="ingredient-category-list"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="input"
-            >
-              <option value="">— select —</option>
-              {ingredientCategoryNames.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+              placeholder="Select or type a category…"
+            />
+            {ingredientCategoryNames.length > 0 && (
+              <datalist id="ingredient-category-list">
+                {ingredientCategoryNames.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            )}
           </div>
 
           <div>
@@ -683,7 +694,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
               </span>
               {purchaseDate && (
                 <span className="text-xs text-muted-foreground ml-auto">
-                  updated {new Date(purchaseDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  updated {new Date(purchaseDate).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
                 </span>
               )}
             </div>

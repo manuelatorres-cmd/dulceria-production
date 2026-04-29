@@ -169,7 +169,7 @@ export function DefrostConfirmModal({
   }, [onCancel]);
 
   const sellBy = preservedShelfLifeDays != null
-    ? new Date(Date.now() + preservedShelfLifeDays * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", {
+    ? new Date(Date.now() + preservedShelfLifeDays * 24 * 60 * 60 * 1000).toLocaleDateString("de-AT", {
         day: "numeric", month: "short", year: "numeric",
       })
     : null;

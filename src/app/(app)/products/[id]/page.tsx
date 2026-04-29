@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductFillingHistory, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, setPlanProductStockStatus, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList, useProductLeadTimeSuggestions } from "@/lib/hooks";
+import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, saveVariant, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductFillingHistory, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, setPlanProductStockStatus, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList, useProductLeadTimeSuggestions, useStockLocationMinimums, saveStockLocationMinimum } from "@/lib/hooks";
 import { SHELL_TECHNIQUES, DECORATION_MATERIAL_TYPE_LABELS, DECORATION_APPLY_AT_OPTIONS, normalizeApplyAt, type ShellDesignStep, type ShellDesignApplyAt, type ProductCostSnapshot, type BreakdownEntry, type ProductFilling, costPerGram, type DecorationMaterial, allergenLabel, type FillMode } from "@/types";
 import { colorToCSS } from "@/lib/colors";
 import { deserializeBreakdown, enrichBreakdownLabels, formatCost, costDelta, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -19,6 +19,7 @@ import type { DragEndEvent } from "@dnd-kit/core";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import { InlineNameEditor } from "@/components/inline-name-editor";
+import { DetailNav } from "@/components/detail-nav";
 import Link from "next/link";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 
@@ -33,9 +34,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const productCategories = useProductCategories();
   const productCategory = useProductCategory(product?.productCategoryId);
   const shellCapableIngredients = useShellCapableIngredients();
+  // Only chocolate-category fillings can be used as shell — apple
+  // puree etc. can't be tempered. Filling.category is a string
+  // matching the FillingCategory.name (case-insensitive "chocolate").
+  const shellCapableFillings = useMemo(
+    () => allFillings.filter((f) => (f.category ?? "").toLowerCase().trim() === "chocolate"),
+    [allFillings],
+  );
   // All products (incl. archived) so the tag autocomplete picks up every
   // tag ever used across the catalogue, not just the active subset.
   const allProducts = useProductsList(true);
+  const allLocationMinimums = useStockLocationMinimums();
+  const productMins = useMemo(
+    () => allLocationMinimums.filter((m) => m.productId === productId),
+    [allLocationMinimums, productId],
+  );
+  const minStoreRow = productMins.find((m) => m.location === "store");
+  const minProdRow = productMins.find((m) => m.location === "production");
   const knownTags = useMemo(() => {
     const set = new Set<string>();
     for (const p of allProducts) for (const t of p.tags ?? []) set.add(t);
@@ -74,12 +89,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [localFillMode, setLocalFillMode] = useState<FillMode>("percentage");
   const [localProductCategoryId, setLocalProductCategoryId] = useState("");
   const [localShellIngredientId, setLocalShellIngredientId] = useState("");
+  const [localShellFillingId, setLocalShellFillingId] = useState("");
   const [localShellPercentageStr, setLocalShellPercentageStr] = useState("");
   const [localCoating, setLocalCoating] = useState("");
   const [localTags, setLocalTags] = useState<string[]>([]);
+  const [localAliases, setLocalAliases] = useState<string[]>([]);
+  const [aliasInput, setAliasInput] = useState("");
   const [notes, setNotes] = useState("");
   const [localShelfLife, setLocalShelfLife] = useState("");
-  const [localLowStockThreshold, setLocalLowStockThreshold] = useState("");
+  const [localMinStore, setLocalMinStore] = useState("");
+  const [localMinProduction, setLocalMinProduction] = useState("");
+  const [localPriorityTier, setLocalPriorityTier] = useState<1 | 2 | 3>(2);
+  const [localIncludedInCustomBoxes, setLocalIncludedInCustomBoxes] = useState<boolean>(false);
+  const [localSecondsAllowed, setLocalSecondsAllowed] = useState<boolean>(false);
+  const [localExcludeFromReplen, setLocalExcludeFromReplen] = useState<boolean>(false);
+  const [localDefaultDiscountPercentSeconds, setLocalDefaultDiscountPercentSeconds] = useState("");
+  const [localDefaultVatRate, setLocalDefaultVatRate] = useState("");
   const [localLeadTimeDays, setLocalLeadTimeDays] = useState("");
   const [localMouldId, setLocalMouldId] = useState("");
   const [batchQtyInput, setBatchQtyInput] = useState("");
@@ -110,16 +135,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       setLocalFillMode(product.fillMode ?? defaultFillMode);
       setLocalProductCategoryId(product.productCategoryId || "");
       setLocalShellIngredientId(product.shellIngredientId || "");
+      setLocalShellFillingId(product.shellFillingId || "");
       setLocalShellPercentageStr(String(product.shellPercentage ?? productCategory?.defaultShellPercent ?? 37));
       setLocalCoating(product.coating || "");
       setLocalTags(product.tags ?? []);
+      setLocalAliases(product.aliases ?? []);
       setNotes(product.notes || "");
       setLocalShelfLife(product.shelfLifeWeeks || "");
-      setLocalLowStockThreshold(product.lowStockThreshold != null ? String(product.lowStockThreshold) : "");
       setLocalLeadTimeDays(product.leadTimeDays != null ? String(product.leadTimeDays) : "");
       setLocalMouldId(product.defaultMouldId || "");
       setBatchQtyInput(String(product.defaultBatchQty ?? 1));
       setLocalShellDesign(product.shellDesign ?? []);
+      setLocalPriorityTier(((product.priorityTier as 1 | 2 | 3 | undefined) ?? 2));
+      setLocalIncludedInCustomBoxes(!!product.includedInCustomBoxes);
+      setLocalSecondsAllowed(!!product.secondsAllowed);
+      setLocalExcludeFromReplen(!!product.excludeFromReplen);
+      setLocalDefaultDiscountPercentSeconds(product.defaultDiscountPercentSeconds != null ? String(product.defaultDiscountPercentSeconds) : "");
+      setLocalDefaultVatRate(product.defaultVatRate != null ? String(product.defaultVatRate) : "");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);
@@ -139,15 +171,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     localFillMode !== (product.fillMode ?? defaultFillMode) ||
     localProductCategoryId !== (product.productCategoryId || "") ||
     localShellIngredientId !== (product.shellIngredientId || "") ||
+    localShellFillingId !== (product.shellFillingId || "") ||
     localShellPercentageStr !== String(product.shellPercentage ?? productCategory?.defaultShellPercent ?? 37) ||
     localCoating !== (product.coating || "") ||
     notes !== (product.notes || "") ||
     localShelfLife !== (product.shelfLifeWeeks || "") ||
-    localLowStockThreshold !== (product.lowStockThreshold != null ? String(product.lowStockThreshold) : "") ||
     localLeadTimeDays !== (product.leadTimeDays != null ? String(product.leadTimeDays) : "") ||
     localMouldId !== (product.defaultMouldId || "") ||
     batchQtyInput !== String(product.defaultBatchQty ?? 1) ||
     JSON.stringify([...localTags].sort()) !== JSON.stringify([...(product.tags ?? [])].sort()) ||
+    JSON.stringify([...localAliases].sort()) !== JSON.stringify([...(product.aliases ?? [])].sort()) ||
     JSON.stringify(localShellDesign) !== JSON.stringify(product.shellDesign ?? [])
   );
   const isDirty = (isNew && !savedOnce) || formDirty;
@@ -175,16 +208,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return min !== null ? { weeks: min, fillingName: limitingFilling! } : null;
   }, [productFillings, allFillings]);
 
-  // Auto-populate shelf life from the fillings' recommendation whenever
-  // the product doesn't have one set. Once the user types a custom value,
-  // we leave it alone — even if fillings change. They can still click the
-  // "Suggested: X weeks" link below to overwrite with the new recommendation.
+  // Auto-sync product shelf life to the soonest-expiring filling
+  // every time the recommendation changes. Manuela measures Aw on
+  // each filling and stamps a shelf life there — the product is
+  // only as fresh as its bottleneck filling, so we propagate that
+  // value automatically. (Manual edits are still allowed and stick
+  // until the underlying recommendation moves again.)
   useEffect(() => {
     if (!product) return;
-    if (localShelfLife.trim() !== "") return;
     if (!recommendedShelfLife) return;
-    setLocalShelfLife(String(recommendedShelfLife.weeks));
-  }, [product?.id, recommendedShelfLife]); // eslint-disable-line react-hooks/exhaustive-deps
+    const desired = String(recommendedShelfLife.weeks);
+    if (localShelfLife === desired) return;
+    setLocalShelfLife(desired);
+  }, [product?.id, recommendedShelfLife?.weeks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Aggregated product allergens — union of the shell ingredient's
   // allergens plus every linked filling's allergens (fillings already
@@ -250,12 +286,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     setLocalFillMode(product.fillMode ?? defaultFillMode);
     setLocalProductCategoryId(product.productCategoryId || "");
     setLocalShellIngredientId(product.shellIngredientId || "");
+    setLocalShellFillingId(product.shellFillingId || "");
     setLocalShellPercentageStr(String(product.shellPercentage ?? productCategory?.defaultShellPercent ?? 37));
     setLocalCoating(product.coating || "");
     setLocalTags(product.tags ?? []);
     setNotes(product.notes || "");
     setLocalShelfLife(product.shelfLifeWeeks || "");
-    setLocalLowStockThreshold(product.lowStockThreshold != null ? String(product.lowStockThreshold) : "");
     setLocalMouldId(product.defaultMouldId || "");
     setBatchQtyInput(String(product.defaultBatchQty ?? 1));
     setLocalShellDesign(product.shellDesign ?? []);
@@ -284,7 +320,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         }
       }
     }
-    if (effectiveShellPct > 0 && !localShellIngredientId) errors.push("Shell chocolate is required when shell % is greater than 0.");
+    if (effectiveShellPct > 0 && !localShellIngredientId && !localShellFillingId) {
+      errors.push("Shell source is required when shell % is greater than 0 — pick a chocolate ingredient or a self-made chocolate filling.");
+    }
+    if (localShellIngredientId && localShellFillingId) {
+      errors.push("Shell cannot reference both an ingredient and a filling — pick one.");
+    }
     if (errors.length > 0) {
       setSaveErrors(errors);
       setActiveTab("product");
@@ -298,16 +339,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       photo: product!.photo,
       popularity: product!.popularity,
       productCategoryId: localProductCategoryId,
-      shellIngredientId: localShellIngredientId || undefined,
+      shellIngredientId: localShellIngredientId || null,
+      shellFillingId: localShellFillingId || null,
       shellPercentage: isNaN(shellPct) ? undefined : shellPct,
       coating: localCoating || undefined,
       tags: localTags.length > 0 ? localTags : undefined,
+      aliases: localAliases.length > 0 ? localAliases : undefined,
       notes: notes.trim() || undefined,
       shelfLifeWeeks: localShelfLife.trim() || undefined,
-      lowStockThreshold: (() => {
-        const v = parseInt(localLowStockThreshold.trim(), 10);
-        return isNaN(v) || v < 0 ? undefined : v;
-      })(),
       leadTimeDays: (() => {
         const v = parseInt(localLeadTimeDays.trim(), 10);
         return isNaN(v) || v < 0 ? undefined : v;
@@ -316,10 +355,47 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       defaultBatchQty: batchQty,
       shellDesign: localShellDesign,
       fillMode: localFillMode,
+      priorityTier: localPriorityTier,
+      includedInCustomBoxes: localIncludedInCustomBoxes,
+      secondsAllowed: localSecondsAllowed,
+      excludeFromReplen: localExcludeFromReplen,
+      defaultDiscountPercentSeconds: (() => {
+        const v = parseFloat(localDefaultDiscountPercentSeconds);
+        return isNaN(v) || v < 0 ? undefined : v;
+      })(),
+      defaultVatRate: (() => {
+        const v = parseFloat(localDefaultVatRate);
+        return isNaN(v) || v < 0 ? undefined : v;
+      })(),
     });
+    // Persist per-location minimums separately — they live on the
+    // `stockLocationMinimums` table, not on the product row.
+    const minStoreVal = parsePositiveIntOrNull(localMinStore);
+    const minProdVal = parsePositiveIntOrNull(localMinProduction);
+    if (localMinStore !== "" && minStoreVal !== null) {
+      await saveStockLocationMinimum({
+        id: minStoreRow?.id,
+        productId,
+        location: "store",
+        minimumUnits: minStoreVal,
+      });
+    }
+    if (localMinProduction !== "" && minProdVal !== null) {
+      await saveStockLocationMinimum({
+        id: minProdRow?.id,
+        productId,
+        location: "production",
+        minimumUnits: minProdVal,
+      });
+    }
     setEditing(false);
     setSavedOnce(true);
     if (isNew) router.replace(`/products/${encodeURIComponent(productId)}`);
+  }
+
+  function parsePositiveIntOrNull(s: string): number | null {
+    const v = parseInt(s.trim(), 10);
+    return isNaN(v) || v < 0 ? null : v;
   }
 
   function handleCancel() {
@@ -327,12 +403,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     setLocalFillMode(product.fillMode ?? defaultFillMode);
     setLocalProductCategoryId(product.productCategoryId || "");
     setLocalShellIngredientId(product.shellIngredientId || "");
+    setLocalShellFillingId(product.shellFillingId || "");
     setLocalShellPercentageStr(String(product.shellPercentage ?? productCategory?.defaultShellPercent ?? 37));
     setLocalCoating(product.coating || "");
     setLocalTags(product.tags ?? []);
     setNotes(product.notes || "");
     setLocalShelfLife(product.shelfLifeWeeks || "");
-    setLocalLowStockThreshold(product.lowStockThreshold != null ? String(product.lowStockThreshold) : "");
     setLocalLeadTimeDays(product.leadTimeDays != null ? String(product.leadTimeDays) : "");
     setLocalMouldId(product.defaultMouldId || "");
     setBatchQtyInput(String(product.defaultBatchQty ?? 1));
@@ -383,11 +459,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div>
-      {/* Back */}
-      <div className="px-4 pt-6 pb-2">
-        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-3">
+      {/* Back + prev/next pager */}
+      <div className="px-4 pt-6 pb-2 space-y-2">
+        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
           <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
         </button>
+        <DetailNav
+          items={[...allProducts].filter((p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name))}
+          currentId={productId}
+          hrefFor={(p) => `/products/${encodeURIComponent(p.id!)}`}
+          labelFor={(p) => p.name}
+        />
       </div>
 
       {/* Photo + Name */}
@@ -480,13 +562,37 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
               {!editing && (
-                <button
-                  onClick={startEditing}
-                  aria-label="Edit product"
-                  className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
-                >
-                  <Pencil aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={async () => {
+                      if (!product?.id) return;
+                      const id = await saveVariant({
+                        name: `${product.name} (variant)`,
+                        description: product.notes ?? undefined,
+                        startDate: new Date().toISOString().slice(0, 10),
+                        labels: product.tags ?? [],
+                        aliases: product.aliases ?? [],
+                        kind: "curated",
+                        vatRatePercent: product.defaultVatRate ?? 10,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                      });
+                      router.push(`/variants/${encodeURIComponent(String(id))}?new=1`);
+                    }}
+                    aria-label="Use as variant template"
+                    title="Create a variant pre-filled from this product"
+                    className="p-1.5 rounded-full hover:bg-muted transition-colors"
+                  >
+                    <Copy aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={startEditing}
+                    aria-label="Edit product"
+                    className="p-1.5 rounded-full hover:bg-muted transition-colors"
+                  >
+                    <Pencil aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -578,10 +684,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <select
             value={localProductCategoryId}
             onChange={(e) => {
-              setLocalProductCategoryId(e.target.value);
+              const newCatId = e.target.value;
+              setLocalProductCategoryId(newCatId);
               // When switching categories, update shellPercentage to the new category's default
-              const cat = productCategories.find((c) => c.id === e.target.value);
+              const cat = productCategories.find((c) => c.id === newCatId);
               if (cat) setLocalShellPercentageStr(String(cat.defaultShellPercent));
+              // Auto-tick "Available in shop custom-box builder" when
+              // category is "moulded" — only moulded chocolates fit a
+              // custom box. Other categories default off; user can
+              // tick manually if they ever do.
+              const isMoulded = (cat?.name ?? "").toLowerCase().trim() === "moulded";
+              if (isNew) setLocalIncludedInCustomBoxes(isMoulded);
             }}
             className="input capitalize"
           >
@@ -625,21 +738,50 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div className="grid grid-cols-2 gap-3">
                 {showShellIngredient && (
                   <div>
-                    <label className="label">Shell chocolate</label>
-                    {shellCapableIngredients.length === 0 ? (
+                    <label className="label">Shell source</label>
+                    {shellCapableIngredients.length === 0 && shellCapableFillings.length === 0 ? (
                       <p className="text-xs text-warning mt-1">
-                        No shell chocolates available. Create an ingredient with category &quot;Chocolate&quot; and mark it as &quot;shell capable&quot; first.
+                        No shell-capable chocolates available. Create an ingredient with the &quot;Shell-capable&quot; flag or a filling in the &quot;Chocolate&quot; category first.
                       </p>
                     ) : (
                       <select
-                        value={localShellIngredientId}
-                        onChange={(e) => setLocalShellIngredientId(e.target.value)}
+                        value={
+                          localShellIngredientId
+                            ? `ing:${localShellIngredientId}`
+                            : localShellFillingId
+                              ? `fil:${localShellFillingId}`
+                              : ""
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!v) {
+                            setLocalShellIngredientId("");
+                            setLocalShellFillingId("");
+                          } else if (v.startsWith("ing:")) {
+                            setLocalShellIngredientId(v.slice(4));
+                            setLocalShellFillingId("");
+                          } else if (v.startsWith("fil:")) {
+                            setLocalShellIngredientId("");
+                            setLocalShellFillingId(v.slice(4));
+                          }
+                        }}
                         className="input"
                       >
                         <option value="">— None —</option>
-                        {shellCapableIngredients.map((ing) => (
-                          <option key={ing.id} value={ing.id}>{ing.name}</option>
-                        ))}
+                        {shellCapableIngredients.length > 0 && (
+                          <optgroup label="Chocolate ingredients">
+                            {shellCapableIngredients.map((ing) => (
+                              <option key={ing.id} value={`ing:${ing.id}`}>{ing.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {shellCapableFillings.length > 0 && (
+                          <optgroup label="Self-made chocolate (fillings · category Chocolate)">
+                            {shellCapableFillings.map((f) => (
+                              <option key={f.id} value={`fil:${f.id}`}>{f.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                     )}
                   </div>
@@ -723,6 +865,59 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
 
+        {/* Aliases — alt names used by importers (Shopify, etc.) */}
+        <div className="px-4 pb-4">
+          <label className="label">Aliases · names used externally</label>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            E.g. Shopify storefront title, German label, abbreviation. Importers match these against incoming line items.
+          </p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {localAliases.map((a) => (
+              <span key={a} className="inline-flex items-center gap-1 rounded-sm bg-muted text-foreground px-2.5 py-0.5 text-xs">
+                {a}
+                <button
+                  onClick={() => setLocalAliases(localAliases.filter((x) => x !== a))}
+                  aria-label={`Remove alias ${a}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={aliasInput}
+              onChange={(e) => setAliasInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const v = aliasInput.trim();
+                  if (v && !localAliases.some((x) => x.toLowerCase() === v.toLowerCase())) {
+                    setLocalAliases([...localAliases, v]);
+                  }
+                  setAliasInput("");
+                }
+              }}
+              placeholder="Add alias (e.g. Erdbeer-Nougat)"
+              className="input"
+            />
+            <button
+              onClick={() => {
+                const v = aliasInput.trim();
+                if (v && !localAliases.some((x) => x.toLowerCase() === v.toLowerCase())) {
+                  setLocalAliases([...localAliases, v]);
+                }
+                setAliasInput("");
+              }}
+              disabled={!aliasInput.trim()}
+              className="btn-primary px-3 py-1.5"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
         {/* Notes */}
         <div className="px-4 pb-4">
           <label className="label">Notes</label>
@@ -758,45 +953,140 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
           <div>
-            <label className="label">Low-stock threshold</label>
-            <input
-              type="number"
-              min={0}
-              value={localLowStockThreshold}
-              onChange={(e) => setLocalLowStockThreshold(e.target.value)}
-              placeholder="e.g. 12"
-              className="input w-32"
-            />
+            <label className="label">Minimum on hand · per location</label>
+            <div className="flex items-end gap-3 flex-wrap">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-0.5">Shop store</p>
+                <input
+                  type="number"
+                  min={0}
+                  value={localMinStore || (minStoreRow?.minimumUnits ?? "")}
+                  onChange={(e) => setLocalMinStore(e.target.value)}
+                  placeholder="e.g. 8"
+                  className="input w-24"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-0.5">Production</p>
+                <input
+                  type="number"
+                  min={0}
+                  value={localMinProduction || (minProdRow?.minimumUnits ?? "")}
+                  onChange={(e) => setLocalMinProduction(e.target.value)}
+                  placeholder="e.g. 4"
+                  className="input w-24"
+                />
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Pieces below which this product is flagged low in the production wizard.
+              Replenishment engine triggers a batch when stock at that location falls below the minimum.
             </p>
           </div>
-          <div>
-            <label className="label">Production lead time (days)</label>
-            <input
-              type="number"
-              min={0}
-              value={localLeadTimeDays}
-              onChange={(e) => setLocalLeadTimeDays(e.target.value)}
-              placeholder="e.g. 2"
-              className="input w-32"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Days to make one replacement batch. Used by the Shop borrow logic
-              — borrow is only offered if the next shop opening is at least
-              this many days away.
-              {suggestedLeadTime != null && (
-                <>
-                  {" "}Suggested: <button
+          {/* Priority tier · Default VAT · Lead time — grouped on one row */}
+          <div className="flex flex-wrap gap-x-6 gap-y-3">
+            <div>
+              <label className="label">Priority tier</label>
+              <div className="flex gap-1.5">
+                {([1, 2, 3] as const).map((t) => (
+                  <button
+                    key={t}
                     type="button"
-                    onClick={() => setLocalLeadTimeDays(String(suggestedLeadTime))}
-                    className="text-primary font-medium hover:underline"
-                  >{suggestedLeadTime} day{suggestedLeadTime === 1 ? "" : "s"}</button>
-                  {" "}— derived from production steps ÷ team capacity.
-                </>
-              )}
-            </p>
+                    onClick={() => setLocalPriorityTier(t)}
+                    className={`rounded-sm border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      localPriorityTier === t
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    }`}
+                    title={t === 1 ? "Top seller — never displaced" : t === 2 ? "Normal" : "Nice-to-have — displaced first when tight"}
+                  >
+                    {t === 1 ? "1 · Top" : t === 2 ? "2 · Normal" : "3 · Nice-to-have"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="label">Default VAT (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step="0.1"
+                value={localDefaultVatRate}
+                onChange={(e) => setLocalDefaultVatRate(e.target.value)}
+                placeholder="10"
+                className="input w-20"
+              />
+            </div>
+            <div>
+              <label className="label">Lead time (days)</label>
+              <input
+                type="number"
+                min={0}
+                value={localLeadTimeDays}
+                onChange={(e) => setLocalLeadTimeDays(e.target.value)}
+                placeholder="2"
+                className="input w-20"
+              />
+            </div>
           </div>
+
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={localIncludedInCustomBoxes}
+                onChange={(e) => setLocalIncludedInCustomBoxes(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span>Available in shop custom-box builder</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={localSecondsAllowed}
+                onChange={(e) => setLocalSecondsAllowed(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span>Can be sold as &quot;seconds&quot; (B-ware) — typically only bars</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={localExcludeFromReplen}
+                onChange={(e) => setLocalExcludeFromReplen(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span>Skip from auto-replen — limited / campaign-only (manual production order)</span>
+            </label>
+            {localSecondsAllowed && (
+              <div className="ml-6">
+                <label className="label">Default seconds discount (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="1"
+                  value={localDefaultDiscountPercentSeconds}
+                  onChange={(e) => setLocalDefaultDiscountPercentSeconds(e.target.value)}
+                  placeholder="e.g. 30"
+                  className="input w-24"
+                />
+              </div>
+            )}
+          </div>
+          {suggestedLeadTime != null && (
+            <p className="text-xs text-muted-foreground -mt-1">
+              Lead-time suggestion:{" "}
+              <button
+                type="button"
+                onClick={() => setLocalLeadTimeDays(String(suggestedLeadTime))}
+                className="text-primary font-medium hover:underline"
+              >
+                {suggestedLeadTime} day{suggestedLeadTime === 1 ? "" : "s"}
+              </button>{" "}
+              — derived from production steps ÷ team capacity.
+            </p>
+          )}
         </div>
 
         {/* Fill mode toggle + fillings — hidden when shell % = 100 (pure shell product, e.g. plain bar) */}
@@ -988,7 +1278,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         {/* --- VIEW MODE --- */}
 
         {/* Category + Shell info */}
-        {(productCategory || product.shellIngredientId) && (
+        {(productCategory || product.shellIngredientId || product.shellFillingId) && (
           <div className="px-4 pb-4 flex flex-wrap gap-2">
             {productCategory && (
               <span className="rounded-sm bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium capitalize">{productCategory.name}</span>
@@ -998,6 +1288,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               return shellIng ? (
                 <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-xs font-medium">
                   {shellIng.name} · {product.shellPercentage ?? 37}%
+                </span>
+              ) : null;
+            })()}
+            {product.shellFillingId && (() => {
+              const shellFil = allFillings.find((f) => f.id === product.shellFillingId);
+              return shellFil ? (
+                <span className="rounded-sm bg-[var(--accent-lilac-bg)] text-[var(--accent-lilac-ink)] px-2.5 py-0.5 text-xs font-medium">
+                  {shellFil.name} (self-made) · {product.shellPercentage ?? 37}%
                 </span>
               ) : null;
             })()}
@@ -1043,34 +1341,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
 
-        {/* Shelf life + low-stock threshold */}
-        {(product.shelfLifeWeeks || recommendedShelfLife || product.lowStockThreshold != null) && (
+        {/* Shelf life */}
+        {(product.shelfLifeWeeks || recommendedShelfLife) && (
           <div className="px-4 pb-4 flex gap-8 flex-wrap">
-            {(product.shelfLifeWeeks || recommendedShelfLife) && (
-              <div>
-                <h2 className="text-sm font-medium text-muted-foreground mb-1">Shelf life</h2>
-                {product.shelfLifeWeeks ? (
-                  <>
-                    <p className="text-sm">{product.shelfLifeWeeks} weeks</p>
-                    {recommendedShelfLife && parseFloat(product.shelfLifeWeeks) > recommendedShelfLife.weeks && (
-                      <p className="text-xs text-status-warn mt-0.5">
-                        Note: {recommendedShelfLife.fillingName} has a {recommendedShelfLife.weeks}-week shelf life
-                      </p>
-                    )}
-                  </>
-                ) : recommendedShelfLife ? (
-                  <p className="text-xs text-muted-foreground">
-                    Suggested: {recommendedShelfLife.weeks} weeks (based on {recommendedShelfLife.fillingName})
-                  </p>
-                ) : null}
-              </div>
-            )}
-            {product.lowStockThreshold != null && (
-              <div>
-                <h2 className="text-sm font-medium text-muted-foreground mb-1">Low-stock threshold</h2>
-                <p className="text-sm">{product.lowStockThreshold} pcs</p>
-              </div>
-            )}
+            <div>
+              <h2 className="text-sm font-medium text-muted-foreground mb-1">Shelf life</h2>
+              {product.shelfLifeWeeks ? (
+                <>
+                  <p className="text-sm">{product.shelfLifeWeeks} weeks</p>
+                  {recommendedShelfLife && parseFloat(product.shelfLifeWeeks) > recommendedShelfLife.weeks && (
+                    <p className="text-xs text-status-warn mt-0.5">
+                      Note: {recommendedShelfLife.fillingName} has a {recommendedShelfLife.weeks}-week shelf life
+                    </p>
+                  )}
+                </>
+              ) : recommendedShelfLife ? (
+                <p className="text-xs text-muted-foreground">
+                  Suggested: {recommendedShelfLife.weeks} weeks (based on {recommendedShelfLife.fillingName})
+                </p>
+              ) : null}
+            </div>
           </div>
         )}
 
@@ -1291,7 +1581,7 @@ function ProductFillingHistorySection({ productId }: { productId: string }) {
   return (
     <ul className="space-y-2 px-4 pb-8">
       {history.map((entry) => {
-        const dateStr = new Date(entry.replacedAt).toLocaleDateString("en-GB", {
+        const dateStr = new Date(entry.replacedAt).toLocaleDateString("de-AT", {
           day: "numeric", month: "short", year: "numeric",
         });
         const oldVersion = entry.oldFilling?.version ?? 1;
@@ -1376,7 +1666,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
         const fullyFrozen = availableCount <= 0 && frozenCount > 0;
         const partiallyFrozen = availableCount > 0 && frozenCount > 0;
         const dateFinished = plan.completedAt
-          ? new Date(plan.completedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+          ? new Date(plan.completedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })
           : null;
         const isDone = plan.status === "done";
 
@@ -1419,7 +1709,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
                 </div>
                 {dateFinished
                   ? <p className="text-[10px] text-muted-foreground">Finished {dateFinished}</p>
-                  : <p className="text-[10px] text-muted-foreground">{new Date(plan.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>
+                  : <p className="text-[10px] text-muted-foreground">{new Date(plan.createdAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}</p>
                 }
               </div>
             </div>
@@ -1511,7 +1801,7 @@ function ProductCostTab({
   sym = "€",
 }: {
   productId: string;
-  product: { defaultMouldId?: string; shellIngredientId?: string; name: string };
+  product: { defaultMouldId?: string; shellIngredientId?: string | null; name: string };
   productFillings: import("@/types").ProductFilling[];
   allMoulds: import("@/types").Mould[];
   sym?: string;
@@ -1545,6 +1835,7 @@ function ProductCostTab({
     for (const rl of productFillings) {
       const lis = fillingIngredientsMap.get(rl.fillingId) ?? [];
       for (const li of lis) {
+        if (!li.ingredientId) continue;
         const ing = ingredientsMap.get(li.ingredientId);
         if (ing && costPerGram(ing) === null) names.add(ing.name);
       }
@@ -1962,7 +2253,7 @@ function ProductCostTab({
 
           {latest && (
             <p className="text-xs text-muted-foreground mt-1.5">
-              Calculated {new Date(latest.recordedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              Calculated {new Date(latest.recordedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
               {" · "}{latest.triggerDetail}
             </p>
           )}
@@ -1988,7 +2279,7 @@ function ProductCostTab({
                         </span>
                       )}
                       <span className="text-xs text-muted-foreground">
-                        {new Date(snap.recordedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {new Date(snap.recordedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     </div>
                   </div>
@@ -2068,7 +2359,7 @@ function CostHistoryChart({ snapshots, sym = "€" }: { snapshots: ProductCostSn
   };
 
   // Date labels: first and last
-  const dateLabel = (t: number) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const dateLabel = (t: number) => new Date(t).toLocaleDateString("de-AT", { day: "numeric", month: "short" });
 
   return (
     <div className="relative">
@@ -2147,7 +2438,7 @@ function CostHistoryChart({ snapshots, sym = "€" }: { snapshots: ProductCostSn
           }}
         >
           <p className="font-semibold">{formatCost(tooltip.snap.costPerProduct, sym)}</p>
-          <p className="text-muted-foreground">{new Date(tooltip.snap.recordedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>
+          <p className="text-muted-foreground">{new Date(tooltip.snap.recordedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}</p>
           <p className="text-muted-foreground max-w-[160px] truncate">{tooltip.snap.triggerDetail}</p>
         </div>
       )}

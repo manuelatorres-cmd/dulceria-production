@@ -39,10 +39,7 @@ export default function SetupWizardPage() {
   const missingMinProducts = useMemo(() => {
     const hasMin = new Set(stockMinimums.map((m) => m.productId));
     return products.filter(
-      (p) =>
-        !p.archived &&
-        !hasMin.has(p.id ?? "") &&
-        !p.lowStockThreshold,
+      (p) => !p.archived && !hasMin.has(p.id ?? ""),
     );
   }, [products, stockMinimums]);
 

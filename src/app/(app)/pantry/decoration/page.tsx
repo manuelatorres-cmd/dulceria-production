@@ -245,6 +245,54 @@ function MaterialsTab() {
         activeFilterCount={activeFilterCount}
       />
 
+      {/* Quick filters under search — baseline pattern. */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Stock</span>
+          {STOCK_OPTIONS.filter((o) => o.value !== "all").map(({ value, label }) => {
+            const active = f.filterStock === value;
+            return (
+              <button
+                key={value}
+                onClick={() => setF("filterStock", active ? "all" : value as StockFilter)}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {categoryOptions.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Type</span>
+            {categoryOptions.map((c) => {
+              const active = filterTypesSet.has(c.value);
+              return (
+                <button
+                  key={c.value}
+                  onClick={() => {
+                    const next = new Set(filterTypesSet);
+                    if (next.has(c.value)) next.delete(c.value); else next.add(c.value);
+                    setF("filterTypes", Array.from(next));
+                  }}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
+                    active
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {f.showFilters && (
         <FilterPanel activeFilterCount={activeFilterCount} onClearAll={clearFilters}>
           <FilterChipGroup
@@ -302,15 +350,23 @@ function MaterialsTab() {
               , then come back to add a material.
             </div>
           ) : (
-            <select
-              value={newType || defaultType}
-              onChange={(e) => setNewType(e.target.value)}
-              className="input w-full"
-            >
-              {categories.map((c) => (
-                <option key={c.slug} value={c.slug}>{c.name}</option>
-              ))}
-            </select>
+            <>
+              {/* Datalist combobox — arrow keys + Enter, opens
+                  downward. Baseline pantry form UX. */}
+              <input
+                type="text"
+                list="decoration-type-list"
+                value={newType || defaultType}
+                onChange={(e) => setNewType(e.target.value)}
+                className="input w-full"
+                placeholder="Select or type…"
+              />
+              <datalist id="decoration-type-list">
+                {categories.map((c) => (
+                  <option key={c.slug} value={c.slug}>{c.name}</option>
+                ))}
+              </datalist>
+            </>
           )}
         </QuickAddForm>
       )}

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingProduct, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -228,7 +228,7 @@ export function useProductsList(includeArchived = false): Omit<Product, "photo">
     queryFn: async () => {
       // Exclude the photo column (base64, heavy) in list queries.
       const rows = assertOk(
-        await supabase.from("products").select("id, name, popularity, productCategoryId, shellIngredientId, shellPercentage, fillMode, coating, productType, tags, notes, shelfLifeWeeks, lowStockThreshold, stockCountedAt, defaultMouldId, defaultBatchQty, shellDesign, stepDurationOverrides, vegan, archived, createdAt, updatedAt"),
+        await supabase.from("products").select("id, name, popularity, productCategoryId, shellIngredientId, shellFillingId, shellPercentage, fillMode, coating, productType, tags, notes, shelfLifeWeeks, aliases, stockCountedAt, defaultMouldId, defaultBatchQty, shellDesign, stepDurationOverrides, vegan, excludeFromReplen, archived, createdAt, updatedAt"),
       ) as Omit<Product, "photo">[];
       return rows
         .filter((r) => includeArchived || !r.archived)
@@ -250,6 +250,127 @@ export function useProduct(id: string | undefined): Product | undefined {
     },
   });
   return data ?? undefined;
+}
+
+/** Append one or more aliases to a product (deduped, case-insensitive
+ *  on the trim-stripped value). No-op when nothing new. Used by the
+ *  Shopify importer to remember manual mappings. */
+export async function appendProductAliases(productId: string, names: string[]): Promise<void> {
+  const cleaned = [...new Set(
+    names.map((n) => (n ?? "").trim()).filter(Boolean),
+  )];
+  if (cleaned.length === 0) return;
+  const existing = assertOkMaybe(
+    await supabase.from("products").select("aliases").eq("id", productId).maybeSingle(),
+  ) as { aliases?: string[] } | null;
+  const current = (existing?.aliases ?? []).map((s) => s.toLowerCase().trim());
+  const additions = cleaned.filter((n) => !current.includes(n.toLowerCase().trim()));
+  if (additions.length === 0) return;
+  const next = [...(existing?.aliases ?? []), ...additions];
+  const { error } = await supabase
+    .from("products")
+    .update({ aliases: next, updatedAt: new Date() })
+    .eq("id", productId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["products"] });
+}
+
+/** Attach picked-chocolate composition to an existing order. Used by
+ *  the box-builder CSV importer for free-pick variants where the
+ *  Shopify CSV alone doesn't reveal which bonbons went in the box.
+ *
+ *  - Looks up an existing free-pick variant line on the order; uses
+ *    its variantId + variantPackagingId so derived orderItems carry
+ *    the right metadata.
+ *  - When no variant line exists, creates plain orderItems anyway so
+ *    the production demand is captured (still imported as a regular
+ *    product line — order detail will show them as orphan lines).
+ *  - Skips orderItems that already exist for the (orderId, variantId,
+ *    productId) tuple — re-importing the same box-builder CSV is a
+ *    no-op for those lines.
+ *
+ *  Returns how many fresh orderItems landed.
+ */
+export async function attachBoxContents(
+  orderId: string,
+  picks: Array<{ productId: string; quantity: number }>,
+): Promise<number> {
+  if (picks.length === 0) return 0;
+  // Find an existing variant line we can attach to. Prefer the first
+  // free-pick variant on the order.
+  const variantLines = assertOk(
+    await supabase.from("orderVariantLines").select("*").eq("orderId", orderId),
+  ) as OrderVariantLine[];
+  let preferredVariantId: string | null = null;
+  let preferredVpId: string | null = null;
+  if (variantLines.length > 0) {
+    const variants = assertOk(
+      await supabase
+        .from("variants")
+        .select("id, kind")
+        .in("id", variantLines.map((l) => l.variantId)),
+    ) as Array<{ id: string; kind: string }>;
+    const freePick = variantLines.find((l) =>
+      variants.find((v) => v.id === l.variantId)?.kind === "free-pick",
+    ) ?? variantLines[0];
+    preferredVariantId = freePick.variantId;
+    preferredVpId = freePick.variantPackagingId ?? null;
+  }
+  // Existing items so we don't double-insert on re-import.
+  const existingItems = assertOk(
+    await supabase.from("orderItems").select("*").eq("orderId", orderId),
+  ) as OrderItem[];
+  const seen = new Set(
+    existingItems
+      .filter((it) => it.variantId === preferredVariantId)
+      .map((it) => it.productId),
+  );
+  const nextSort = existingItems.reduce((m, it) => Math.max(m, it.sortOrder ?? 0), -1) + 1;
+  const inserts: Array<Omit<OrderItem, "id"> & { id: string }> = [];
+  let s = nextSort;
+  for (const p of picks) {
+    if (seen.has(p.productId)) continue;
+    seen.add(p.productId);
+    inserts.push({
+      id: newId(),
+      orderId,
+      productId: p.productId,
+      quantity: p.quantity,
+      unitPrice: 0,
+      sortOrder: s++,
+      variantId: preferredVariantId ?? undefined,
+      variantPackagingId: preferredVpId ?? undefined,
+      fulfilmentMode: "produce",
+    } as OrderItem & { id: string });
+  }
+  if (inserts.length === 0) return 0;
+  const { error } = await supabase.from("orderItems").insert(inserts);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  queryClient.invalidateQueries({ queryKey: ["orderItems"] });
+  return inserts.length;
+}
+
+/** Same as appendProductAliases but for variants — used when the
+ *  Shopify importer maps a Lineitem name to a curated SKU. */
+export async function appendVariantAliases(variantId: string, names: string[]): Promise<void> {
+  const cleaned = [...new Set(
+    names.map((n) => (n ?? "").trim()).filter(Boolean),
+  )];
+  if (cleaned.length === 0) return;
+  const existing = assertOkMaybe(
+    await supabase.from("variants").select("aliases").eq("id", variantId).maybeSingle(),
+  ) as { aliases?: string[] } | null;
+  const current = (existing?.aliases ?? []).map((s) => s.toLowerCase().trim());
+  const additions = cleaned.filter((n) => !current.includes(n.toLowerCase().trim()));
+  if (additions.length === 0) return;
+  const next = [...(existing?.aliases ?? []), ...additions];
+  const { error } = await supabase
+    .from("variants")
+    .update({ aliases: next, updatedAt: new Date() })
+    .eq("id", variantId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["variants"] });
 }
 
 export async function saveProduct(product: Omit<Product, "id" | "createdAt" | "updatedAt"> & { id?: string }) {
@@ -1182,6 +1303,15 @@ export function useFillingIngredients(fillingId: string | undefined): FillingIng
   return data ?? [];
 }
 
+export function useAllFillingIngredients(): FillingIngredient[] {
+  const { data } = useQuery({
+    queryKey: ["filling-ingredients", "all"],
+    queryFn: async () =>
+      assertOk(await supabase.from("fillingIngredients").select("*")) as FillingIngredient[],
+  });
+  return data ?? [];
+}
+
 export function useProductFillingsForProducts(productIds: string[]): Map<string, ProductFilling[]> {
   const { data } = useQuery({
     queryKey: ["product-fillings", "batch", productIds.join(",")],
@@ -1382,11 +1512,269 @@ export function useProductionPlans(): ProductionPlan[] {
   const { data } = useQuery({
     queryKey: ["production-plans"],
     queryFn: async () => {
-      const rows = assertOk(await supabase.from("productionPlans").select("*")) as ProductionPlan[];
-      return rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // Paginate — Supabase caps at 1000 per request, and live workshops
+      // accumulate thousands of plans (cancelled / orphaned + active).
+      const out: ProductionPlan[] = [];
+      const PAGE = 1000;
+      const MAX_PAGES = 20;
+      for (let i = 0; i < MAX_PAGES; i++) {
+        const from = i * PAGE;
+        const res = await supabase
+          .from("productionPlans")
+          .select("*")
+          .range(from, from + PAGE - 1);
+        const page = assertOk(res) as ProductionPlan[];
+        out.push(...page);
+        if (page.length < PAGE) break;
+      }
+      return out.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     },
   });
   return data ?? [];
+}
+
+/** Move a set of plans onto a target date by rewriting their
+ *  productionDayLineItems. Creates the productionDay row if missing.
+ *  When `pin` is true, the plans' `pinnedDate` flag is set so the
+ *  next regenerate respects the manual placement. */
+export async function moveProductionPlansToDate(args: {
+  planIds: string[];
+  targetDate: string;     // ISO YYYY-MM-DD
+  pin?: boolean;
+}): Promise<void> {
+  const { planIds, targetDate, pin } = args;
+  if (planIds.length === 0) return;
+
+  // 1. Resolve / create the target productionDay row.
+  const existingDay = assertOkMaybe(
+    await supabase.from("productionDays").select("*").eq("date", targetDate).maybeSingle(),
+  ) as { id: string; date: string } | null;
+  let dayId = existingDay?.id;
+  if (!dayId) {
+    dayId = newId();
+    const now = new Date();
+    const { error } = await supabase.from("productionDays").insert({
+      id: dayId,
+      date: targetDate,
+      status: "draft",
+      tempLogComplete: false,
+      cleaningComplete: false,
+      summaryJson: {},
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (error) throw error;
+  }
+
+  // 2. Move each plan's lineItems to the new dayId. Chunk for URL safety.
+  const CHUNK = 100;
+  for (let i = 0; i < planIds.length; i += CHUNK) {
+    const slice = planIds.slice(i, i + CHUNK);
+    const { error } = await supabase
+      .from("productionDayLineItems")
+      .update({ productionDayId: dayId, updatedAt: new Date() })
+      .in("planId", slice);
+    if (error) throw error;
+  }
+
+  // 3. Optional pin so regenerate respects this placement.
+  if (pin) {
+    for (let i = 0; i < planIds.length; i += CHUNK) {
+      const slice = planIds.slice(i, i + CHUNK);
+      const { error } = await supabase
+        .from("productionPlans")
+        .update({ pinnedDate: targetDate, updatedAt: new Date() })
+        .in("id", slice);
+      if (error) throw error;
+    }
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["production-day-line-items"] });
+  queryClient.invalidateQueries({ queryKey: ["production-days"] });
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+}
+
+/** Push an order's deadline forward by N days (typically 1).
+ *  Used by the "must do" view's defer button so an over-stretched
+ *  day can be relieved without editing the order in detail. */
+export async function bumpOrderDeadline(orderId: string, days: number): Promise<void> {
+  const cur = assertOkMaybe(
+    await supabase.from("orders").select("deadline").eq("id", orderId).maybeSingle(),
+  ) as { deadline?: string } | null;
+  if (!cur?.deadline) throw new Error("Order has no deadline to bump");
+  const d = new Date(cur.deadline);
+  d.setDate(d.getDate() + days);
+  const { error } = await supabase
+    .from("orders")
+    .update({ deadline: d.toISOString(), updatedAt: new Date() })
+    .eq("id", orderId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+}
+
+/** Move SPECIFIC step(s) of a plan from their current scheduled day
+ *  to a new day. Splits the stepId out of the source lineItem (or
+ *  deletes the row entirely if the step was the only entry on that
+ *  day for this plan), then inserts/merges into the target day's
+ *  lineItem for the same plan. Used by /plan week view's drag-drop
+ *  on step or category headers — only the dragged step migrates,
+ *  the plan's other steps stay put on their original days. */
+export async function moveProductionStepsToDate(args: {
+  moves: Array<{ planId: string; stepId: string }>;
+  targetDate: string;
+}): Promise<void> {
+  const { moves, targetDate } = args;
+  if (moves.length === 0) return;
+
+  // 1. Resolve / create the target productionDay row.
+  const existingDay = assertOkMaybe(
+    await supabase.from("productionDays").select("*").eq("date", targetDate).maybeSingle(),
+  ) as { id: string; date: string } | null;
+  let targetDayId = existingDay?.id;
+  if (!targetDayId) {
+    targetDayId = newId();
+    const now = new Date();
+    const { error } = await supabase.from("productionDays").insert({
+      id: targetDayId,
+      date: targetDate,
+      status: "draft",
+      tempLogComplete: false,
+      cleaningComplete: false,
+      summaryJson: {},
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (error) throw error;
+  }
+
+  // 2. Read every lineItem for the planIds being touched. We need
+  //    them all because the step might live on any day, and we have
+  //    to update both source AND target rows for the same plan.
+  const planIds = [...new Set(moves.map((m) => m.planId))];
+  const allLineItems = assertOk(
+    await supabase
+      .from("productionDayLineItems")
+      .select("*")
+      .in("planId", planIds),
+  ) as Array<{
+    id: string; planId: string; productionDayId: string;
+    stepIds: string[]; plannedMinutes: number; sortOrder: number;
+  }>;
+
+  for (const m of moves) {
+    const src = allLineItems.find(
+      (li) => li.planId === m.planId && (li.stepIds ?? []).includes(m.stepId),
+    );
+    if (!src) continue;
+    if (src.productionDayId === targetDayId) continue;
+
+    // Remove the step from its source row. If that empties the row,
+    // delete it; otherwise update with the trimmed stepIds.
+    const remainingSteps = (src.stepIds ?? []).filter((s) => s !== m.stepId);
+    if (remainingSteps.length === 0) {
+      await supabase.from("productionDayLineItems").delete().eq("id", src.id);
+    } else {
+      await supabase
+        .from("productionDayLineItems")
+        .update({ stepIds: remainingSteps, updatedAt: new Date() })
+        .eq("id", src.id);
+    }
+
+    // Find / merge into target day's lineItem for the same plan.
+    const target = allLineItems.find(
+      (li) => li.planId === m.planId && li.productionDayId === targetDayId,
+    );
+    if (target) {
+      const merged = [...new Set([...(target.stepIds ?? []), m.stepId])];
+      await supabase
+        .from("productionDayLineItems")
+        .update({ stepIds: merged, updatedAt: new Date() })
+        .eq("id", target.id);
+      // Update local cache so subsequent moves see the merge.
+      target.stepIds = merged;
+    } else {
+      const newRow = {
+        id: newId(),
+        productionDayId: targetDayId,
+        planId: m.planId,
+        stepIds: [m.stepId],
+        plannedMinutes: 0, // reverse-engineered minutes are recomputed by next regen
+        sortOrder: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      await supabase.from("productionDayLineItems").insert(newRow);
+      allLineItems.push({
+        id: newRow.id,
+        planId: m.planId,
+        productionDayId: targetDayId,
+        stepIds: [m.stepId],
+        plannedMinutes: 0,
+        sortOrder: 0,
+      });
+    }
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["production-day-line-items"] });
+  queryClient.invalidateQueries({ queryKey: ["production-days"] });
+}
+
+/** Clear a plan's pinnedDate so the next regenerate is free to
+ *  reschedule it according to capacity / deadlines. */
+export async function unpinProductionPlan(planId: string): Promise<void> {
+  const { error } = await supabase
+    .from("productionPlans")
+    .update({ pinnedDate: null, updatedAt: new Date() })
+    .eq("id", planId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+}
+
+/** Lock multiple plans onto an explicit date (or their currently
+ *  scheduled day if `date` is omitted). The week view's lock buttons
+ *  call this so an operator can fix a batch in place without dragging. */
+export async function pinProductionPlans(planIds: string[], date?: string): Promise<void> {
+  if (planIds.length === 0) return;
+  const CHUNK = 100;
+  // When no date is given we resolve each plan's current scheduled
+  // day individually — a "lock here" affordance.
+  if (!date) {
+    const lineItems = assertOk(
+      await supabase
+        .from("productionDayLineItems")
+        .select("planId, productionDayId")
+        .in("planId", planIds),
+    ) as Array<{ planId: string; productionDayId: string }>;
+    const dayIds = [...new Set(lineItems.map((li) => li.productionDayId))];
+    const days = dayIds.length > 0
+      ? assertOk(await supabase.from("productionDays").select("id, date").in("id", dayIds)) as Array<{ id: string; date: string }>
+      : [];
+    const dateByDay = new Map(days.map((d) => [d.id, d.date]));
+    const dateByPlan = new Map<string, string>();
+    for (const li of lineItems) {
+      const d = dateByDay.get(li.productionDayId);
+      if (!d) continue;
+      const cur = dateByPlan.get(li.planId);
+      if (!cur || d < cur) dateByPlan.set(li.planId, d);
+    }
+    for (const pid of planIds) {
+      const d = dateByPlan.get(pid);
+      if (!d) continue;
+      await supabase
+        .from("productionPlans")
+        .update({ pinnedDate: d, updatedAt: new Date() })
+        .eq("id", pid);
+    }
+  } else {
+    for (let i = 0; i < planIds.length; i += CHUNK) {
+      const slice = planIds.slice(i, i + CHUNK);
+      await supabase
+        .from("productionPlans")
+        .update({ pinnedDate: date, updatedAt: new Date() })
+        .in("id", slice);
+    }
+  }
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
 }
 
 export function useProductionPlan(id: string | undefined): ProductionPlan | undefined {
@@ -1428,28 +1816,161 @@ export async function saveProductionPlan(plan: Omit<ProductionPlan, "id"> & { id
   const completedAt = plan.status === "done"
     ? (plan.completedAt ?? now)
     : null;
+  let savedId: string;
   if (plan.id) {
     const { error } = await supabase
       .from("productionPlans")
       .update({ ...plan, updatedAt: now, completedAt })
       .eq("id", plan.id);
     if (error) throw error;
-    queryClient.invalidateQueries({ queryKey: ["production-plans"] });
-    return plan.id;
+    savedId = plan.id;
+  } else {
+    const batchNumber = plan.batchNumber ?? await generateBatchNumber(now);
+    const createdId = newId();
+    const { error } = await supabase.from("productionPlans").insert({
+      ...plan,
+      id: createdId,
+      batchNumber,
+      createdAt: now,
+      updatedAt: now,
+      completedAt,
+    });
+    if (error) throw error;
+    savedId = createdId;
   }
-  const batchNumber = plan.batchNumber ?? await generateBatchNumber(now);
-  const createdId = newId();
-  const { error } = await supabase.from("productionPlans").insert({
-    ...plan,
-    id: createdId,
-    batchNumber,
-    createdAt: now,
-    updatedAt: now,
-    completedAt,
-  });
-  if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["production-plans"] });
-  return createdId;
+
+  // Auto-flip parent Production Order to "done" when this plan flipped
+  // to done AND all its sibling plans (same PO) are now done. Plans
+  // are linked to their PO via name-pattern `PO: <po name> — <product>`.
+  if (plan.status === "done" && plan.name && plan.name.startsWith("PO: ")) {
+    try {
+      const dashIdx = plan.name.indexOf(" — ");
+      if (dashIdx > 4) {
+        const poName = plan.name.slice(4, dashIdx);
+        await maybeAutoFlipProductionOrderDone(poName);
+      }
+    } catch (e) {
+      // Non-blocking — log only.
+      console.warn("auto-flip PO done failed", e);
+    }
+  }
+
+  // Auto-flip linked customer orders to "done" when EVERY orderItem
+  // they carry has been fully allocated (allocatedQuantity ≥ quantity)
+  // by some plan that's either active, done, or borrow-fulfilled.
+  // Triggered every time a plan flips to done so the order leaves
+  // the open list automatically.
+  if (plan.status === "done" && savedId) {
+    try {
+      await maybeAutoFlipOrdersDone(savedId);
+    } catch (e) {
+      console.warn("auto-flip linked orders done failed", e);
+    }
+  }
+
+  return savedId;
+}
+
+/** When a plan finishes, walk its orderPlanLinks and check whether
+ *  every contributing order is now fully fulfilled. If yes, flip the
+ *  order's status to "done". */
+async function maybeAutoFlipOrdersDone(planId: string): Promise<void> {
+  const planLinks = assertOk(
+    await supabase.from("orderPlanLinks").select("*").eq("planId", planId),
+  ) as OrderPlanLink[];
+  if (planLinks.length === 0) return;
+
+  const itemIds = [...new Set(planLinks.map((l) => l.orderItemId))];
+  const items = assertOk(
+    await supabase.from("orderItems").select("*").in("id", itemIds),
+  ) as OrderItem[];
+  const orderIds = [...new Set(items.map((it) => it.orderId))];
+
+  for (const orderId of orderIds) {
+    const order = assertOkMaybe(
+      await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
+    ) as Order | null;
+    if (!order) continue;
+    if (order.status === "done" || order.status === "cancelled") continue;
+
+    // Pull every item + every link for that order.
+    const orderItems = assertOk(
+      await supabase.from("orderItems").select("*").eq("orderId", orderId),
+    ) as OrderItem[];
+    if (orderItems.length === 0) continue;
+
+    const itemIdsForOrder = orderItems.map((i) => i.id!);
+    const allLinks = assertOk(
+      await supabase.from("orderPlanLinks").select("*").in("orderItemId", itemIdsForOrder),
+    ) as OrderPlanLink[];
+
+    const linkedPlanIds = [...new Set(allLinks.map((l) => l.planId))];
+    const linkedPlans = linkedPlanIds.length > 0
+      ? assertOk(await supabase.from("productionPlans").select("id, status").in("id", linkedPlanIds)) as Array<{ id: string; status: string }>
+      : [];
+    const planStatusById = new Map(linkedPlans.map((p) => [p.id, p.status]));
+
+    let allFulfilled = true;
+    for (const it of orderItems) {
+      if ((it.fulfilmentMode ?? "produce") === "borrow") continue; // ship deduction handled elsewhere
+      const itemLinks = allLinks.filter((l) => l.orderItemId === it.id);
+      const fulfilledQty = itemLinks
+        .filter((l) => {
+          const s = planStatusById.get(l.planId);
+          return s === "done" || s === "active";
+        })
+        .reduce((sum, l) => sum + (l.allocatedQuantity ?? 0), 0);
+      if (fulfilledQty < it.quantity) { allFulfilled = false; break; }
+    }
+    if (!allFulfilled) continue;
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: "done", updatedAt: new Date() })
+      .eq("id", orderId);
+    if (error) console.warn(`auto-flip order ${orderId} failed`, error);
+  }
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
+}
+
+/** Look up the open (pending / in_production) Production Order by name,
+ *  check if every linked plan is now "done", and flip the PO to "done"
+ *  if so. Idempotent. Called from saveProductionPlan when a plan
+ *  transitions to done. */
+async function maybeAutoFlipProductionOrderDone(poName: string): Promise<void> {
+  const po = assertOkMaybe(
+    await supabase.from("productionOrders")
+      .select("*")
+      .eq("name", poName)
+      .in("status", ["pending", "in_production"])
+      .maybeSingle(),
+  ) as ProductionOrder | null;
+  if (!po) return;
+  const namePrefix = `PO: ${poName} — `;
+  const linkedPlans = assertOk(
+    await supabase.from("productionPlans")
+      .select("id, status")
+      .like("name", `${namePrefix}%`),
+  ) as Array<{ id: string; status: string }>;
+  if (linkedPlans.length === 0) return;
+  const allDone = linkedPlans.every((p) => p.status === "done");
+  if (!allDone) return;
+  await supabase.from("productionOrders")
+    .update({ status: "done", updatedAt: new Date() })
+    .eq("id", po.id!);
+  queryClient.invalidateQueries({ queryKey: ["production-orders"] });
+}
+
+/** Manually flip a Production Order to "done" — used by the PO detail
+ *  page's "Mark done" button. Skips the all-children-done check so the
+ *  user can close out an order even if some plans were cancelled. */
+export async function markProductionOrderDone(poId: string): Promise<void> {
+  const { error } = await supabase.from("productionOrders")
+    .update({ status: "done", updatedAt: new Date() })
+    .eq("id", poId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["production-orders"] });
 }
 
 export async function deleteProductionPlan(id: string) {
@@ -1553,11 +2074,11 @@ export async function defrostPlanProduct(id: string): Promise<void> {
  *  in the production wizard.
  *
  *  Resolution:
- *   1. If the product has `lowStockThreshold` set → compare against the sum of
- *      `currentStock` (falling back to `actualYield`) across non-"gone" batches.
- *      0 → "gone", below threshold → "low".
- *   2. Otherwise fall back to the legacy per-batch `stockStatus` flag: "gone"
- *      only when all batches are gone, "low" when any is flagged low.
+ *   1. If the product has any `stockLocationMinimums` rows → sum the
+ *      `minimumUnits` and compare against the total of `currentStock`
+ *      (fallback `actualYield`) across non-"gone" batches. 0 → "gone",
+ *      below sum → "low".
+ *   2. Otherwise fall back to the legacy per-batch `stockStatus` flag.
  */
 export function useProductStockAlerts(): Map<string, "low" | "gone"> {
   const { data } = useQuery({
@@ -1568,11 +2089,15 @@ export function useProductStockAlerts(): Map<string, "low" | "gone"> {
     ) as ProductionPlan[];
     if (donePlans.length === 0) return new Map<string, "low" | "gone">();
     const planIds = donePlans.map((p) => p.id!);
-    const [allBatches, allProducts] = await Promise.all([
+    const [allBatches, mins] = await Promise.all([
       supabase.from("planProducts").select("*").in("planId", planIds).then((r) => assertOk(r) as PlanProduct[]),
-      supabase.from("products").select("*").then((r) => assertOk(r) as Product[]),
+      supabase.from("stockLocationMinimums").select("productId, minimumUnits").then((r) => assertOk(r) as Array<{ productId: string; minimumUnits: number }>),
     ]);
-    const productsById = new Map(allProducts.map((p) => [p.id!, p] as const));
+    const minSumByProduct = new Map<string, number>();
+    for (const m of mins) {
+      const cur = minSumByProduct.get(m.productId) ?? 0;
+      minSumByProduct.set(m.productId, cur + Number(m.minimumUnits ?? 0));
+    }
 
     // Per-product aggregation. Frozen pieces (pb.frozenQty) do NOT count toward
     // available stock — they're in the freezer and unavailable until defrosted.
@@ -1596,9 +2121,8 @@ export function useProductStockAlerts(): Map<string, "low" | "gone"> {
     const result = new Map<string, "low" | "gone">();
     for (const [productId, a] of agg) {
       if (!a.hasBatches) continue;
-      const product = productsById.get(productId);
-      const threshold = product?.lowStockThreshold;
-      if (typeof threshold === "number" && threshold >= 0) {
+      const threshold = minSumByProduct.get(productId);
+      if (typeof threshold === "number" && threshold > 0) {
         if (a.allGone || a.total <= 0) result.set(productId, "gone");
         else if (a.total < threshold) result.set(productId, "low");
       } else {
@@ -1714,7 +2238,24 @@ export async function updateProductStockCount(productId: string, newTotal: numbe
 export function useAllPlanProducts(): PlanProduct[] {
   const { data } = useQuery({
     queryKey: ["plan-products", "all"],
-    queryFn: async () => assertOk(await supabase.from("planProducts").select("*")) as PlanProduct[],
+    queryFn: async () => {
+      // Paginate but cap at 20 pages (20k rows) to prevent infinite
+      // loops if the response keeps returning full pages.
+      const out: PlanProduct[] = [];
+      const PAGE = 1000;
+      const MAX_PAGES = 20;
+      for (let i = 0; i < MAX_PAGES; i++) {
+        const from = i * PAGE;
+        const res = await supabase
+          .from("planProducts")
+          .select("*")
+          .range(from, from + PAGE - 1);
+        const page = assertOk(res) as PlanProduct[];
+        out.push(...page);
+        if (page.length < PAGE) break;
+      }
+      return out;
+    },
   });
   return data ?? [];
 }
@@ -1940,7 +2481,22 @@ export function usePlanStepStatuses(planId: string | undefined): PlanStepStatus[
 export function useAllPlanStepStatuses(): PlanStepStatus[] {
   const { data } = useQuery({
     queryKey: ["plan-step-statuses", "all"],
-    queryFn: async () => assertOk(await supabase.from("planStepStatus").select("*")) as PlanStepStatus[],
+    queryFn: async () => {
+      const out: PlanStepStatus[] = [];
+      const PAGE = 1000;
+      const MAX_PAGES = 20;
+      for (let i = 0; i < MAX_PAGES; i++) {
+        const from = i * PAGE;
+        const res = await supabase
+          .from("planStepStatus")
+          .select("*")
+          .range(from, from + PAGE - 1);
+        const page = assertOk(res) as PlanStepStatus[];
+        out.push(...page);
+        if (page.length < PAGE) break;
+      }
+      return out;
+    },
   });
   return data ?? [];
 }
@@ -2017,6 +2573,23 @@ export function useCoatings(): string[] {
     queryFn: async () => (await getPreferences()).coatings,
   });
   return data ?? [...DEFAULT_COATINGS];
+}
+
+/** Last successful `regenerateAllPlansAndSchedule` stamp. Used by /plan
+ *  (and dashboard) to show "Last updated …" beside the Regenerate button. */
+export function useLastRegenAt(): Date | null {
+  const { data } = useQuery({
+    queryKey: ["user-preferences", "lastRegenAt"],
+    queryFn: async () => {
+      const p = await getPreferences();
+      const v = p.lastRegenAt;
+      if (!v) return null;
+      const d = v instanceof Date ? v : new Date(v as unknown as string);
+      return Number.isFinite(d.getTime()) ? d : null;
+    },
+    refetchInterval: 30_000,
+  });
+  return data ?? null;
 }
 
 export async function addCoating(coating: string): Promise<void> {
@@ -2621,25 +3194,55 @@ export async function computeAndSaveProductCostSnapshot(params: {
   if (!product) return;
 
   const fillingIds = productFillings.map((rl) => rl.fillingId);
+  // When the product's shell is a filling (migration 0062), pull its
+  // row + recipe too so shellCostPerGram can resolve.
+  const shellFillingId = product.shellFillingId ?? null;
+  const allFillingIdsToFetch = Array.from(new Set(
+    shellFillingId ? [...fillingIds, shellFillingId] : fillingIds,
+  ));
   const [fillings, ...liArrays] = await Promise.all([
-    fillingIds.length > 0
-      ? supabase.from("fillings").select("*").in("id", fillingIds).then((r) => assertOk(r) as Filling[])
+    allFillingIdsToFetch.length > 0
+      ? supabase.from("fillings").select("*").in("id", allFillingIdsToFetch).then((r) => assertOk(r) as Filling[])
       : Promise.resolve([] as Filling[]),
-    ...fillingIds.map((lid) =>
+    ...allFillingIdsToFetch.map((lid) =>
       supabase.from("fillingIngredients").select("*").eq("fillingId", lid).then((r) => assertOk(r) as FillingIngredient[]),
     ),
   ]);
 
   const fillingsMap = new Map(fillings.map((l) => [l.id!, l]));
   const fillingIngredientsMap = new Map<string, typeof liArrays[0]>();
-  fillingIds.forEach((lid, i) => fillingIngredientsMap.set(lid, liArrays[i]));
+  allFillingIdsToFetch.forEach((lid, i) => fillingIngredientsMap.set(lid, liArrays[i]));
 
   const ingredientCostMap = buildIngredientCostMap(allIngredients);
   const ingredientMap = new Map(allIngredients.map((i) => [i.id!, i]));
 
-  // Resolve the shell chocolate cost directly from the product's shellIngredientId
+  // Resolve shell cost. Two paths:
+  //   1. Ingredient-based shell (legacy) — single chocolate ingredient.
+  //   2. Filling-based shell (2026-04-24, migration 0062) — self-made
+  //      blend stored as a filling. Cost per gram = filling recipe
+  //      totalCost / totalGrams.
   const shellIngredientId = product.shellIngredientId;
-  const shellCostPerGram = shellIngredientId ? (ingredientCostMap.get(shellIngredientId) ?? null) : null;
+  // `shellFillingId` already declared above to pre-fetch the recipe.
+  let shellCostPerGram: number | null = null;
+  let shellLabel: string | undefined;
+  if (shellIngredientId) {
+    shellCostPerGram = ingredientCostMap.get(shellIngredientId) ?? null;
+    const shellIng = ingredientMap.get(shellIngredientId);
+    shellLabel = shellIng?.name;
+  } else if (shellFillingId) {
+    const lis = fillingIngredientsMap.get(shellFillingId) ?? [];
+    let totalG = 0;
+    let totalCost = 0;
+    for (const li of lis) {
+      if (!li.ingredientId) continue; // sub-filling rows not recursed yet
+      const cpg = ingredientCostMap.get(li.ingredientId);
+      if (cpg == null) continue;
+      totalG += li.amount;
+      totalCost += li.amount * cpg;
+    }
+    shellCostPerGram = totalG > 0 ? totalCost / totalG : null;
+    shellLabel = fillingsMap.get(shellFillingId)?.name;
+  }
   const shellIngredient = shellIngredientId ? ingredientMap.get(shellIngredientId) : undefined;
   const shellPercentage = product.shellPercentage ?? 37;
 
@@ -2661,13 +3264,24 @@ export async function computeAndSaveProductCostSnapshot(params: {
   //      snapshot via manual recalc.
   if (!isUserEdit) {
     const allFillingIngredients = liArrays.flat();
-    const usedIngredientIds = [...new Set(allFillingIngredients.map((li) => li.ingredientId))];
+    const usedIngredientIds = [...new Set(
+      allFillingIngredients
+        .map((li) => li.ingredientId)
+        .filter((id): id is string => !!id),
+    )];
     const allPriced = usedIngredientIds.every((id) => {
       const ing = ingredientMap.get(id);
       return ing && hasPricingData(ing);
     });
-    const shellIngredientPriced = shellPercentage === 0 || !shellIngredientId || (shellIngredient ? hasPricingData(shellIngredient) : false);
-    if (!allPriced || !shellIngredientPriced) return;
+    // Shell pricing check covers both paths:
+    //   - ingredient shell: the ingredient has pricing data
+    //   - filling shell: shellCostPerGram resolved to a number
+    const shellPriced =
+      shellPercentage === 0 ||
+      (shellIngredientId ? (shellIngredient ? hasPricingData(shellIngredient) : false) :
+       shellFillingId ? shellCostPerGram != null :
+       true);
+    if (!allPriced || !shellPriced) return;
 
     const { count: existingCount, error: countErr } = await supabase
       .from("productCostSnapshots")
@@ -2698,7 +3312,7 @@ export async function computeAndSaveProductCostSnapshot(params: {
     fillingsMap,
     ingredientCostMap,
     shellChocolateCostPerGram: shellCostPerGram,
-    shellChocolateLabel: shellIngredient?.name,
+    shellChocolateLabel: shellLabel,
     shellPercentage: effectiveShellPercentage,
     fillMode,
   });
@@ -3635,6 +4249,110 @@ export async function saveVariant(obj: Omit<Variant, "id"> & { id?: string }): P
   return createdId;
 }
 
+/** Clone a variant with all its sizes, composition rows, and packaging
+ *  components. Returns the new variant id. Copy carries every field
+ *  except the name (suffixed " (copy)") so the user can immediately
+ *  edit it. Used for "all the same except name + product" scenarios.
+ */
+export async function duplicateVariant(sourceId: string): Promise<string> {
+  const src = assertOkMaybe(
+    await supabase.from("variants").select("*").eq("id", sourceId).maybeSingle(),
+  ) as Variant | null;
+  if (!src) throw new Error(`Variant ${sourceId} not found`);
+
+  const now = new Date();
+  const newVariantId = newId();
+  const { error: vErr } = await supabase.from("variants").insert({
+    ...src,
+    id: newVariantId,
+    name: `${src.name} (copy)`,
+    createdAt: now,
+    updatedAt: now,
+  });
+  if (vErr) throw vErr;
+
+  // Variant products (catalog of chocolates that belong to this variant).
+  const variantProducts = assertOk(
+    await supabase.from("variantProducts").select("*").eq("variantId", sourceId),
+  ) as VariantProduct[];
+  if (variantProducts.length > 0) {
+    const rows = variantProducts.map((vp) => ({
+      ...vp,
+      id: newId(),
+      variantId: newVariantId,
+    }));
+    const { error } = await supabase.from("variantProducts").insert(rows);
+    if (error) throw error;
+  }
+
+  // Sizes (variantPackagings) — new ids needed since composition + components reference them.
+  const variantPackagings = assertOk(
+    await supabase.from("variantPackagings").select("*").eq("variantId", sourceId),
+  ) as VariantPackaging[];
+  const oldToNewVp = new Map<string, string>();
+  for (const vp of variantPackagings) {
+    const newVpId = newId();
+    oldToNewVp.set(vp.id!, newVpId);
+    const { error } = await supabase.from("variantPackagings").insert({
+      ...vp,
+      id: newVpId,
+      variantId: newVariantId,
+      // Reset on-hand count on the copy — it's a fresh SKU.
+      quantityOnHand: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (error) throw error;
+  }
+
+  // Composition rows (curated kind only).
+  if (oldToNewVp.size > 0) {
+    const composition = assertOk(
+      await supabase
+        .from("variantPackagingProducts")
+        .select("*")
+        .in("variantPackagingId", [...oldToNewVp.keys()]),
+    ) as VariantPackagingProduct[];
+    if (composition.length > 0) {
+      const rows = composition.map((c) => ({
+        ...c,
+        id: newId(),
+        variantPackagingId: oldToNewVp.get(c.variantPackagingId)!,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      const { error } = await supabase.from("variantPackagingProducts").insert(rows);
+      if (error) throw error;
+    }
+    // Packaging components (box + cushion + sticker per size).
+    const components = assertOk(
+      await supabase
+        .from("variantPackagingComponents")
+        .select("*")
+        .in("variantPackagingId", [...oldToNewVp.keys()]),
+    ) as VariantPackagingComponent[];
+    if (components.length > 0) {
+      const rows = components.map((c) => ({
+        ...c,
+        id: newId(),
+        variantPackagingId: oldToNewVp.get(c.variantPackagingId)!,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      const { error } = await supabase.from("variantPackagingComponents").insert(rows);
+      if (error) throw error;
+    }
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["variants"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-products"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packaging-products"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packaging-components"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packaging-components-bulk"] });
+  return newVariantId;
+}
+
 export async function deleteVariant(id: string): Promise<void> {
   const delCp = await supabase.from("variantProducts").delete().eq("variantId", id);
   if (delCp.error) throw delCp.error;
@@ -3722,10 +4440,89 @@ export function useVariantPackagings(variantId: string | undefined): VariantPack
   return data ?? [];
 }
 
+/** Components (box + cushion + paper + sticker …) for a single
+ *  variantPackaging row. Migration 0064. */
+export function useVariantPackagingComponents(
+  variantPackagingId: string | undefined,
+): VariantPackagingComponent[] {
+  const { data } = useQuery({
+    queryKey: ["variant-packaging-components", variantPackagingId],
+    enabled: !!variantPackagingId,
+    queryFn: async () =>
+      assertOk(
+        await supabase
+          .from("variantPackagingComponents")
+          .select("*")
+          .eq("variantPackagingId", variantPackagingId!)
+          .order("sortOrder", { ascending: true }),
+      ) as VariantPackagingComponent[],
+  });
+  return data ?? [];
+}
+
+/** Bulk fetch components for a list of variantPackagingIds in one
+ *  query — used by the variant detail page so each size renders its
+ *  components without N round-trips. */
+export function useVariantPackagingComponentsBulk(
+  variantPackagingIds: string[],
+): VariantPackagingComponent[] {
+  const key = [...variantPackagingIds].sort().join(",");
+  const { data } = useQuery({
+    queryKey: ["variant-packaging-components-bulk", key],
+    enabled: variantPackagingIds.length > 0,
+    queryFn: async () =>
+      assertOk(
+        await supabase
+          .from("variantPackagingComponents")
+          .select("*")
+          .in("variantPackagingId", variantPackagingIds)
+          .order("sortOrder", { ascending: true }),
+      ) as VariantPackagingComponent[],
+  });
+  return data ?? [];
+}
+
+export async function saveVariantPackagingComponent(
+  row: Omit<VariantPackagingComponent, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const now = new Date();
+  const payload = { ...row, id, updatedAt: now };
+  const { error } = await supabase
+    .from("variantPackagingComponents")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["variant-packaging-components"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packaging-components-bulk"] });
+  return id;
+}
+
+export async function deleteVariantPackagingComponent(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("variantPackagingComponents")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["variant-packaging-components"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-packaging-components-bulk"] });
+}
+
 export function useAllVariantPackagings(): VariantPackaging[] {
   const { data } = useQuery({
     queryKey: ["variant-packagings", "all"],
     queryFn: async () => assertOk(await supabase.from("variantPackagings").select("*")) as VariantPackaging[],
+  });
+  return data ?? [];
+}
+
+/** Aggregate hook: every variantPackagingComponent across every size.
+ *  Used by the daily-count page to compute composition deductions
+ *  without N per-variant queries. */
+export function useAllVariantPackagingComponents(): VariantPackagingComponent[] {
+  const { data } = useQuery({
+    queryKey: ["variant-packaging-components", "all"],
+    queryFn: async () =>
+      assertOk(await supabase.from("variantPackagingComponents").select("*")) as VariantPackagingComponent[],
   });
   return data ?? [];
 }
@@ -4050,8 +4847,22 @@ export async function adjustIngredientStock(args: {
   });
   if (mvErr) throw mvErr;
 
+  // Mirror the new total into the legacy `ingredients.currentStockG`
+  // column so older call sites (shopping-needs "on hand", the
+  // shopping page) show the same number as the ingredientStock table.
+  // Kept deliberately — a follow-up refactor can fully retire
+  // `currentStockG` once no page reads it.
+  {
+    const { error: mirrorErr } = await supabase
+      .from("ingredients")
+      .update({ currentStockG: next, updatedAt: now })
+      .eq("id", ingredientId);
+    if (mirrorErr) console.warn("currentStockG mirror failed", mirrorErr);
+  }
+
   queryClient.invalidateQueries({ queryKey: ["ingredient-stock"] });
   queryClient.invalidateQueries({ queryKey: ["ingredient-stock-movements"] });
+  queryClient.invalidateQueries({ queryKey: ["ingredients"] });
   return { applied, balanceAfter: next };
 }
 
@@ -4273,8 +5084,10 @@ export async function prepareFillingForBatch(
   }
   const scale = totalToMakeG / recipeBaseG;
 
-  // Deduct each recipe ingredient.
+  // Deduct each recipe ingredient. Sub-filling lines are skipped —
+  // production-prep deduction doesn't yet recurse into nested fillings.
   for (const ri of recipe) {
+    if (!ri.ingredientId) continue;
     const needG = Math.round(Number(ri.amount) * scale * 10) / 10;
     if (needG <= 0) continue;
     const r = await adjustIngredientStock({
@@ -6380,16 +7193,37 @@ export async function regenerateAllProductionPlans(): Promise<RegeneratePlansRes
   }
   for (const upd of decision.updateBatches) {
     // Resize the single planProduct + insert replacement links.
+    //
+    // Wipe every existing orderPlanLink for this plan first so the
+    // fresh `upd.allocations` rows don't collide with the prior set
+    // on the (orderItemId, planId) unique constraint. Earlier we
+    // relied on `decision.linksToDelete` to clear them upstream, but
+    // when the reconciler re-emitted an allocation for an item still
+    // in the old set the regenerate crashed with 23505. Deleting
+    // here is idempotent and safe — the very next step rewrites them.
     const { error: ppError } = await supabase
       .from("planProducts")
       .update({ quantity: upd.moulds })
       .eq("id", upd.planProductId);
     if (ppError) throw ppError;
-    const linkRows = upd.allocations.map((a) => ({
+    const { error: delLinksErr } = await supabase
+      .from("orderPlanLinks")
+      .delete()
+      .eq("planId", upd.planId);
+    if (delLinksErr) throw delLinksErr;
+    // Coalesce duplicate (orderItemId, planId) rows in the incoming
+    // allocations by summing allocatedQuantity. Defensive against the
+    // reconciler emitting two allocations for the same orderItem on
+    // the same updateBatch.
+    const mergedAllocs = new Map<string, number>();
+    for (const a of upd.allocations) {
+      mergedAllocs.set(a.orderItemId, (mergedAllocs.get(a.orderItemId) ?? 0) + a.allocatedQuantity);
+    }
+    const linkRows = [...mergedAllocs.entries()].map(([orderItemId, allocatedQuantity]) => ({
       id: newId(),
-      orderItemId: a.orderItemId,
+      orderItemId,
       planId: upd.planId,
-      allocatedQuantity: a.allocatedQuantity,
+      allocatedQuantity,
       createdAt: now,
       updatedAt: now,
     }));
@@ -6423,11 +7257,19 @@ export async function regenerateAllProductionPlans(): Promise<RegeneratePlansRes
       sortOrder: 0,
     });
     if (ppError) throw ppError;
-    const linkRows = b.allocations.map((a) => ({
+    // Coalesce duplicate orderItemIds in the new batch's allocations
+    // — same defensive logic as the updateBatches path; without it
+    // the reconciler emitting the same item twice would trip the
+    // (orderItemId, planId) unique constraint.
+    const mergedAllocs = new Map<string, number>();
+    for (const a of b.allocations) {
+      mergedAllocs.set(a.orderItemId, (mergedAllocs.get(a.orderItemId) ?? 0) + a.allocatedQuantity);
+    }
+    const linkRows = [...mergedAllocs.entries()].map(([orderItemId, allocatedQuantity]) => ({
       id: newId(),
-      orderItemId: a.orderItemId,
+      orderItemId,
       planId,
-      allocatedQuantity: a.allocatedQuantity,
+      allocatedQuantity,
       createdAt: now,
       updatedAt: now,
     }));
@@ -6453,6 +7295,629 @@ export async function regenerateAllProductionPlans(): Promise<RegeneratePlansRes
  * (DB reads, not hook state) so the schedule sees the batches this
  * regenerate just created, not the pre-reconcile cache.
  */
+/** Materialise campaign-target demand into draft `productionPlans`
+ *  rows so the legacy /plan view + dashboard see them. One draft
+ *  plan per (campaign, product) — quantity in moulds derived from
+ *  product cavities. Skips combos that already have a draft / active
+ *  campaign plan. Returns warnings (missing mould, missing product,
+ *  etc.) to surface in the regenerate banner. */
+async function seedCampaignDrivenPlans(): Promise<{ warnings: string[]; deadlineByPlanId: Map<string, number> }> {
+  const warnings: string[] = [];
+  const deadlineByPlanId = new Map<string, number>();
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  // Pull every campaign that's still meant to run — planned or
+  // active. Past-deadline ones are still scheduled (ASAP) so the user
+  // sees a batch + warning instead of silent skip. Done / cancelled
+  // are excluded.
+  const campaigns = assertOk(
+    await supabase
+      .from("campaigns")
+      .select("*")
+      .in("status", ["planned", "active"]),
+  ) as Campaign[];
+  if (campaigns.length === 0) return { warnings, deadlineByPlanId };
+  for (const c of campaigns) {
+    // Campaign deadline = startDate (when products must be ready).
+    if (c.startDate && c.startDate < todayIso) {
+      warnings.push(`Campaign "${c.name}" start date (${c.startDate}) has passed — scheduling ASAP.`);
+    }
+  }
+
+  const interestingProductIds = new Set<string>();
+  for (const c of campaigns) {
+    for (const pid of Object.keys(c.productTargets ?? {})) interestingProductIds.add(pid);
+  }
+  if (interestingProductIds.size === 0) return { warnings, deadlineByPlanId };
+
+  const products = assertOk(
+    await supabase.from("products").select("*").in("id", [...interestingProductIds]),
+  ) as Product[];
+  const productById = new Map(products.map((p) => [p.id!, p]));
+
+  const mouldIds = products.map((p) => p.defaultMouldId).filter((x): x is string => !!x);
+  const moulds = mouldIds.length > 0
+    ? assertOk(await supabase.from("moulds").select("*").in("id", mouldIds)) as Mould[]
+    : [];
+  const mouldById = new Map(moulds.map((m) => [m.id!, m]));
+
+  const existingPlans = assertOk(
+    await supabase.from("productionPlans").select("*").in("status", ["draft", "active"]),
+  ) as ProductionPlan[];
+  const existingPP = assertOk(
+    await supabase.from("planProducts").select("*"),
+  ) as PlanProduct[];
+  const planById = new Map(existingPlans.map((p) => [p.id!, p]));
+
+  const now = new Date();
+
+  for (const c of campaigns) {
+    const targets = c.productTargets ?? {};
+    for (const [productId, units] of Object.entries(targets)) {
+      if (!units || units <= 0) continue;
+      const product = productById.get(productId);
+      if (!product) {
+        warnings.push(`Campaign "${c.name}" references unknown product ${productId} — skipped.`);
+        continue;
+      }
+      if (!product.defaultMouldId) {
+        warnings.push(`"${product.name}" in campaign "${c.name}" has no default mould — set one to schedule.`);
+        continue;
+      }
+      const mould = mouldById.get(product.defaultMouldId);
+      if (!mould) {
+        warnings.push(`Mould missing for "${product.name}" in campaign "${c.name}" — skipped.`);
+        continue;
+      }
+      const namePattern = `Campaign: ${c.name} — ${product.name}`;
+      const existing = existingPlans.find((p) => p.name === namePattern);
+      // Anchor at local noon — using end-of-day shifts to next-day in
+      // some timezones once the scheduler converts back to ISO date,
+      // landing batches on the day AFTER the launch.
+      // Campaigns: production must be READY by the campaign's start
+      // date, not its end date. End is when the campaign closes (last
+      // market day, last sale day, etc) — products need to exist on
+      // shelves before that. Fall back to endDate only if startDate
+      // somehow missing on a legacy row.
+      const deadlineDate = c.startDate ?? c.endDate;
+      const campaignDeadlineMs = deadlineDate ? new Date(deadlineDate + "T12:00:00").getTime() : null;
+      if (existing) {
+        // Already created on a previous Regenerate — still record the
+        // deadline so the scheduler can reverse-place this batch.
+        if (campaignDeadlineMs != null && existing.id) {
+          deadlineByPlanId.set(existing.id, campaignDeadlineMs);
+        }
+        continue;
+      }
+
+      const cavities = mould.numberOfCavities ?? 1;
+      const moulds_count = Math.max(1, Math.ceil(units / cavities));
+
+      const planId = newId();
+      const batchNumber = await generateBatchNumber(now);
+      const { error: planErr } = await supabase.from("productionPlans").insert({
+        id: planId,
+        name: namePattern,
+        batchNumber,
+        status: "draft",
+        sourceOrderId: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      if (planErr) {
+        warnings.push(`Could not create campaign plan for ${product.name}: ${planErr.message}`);
+        continue;
+      }
+      const { error: ppErr } = await supabase.from("planProducts").insert({
+        id: newId(),
+        planId,
+        productId,
+        mouldId: product.defaultMouldId,
+        quantity: moulds_count,
+        sortOrder: 0,
+      });
+      if (ppErr) {
+        warnings.push(`Could not link campaign plan products: ${ppErr.message}`);
+        continue;
+      }
+      // Push into the in-memory caches so successive iterations see
+      // the new plan and don't re-create.
+      existingPlans.push({
+        id: planId, name: namePattern, batchNumber, status: "draft",
+        createdAt: now, updatedAt: now,
+      } as ProductionPlan);
+      planById.set(planId, existingPlans[existingPlans.length - 1]);
+      existingPP.push({ id: newId(), planId, productId, mouldId: product.defaultMouldId, quantity: moulds_count, sortOrder: 0 } as PlanProduct);
+      // Record the deadline so the scheduler reverse-schedules this
+      // batch from the campaign's endDate (minus production buffer)
+      // instead of forward-filling from today.
+      if (campaignDeadlineMs != null) {
+        deadlineByPlanId.set(planId, campaignDeadlineMs);
+      }
+    }
+  }
+
+  return { warnings, deadlineByPlanId };
+}
+
+/** Materialise low-stock-vs-minimum gaps into draft plans. Reads
+ *  every (product, location) row from `stockLocationMinimums`, sums
+ *  current pieces at that location from `productStock`, and creates
+ *  a draft plan when current < minimum. Skips when a replen plan
+ *  for that combo already exists. Mirrors `seedCampaignDrivenPlans`
+ *  but for the location-minimum signal. */
+/** Materialise pending `productionOrders` into draft batches. Each
+ *  productionOrderItem becomes one draft plan named
+ *  `PO: {orderName} — {productName}`. The PO's dueDate becomes the
+ *  scheduler deadline so reverse-placement works the same as for
+ *  campaigns. Skips POs that are done/cancelled and items already
+ *  scheduled (matched by plan name). */
+async function seedProductionOrderDrivenPlans(): Promise<{ warnings: string[]; deadlineByPlanId: Map<string, number> }> {
+  const warnings: string[] = [];
+  const deadlineByPlanId = new Map<string, number>();
+
+  const pos = assertOk(
+    await supabase
+      .from("productionOrders")
+      .select("*")
+      .in("status", ["pending", "in_production"]),
+  ) as ProductionOrder[];
+  if (pos.length === 0) return { warnings, deadlineByPlanId };
+
+  const poItems = assertOk(
+    await supabase.from("productionOrderItems").select("*"),
+  ) as ProductionOrderItem[];
+  const itemsByOrder = new Map<string, ProductionOrderItem[]>();
+  for (const it of poItems) {
+    const arr = itemsByOrder.get(it.productionOrderId) ?? [];
+    arr.push(it);
+    itemsByOrder.set(it.productionOrderId, arr);
+  }
+
+  const productIds = [...new Set(poItems.map((i) => i.productId))];
+  const products = productIds.length > 0
+    ? assertOk(await supabase.from("products").select("*").in("id", productIds)) as Product[]
+    : [];
+  const productById = new Map(products.map((p) => [p.id!, p]));
+  const mouldIds = products.map((p) => p.defaultMouldId).filter((x): x is string => !!x);
+  const moulds = mouldIds.length > 0
+    ? assertOk(await supabase.from("moulds").select("*").in("id", mouldIds)) as Mould[]
+    : [];
+  const mouldById = new Map(moulds.map((m) => [m.id!, m]));
+
+  const existingPlans = assertOk(
+    await supabase.from("productionPlans").select("*").in("status", ["draft", "active"]),
+  ) as ProductionPlan[];
+
+  const now = new Date();
+  for (const po of pos) {
+    const items = itemsByOrder.get(po.id!) ?? [];
+    if (items.length === 0) continue;
+    const dueMs = po.dueDate ? new Date(po.dueDate + "T12:00:00").getTime() : null;
+    for (const it of items) {
+      const product = productById.get(it.productId);
+      if (!product) {
+        warnings.push(`PO "${po.name ?? po.dueDate}" references unknown product — skipped.`);
+        continue;
+      }
+      if (!product.defaultMouldId) {
+        warnings.push(`"${product.name}" in PO "${po.name ?? po.dueDate}" has no default mould — set one.`);
+        continue;
+      }
+      const mould = mouldById.get(product.defaultMouldId);
+      if (!mould) continue;
+      const namePattern = `PO: ${po.name ?? po.dueDate} — ${product.name}`;
+      const existing = existingPlans.find((p) => p.name === namePattern);
+      if (existing) {
+        if (dueMs != null && existing.id) deadlineByPlanId.set(existing.id, dueMs);
+        continue;
+      }
+      const cavities = mould.numberOfCavities ?? 1;
+      const moulds_count = Math.max(1, Math.ceil(it.targetUnits / cavities));
+      const planId = newId();
+      const batchNumber = await generateBatchNumber(now);
+      const { error: planErr } = await supabase.from("productionPlans").insert({
+        id: planId,
+        name: namePattern,
+        batchNumber,
+        status: "draft",
+        sourceOrderId: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      if (planErr) { warnings.push(`Could not create plan for ${product.name}: ${planErr.message}`); continue; }
+      const { error: ppErr } = await supabase.from("planProducts").insert({
+        id: newId(),
+        planId,
+        productId: it.productId,
+        mouldId: product.defaultMouldId,
+        quantity: moulds_count,
+        sortOrder: 0,
+      });
+      if (ppErr) { warnings.push(`Could not link plan products: ${ppErr.message}`); continue; }
+      existingPlans.push({
+        id: planId, name: namePattern, batchNumber, status: "draft",
+        createdAt: now, updatedAt: now,
+      } as ProductionPlan);
+      if (dueMs != null) deadlineByPlanId.set(planId, dueMs);
+    }
+  }
+  return { warnings, deadlineByPlanId };
+}
+
+/**
+ * Replenishment seeder — converts (product × location) stock gaps into
+ * **production orders**, not raw plans. The PO seeder downstream picks
+ * them up and creates the actual plans, so replen work appears in
+ * `/production-orders` alongside campaign / market POs.
+ *
+ * Idempotent: skips a (product, location) pair that already has an
+ * open replen PO ('pending' or 'in_production').
+ */
+async function seedReplenishmentDrivenPlans(): Promise<string[]> {
+  const warnings: string[] = [];
+
+  const minimums = assertOk(
+    await supabase.from("stockLocationMinimums").select("*"),
+  ) as StockLocationMinimum[];
+  if (minimums.length === 0) return warnings;
+
+  // Shop hours: when location === "store", the stock isn't actually
+  // needed until the next time the shop opens. Pull hours + closures
+  // and compute that anchor; we only seed a store-replen plan when
+  // production lead time would push completion AT/AFTER the opening
+  // day. Otherwise we skip with a note so the next Regenerate (or
+  // tomorrow's auto-regen) re-evaluates closer to opening.
+  const [hoursRes, closuresRes] = await Promise.all([
+    supabase.from("shopOpeningHours").select("*"),
+    supabase.from("shopClosures").select("*"),
+  ]);
+  const shopHours = (hoursRes.data ?? []) as ShopOpeningHours[];
+  const shopClosures = (closuresRes.data ?? []) as ShopClosure[];
+  const { nextShopOpeningDay } = await import("@/lib/shopHours");
+  const nextOpening = nextShopOpeningDay(shopHours, shopClosures, new Date());
+  // Local-date format (NOT toISOString which drifts in UTC+ zones).
+  const nextOpeningIso = nextOpening
+    ? `${nextOpening.getFullYear()}-${String(nextOpening.getMonth() + 1).padStart(2, "0")}-${String(nextOpening.getDate()).padStart(2, "0")}`
+    : null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  function shouldDeferStoreReplen(productLeadDays: number): { defer: boolean; reason: string | null } {
+    if (!nextOpeningIso) return { defer: false, reason: null };
+    const opening = new Date(nextOpeningIso + "T00:00:00").getTime();
+    // Reserve enough days BEFORE opening to actually produce + cap.
+    // Most chocolates need ~3 days end-to-end (polishing → painting →
+    // shelling → filling → capping → unmoulding). leadTimeDays per
+    // product is rarely set, so fall back to a 3-day floor — that
+    // matches Manuela's expectation that store replen for an opening
+    // 2 days away should already be in this week's plan.
+    const PRODUCTION_BUFFER_DAYS = 3;
+    const buffer = Math.max(productLeadDays, PRODUCTION_BUFFER_DAYS);
+    const earliestUseful = opening - buffer * 86_400_000;
+    if (earliestUseful > today.getTime()) {
+      return { defer: true, reason: nextOpeningIso };
+    }
+    return { defer: false, reason: null };
+  }
+
+  // Current pieces on hand per (product, location).
+  const stockRows = assertOk(
+    await supabase.from("productStock").select("*"),
+  ) as Array<{ productId: string; locationId: string; quantity: number }>;
+  const onHand = new Map<string, number>();
+  for (const r of stockRows) {
+    const key = `${r.productId}|${r.locationId}`;
+    onHand.set(key, (onHand.get(key) ?? 0) + Number(r.quantity ?? 0));
+  }
+
+  const productIds = [...new Set(minimums.map((m) => m.productId))];
+  const products = productIds.length > 0
+    ? assertOk(await supabase.from("products").select("*").in("id", productIds)) as Product[]
+    : [];
+  const productById = new Map(products.map((p) => [p.id!, p]));
+
+  const mouldIds = products.map((p) => p.defaultMouldId).filter((x): x is string => !!x);
+  const moulds = mouldIds.length > 0
+    ? assertOk(await supabase.from("moulds").select("*").in("id", mouldIds)) as Mould[]
+    : [];
+  const mouldById = new Map(moulds.map((m) => [m.id!, m]));
+
+  // Existing open replen POs — find the most recent open one created
+  // today and APPEND items to it instead of spawning a fresh PO per
+  // (product, location). One bucket per day = clean list view.
+  const openPOs = assertOk(
+    await supabase
+      .from("productionOrders")
+      .select("*")
+      .in("status", ["pending", "in_production"]),
+  ) as ProductionOrder[];
+  const openPOItems = openPOs.length > 0
+    ? assertOk(
+        await supabase
+          .from("productionOrderItems")
+          .select("*")
+          .in("productionOrderId", openPOs.map((p) => p.id!)),
+      ) as ProductionOrderItem[]
+    : [];
+  const itemsByPo = new Map<string, ProductionOrderItem[]>();
+  for (const it of openPOItems) {
+    const arr = itemsByPo.get(it.productionOrderId) ?? [];
+    arr.push(it);
+    itemsByPo.set(it.productionOrderId, arr);
+  }
+
+  // Pick a bucket to append to: prefer any open NON-LOCKED Replen PO.
+  // We sort newest-first so the most recent (and probably still
+  // mutable) one wins. Locked POs (production started) are excluded
+  // — adding to them would mutate work in flight. If no open non-
+  // locked bucket exists, lazy-create today's.
+  const todayIso = todayDateString();
+  const todayBucketName = `Replen · ${todayIso}`;
+  // When today's base name is taken by a LOCKED PO already in flight,
+  // we fall back to a `· v2` / `· v3` suffix so the new bucket has a
+  // unique name and the locked one stays visually distinct.
+  function nextFreshBucketName(): string {
+    const used = new Set(openPOs.map((p) => p.name).filter((n): n is string => !!n));
+    if (!used.has(todayBucketName)) return todayBucketName;
+    for (let i = 2; i < 50; i++) {
+      const candidate = `${todayBucketName} · v${i}`;
+      if (!used.has(candidate)) return candidate;
+    }
+    return `${todayBucketName} · v${Date.now()}`;
+  }
+  // Detect which open replen POs are "locked" — production already
+  // started on at least one of their derived plans. Locked POs do
+  // NOT count as covering their items (the production order is now
+  // a sealed batch in flight; new gaps need a fresh bucket so we
+  // don't mutate work the chocolatier is mid-run on).
+  //
+  // Linkage: seedProductionOrderDrivenPlans names plans
+  // `PO: <po name> — <product>`. We match by name prefix.
+  const allPlansForLockCheck = assertOk(
+    await supabase.from("productionPlans").select("id, name, status"),
+  ) as Array<{ id: string; name: string; status: string }>;
+  const allDoneStatuses = assertOk(
+    await supabase.from("planStepStatus").select("planId, done"),
+  ) as Array<{ planId: string; done: boolean }>;
+  const startedPlanIds = new Set<string>();
+  for (const p of allPlansForLockCheck) {
+    if (p.status === "active") startedPlanIds.add(p.id);
+  }
+  for (const s of allDoneStatuses) {
+    if (s.done) startedPlanIds.add(s.planId);
+  }
+  const lockedPoIds = new Set<string>();
+  for (const po of openPOs) {
+    if (po.channel !== "restock" || !(po.name ?? "").startsWith("Replen ·")) continue;
+    const namePrefix = `PO: ${po.name} — `;
+    const linkedPlans = allPlansForLockCheck.filter((p) => (p.name ?? "").startsWith(namePrefix));
+    if (linkedPlans.some((p) => startedPlanIds.has(p.id))) {
+      lockedPoIds.add(po.id!);
+    }
+  }
+
+  let bucketPo: ProductionOrder | null = (() => {
+    const candidates = openPOs
+      .filter((p) => p.channel === "restock" && (p.name ?? "").startsWith("Replen ·"))
+      .filter((p) => !lockedPoIds.has(p.id!))
+      .sort((a, b) => (b.dueDate ?? "").localeCompare(a.dueDate ?? ""));
+    return candidates[0] ?? null;
+  })();
+
+  // Already-covered productId set — pulls items from every open
+  // replen PO, locked or not.
+  //
+  // Earlier this excluded locked POs on the theory that "fresh demand
+  // on the same item needs a fresh bucket." In practice that ran the
+  // chocolatier through duplicate POs: a locked PO mid-flight produces
+  // 120 hazelnut, the gap calc still sees onHand below minimum
+  // (locked PO hasn't unmoulded yet), and the next regenerate seeded
+  // a SECOND PO with the same 120-hazelnut item. Two PO Replen rows,
+  // identical quantities.
+  //
+  // Treating locked POs as covering their items doesn't mutate them
+  // — it just stops a redundant fresh bucket from being created
+  // against the same demand. Once the locked PO completes and stock
+  // lands, future regenerates will re-evaluate the gap normally.
+  const coveredInBucket = new Set<string>();
+  const coveredDebug: Array<{ poName: string; poStatus: string; productId: string; productName: string; targetUnits: number }> = [];
+  for (const po of openPOs) {
+    if (po.channel !== "restock") continue;
+    if (!(po.name ?? "").startsWith("Replen ·")) continue;
+    for (const it of itemsByPo.get(po.id!) ?? []) {
+      coveredInBucket.add(it.productId);
+      coveredDebug.push({
+        poName: po.name ?? "(no name)",
+        poStatus: po.status,
+        productId: it.productId,
+        productName: productById.get(it.productId)?.name ?? "(unknown)",
+        targetUnits: it.targetUnits,
+      });
+    }
+  }
+  console.log(`[replen] open replen POs: ${openPOs.filter((p) => p.channel === "restock" && (p.name ?? "").startsWith("Replen ·")).length}`);
+  console.log(`[replen] coveredInBucket products (${coveredInBucket.size}):`, coveredDebug);
+
+  // ── Step 1 — migrate legacy "Replen: <product> → <location>" plans
+  //    into the bucket so they show up in /production-orders. We keep
+  //    the plan rows but rename them to the PO-driven pattern so the PO
+  //    seeder finds them on its match-by-name pass and skips re-creating.
+  const legacyReplenPlans = assertOk(
+    await supabase
+      .from("productionPlans")
+      .select("*")
+      .in("status", ["draft", "active"])
+      .like("name", "Replen:%"),
+  ) as ProductionPlan[];
+  const now = new Date();
+  if (legacyReplenPlans.length > 0) {
+    if (!bucketPo) {
+      const poId = newId();
+      const poName = nextFreshBucketName();
+      const bucketDueDate = nextOpeningIso ?? todayIso;
+      const { error: poErr } = await supabase.from("productionOrders").insert({
+        id: poId,
+        name: poName,
+        dueDate: bucketDueDate,
+        status: "pending",
+        channel: "restock",
+        campaignId: null,
+        targetLocation: null,
+        notes: "Auto-bucket for daily replenishment needs.",
+        createdAt: now,
+        updatedAt: now,
+      });
+      if (poErr) {
+        warnings.push(`Could not create replen bucket PO: ${poErr.message}`);
+      } else {
+        bucketPo = {
+          id: poId, name: poName, dueDate: bucketDueDate, status: "pending",
+          channel: "restock", campaignId: null, targetLocation: null,
+          notes: null, createdAt: now, updatedAt: now,
+        } as unknown as ProductionOrder;
+      }
+    }
+    if (bucketPo) {
+      // Need planProducts to know quantity-per-mould for each legacy plan.
+      const planIds = legacyReplenPlans.map((p) => p.id!).filter(Boolean);
+      const legacyPP = planIds.length > 0
+        ? assertOk(await supabase.from("planProducts").select("*").in("planId", planIds)) as PlanProduct[]
+        : [];
+      const ppByPlan = new Map<string, PlanProduct[]>();
+      for (const pp of legacyPP) {
+        const arr = ppByPlan.get(pp.planId) ?? [];
+        arr.push(pp);
+        ppByPlan.set(pp.planId, arr);
+      }
+      for (const plan of legacyReplenPlans) {
+        const pps = ppByPlan.get(plan.id!) ?? [];
+        for (const pp of pps) {
+          const product = productById.get(pp.productId);
+          if (!product) continue;
+          const mould = product.defaultMouldId ? mouldById.get(product.defaultMouldId) : undefined;
+          const cavities = mould?.numberOfCavities ?? 1;
+          const targetUnits = Math.max(1, pp.quantity * cavities);
+          if (!coveredInBucket.has(pp.productId)) {
+            const { error: itemErr } = await supabase.from("productionOrderItems").insert({
+              id: newId(),
+              productionOrderId: bucketPo.id,
+              productId: pp.productId,
+              targetUnits,
+              sortOrder: 0,
+              notes: null,
+              createdAt: now,
+              updatedAt: now,
+            });
+            if (itemErr) {
+              warnings.push(`Could not migrate legacy replen item for ${product.name}: ${itemErr.message}`);
+              continue;
+            }
+            coveredInBucket.add(pp.productId);
+          }
+        }
+        // Rename the plan so the PO seeder claims it on its next pass
+        // via its name-pattern match (`PO: <po name> — <product>`).
+        const firstPP = pps[0];
+        const productName = firstPP ? productById.get(firstPP.productId)?.name : null;
+        if (productName && bucketPo.name) {
+          const newName = `PO: ${bucketPo.name} — ${productName}`;
+          await supabase.from("productionPlans").update({
+            name: newName,
+            updatedAt: now,
+          }).eq("id", plan.id!);
+        }
+      }
+    }
+  }
+
+  // ── Step 2 — seed fresh gaps that aren't already covered.
+  for (const m of minimums) {
+    if (m.minimumUnits == null || m.minimumUnits <= 0) continue;
+    const current = onHand.get(`${m.productId}|${m.location}`) ?? 0;
+    const gap = m.minimumUnits - current;
+    if (gap <= 0) continue;
+    const product = productById.get(m.productId);
+    if (!product) continue;
+    // Per-product opt-out: limited-edition / campaign-only chocolates
+    // whose production runs are hand-driven via Production Orders.
+    if (product.excludeFromReplen) continue;
+    if (!product.defaultMouldId) {
+      warnings.push(`"${product.name}" needs ${gap} pcs at ${m.location} — set a default mould to schedule.`);
+      continue;
+    }
+    if (!mouldById.get(product.defaultMouldId)) continue;
+
+    // Already in today's bucket (likely from legacy plan migration or
+    // a prior gap-loop iteration) → skip silently. No duplicate item,
+    // no misleading "deferred" warning either.
+    if (coveredInBucket.has(m.productId)) {
+      console.log(`[replen] skip (covered): ${product.name} @ ${m.location} (gap ${gap})`);
+      continue;
+    }
+    console.log(`[replen] gap NOT covered → will add to bucket: ${product.name} @ ${m.location} (current ${current} / min ${m.minimumUnits} → gap ${gap})`);
+
+    // Defer store-location replen when shop won't open for a while.
+    if (m.location === "store") {
+      const lead = Math.max(0, Number(product.leadTimeDays ?? 0));
+      const { defer, reason } = shouldDeferStoreReplen(lead);
+      if (defer && reason) {
+        warnings.push(`"${product.name}" → store replen deferred — shop next opens ${reason}, will seed closer to that date.`);
+        continue;
+      }
+    }
+
+    // Lazy-create the bucket PO on first new gap of the run.
+    if (!bucketPo) {
+      const poId = newId();
+      const poName = nextFreshBucketName();
+      // Due date = next shop opening day if known, else today. The
+      // scheduler reads this as the deadline for downstream plans —
+      // setting it to today wrongly tells the scheduler "produce all of
+      // this NOW" with zero lead, so capacity can't spread the load
+      // across the lead-time window.
+      const bucketDueDate = nextOpeningIso ?? todayIso;
+      const { error: poErr } = await supabase.from("productionOrders").insert({
+        id: poId,
+        name: poName,
+        dueDate: bucketDueDate,
+        status: "pending",
+        channel: "restock",
+        campaignId: null,
+        targetLocation: null,
+        notes: "Auto-bucket for daily replenishment needs.",
+        createdAt: now,
+        updatedAt: now,
+      });
+      if (poErr) {
+        warnings.push(`Could not create replen bucket PO: ${poErr.message}`);
+        break;
+      }
+      bucketPo = {
+        id: poId, name: poName, dueDate: bucketDueDate, status: "pending",
+        channel: "restock", campaignId: null, targetLocation: null,
+        notes: null, createdAt: now, updatedAt: now,
+      } as unknown as ProductionOrder;
+    }
+
+    const { error: poItemErr } = await supabase.from("productionOrderItems").insert({
+      id: newId(),
+      productionOrderId: bucketPo.id,
+      productId: m.productId,
+      targetUnits: gap,
+      sortOrder: 0,
+      notes: `${m.location} · current ${current} / min ${m.minimumUnits}`,
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (poItemErr) {
+      warnings.push(`Could not add replen PO item for ${product.name}: ${poItemErr.message}`);
+      continue;
+    }
+    coveredInBucket.add(m.productId);
+  }
+  return warnings;
+}
+
 export async function regenerateAllPlansAndSchedule(staticInputs: {
   config: CapacityConfig | null;
   people: Person[];
@@ -6466,35 +7931,194 @@ export async function regenerateAllPlansAndSchedule(staticInputs: {
   warnings: string[];
   unscheduledPlanIds: string[];
 }> {
-  const reconcileResult = await regenerateAllProductionPlans();
+  // Wrap each step so a failure in one phase logs which phase fired.
+  // The catch site in /plan only sees a final thrown object — without
+  // a tag we can't tell whether seedReplenishment or buildDailySchedule
+  // is the culprit. Tag log + console.log so a phase trail appears
+  // even when the error itself is opaque ("Bad Request" with no body).
+  const tag = (name: string) => (err: unknown) => {
+    const e = (err ?? {}) as Record<string, unknown>;
+    const msg = (e.message as string) ?? String(err);
+    console.error(`[regen] step "${name}" failed:`, err);
+    const enriched = new Error(`${name}: ${msg}`);
+    Object.assign(enriched, e);
+    throw enriched;
+  };
+  const step = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
+    console.log(`[regen] starting ${name}…`);
+    try {
+      const out = await fn();
+      console.log(`[regen] ✓ ${name}`);
+      return out;
+    } catch (err) {
+      tag(name)(err);
+      throw err; // unreachable — tag throws
+    }
+  };
+  const reconcileResult = await step("regenerateAllProductionPlans", regenerateAllProductionPlans);
+  const { warnings: campaignWarnings, deadlineByPlanId: campaignDeadlines } =
+    await step("seedCampaignDrivenPlans", seedCampaignDrivenPlans);
+  const replenWarnings = await step("seedReplenishmentDrivenPlans", seedReplenishmentDrivenPlans);
+  const { warnings: poWarnings, deadlineByPlanId: poDeadlines } =
+    await step("seedProductionOrderDrivenPlans", seedProductionOrderDrivenPlans);
+  reconcileResult.warnings.push(...campaignWarnings, ...replenWarnings, ...poWarnings);
+  for (const [k, v] of poDeadlines) {
+    const cur = campaignDeadlines.get(k);
+    if (cur === undefined || v < cur) campaignDeadlines.set(k, v);
+  }
 
   // Fresh reads — the post-reconcile state is what the scheduler must
   // see. Hook state at this point is stale (invalidation is async).
-  const [plans, planProducts, orderPlanLinks, orders, orderItems, products, moulds] = await Promise.all([
-    supabase.from("productionPlans").select("*").then((r) => assertOk(r) as ProductionPlan[]),
-    supabase.from("planProducts").select("*").then((r) => assertOk(r) as PlanProduct[]),
-    supabase.from("orderPlanLinks").select("*").then((r) => assertOk(r) as OrderPlanLink[]),
-    supabase.from("orders").select("*").then((r) => assertOk(r) as Order[]),
-    supabase.from("orderItems").select("*").then((r) => assertOk(r) as OrderItem[]),
-    supabase.from("products").select("*").then((r) => assertOk(r) as Product[]),
-    supabase.from("moulds").select("*").then((r) => assertOk(r) as Mould[]),
-  ]);
+  const [plans, planProducts, orderPlanLinks, orders, orderItems, products, moulds] = await step(
+    "fresh-reads",
+    () => Promise.all([
+      supabase.from("productionPlans").select("*").then((r) => assertOk(r) as ProductionPlan[]),
+      supabase.from("planProducts").select("*").then((r) => assertOk(r) as PlanProduct[]),
+      supabase.from("orderPlanLinks").select("*").then((r) => assertOk(r) as OrderPlanLink[]),
+      supabase.from("orders").select("*").then((r) => assertOk(r) as Order[]),
+      supabase.from("orderItems").select("*").then((r) => assertOk(r) as OrderItem[]),
+      supabase.from("products").select("*").then((r) => assertOk(r) as Product[]),
+      supabase.from("moulds").select("*").then((r) => assertOk(r) as Mould[]),
+    ]),
+  );
 
   // planStepStatus is passed to the scheduler so day-level session
   // locks can respect in-progress work. Empty after a wipe, so the
   // scheduler treats every day as freely mergeable.
-  const planStepStatus = assertOk(
-    await supabase.from("planStepStatus").select("*"),
-  ) as PlanStepStatus[];
+  const planStepStatus = await step(
+    "read-planStepStatus",
+    async () => assertOk(await supabase.from("planStepStatus").select("*")) as PlanStepStatus[],
+  );
 
   const { buildDailySchedule } = await import("@/lib/scheduler");
-  const preview = buildDailySchedule({
-    plans, planProducts, orders, orderItems, orderPlanLinks,
-    products, moulds, planStepStatus,
-    ...staticInputs,
+  const preview = await step("buildDailySchedule", async () =>
+    buildDailySchedule({
+      plans, planProducts, orders, orderItems, orderPlanLinks,
+      products, moulds, planStepStatus,
+      extraDeadlineByPlanId: campaignDeadlines,
+      ...staticInputs,
+    }),
+  );
+
+  // Honour manually-pinned plans: any plan with a pinnedDate gets all
+  // its proposed lineItems forced onto that date, regardless of what
+  // the scheduler chose. The user pinned it explicitly via /plan
+  // drag-drop "Move + lock", so regenerate must not move it back.
+  const pinnedByPlanId = new Map<string, string>();
+  for (const p of plans) {
+    if (p.pinnedDate && p.id) pinnedByPlanId.set(p.id, p.pinnedDate);
+  }
+  if (pinnedByPlanId.size > 0) {
+    const seenDates = new Set(preview.days.map((d) => d.date));
+    for (const date of pinnedByPlanId.values()) {
+      if (!seenDates.has(date)) {
+        preview.days.push({ date });
+        seenDates.add(date);
+      }
+    }
+    for (const li of preview.lineItems) {
+      const pinned = pinnedByPlanId.get(li.planId);
+      if (pinned) li.dateRef = pinned;
+    }
+  }
+
+  await step("replaceProductionPlanning", () => replaceProductionPlanning(preview.days, preview.lineItems));
+
+  // Sweep zombie PO/campaign plans whose parent row has been
+  // deleted. The legacy delete-cascades for productionOrders +
+  // campaigns weren't always wired, so deletions from /production-
+  // orders or /campaigns left "PO: <gone-name> — <product>" plans
+  // lingering in /plan with no way to remove them via the UI.
+  // Detection: plan name starts with "PO: …" or "Campaign: …" but
+  // no row in productionOrders / campaigns matches the prefix.
+  await step("mark zombie PO/campaign plans cancelled", async () => {
+    const allPlans = assertOk(
+      await supabase
+        .from("productionPlans")
+        .select("id, name, status")
+        .in("status", ["draft", "active"]),
+    ) as Array<{ id: string; name: string; status: string }>;
+    const poNames = new Set<string>(
+      (assertOk(await supabase.from("productionOrders").select("name")) as Array<{ name: string | null }>)
+        .map((p) => p.name)
+        .filter((n): n is string => !!n),
+    );
+    const campNames = new Set<string>(
+      (assertOk(await supabase.from("campaigns").select("name")) as Array<{ name: string | null }>)
+        .map((c) => c.name)
+        .filter((n): n is string => !!n),
+    );
+    const toCancel: string[] = [];
+    for (const p of allPlans) {
+      const name = p.name ?? "";
+      if (name.startsWith("PO: ")) {
+        const rest = name.slice("PO: ".length);
+        const dash = rest.indexOf(" — ");
+        const poName = dash > 0 ? rest.slice(0, dash) : rest;
+        if (!poNames.has(poName)) toCancel.push(p.id);
+      } else if (name.startsWith("Campaign: ")) {
+        const rest = name.slice("Campaign: ".length);
+        const dash = rest.indexOf(" — ");
+        const campName = dash > 0 ? rest.slice(0, dash) : rest;
+        if (!campNames.has(campName)) toCancel.push(p.id);
+      }
+    }
+    if (toCancel.length === 0) return;
+    const CHUNK = 100;
+    for (let i = 0; i < toCancel.length; i += CHUNK) {
+      const slice = toCancel.slice(i, i + CHUNK);
+      await supabase
+        .from("productionPlans")
+        .update({ status: "cancelled", updatedAt: new Date() })
+        .in("id", slice);
+    }
+    console.log(`[regen] marked ${toCancel.length} zombie PO/campaign plan(s) cancelled`);
   });
 
-  await replaceProductionPlanning(preview.days, preview.lineItems);
+  // Sweep cancelled / orphaned plans + their bookkeeping rows so
+  // /production-orders detail and the audit pages don't pile up
+  // with bookkeeping junk. Active + done + draft plans are left
+  // alone. Errors are logged but never fail the whole regen — the
+  // sweep is a cleanup nicety, not a correctness step.
+  await step("purge cancelled / orphaned plans", async () => {
+    const stale = assertOk(
+      await supabase.from("productionPlans")
+        .select("id")
+        .in("status", ["cancelled", "orphaned"]),
+    ) as Array<{ id: string }>;
+    if (stale.length === 0) return;
+    const ids = stale.map((p) => p.id);
+    const CHUNK = 100;
+    // 1) Wipe their lineItems first (FK constraint).
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      await supabase.from("productionDayLineItems").delete().in("planId", slice);
+    }
+    // 2) Wipe planStepStatus + planProducts (also FK to plans).
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      await supabase.from("planStepStatus").delete().in("planId", slice);
+      await supabase.from("planProducts").delete().in("planId", slice);
+    }
+    // 3) Wipe orderPlanLinks pointing at these plans.
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      await supabase.from("orderPlanLinks").delete().in("planId", slice);
+    }
+    // 4) Finally delete the plans themselves.
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const slice = ids.slice(i, i + CHUNK);
+      await supabase.from("productionPlans").delete().in("id", slice);
+    }
+  });
+
+  // Stamp the regen timestamp so the UI can show "last updated …".
+  try {
+    await updatePreference({ lastRegenAt: new Date() });
+  } catch (e) {
+    // Don't fail the whole regen on a preferences write — log only.
+    console.warn("regen: lastRegenAt write failed", e);
+  }
 
   return {
     reconcile: reconcileResult,
@@ -6509,7 +8133,7 @@ export async function regenerateAllPlansAndSchedule(staticInputs: {
  *  name on. Locale-stable across browsers because we pin en-GB. */
 function formatOrderDate(iso: string | Date): string {
   const d = iso instanceof Date ? iso : new Date(iso);
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString("de-AT", { day: "2-digit", month: "short" });
 }
 
 export async function syncReplenishmentOrder(parentOrderId: string): Promise<void> {
@@ -6782,10 +8406,20 @@ export function useAllProductionDayLineItems(): ProductionDayLineItem[] {
   const { data } = useQuery({
     queryKey: ["production-day-line-items", "all"],
     queryFn: async () => {
-      const rows = assertOk(
-        await supabase.from("productionDayLineItems").select("*"),
-      ) as ProductionDayLineItem[];
-      return rows.sort((a, b) => a.sortOrder - b.sortOrder);
+      const out: ProductionDayLineItem[] = [];
+      const PAGE = 1000;
+      const MAX_PAGES = 20;
+      for (let i = 0; i < MAX_PAGES; i++) {
+        const from = i * PAGE;
+        const res = await supabase
+          .from("productionDayLineItems")
+          .select("*")
+          .range(from, from + PAGE - 1);
+        const page = assertOk(res) as ProductionDayLineItem[];
+        out.push(...page);
+        if (page.length < PAGE) break;
+      }
+      return out.sort((a, b) => a.sortOrder - b.sortOrder);
     },
   });
   return data ?? [];
@@ -6842,38 +8476,60 @@ export async function replaceProductionPlanning(
   }>,
 ): Promise<void> {
   const now = new Date();
+  console.log(`[replaceProductionPlanning] proposed: ${proposedDays.length} days, ${proposedLineItems.length} line items`);
 
   // 1. Find every plan the scheduler is allowed to rewrite. That's
   //    anything NOT currently active or done: draft (the normal case),
   //    plus cancelled / orphaned, both of which are "no longer the
   //    operator's concern" and whose stale lineItems would otherwise
   //    linger on /plan and /production pointing at ghost orders.
-  const rewritablePlans = assertOk(
-    await supabase
-      .from("productionPlans")
-      .select("id")
-      .in("status", ["draft", "cancelled", "orphaned"]),
-  ) as Array<{ id: string }>;
+  const rewritablePlansRes = await supabase
+    .from("productionPlans")
+    .select("id")
+    .in("status", ["draft", "cancelled", "orphaned"]);
+  if (rewritablePlansRes.error) {
+    console.error("[replaceProductionPlanning] step 1 (read rewritablePlans) failed:", rewritablePlansRes.error);
+    throw rewritablePlansRes.error;
+  }
+  const rewritablePlans = rewritablePlansRes.data as Array<{ id: string }>;
   const rewritablePlanIds = rewritablePlans.map((p) => p.id);
 
   // 2. Delete every line item whose planId is rewritable. Handles
   //    both the duplicate-key crash (same (dayId, planId) alive from
   //    a previous run) and the ghost-lineItem bug where a cancelled
   //    plan's old schedule rows kept rendering on the UI.
+  //
+  //    Chunked: a single `.in("planId", [<1000 uuids>])` exceeds
+  //    PostgREST's URL length cap and 400s. Slice into batches.
   if (rewritablePlanIds.length > 0) {
-    const { error } = await supabase
-      .from("productionDayLineItems")
-      .delete()
-      .in("planId", rewritablePlanIds);
-    if (error) throw error;
+    const CHUNK = 100;
+    for (let i = 0; i < rewritablePlanIds.length; i += CHUNK) {
+      const slice = rewritablePlanIds.slice(i, i + CHUNK);
+      const delRes = await supabase
+        .from("productionDayLineItems")
+        .delete()
+        .in("planId", slice);
+      if (delRes.error) {
+        console.error(
+          "[replaceProductionPlanning] step 2 (delete lineItems) failed:",
+          delRes.error,
+          "chunk start:", i, "size:", slice.length,
+          "first 5 ids:", slice.slice(0, 5),
+        );
+        throw delRes.error;
+      }
+    }
   }
 
   // 3. Snapshot existing productionDays so we can reuse ids by date.
   //    Active / done days are preserved regardless of what the
   //    scheduler outputs.
-  const existingDays = assertOk(
-    await supabase.from("productionDays").select("id, date, status"),
-  ) as Array<{ id: string; date: string; status: string }>;
+  const existingDaysRes = await supabase.from("productionDays").select("id, date, status");
+  if (existingDaysRes.error) {
+    console.error("[replaceProductionPlanning] step 3 (read productionDays) failed:", existingDaysRes.error);
+    throw existingDaysRes.error;
+  }
+  const existingDays = existingDaysRes.data as Array<{ id: string; date: string; status: string }>;
   const dayByDate = new Map(existingDays.map((d) => [d.date, d]));
   const dayIdByDate = new Map<string, string>();
   const daysToInsert: Array<{
@@ -6897,15 +8553,56 @@ export async function replaceProductionPlanning(
     });
   }
   if (daysToInsert.length > 0) {
+    console.log(`[replaceProductionPlanning] inserting ${daysToInsert.length} productionDays`, daysToInsert);
     const { error } = await supabase.from("productionDays").insert(daysToInsert);
-    if (error) throw error;
+    if (error) {
+      console.error("[replaceProductionPlanning] productionDays insert failed:", error, "rows:", daysToInsert);
+      throw error;
+    }
   }
 
   // 4. Insert the fresh line items. The (productionDayId, planId)
   //    unique constraint is now satisfiable because step 2 wiped any
   //    overlaps.
+  //
+  //    Coalesce proposedLineItems on (dateRef, planId) before insert.
+  //    The scheduler can emit multiple entries for the same plan on
+  //    the same day when steps come from different phase groups; the
+  //    table's unique constraint forbids that, and the operator-facing
+  //    semantics we want is "one row per plan-day with the union of
+  //    its steps". Merging here means the constraint can't be hit by
+  //    benign multi-emit; a real bug (e.g. crossed planIds) would
+  //    surface elsewhere.
   if (proposedLineItems.length > 0) {
-    const rows = proposedLineItems.map((li) => {
+    const merged = new Map<string, {
+      dateRef: string; planId: string; stepIds: string[];
+      plannedMinutes: number; sortOrder: number;
+    }>();
+    for (const li of proposedLineItems) {
+      const key = `${li.dateRef}|${li.planId}`;
+      const cur = merged.get(key);
+      if (!cur) {
+        merged.set(key, {
+          dateRef: li.dateRef,
+          planId: li.planId,
+          stepIds: [...li.stepIds],
+          plannedMinutes: li.plannedMinutes,
+          sortOrder: li.sortOrder,
+        });
+        continue;
+      }
+      // Union step ids, sum minutes, keep earliest sort order so the
+      // merged row appears at the same place a single emit would.
+      const seen = new Set(cur.stepIds);
+      for (const sid of li.stepIds) if (!seen.has(sid)) { cur.stepIds.push(sid); seen.add(sid); }
+      cur.plannedMinutes += li.plannedMinutes;
+      if (li.sortOrder < cur.sortOrder) cur.sortOrder = li.sortOrder;
+    }
+    const dupCount = proposedLineItems.length - merged.size;
+    if (dupCount > 0) {
+      console.warn(`[replaceProductionPlanning] merged ${dupCount} duplicate (date, plan) line item${dupCount === 1 ? "" : "s"} before insert`);
+    }
+    const rows = [...merged.values()].map((li) => {
       const dayId = dayIdByDate.get(li.dateRef);
       if (!dayId) throw new Error(`Scheduler produced a line item for unknown date ${li.dateRef}`);
       return {
@@ -6919,8 +8616,16 @@ export async function replaceProductionPlanning(
         updatedAt: now,
       };
     });
-    const { error } = await supabase.from("productionDayLineItems").insert(rows);
-    if (error) throw error;
+    console.log(`[replaceProductionPlanning] inserting ${rows.length} productionDayLineItems · sample:`, rows.slice(0, 3));
+    const CHUNK = 200;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const slice = rows.slice(i, i + CHUNK);
+      const { error } = await supabase.from("productionDayLineItems").insert(slice);
+      if (error) {
+        console.error("[replaceProductionPlanning] productionDayLineItems insert failed:", error, "chunk start:", i, "first row:", slice[0]);
+        throw error;
+      }
+    }
   }
 
   // 5. Delete orphan draft productionDays that no longer carry work
@@ -6930,11 +8635,19 @@ export async function replaceProductionPlanning(
     const stillUsedDayIds = new Set(proposedLineItems.map((li) => dayIdByDate.get(li.dateRef)!));
     const toDelete = draftDayIds.filter((id) => !stillUsedDayIds.has(id));
     if (toDelete.length > 0) {
-      const { error } = await supabase
-        .from("productionDays")
-        .delete()
-        .in("id", toDelete);
-      if (error) throw error;
+      const CHUNK = 100;
+      for (let i = 0; i < toDelete.length; i += CHUNK) {
+        const slice = toDelete.slice(i, i + CHUNK);
+        const delDaysRes = await supabase.from("productionDays").delete().in("id", slice);
+        if (delDaysRes.error) {
+          console.error(
+            "[replaceProductionPlanning] step 5 (delete orphan productionDays) failed:",
+            delDaysRes.error,
+            "chunk start:", i, "size:", slice.length,
+          );
+          throw delDaysRes.error;
+        }
+      }
     }
   }
 
@@ -7043,6 +8756,8 @@ export function useStockMovements(planProductId?: string): StockMovement[] {
 export function useProductLocationTotals(): Map<string, Record<StockLocation, number>> {
   const { data } = useQuery({
     queryKey: ["stock-locations", "product-totals"],
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const [locations, batches] = await Promise.all([
         supabase.from("stockLocations").select("*").then((r) => assertOk(r) as StockLocationRow[]),
@@ -7958,7 +9673,28 @@ export interface OnlineOrderImportInput {
   shippingAddress?: string;
   phone?: string;
   deadline: string;
-  items: Array<{ productId: string; quantity: number; unitPrice?: number; notes?: string }>;
+  /** Each line is either a single product OR a curated variant (with size).
+   *  Variant lines spawn their composition as derived orderItems via
+   *  addVariantToOrder. */
+  items: Array<
+    | {
+        kind?: "product";
+        productId: string;
+        quantity: number;
+        unitPrice?: number;
+        notes?: string;
+        fulfilmentMode?: "produce" | "borrow";
+      }
+    | {
+        kind: "variant";
+        variantId: string;
+        variantPackagingId?: string | null;
+        quantity: number;
+        unitPrice?: number;
+        notes?: string;
+        fulfilmentMode?: "produce" | "borrow";
+      }
+  >;
 }
 
 /** Import multiple online orders (+ their items). Rows whose
@@ -7988,7 +9724,7 @@ export async function importOnlineOrders(input: OnlineOrderImportInput[]): Promi
     notes: o.email ? `Email: ${o.email}` : null,
     sourceRef: o.sourceRef,
     deliveryAddress: o.shippingAddress ?? null,
-    deliveryType: o.shippingAddress ? "ship" : null,
+    deliveryType: o.shippingAddress ? "ship" : "pickup",
     createdAt: o.placedAt ?? now,
     updatedAt: now,
   }));
@@ -7996,24 +9732,87 @@ export async function importOnlineOrders(input: OnlineOrderImportInput[]): Promi
   const { error: insOrdersErr } = await supabase.from("orders").insert(orderRows);
   if (insOrdersErr) throw insOrdersErr;
 
-  const itemRows = fresh.flatMap((o, oi) =>
-    o.items.map((it, ii) => ({
-      id: newId(),
-      orderId: orderRows[oi].id,
-      productId: it.productId,
-      quantity: it.quantity,
-      unitPrice: it.unitPrice ?? null,
-      sortOrder: ii,
-      notes: it.notes ?? null,
-    })),
-  );
-  if (itemRows.length > 0) {
-    const { error: insItemsErr } = await supabase.from("orderItems").insert(itemRows);
+  // Pre-fetch variant composition once for all variant-kind items so
+  // addVariantToOrder calls don't re-query per line.
+  const variantIds = new Set<string>();
+  const variantPackagingIds = new Set<string>();
+  for (const o of fresh) {
+    for (const it of o.items) {
+      if (it.kind === "variant") {
+        variantIds.add(it.variantId);
+        if (it.variantPackagingId) variantPackagingIds.add(it.variantPackagingId);
+      }
+    }
+  }
+  const compositionByVp = new Map<string, Array<{ productId: string; qty: number }>>();
+  if (variantPackagingIds.size > 0) {
+    const vps = assertOk(
+      await supabase
+        .from("variantPackagingProducts")
+        .select("*")
+        .in("variantPackagingId", [...variantPackagingIds]),
+    ) as VariantPackagingProduct[];
+    for (const v of vps) {
+      const arr = compositionByVp.get(v.variantPackagingId) ?? [];
+      arr.push({ productId: v.productId, qty: v.qty });
+      compositionByVp.set(v.variantPackagingId, arr);
+    }
+  }
+
+  // Walk every fresh order, splitting items into product + variant
+  // paths. Product items batch-insert. Variant items go through
+  // addVariantToOrder so derived orderItems get spawned correctly.
+  type ProductItemRow = {
+    id: string;
+    orderId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number | null;
+    sortOrder: number;
+    notes: string | null;
+    fulfilmentMode: "produce" | "borrow";
+  };
+  const productItemRows: ProductItemRow[] = [];
+  for (let oi = 0; oi < fresh.length; oi++) {
+    const o = fresh[oi];
+    const orderId = orderRows[oi].id;
+    let sortIdx = 0;
+    for (const it of o.items) {
+      if (it.kind === "variant") {
+        const composition = it.variantPackagingId
+          ? compositionByVp.get(it.variantPackagingId) ?? []
+          : [];
+        await addVariantToOrder({
+          orderId,
+          variantId: it.variantId,
+          variantPackagingId: it.variantPackagingId ?? null,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice ?? 0,
+          composition,
+          fulfilmentMode: it.fulfilmentMode ?? "produce",
+        });
+      } else {
+        productItemRows.push({
+          id: newId(),
+          orderId,
+          productId: it.productId,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice ?? null,
+          sortOrder: sortIdx++,
+          notes: it.notes ?? null,
+          fulfilmentMode: it.fulfilmentMode ?? "produce",
+        });
+      }
+    }
+  }
+  if (productItemRows.length > 0) {
+    const { error: insItemsErr } = await supabase.from("orderItems").insert(productItemRows);
     if (insItemsErr) throw insItemsErr;
   }
 
   queryClient.invalidateQueries({ queryKey: ["orders"] });
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  queryClient.invalidateQueries({ queryKey: ["order-variant-lines"] });
   return fresh.length;
 }
 
@@ -8329,16 +10128,21 @@ export interface CloseProductionSummary {
  *  next Regenerate picks them up. If a batch has incomplete steps
  *  after its day closes, the operator runs Regenerate to replan the
  *  remaining work forward. */
-export async function closeProductionDay(closedBy?: string): Promise<CloseProductionSummary> {
-  const today = todayDateString();
+export async function closeProductionDay(
+  closedBy?: string,
+  dateIso?: string,
+): Promise<CloseProductionSummary> {
+  // `dateIso` lets callers close a stale day from yesterday or earlier
+  // (e.g. she didn't tap Close last night). Defaults to today.
+  const target = dateIso ?? todayDateString();
   const dayRow = assertOkMaybe(
-    await supabase.from("productionDays").select("*").eq("date", today).maybeSingle(),
+    await supabase.from("productionDays").select("*").eq("date", target).maybeSingle(),
   ) as ProductionDay | null;
-  if (!dayRow) throw new Error("No production day is open. Click Open Production first.");
+  if (!dayRow) throw new Error(`No production day is open for ${target}.`);
 
-  const startOfToday = new Date();
+  const startOfToday = new Date(target + "T00:00:00");
   startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = new Date();
+  const endOfToday = new Date(target + "T00:00:00");
   endOfToday.setHours(23, 59, 59, 999);
 
   // Line items scheduled for today — we count how many steps are
@@ -8682,12 +10486,34 @@ async function applyIngredientAdjustment(args: StockAdjustmentInput): Promise<vo
   queryClient.invalidateQueries({ queryKey: ["ingredients"] });
 }
 
+async function applyVariantAdjustment(args: StockAdjustmentInput): Promise<void> {
+  // For variants, `itemId` references a variantPackaging.id — the
+  // specific size of the variant whose pre-assembled box count is
+  // being tracked. Adjust the row's `quantityOnHand` (clamped at 0).
+  const row = assertOkMaybe(
+    await supabase
+      .from("variantPackagings")
+      .select("quantityOnHand")
+      .eq("id", args.itemId)
+      .maybeSingle(),
+  ) as { quantityOnHand?: number } | null;
+  const current = row?.quantityOnHand ?? 0;
+  const next = Math.max(0, current + Math.round(args.deltaQty));
+  const { error } = await supabase
+    .from("variantPackagings")
+    .update({ quantityOnHand: next, updatedAt: new Date() })
+    .eq("id", args.itemId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["variant-packagings"] });
+}
+
 /** Apply a single stock adjustment: update the relevant stock total +
  *  append an audit row to stockAdjustments. Throws on any error. */
 export async function applyStockAdjustment(args: StockAdjustmentInput): Promise<void> {
   if (args.deltaQty === 0) return;
   switch (args.itemType) {
     case "product":    await applyProductAdjustment(args); break;
+    case "variant":    await applyVariantAdjustment(args); break;
     case "filling":    await applyFillingAdjustment(args); break;
     case "packaging":  await applyPackagingAdjustment(args); break;
     case "ingredient": await applyIngredientAdjustment(args); break;
@@ -8743,6 +10569,17 @@ export function useOrderPackagingLines(orderId: string | undefined): OrderPackag
       ) as OrderPackagingLine[];
       return rows;
     },
+  });
+  return data ?? [];
+}
+
+/** Aggregate hook: every packaging line across every order. Used by
+ *  the weekly sales report so we don't fan out N per-order queries. */
+export function useOrderPackagingLinesAll(): OrderPackagingLine[] {
+  const { data } = useQuery({
+    queryKey: ["order-packaging-lines", "all"],
+    queryFn: async () =>
+      assertOk(await supabase.from("orderPackagingLines").select("*")) as OrderPackagingLine[],
   });
   return data ?? [];
 }
@@ -10115,3 +11952,276 @@ export async function deleteSubscriptionRun(id: string): Promise<void> {
   queryClient.invalidateQueries({ queryKey: ["subscriptionRuns"] });
 }
 
+
+// =====================================================================
+// Production orders — internal demand sibling of customer orders
+// (migration 0066). Drives the brain alongside `orders`.
+// =====================================================================
+
+export function useProductionOrders(): ProductionOrder[] {
+  const { data } = useQuery({
+    queryKey: ["productionOrders"],
+    queryFn: async () =>
+      assertOk(await supabase.from("productionOrders").select("*")) as ProductionOrder[],
+  });
+  return data ?? [];
+}
+
+export function useProductionOrder(id: string | undefined): ProductionOrder | null {
+  const { data } = useQuery({
+    queryKey: ["productionOrders", "one", id ?? ""],
+    enabled: !!id,
+    queryFn: async () =>
+      assertOkMaybe(
+        await supabase.from("productionOrders").select("*").eq("id", id!).maybeSingle(),
+      ) as ProductionOrder | null,
+  });
+  return data ?? null;
+}
+
+export function useProductionOrderItems(productionOrderId: string | undefined): ProductionOrderItem[] {
+  const { data } = useQuery({
+    queryKey: ["productionOrderItems", productionOrderId ?? ""],
+    enabled: !!productionOrderId,
+    queryFn: async () =>
+      assertOk(
+        await supabase
+          .from("productionOrderItems")
+          .select("*")
+          .eq("productionOrderId", productionOrderId!)
+          .order("sortOrder", { ascending: true }),
+      ) as ProductionOrderItem[],
+  });
+  return data ?? [];
+}
+
+export function useAllProductionOrderItems(): ProductionOrderItem[] {
+  const { data } = useQuery({
+    queryKey: ["productionOrderItems", "all"],
+    queryFn: async () =>
+      assertOk(
+        await supabase.from("productionOrderItems").select("*"),
+      ) as ProductionOrderItem[],
+  });
+  return data ?? [];
+}
+
+export async function saveProductionOrder(
+  row: Omit<ProductionOrder, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const now = new Date();
+  const payload = { ...row, id, updatedAt: now };
+  const { error } = await supabase
+    .from("productionOrders")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["productionOrders"] });
+  return id;
+}
+
+export async function deleteProductionOrder(id: string): Promise<void> {
+  // Read the PO first so we know its name — every derived plan is
+  // named `PO: <po name> — <product>` and we have to clean those up
+  // too. Without the cascade the operator deletes a Replen PO from
+  // /production-orders but its child plans linger in /plan, scheduled
+  // and untouchable.
+  const po = assertOkMaybe(
+    await supabase.from("productionOrders").select("name").eq("id", id).maybeSingle(),
+  ) as { name: string | null } | null;
+
+  const { error } = await supabase.from("productionOrders").delete().eq("id", id);
+  if (error) throw error;
+
+  if (po?.name) {
+    const namePrefix = `PO: ${po.name} — `;
+    const linkedPlans = assertOk(
+      await supabase
+        .from("productionPlans")
+        .select("id, status")
+        .like("name", `${namePrefix}%`),
+    ) as Array<{ id: string; status: string }>;
+
+    // Hard-delete draft plans (no work done yet, safe to remove).
+    // Mark active plans `orphaned` so they survive for audit / yield
+    // recovery but stop scheduling. Done / cancelled stay as-is.
+    const draftIds = linkedPlans.filter((p) => p.status === "draft").map((p) => p.id);
+    const activeIds = linkedPlans.filter((p) => p.status === "active").map((p) => p.id);
+
+    if (draftIds.length > 0) {
+      // Drop downstream rows first to satisfy FKs.
+      await supabase.from("productionDayLineItems").delete().in("planId", draftIds);
+      await supabase.from("planStepStatus").delete().in("planId", draftIds);
+      await supabase.from("planProducts").delete().in("planId", draftIds);
+      await supabase.from("orderPlanLinks").delete().in("planId", draftIds);
+      await supabase.from("productionPlans").delete().in("id", draftIds);
+    }
+    if (activeIds.length > 0) {
+      await supabase
+        .from("productionPlans")
+        .update({ status: "orphaned", updatedAt: new Date() })
+        .in("id", activeIds);
+    }
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["productionOrders"] });
+  queryClient.invalidateQueries({ queryKey: ["productionOrderItems"] });
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+  queryClient.invalidateQueries({ queryKey: ["plan-products"] });
+  queryClient.invalidateQueries({ queryKey: ["production-day-line-items"] });
+  queryClient.invalidateQueries({ queryKey: ["plan-step-statuses"] });
+}
+
+export async function saveProductionOrderItem(
+  row: Omit<ProductionOrderItem, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const now = new Date();
+  const payload = { ...row, id, updatedAt: now };
+  const { error } = await supabase
+    .from("productionOrderItems")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["productionOrderItems"] });
+  return id;
+}
+
+export async function deleteProductionOrderItem(id: string): Promise<void> {
+  const { error } = await supabase.from("productionOrderItems").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["productionOrderItems"] });
+}
+
+// =====================================================================
+// Order variant lines — customer-facing priced lines tied to a variant
+// (migration 0068). Brain still reads orderItems; these are display +
+// invoice pricing only.
+// =====================================================================
+
+export function useOrderVariantLines(orderId: string | undefined): OrderVariantLine[] {
+  const { data } = useQuery({
+    queryKey: ["orderVariantLines", orderId ?? ""],
+    enabled: !!orderId,
+    queryFn: async () =>
+      assertOk(
+        await supabase
+          .from("orderVariantLines")
+          .select("*")
+          .eq("orderId", orderId!)
+          .order("sortOrder", { ascending: true }),
+      ) as OrderVariantLine[],
+  });
+  return data ?? [];
+}
+
+export function useAllOrderVariantLines(): OrderVariantLine[] {
+  const { data } = useQuery({
+    queryKey: ["orderVariantLines", "all"],
+    queryFn: async () =>
+      assertOk(
+        await supabase.from("orderVariantLines").select("*"),
+      ) as OrderVariantLine[],
+  });
+  return data ?? [];
+}
+
+export async function saveOrderVariantLine(
+  row: Omit<OrderVariantLine, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const now = new Date();
+  const payload = { ...row, id, updatedAt: now };
+  const { error } = await supabase
+    .from("orderVariantLines")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["orderVariantLines"] });
+  return id;
+}
+
+export async function deleteOrderVariantLine(id: string): Promise<void> {
+  const { error } = await supabase.from("orderVariantLines").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["orderVariantLines"] });
+}
+
+/** Add a variant to an order: creates the priced variantLine PLUS
+ *  derived orderItems for each product in the variant's composition.
+ *  Item qty = compositionQty × variant qty. Each derived item carries
+ *  variantId + variantPackagingId metadata so the order display can
+ *  group them under their parent variant line. Returns the variantLine id. */
+export async function addVariantToOrder(args: {
+  orderId: string;
+  variantId: string;
+  variantPackagingId: string | null;
+  quantity: number;
+  unitPrice: number;
+  composition: Array<{ productId: string; qty: number }>; // from variantPackagingProducts
+  fulfilmentMode?: "produce" | "borrow";
+}): Promise<string> {
+  const { orderId, variantId, variantPackagingId, quantity, unitPrice, composition, fulfilmentMode = "produce" } = args;
+  // 1. Variant line — what the customer sees / pays.
+  const existingLines = assertOk(
+    await supabase
+      .from("orderVariantLines")
+      .select("sortOrder")
+      .eq("orderId", orderId),
+  ) as Array<{ sortOrder: number }>;
+  const nextSort = existingLines.reduce((m, x) => Math.max(m, x.sortOrder ?? 0), -1) + 1;
+  const variantLineId = await saveOrderVariantLine({
+    orderId,
+    variantId,
+    variantPackagingId,
+    quantity,
+    unitPrice,
+    sortOrder: nextSort,
+  });
+
+  // 2. Derived production-demand orderItems — one per product in the
+  //    variant composition. Price = 0 (variantLine carries the money).
+  const existingItems = assertOk(
+    await supabase
+      .from("orderItems")
+      .select("sortOrder")
+      .eq("orderId", orderId),
+  ) as Array<{ sortOrder: number }>;
+  let nextItemSort = existingItems.reduce((m, x) => Math.max(m, x.sortOrder ?? 0), -1) + 1;
+  for (const c of composition) {
+    if (c.qty <= 0) continue;
+    await supabase.from("orderItems").insert({
+      id: newId(),
+      orderId,
+      productId: c.productId,
+      quantity: c.qty * quantity,
+      unitPrice: 0,
+      sortOrder: nextItemSort++,
+      variantId,
+      variantPackagingId: variantPackagingId ?? null,
+      fulfilmentMode,
+    });
+  }
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  queryClient.invalidateQueries({ queryKey: ["orderItems"] });
+  return variantLineId;
+}
+
+/** Remove a variant line from an order — also cascade-delete its
+ *  derived orderItems (matched on variantId + variantPackagingId). */
+export async function removeVariantFromOrder(variantLineId: string): Promise<void> {
+  const line = assertOkMaybe(
+    await supabase.from("orderVariantLines").select("*").eq("id", variantLineId).maybeSingle(),
+  ) as OrderVariantLine | null;
+  if (!line) return;
+  // Cascade-delete derived orderItems for this (orderId, variantId, vpId).
+  let q = supabase.from("orderItems").delete().eq("orderId", line.orderId).eq("variantId", line.variantId);
+  if (line.variantPackagingId) {
+    q = q.eq("variantPackagingId", line.variantPackagingId);
+  } else {
+    q = q.is("variantPackagingId", null);
+  }
+  const { error: itemErr } = await q;
+  if (itemErr) throw itemErr;
+  await deleteOrderVariantLine(variantLineId);
+  queryClient.invalidateQueries({ queryKey: ["order-items"] });
+  queryClient.invalidateQueries({ queryKey: ["orderItems"] });
+}

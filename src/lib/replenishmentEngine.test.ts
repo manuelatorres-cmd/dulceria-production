@@ -213,16 +213,16 @@ describe("getLocationMinimum", () => {
   ];
 
   it("returns the per-location row when present", () => {
-    expect(getLocationMinimum(minimums, "p1", "shop", 0)).toEqual({ min: 30, target: 80 });
+    expect(getLocationMinimum(minimums, "p1", "shop")).toEqual({ min: 30, target: 80 });
   });
-  it("falls back to the supplied default when no row matches", () => {
-    expect(getLocationMinimum(minimums, "p2", "shop", 5)).toEqual({ min: 5, target: 5 });
+  it("returns 0/0 when no row matches", () => {
+    expect(getLocationMinimum(minimums, "p2", "shop")).toEqual({ min: 0, target: 0 });
   });
 });
 
 describe("runReplenishmentEngine", () => {
   it("produces one proposal per (product, location) when projection triggers", () => {
-    const products: Product[] = [baseProduct({ id: "p1", lowStockThreshold: 30 })];
+    const products: Product[] = [baseProduct({ id: "p1" })];
     const out = runReplenishmentEngine({
       products,
       startDate: "2026-04-21",
@@ -240,7 +240,14 @@ describe("runReplenishmentEngine", () => {
           rollingAvg30d: 12,
         },
       ],
-      minimums: [],
+      minimums: [
+        {
+          productId: "p1",
+          location: "shop" as unknown as StockLocationMinimum["location"],
+          minimumUnits: 30,
+          updatedAt: new Date(),
+        },
+      ],
       locations: ["shop"],
       mouldFloorByProduct: new Map([["p1", 40]]),
     });
@@ -250,9 +257,7 @@ describe("runReplenishmentEngine", () => {
   });
 
   it("skips archived products", () => {
-    const products: Product[] = [
-      baseProduct({ id: "p1", lowStockThreshold: 30, archived: true }),
-    ];
+    const products: Product[] = [baseProduct({ id: "p1", archived: true })];
     const out = runReplenishmentEngine({
       products,
       startDate: "2026-04-21",
@@ -261,7 +266,14 @@ describe("runReplenishmentEngine", () => {
       scheduledBatches: [],
       pendingDemand: [],
       estimates: [],
-      minimums: [],
+      minimums: [
+        {
+          productId: "p1",
+          location: "shop" as unknown as StockLocationMinimum["location"],
+          minimumUnits: 30,
+          updatedAt: new Date(),
+        },
+      ],
       locations: ["shop"],
       mouldFloorByProduct: new Map(),
     });
@@ -269,7 +281,7 @@ describe("runReplenishmentEngine", () => {
   });
 
   it("skips products with no min policy", () => {
-    const products: Product[] = [baseProduct({ id: "p1", lowStockThreshold: 0 })];
+    const products: Product[] = [baseProduct({ id: "p1" })];
     const out = runReplenishmentEngine({
       products,
       startDate: "2026-04-21",

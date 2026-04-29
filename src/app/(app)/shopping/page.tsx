@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useIngredients, usePackagingList, useShoppingItems, setIngredientLowStock, markIngredientOrdered, unorderIngredient, setPackagingLowStock, markPackagingOrdered, unorderPackaging, saveShoppingItem, markShoppingItemOrdered, deleteShoppingItem, useDecorationMaterials, setDecorationMaterialLowStock, markDecorationMaterialOrdered, unorderDecorationMaterial, useOrders, useAllOrderItems, useProductsList, useMouldsList, useCapacityConfig, saveIngredient, useAllIngredientStock } from "@/lib/hooks";
+import { useIngredients, usePackagingList, useShoppingItems, setIngredientLowStock, markIngredientOrdered, unorderIngredient, setPackagingLowStock, markPackagingOrdered, unorderPackaging, saveShoppingItem, markShoppingItemOrdered, deleteShoppingItem, useDecorationMaterials, setDecorationMaterialLowStock, markDecorationMaterialOrdered, unorderDecorationMaterial, useOrders, useAllOrderItems, useProductsList, useMouldsList, useCapacityConfig, saveIngredient, useAllIngredientStock, useCampaigns, useProductionOrders, useAllProductionOrderItems } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
@@ -638,6 +638,10 @@ function PlannedDemandSection() {
     return m;
   }, [fillingIngredients]);
 
+  const ingredientStockTopLevel = useAllIngredientStock();
+  const campaignsForShopping = useCampaigns();
+  const productionOrdersForShopping = useProductionOrders();
+  const productionOrderItemsForShopping = useAllProductionOrderItems();
   const { rows, warnings } = useMemo(
     () => computeShoppingNeeds({
       orders,
@@ -648,8 +652,12 @@ function PlannedDemandSection() {
       fillingIngredientsByFillingId: fiByFilling,
       ingredients,
       config,
+      ingredientStock: ingredientStockTopLevel,
+      campaigns: campaignsForShopping,
+      productionOrders: productionOrdersForShopping,
+      productionOrderItems: productionOrderItemsForShopping,
     }),
-    [orders, orderItems, products, moulds, productFillings, fiByFilling, ingredients, config],
+    [orders, orderItems, products, moulds, productFillings, fiByFilling, ingredients, config, ingredientStockTopLevel, campaignsForShopping, productionOrdersForShopping, productionOrderItemsForShopping],
   );
 
   const shortfalls = rows.filter((r) => r.shortageG > 0);
@@ -682,19 +690,124 @@ function PlannedDemandSection() {
           You have enough stock for every open order.
         </p>
       ) : (
-        <div className="rounded-sm border border-border bg-card overflow-hidden">
-          <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
-            <span className="flex-1">Ingredient</span>
-            <span className="w-24 text-right">Needed</span>
-            <span className="w-28 text-right">On hand</span>
-            <span className="w-24 text-right">Short by</span>
-          </div>
-          {shortfalls.map((row) => (
-            <ShortageRow key={row.ingredientId} row={row} ingredients={ingredients} />
-          ))}
-        </div>
+        <ShortageBySupplier shortfalls={shortfalls} ingredients={ingredients} />
       )}
     </section>
+  );
+}
+
+/** Group planned-demand shortfalls by supplier (`ingredient.vendor`)
+ *  with per-row purchase units, unit price, subtotal, plus per-group
+ *  and grand totals. Falls back to "Other" when no vendor is set. */
+function ShortageBySupplier({
+  shortfalls, ingredients,
+}: {
+  shortfalls: { ingredientId: string; name: string; neededG: number; onHandG: number; shortageG: number; purchaseUnit?: string; gramsPerUnit?: number }[];
+  ingredients: import("@/types").Ingredient[];
+}) {
+  const ingMap = useMemo(() => new Map(ingredients.map((i) => [i.id!, i])), [ingredients]);
+
+  type EnrichedRow = {
+    row: typeof shortfalls[number];
+    ing: import("@/types").Ingredient | undefined;
+    vendor: string;
+    unitsToBuy: number | null;
+    unitLabel: string;
+    unitPrice: number | null;
+    subtotal: number | null;
+  };
+
+  const enriched: EnrichedRow[] = useMemo(() => shortfalls.map((row) => {
+    const ing = ingMap.get(row.ingredientId);
+    const gramsPerUnit = ing?.gramsPerUnit ?? row.gramsPerUnit ?? null;
+    const unitLabel = ing?.purchaseUnit ?? row.purchaseUnit ?? "g";
+    const unitsToBuy = gramsPerUnit && gramsPerUnit > 0
+      ? Math.ceil(row.shortageG / gramsPerUnit)
+      : null;
+    // Unit price = purchaseCost / purchaseQty (defaults to 1 when unset).
+    const unitPrice = ing?.purchaseCost && (ing.purchaseQty ?? 1) > 0
+      ? ing.purchaseCost / (ing.purchaseQty ?? 1)
+      : null;
+    const subtotal = unitsToBuy != null && unitPrice != null
+      ? unitsToBuy * unitPrice
+      : null;
+    return {
+      row,
+      ing,
+      vendor: ing?.vendor?.trim() || "Other / no supplier set",
+      unitsToBuy,
+      unitLabel,
+      unitPrice,
+      subtotal,
+    };
+  }), [shortfalls, ingMap]);
+
+  const groups = useMemo(() => {
+    const m = new Map<string, EnrichedRow[]>();
+    for (const r of enriched) {
+      const arr = m.get(r.vendor) ?? [];
+      arr.push(r);
+      m.set(r.vendor, arr);
+    }
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [enriched]);
+
+  const grandTotal = enriched.reduce((s, r) => s + (r.subtotal ?? 0), 0);
+  const fmt = (v: number) => `€${v.toFixed(2).replace(/\.00$/, "")}`;
+
+  return (
+    <div className="space-y-3">
+      {groups.map(([vendor, rows]) => {
+        const vendorTotal = rows.reduce((s, r) => s + (r.subtotal ?? 0), 0);
+        return (
+          <div key={vendor} className="rounded-sm border border-border bg-card overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border">
+              <h3
+                className="text-[13px]"
+                style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
+              >
+                {vendor}
+                <span className="ml-2 text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-normal">
+                  {rows.length} item{rows.length === 1 ? "" : "s"}
+                </span>
+              </h3>
+              <span className="text-[11px] tabular-nums font-medium">≈ {fmt(vendorTotal)}</span>
+            </div>
+            <div className="hidden sm:flex items-center px-3 py-1 text-[10px] uppercase tracking-[0.06em] text-muted-foreground bg-muted/20 border-b border-border">
+              <span className="flex-1">Ingredient</span>
+              <span className="w-20 text-right">Short</span>
+              <span className="w-24 text-right">Buy</span>
+              <span className="w-20 text-right">Unit €</span>
+              <span className="w-20 text-right">Subtotal</span>
+            </div>
+            {rows.map((r) => (
+              <div key={r.row.ingredientId} className="flex items-center px-3 py-1.5 text-sm border-b border-border last:border-b-0">
+                <Link
+                  href={`/ingredients/${encodeURIComponent(r.row.ingredientId)}`}
+                  className="flex-1 truncate hover:underline"
+                >
+                  {r.row.name}
+                </Link>
+                <span className="w-20 text-right tabular-nums text-muted-foreground">{formatGrams(r.row.shortageG)}</span>
+                <span className="w-24 text-right tabular-nums">
+                  {r.unitsToBuy != null ? `${r.unitsToBuy} ${r.unitLabel}` : "—"}
+                </span>
+                <span className="w-20 text-right tabular-nums text-muted-foreground">
+                  {r.unitPrice != null ? fmt(r.unitPrice) : "—"}
+                </span>
+                <span className="w-20 text-right tabular-nums font-medium">
+                  {r.subtotal != null ? fmt(r.subtotal) : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+      <div className="flex items-center justify-between px-3 py-2 rounded-sm border border-border bg-muted/30">
+        <span className="text-[12px] uppercase tracking-[0.08em] text-muted-foreground font-medium">Approx. total to buy</span>
+        <span className="text-[14px] tabular-nums font-semibold">≈ {fmt(grandTotal)}</span>
+      </div>
+    </div>
   );
 }
 

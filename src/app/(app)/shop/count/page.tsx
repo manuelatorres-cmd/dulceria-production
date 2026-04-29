@@ -5,14 +5,16 @@ import { PageHeader } from "@/components/page-header";
 import {
   useProductsList,
   useProductLocationTotals,
-  saveStockTransfer,
+  useProductCategories,
+  applyStockAdjustments,
 } from "@/lib/hooks";
 
 /**
  * Monthly physical inventory count — reconciles system stock with
  * what's actually on the shelves. Manuela walks through the shop,
- * enters actual counts, saves. Differences are logged as adjustment
- * transfers (reason='manual') with the variance as quantity.
+ * enters actual counts, saves. Differences go through
+ * `applyStockAdjustments` so real productStock totals move (not just
+ * an audit row).
  *
  * Kept intentionally simple: no partial drafts, no wizard. One screen,
  * click Save to commit all entries.
@@ -20,16 +22,45 @@ import {
 export default function MonthlyCountPage() {
   const products = useProductsList();
   const totals = useProductLocationTotals();
+  const categories = useProductCategories(true);
 
   const [counts, setCounts] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+
+  const categoryNameById = useMemo(
+    () => new Map(categories.map((c) => [c.id!, c.name])),
+    [categories],
+  );
 
   const eligible = useMemo(
     () => products.filter((p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name)),
     [products],
   );
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return eligible.filter((p) => {
+      if (activeCategories.size > 0) {
+        if (!p.productCategoryId || !activeCategories.has(p.productCategoryId)) return false;
+      }
+      if (q && !p.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [eligible, activeCategories, search]);
+
+  // Categories used in the eligible product set — chip pool.
+  const usedCategories = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of eligible) if (p.productCategoryId) ids.add(p.productCategoryId);
+    return [...ids]
+      .map((id) => ({ id, name: categoryNameById.get(id) ?? id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [eligible, categoryNameById]);
 
   const variances = useMemo(() => {
     return eligible.map((p) => {
@@ -47,23 +78,26 @@ export default function MonthlyCountPage() {
   async function save() {
     setSaving(true);
     setSavedMsg(null);
+    setSaveError(null);
     try {
-      for (const v of variances) {
-        if (v.counted === null || v.variance === 0) continue;
-        await saveStockTransfer({
-          entityType: "product",
-          entityId: v.product.id ?? "",
-          quantity: Math.abs(v.variance),
-          fromLocationId: v.variance > 0 ? "count-adjust-in" : "store",
-          toLocationId: v.variance > 0 ? "store" : "count-adjust-out",
-          transferredAt: new Date(),
-          reason: "manual",
-          notes:
-            notes ||
-            `Monthly count reconciliation (${v.variance > 0 ? "+" : ""}${v.variance})`,
-        });
+      const inputs = variances
+        .filter((v) => v.counted !== null && v.variance !== 0)
+        .map((v) => ({
+          itemType: "product" as const,
+          itemId: v.product.id ?? "",
+          location: "store" as const,
+          deltaQty: v.variance,
+          reason: "correction" as const,
+          note: notes
+            ? `${notes} (monthly count ${v.variance > 0 ? "+" : ""}${v.variance})`
+            : `Monthly count reconciliation (${v.variance > 0 ? "+" : ""}${v.variance})`,
+        }));
+      const result = await applyStockAdjustments(inputs);
+      if (result.failed) {
+        setSaveError(`Stopped at "${result.failed.itemId}" after ${result.applied} adjustments. ${result.error instanceof Error ? result.error.message : ""}`);
+        return;
       }
-      setSavedMsg(`Logged ${entered} counts, ${totalVariance} pieces reconciled.`);
+      setSavedMsg(`Reconciled ${result.applied} product${result.applied === 1 ? "" : "s"}, ${totalVariance} pieces total. Stock totals updated.`);
       setCounts({});
       setNotes("");
     } finally {
@@ -78,6 +112,52 @@ export default function MonthlyCountPage() {
         accent="Shop"
         description="Walk through the shop with a tablet, enter actuals, save. Variances auto-create adjustment transfers so the system reflects reality."
       />
+
+      {/* Category chip row + search — narrows the count table. */}
+      {usedCategories.length > 0 && (
+        <div className="px-4 mb-3 space-y-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {usedCategories.map((c) => {
+              const active = activeCategories.has(c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    setActiveCategories((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(c.id)) next.delete(c.id);
+                      else next.add(c.id);
+                      return next;
+                    });
+                  }}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors capitalize ${
+                    active
+                      ? "bg-foreground text-background"
+                      : "bg-card text-muted-foreground border border-border hover:border-foreground"
+                  }`}
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+            {activeCategories.size > 0 && (
+              <button
+                onClick={() => setActiveCategories(new Set())}
+                className="text-[11px] text-muted-foreground hover:text-foreground underline"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search products…"
+            className="input"
+          />
+        </div>
+      )}
 
       <section
         className="border border-border bg-card p-4 mb-4"
@@ -99,7 +179,7 @@ export default function MonthlyCountPage() {
               </tr>
             </thead>
             <tbody>
-              {variances.map((v) => (
+              {variances.filter((v) => visible.some((p) => p.id === v.product.id)).map((v) => (
                 <tr
                   key={v.product.id}
                   className="border-t border-border/60"
@@ -175,7 +255,9 @@ export default function MonthlyCountPage() {
           {entered} counted · {totalVariance} pieces total variance
         </span>
         <div className="flex items-center gap-3">
-          {savedMsg ? (
+          {saveError ? (
+            <span className="text-[11px] text-status-alert">{saveError}</span>
+          ) : savedMsg ? (
             <span className="text-[11px] text-status-ok">{savedMsg}</span>
           ) : null}
           <button

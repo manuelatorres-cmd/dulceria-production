@@ -175,18 +175,17 @@ export function buildProposal(args: {
   };
 }
 
-/** Pull the per-location min/target for a product. Falls back to
- *  product.lowStockThreshold when no per-location row exists. */
+/** Pull the per-location min/target for a product. Returns 0/0 when
+ *  no per-location row exists — caller skips that (product, location). */
 export function getLocationMinimum(
   minimums: StockLocationMinimum[],
   productId: string,
   locationId: string,
-  fallbackMin: number,
 ): { min: number; target: number } {
   const row = minimums.find(
     (m) => m.productId === productId && (m.location as unknown as string) === locationId,
   );
-  if (!row) return { min: fallbackMin, target: fallbackMin };
+  if (!row) return { min: 0, target: 0 };
   return { min: row.minimumUnits, target: row.maximumUnits ?? row.minimumUnits };
 }
 
@@ -220,7 +219,6 @@ export function runReplenishmentEngine(args: {
         args.minimums,
         product.id,
         locationId,
-        product.lowStockThreshold ?? 0,
       );
       if (min <= 0) continue; // no policy → skip
       const dailyDemand = resolveDailyDemand(args.estimates, product.id, locationId);

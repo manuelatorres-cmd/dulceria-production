@@ -3,17 +3,18 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { FillingIngredientRow } from "./filling-ingredient-row";
-import type { FillingIngredient, Ingredient } from "@/types";
+import type { Filling, FillingIngredient, Ingredient } from "@/types";
 
 interface Props {
   li: FillingIngredient;
   ingredient: Ingredient | undefined;
+  componentFilling?: Filling;
   pct?: number;
   onChanged: () => void;
   readonly?: boolean;
 }
 
-export function SortableFillingIngredientRow({ li, ingredient, pct, onChanged, readonly }: Props) {
+export function SortableFillingIngredientRow({ li, ingredient, componentFilling, pct, onChanged, readonly }: Props) {
   const {
     attributes,
     listeners,
@@ -33,6 +34,7 @@ export function SortableFillingIngredientRow({ li, ingredient, pct, onChanged, r
       <FillingIngredientRow
         li={li}
         ingredient={ingredient}
+        componentFilling={componentFilling}
         pct={pct}
         onChanged={onChanged}
         dragHandleListeners={listeners}

@@ -47,3 +47,10 @@ skills-lock.json
 
 # supabase CLI cache
 supabase/.temp/
+
+# Lab research source PDFs/xlsx (large, local-only)
+docs/lab-research/
+
+# Personal notes / docs in repo root (not source)
+*.docx
+Infostuff/

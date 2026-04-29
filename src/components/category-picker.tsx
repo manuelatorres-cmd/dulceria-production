@@ -7,25 +7,29 @@ interface CategoryPickerProps {
   onCategoryChange: (cat: string) => void;
 }
 
+/** Datalist combobox — arrow keys + Enter select, opens downward
+ *  consistently. Typing a new name is allowed; saver can create it.
+ *  See feedback_form_ux_patterns.md (datalist baseline pattern). */
 export function CategoryPicker({ category, onCategoryChange }: CategoryPickerProps) {
   const categories = useFillingCategories();
   return (
     <div>
       <label className="label">Category</label>
-      <select
+      <input
+        type="text"
+        list="filling-category-list"
         value={category}
         onChange={(e) => onCategoryChange(e.target.value)}
+        placeholder="Select or type a category…"
         className="input"
-      >
-        <option value="">— Select category —</option>
-        {categories.map((cat) => (
-          <option key={cat.id ?? cat.name} value={cat.name}>{cat.name}</option>
-        ))}
-        {/* Preserve any legacy/custom category currently set on the filling that isn't in the table */}
-        {category && !categories.some((c) => c.name === category) && (
-          <option value={category}>{category}</option>
-        )}
-      </select>
+      />
+      {categories.length > 0 && (
+        <datalist id="filling-category-list">
+          {categories.map((cat) => (
+            <option key={cat.id ?? cat.name} value={cat.name} />
+          ))}
+        </datalist>
+      )}
     </div>
   );
 }

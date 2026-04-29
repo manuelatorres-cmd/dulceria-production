@@ -52,6 +52,7 @@ export function buildFillingIngredientList(
 ): IngredientListEntry[] {
   const contributions: Contribution[] = [];
   for (const li of fillingIngredients) {
+    if (!li.ingredientId) continue; // sub-filling line — not expanded here
     const ing = ingredientMap.get(li.ingredientId);
     if (!ing) continue;
     contributions.push({ ing, grams: li.amount });
@@ -130,6 +131,7 @@ function accumulateProduct(out: Contribution[], input: ProductIngredientListInpu
     if (fillingTotalProductG <= 0) continue;
 
     for (const li of lis) {
+      if (!li.ingredientId) continue; // sub-filling line — not expanded here
       const ing = ingredientMap.get(li.ingredientId);
       if (!ing) continue;
       const fraction = li.amount / fillingTotalProductG;

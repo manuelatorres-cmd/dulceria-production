@@ -8,6 +8,7 @@ import {
   useOrders, useAllOrderItems, useAllOrderPlanLinks,
 } from "@/lib/hooks";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
+import { planStepDoneById } from "@/lib/production";
 import { PageHeader } from "@/components/page-header";
 import { Calendar, Clock, Play, CheckCircle, Trash2, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -89,13 +90,12 @@ export default function ProductionPage() {
     return m;
   }, [allStepStatuses]);
 
+  // Use the shared phase-key helper. Comparing the bare stepId UUID
+  // against doneKeys (e.g. "polishing-<planProductId>") never matched
+  // → all steps rendered as not done. Now resolves stepId → step.name
+  // → phaseKey → prefix-match.
   function stepDoneFor(planId: string, stepId: string): boolean {
-    const done = doneKeysByPlan.get(planId);
-    if (!done) return false;
-    for (const k of done) {
-      if (k === stepId || k.startsWith(`${stepId}-`)) return true;
-    }
-    return false;
+    return planStepDoneById(stepId, planId, stepById, doneKeysByPlan);
   }
 
   // Today's local ISO date.
@@ -391,7 +391,7 @@ function formatDayLabel(iso: string, todayIso: string): string {
   const d = new Date(iso + "T12:00:00");
   const today = new Date(todayIso + "T12:00:00");
   const days = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  const label = d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const label = d.toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long" });
   if (days === 0) return `Today · ${label}`;
   if (days === 1) return `Tomorrow · ${label}`;
   if (days === -1) return `Yesterday · ${label}`;

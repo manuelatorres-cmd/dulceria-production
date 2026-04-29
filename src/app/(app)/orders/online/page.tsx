@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -17,12 +17,22 @@ export default function OnlineOrdersPage() {
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
 
+  const [deliveryFilter, setDeliveryFilter] = useState<"all" | "pickup" | "ship">("all");
+
   const onlineOrders = useMemo(
     () => orders
       .filter((o) => o.channel === "online" && (o.status === "pending" || o.status === "in_production"))
+      .filter((o) => deliveryFilter === "all" || o.deliveryType === deliveryFilter)
       .sort((a, b) => a.deadline.localeCompare(b.deadline)),
+    [orders, deliveryFilter],
+  );
+
+  const allOnline = useMemo(
+    () => orders.filter((o) => o.channel === "online" && (o.status === "pending" || o.status === "in_production")),
     [orders],
   );
+  const pickupCount = allOnline.filter((o) => o.deliveryType === "pickup").length;
+  const shipCount = allOnline.filter((o) => o.deliveryType === "ship").length;
 
   const itemsByOrder = useMemo(() => {
     const m = new Map<string, typeof items>();
@@ -65,12 +75,20 @@ export default function OnlineOrdersPage() {
             {onlineOrders.length} open order{onlineOrders.length === 1 ? "" : "s"}
             {totalShort > 0 && ` · ${totalShort} pcs short across Production Storage`}
           </p>
-          <Link
-            href="/orders/online/import"
-            className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
-          >
-            <Upload className="w-4 h-4" /> Import Shopify CSV
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/orders/online/import"
+              className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
+            >
+              <Upload className="w-4 h-4" /> Import Shopify CSV
+            </Link>
+            <Link
+              href="/orders/online/import-bonbons"
+              className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-foreground/30"
+            >
+              <Upload className="w-4 h-4" /> Import box contents
+            </Link>
+          </div>
         </div>
 
         {/* Combined demand view */}
@@ -106,7 +124,27 @@ export default function OnlineOrdersPage() {
 
         {/* Per-order list */}
         <section>
-          <h2 className="text-sm font-semibold text-primary mb-2">Orders</h2>
+          <div className="flex items-baseline gap-3 mb-2 flex-wrap">
+            <h2 className="text-sm font-semibold text-primary">Orders</h2>
+            <div className="flex items-center gap-1.5">
+              {(["all", "pickup", "ship"] as const).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setDeliveryFilter(k)}
+                  className={
+                    "text-[11.5px] px-2.5 py-0.5 rounded-full border transition " +
+                    (deliveryFilter === k
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-card border-border text-foreground hover:border-foreground")
+                  }
+                >
+                  {k === "all" ? `All (${allOnline.length})`
+                    : k === "pickup" ? `Pickup (${pickupCount})`
+                      : `Ship (${shipCount})`}
+                </button>
+              ))}
+            </div>
+          </div>
           {onlineOrders.length === 0 ? (
             <div className="rounded-sm border border-dashed border-border bg-card p-8 text-center">
               <p className="text-sm text-muted-foreground">
@@ -132,16 +170,19 @@ export default function OnlineOrdersPage() {
                   <li key={o.id} className="rounded-sm border border-border bg-card p-3">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold">
-                          {o.sourceRef ? `${o.sourceRef} · ` : ""}{o.customerName || "Anonymous"}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold">
+                            {o.sourceRef ? `${o.sourceRef} · ` : ""}{o.customerName || "Anonymous"}
+                          </p>
+                          <DeliveryPill type={o.deliveryType} />
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {o.deliveryAddress ?? "No shipping address"}
                         </p>
                         <p className={`text-[11px] ${deadlineCls}`}>
                           {daysToDeadline < 0 ? "overdue" : daysToDeadline === 0 ? "today" : daysToDeadline === 1 ? "tomorrow" : `in ${daysToDeadline}d`}
                           {" · "}
-                          deadline {deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                          deadline {deadline.toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -178,6 +219,24 @@ export default function OnlineOrdersPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+function DeliveryPill({ type }: { type?: string | null }) {
+  const isShip = type === "ship";
+  const isPickup = type === "pickup";
+  if (!isShip && !isPickup) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10.5px] px-2 py-0.5 rounded-full"
+      style={
+        isShip
+          ? { background: "#eff5fb", color: "#4b6b8f", border: "1px solid #cfe0f0" }
+          : { background: "#fdf2f4", color: "#6e2b32", border: "1px solid #f0c6c0" }
+      }
+    >
+      {isShip ? "🚚 Ship" : "🛍 Pickup"}
+    </span>
   );
 }
 

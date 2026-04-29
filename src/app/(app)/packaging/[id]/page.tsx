@@ -3,13 +3,14 @@
 import { useState, use, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  usePackaging, usePackagingOrders, useAllPackagingSuppliers,
+  usePackaging, usePackagingList, usePackagingOrders, useAllPackagingSuppliers,
   savePackaging, deletePackaging, archivePackaging, unarchivePackaging, isPackagingInUse,
   savePackagingOrder, deletePackagingOrder,
   setPackagingLowStock, setPackagingOutOfStock, markPackagingOrdered, useCurrencySymbol,
 } from "@/lib/hooks";
 import { ArrowLeft, Pencil, Trash2, Plus, Package, Archive, ArchiveRestore } from "lucide-react";
 import { InlineNameEditor } from "@/components/inline-name-editor";
+import { DetailNav } from "@/components/detail-nav";
 import { StockStatusPanel } from "@/components/stock-status-panel";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 
@@ -32,6 +33,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
   const pkg = usePackaging(packagingId);
   const orders = usePackagingOrders(packagingId);
   const allSuppliers = useAllPackagingSuppliers();
+  const allPackaging = usePackagingList(false);
 
   const [editing, setEditing] = useState(isNew);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -42,6 +44,10 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
   // Edit form state
   const [capacity, setCapacity] = useState("");
   const [manufacturer, setManufacturer] = useState("");
+  const [lowStockThreshold, setLowStockThreshold] = useState("");
+  const [leadTimeDays, setLeadTimeDays] = useState("");
+  const [packingTimePerUnit, setPackingTimePerUnit] = useState("");
+  const [defaultVatRate, setDefaultVatRate] = useState("");
   const [notes, setNotes] = useState("");
 
   // Order form state
@@ -70,6 +76,10 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
   if (pkg && (!editing || isNew) && capacity === "" && pkg.name) {
     setCapacity(String(pkg.capacity));
     setManufacturer(pkg.manufacturer ?? "");
+    setLowStockThreshold(pkg.lowStockThreshold != null ? String(pkg.lowStockThreshold) : "");
+    setLeadTimeDays(pkg.leadTimeDays != null ? String(pkg.leadTimeDays) : "");
+    setPackingTimePerUnit(pkg.packingTimePerUnit != null ? String(pkg.packingTimePerUnit) : "");
+    setDefaultVatRate(pkg.defaultVatRate != null ? String(pkg.defaultVatRate) : "");
     setNotes(pkg.notes ?? "");
   }
 
@@ -98,6 +108,10 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
   function startEditing() {
     setCapacity(String(pkg!.capacity));
     setManufacturer(pkg!.manufacturer ?? "");
+    setLowStockThreshold(pkg!.lowStockThreshold != null ? String(pkg!.lowStockThreshold) : "");
+    setLeadTimeDays(pkg!.leadTimeDays != null ? String(pkg!.leadTimeDays) : "");
+    setPackingTimePerUnit(pkg!.packingTimePerUnit != null ? String(pkg!.packingTimePerUnit) : "");
+    setDefaultVatRate(pkg!.defaultVatRate != null ? String(pkg!.defaultVatRate) : "");
     setNotes(pkg!.notes ?? "");
     setEditing(true);
   }
@@ -110,12 +124,24 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const cap = parseInt(capacity) || 1;
+    const parseNum = (s: string) => {
+      const v = parseFloat(s.trim());
+      return isNaN(v) || v < 0 ? undefined : v;
+    };
+    const parseInt0 = (s: string) => {
+      const v = parseInt(s.trim(), 10);
+      return isNaN(v) || v < 0 ? undefined : v;
+    };
     await savePackaging({
       id: packagingId,
       name: pkg!.name,
       capacity: cap,
       manufacturer: manufacturer.trim() || undefined,
       notes: notes.trim() || undefined,
+      lowStockThreshold: parseInt0(lowStockThreshold),
+      leadTimeDays: parseInt0(leadTimeDays),
+      packingTimePerUnit: parseNum(packingTimePerUnit),
+      defaultVatRate: parseNum(defaultVatRate),
       createdAt: pkg!.createdAt,
       updatedAt: new Date(),
     });
@@ -160,10 +186,16 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
 
   return (
     <div>
-      <div className="px-4 pt-6 pb-2">
-        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-3">
+      <div className="px-4 pt-6 pb-2 space-y-2">
+        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
+        <DetailNav
+          items={[...allPackaging].sort((a, b) => a.name.localeCompare(b.name))}
+          currentId={packagingId}
+          hrefFor={(p) => `/packaging/${encodeURIComponent(p.id!)}`}
+          labelFor={(p) => p.name}
+        />
       </div>
 
       <div className="px-4 pb-6 space-y-6">
@@ -264,6 +296,59 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                 </datalist>
               )}
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Low-stock threshold</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={lowStockThreshold}
+                  onChange={(e) => setLowStockThreshold(e.target.value)}
+                  placeholder="e.g. 20"
+                  className="input"
+                />
+                <p className="text-xs text-muted-foreground mt-0.5">Units below which auto-flips low-stock</p>
+              </div>
+              <div>
+                <label className="label">Supplier lead time (days)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={leadTimeDays}
+                  onChange={(e) => setLeadTimeDays(e.target.value)}
+                  placeholder="e.g. 7"
+                  className="input"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Packing time per unit (min)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={packingTimePerUnit}
+                  onChange={(e) => setPackingTimePerUnit(e.target.value)}
+                  placeholder="e.g. 1.5"
+                  className="input"
+                />
+                <p className="text-xs text-muted-foreground mt-0.5">Hands-on minutes — feeds labour rollup</p>
+              </div>
+              <div>
+                <label className="label">Default VAT (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={defaultVatRate}
+                  onChange={(e) => setDefaultVatRate(e.target.value)}
+                  placeholder="e.g. 20"
+                  className="input"
+                />
+              </div>
+            </div>
             <div>
               <label className="label">Notes</label>
               <textarea
@@ -331,7 +416,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="label">Price per unit ({sym}) *</label>
+                  <label className="label">Price per unit, net ({sym}) *</label>
                   <input
                     type="number"
                     value={orderPrice}
