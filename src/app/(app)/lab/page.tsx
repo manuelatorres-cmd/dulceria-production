@@ -6,12 +6,14 @@ import { PageHeader } from "@/components/page-header";
 import { ExperimentsTab } from "./experiments-tab";
 import { GanacheCalculatorTab } from "./ganache-calculator-tab";
 import { RecipeCalculatorTab } from "./recipe-calculator-tab";
+import { AuditTab } from "./audit-tab";
 
-type Tab = "experiments" | "ganache" | "recipes";
+type Tab = "experiments" | "ganache" | "recipes" | "audit";
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "experiments", label: "Experiments" },
   { id: "ganache", label: "Ganache calculator" },
   { id: "recipes", label: "Recipe calculator" },
+  { id: "audit", label: "Audit recipes" },
 ];
 
 export default function LabPage() {
@@ -56,6 +58,7 @@ export default function LabPage() {
         {activeTab === "experiments" && <ExperimentsTab />}
         {activeTab === "ganache" && <GanacheCalculatorTab />}
         {activeTab === "recipes" && <RecipeCalculatorTab />}
+        {activeTab === "audit" && <AuditTab />}
       </div>
     </div>
   );

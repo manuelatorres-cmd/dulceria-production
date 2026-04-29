@@ -8,6 +8,7 @@ import {
   useOrders, useAllOrderItems, useProductsList, useMouldsList,
   useFillings, useFillingCategories, useCapacityConfig, useFillingStockItems,
   useIngredients, useAllIngredientStock,
+  saveFillingStock, adjustIngredientStock,
 } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -45,6 +46,69 @@ export default function FillingConsolidationPage() {
 
   const [windowDays, setWindowDays] = useState<number>(7);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Mark-cooked modal state. When set, shows a confirm dialog for
+  // the chosen filling — operator can tweak actual yield grams,
+  // hits Save, the row goes to fillingStock + ingredients deducted.
+  const [cookedModal, setCookedModal] = useState<
+    | { fillingId: string; fillingName: string; defaultGrams: number; scaled: Array<{ ingredientId: string; amount: number; unit: string }> }
+    | null
+  >(null);
+  const [cookedGrams, setCookedGrams] = useState("");
+  const [cookedNotes, setCookedNotes] = useState("");
+  const [cookedSaving, setCookedSaving] = useState(false);
+
+  async function applyCooked() {
+    if (!cookedModal) return;
+    const grams = parseFloat(cookedGrams.replace(",", "."));
+    if (isNaN(grams) || grams <= 0) return;
+    setCookedSaving(true);
+    try {
+      // 1) Add the cooked batch to fillingStock so /shop and the
+      //    consumption pipeline see it on hand.
+      await saveFillingStock({
+        fillingId: cookedModal.fillingId,
+        remainingG: grams,
+        madeAt: new Date().toISOString().slice(0, 10),
+        notes: cookedNotes.trim() || undefined,
+        createdAt: Date.now(),
+      });
+      // 2) Deduct each scaled ingredient from on-hand stock so the
+      //    shopping list + cookable flag stay accurate. Scale to the
+      //    actual cooked grams in case the operator made more or
+      //    less than the buffered target.
+      const scaleFactor = cookedModal.defaultGrams > 0
+        ? grams / cookedModal.defaultGrams
+        : 1;
+      for (const si of cookedModal.scaled) {
+        const recipeG = unitToGramsLocal(si.amount, si.unit) * scaleFactor;
+        if (recipeG <= 0) continue;
+        try {
+          await adjustIngredientStock({
+            ingredientId: si.ingredientId,
+            deltaG: -recipeG,
+            reason: "filling_prep",
+            notes: `Used for ${cookedModal.fillingName}`,
+          });
+        } catch (e) {
+          // Don't fail the whole cook on a single ingredient hiccup —
+          // operator can fix balances on the ingredient page.
+          console.warn("ingredient deduct failed", si.ingredientId, e);
+        }
+      }
+      setCookedModal(null);
+      setCookedGrams("");
+      setCookedNotes("");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Mark cooked failed");
+    } finally {
+      setCookedSaving(false);
+    }
+  }
+  function unitToGramsLocal(amount: number, unit: string): number {
+    if (unit === "g" || unit === "ml") return amount;
+    if (unit === "kg" || unit === "L") return amount * 1000;
+    return amount;
+  }
 
   const result = useMemo(() => {
     const windowEnd = new Date();
@@ -310,6 +374,30 @@ export default function FillingConsolidationPage() {
                             </p>
                           )}
                           <p className="text-[10px] text-muted-foreground">deadline {deadline}</p>
+                          {!nothingToCook && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCookedModal({
+                                  fillingId: need.fillingId,
+                                  fillingName: need.fillingName,
+                                  defaultGrams: need.toCookBufferedG,
+                                  scaled: need.scaledIngredients.map((s) => ({
+                                    ingredientId: s.ingredientId,
+                                    amount: s.amount,
+                                    unit: s.unit,
+                                  })),
+                                });
+                                setCookedGrams(String(need.toCookBufferedG));
+                                setCookedNotes("");
+                              }}
+                              className="mt-1.5 inline-flex items-center gap-1 text-[10.5px] px-2 py-1 rounded-sm bg-foreground text-background hover:opacity-90"
+                              title="Add this batch to filling stock + deduct ingredients"
+                            >
+                              <CheckCircle2 className="w-3 h-3" /> Mark as cooked
+                            </button>
+                          )}
                         </div>
                       </div>
                     </button>
@@ -389,6 +477,63 @@ export default function FillingConsolidationPage() {
           </section>
         )}
       </div>
+
+      {/* Mark-cooked confirm modal */}
+      {cookedModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          onClick={() => !cookedSaving && setCookedModal(null)}
+        >
+          <div
+            className="bg-card rounded-sm border border-border p-5 max-w-[420px] w-[92vw] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold mb-1">
+              Mark <span style={{ fontFamily: "var(--font-serif)" }}>{cookedModal.fillingName}</span> as cooked
+            </h3>
+            <p className="text-[12px] text-muted-foreground mb-4">
+              Adds the batch to filling stock and deducts each recipe ingredient
+              from on-hand. Edit the actual yield if you cooked more or less than
+              the suggested amount.
+            </p>
+            <label className="block text-[11px] text-muted-foreground mb-1">Cooked amount (grams)</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={cookedGrams}
+              onChange={(e) => setCookedGrams(e.target.value)}
+              className="input w-full mb-3"
+              autoFocus
+            />
+            <label className="block text-[11px] text-muted-foreground mb-1">Notes (optional)</label>
+            <input
+              type="text"
+              value={cookedNotes}
+              onChange={(e) => setCookedNotes(e.target.value)}
+              placeholder="e.g. extra batch for the freezer"
+              className="input w-full mb-4"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setCookedModal(null)}
+                disabled={cookedSaving}
+                className="text-[12px] px-3 py-1.5 rounded-sm border border-border hover:bg-muted/40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyCooked}
+                disabled={cookedSaving || !cookedGrams.trim()}
+                className="text-[12px] px-3 py-1.5 rounded-sm bg-foreground text-background disabled:opacity-50"
+              >
+                {cookedSaving ? "Saving…" : "Mark cooked + deduct ingredients"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
