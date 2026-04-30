@@ -10,6 +10,7 @@ import { DENSITY_G_PER_ML } from "@/lib/production";
 import { getNutrientsByMarket, getNutritionPanelTitle, scaleToServing, formatNutrientValue, percentDailyValue, calculateProductNutrition } from "@/lib/nutrition";
 import { buildProductIngredientList } from "@/lib/ingredientList";
 import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
+import { containsAllergen } from "@/lib/allergenKeywordsDe";
 import { calculateShellWeightG, calculateCapWeightG } from "@/lib/costCalculation";
 import type { MarketRegion } from "@/types";
 import { ArrowLeft, Camera, Plus, X, Search, Trash2, Pencil, ChevronRight, StickyNote, RefreshCw, AlertTriangle, Undo2, Copy, Archive, ArchiveRestore, GripVertical, Snowflake } from "lucide-react";
@@ -3299,7 +3300,7 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
             {ingredientList.map((entry, i) => (
               <span key={i}>
                 {i > 0 ? ", " : ""}
-                {entry.allergens.length > 0 ? <strong>{entry.label}</strong> : entry.label}
+                {containsAllergen(entry.label) ? <strong>{entry.label}</strong> : entry.label}
               </span>
             ))}
             .

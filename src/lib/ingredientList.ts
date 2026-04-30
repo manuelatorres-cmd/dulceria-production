@@ -24,7 +24,6 @@ import {
   calculateFillingWeightPerCavityG,
   DEFAULT_SHELL_PERCENTAGE,
 } from "@/lib/costCalculation";
-import { nameMatchesAllergenDe } from "@/lib/allergenKeywordsDe";
 
 /** One item on a rolled-up ingredient list. */
 export interface IngredientListEntry {
@@ -158,28 +157,18 @@ function flattenAndDedup(contributions: Contribution[]): IngredientListEntry[] {
 
     const names = deriveDisplayNames(ing);
     const parentAllergens = ing.allergens ?? [];
-    const isFlattened = (ing.subIngredients ?? [])
-      .some((s) => (s.name ?? "").trim().length > 0);
 
     for (const name of names) {
-      // When a parent ingredient flattens into N subs, only the sub whose
-      // name actually carries the allergen should be bolded — siblings get
-      // an empty allergen set. When the ingredient appears under its own
-      // name, every parent allergen applies.
-      const allergensForName = isFlattened
-        ? parentAllergens.filter((id) => nameMatchesAllergenDe(name, id))
-        : parentAllergens;
-
       const key = name.toLowerCase();
       const cur = byKey.get(key);
       if (cur) {
         cur.grams += grams;
-        for (const a of allergensForName) cur.allergens.add(a);
+        for (const a of parentAllergens) cur.allergens.add(a);
       } else {
         byKey.set(key, {
           label: name,
           grams,
-          allergens: new Set(allergensForName),
+          allergens: new Set(parentAllergens),
         });
       }
     }

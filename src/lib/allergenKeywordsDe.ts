@@ -16,43 +16,74 @@
 
 const DE_ALLERGEN_KEYWORDS: Record<string, string[]> = {
   gluten: [
+    // DE
     "weizen", "roggen", "gerste", "hafer", "dinkel", "kamut", "gluten",
     "weizenmehl", "roggenmehl", "dinkelmehl", "gerstenmehl", "hafermehl",
     "weizenstärke", "weizengrieß", "weichweizen", "hartweizen", "graupen",
-    "couscous", "bulgur", "seitan",
+    "couscous", "bulgur", "seitan", "khorasan",
+    // EN
+    "wheat", "rye", "barley", "oats", "spelt",
   ],
-  crustaceans: ["krebstier", "garnele", "garnelen", "krabbe", "krabben", "hummer", "languste", "scampi", "shrimp"],
-  eggs: ["ei ", "eier", "eigelb", "eiweiß", "eiweiss", "vollei", "trockenei", "eipulver", "hühnerei"],
-  fish: ["fisch", "lachs", "thunfisch", "sardelle", "anchovis", "anchovi", "kabeljau", "forelle", "hering", "makrele"],
-  peanuts: ["erdnuss", "erdnüsse", "erdnussöl", "erdnussbutter"],
-  soybeans: ["soja", "sojabohne", "sojabohnen", "sojalecithin", "sojaprotein", "sojaöl", "tofu", "tempeh", "edamame"],
+  crustaceans: [
+    "krebstier", "garnele", "garnelen", "krabbe", "krabben", "hummer", "languste", "scampi", "shrimp",
+    "crustacean", "prawn", "crab", "lobster", "crayfish",
+  ],
+  eggs: ["ei ", "eier", "eigelb", "eiweiß", "eiweiss", "vollei", "trockenei", "eipulver", "hühnerei", "egg"],
+  fish: [
+    "fisch", "lachs", "thunfisch", "sardelle", "anchovis", "anchovi", "kabeljau", "forelle", "hering", "makrele",
+    "fish", "salmon", "tuna", "cod",
+  ],
+  peanuts: ["erdnuss", "erdnüsse", "erdnussöl", "erdnussbutter", "peanut"],
+  soybeans: [
+    "soja", "sojabohne", "sojabohnen", "sojalecithin", "sojaprotein", "sojaöl", "tofu", "tempeh", "edamame",
+    "soy", "soybean",
+  ],
   milk: [
+    // DE
     "milch", "milchpulver", "magermilch", "vollmilch", "butter", "butterreinfett",
     "butterfett", "sahne", "rahm", "joghurt", "jogurt", "käse", "quark",
     "molke", "molkenpulver", "kasein", "casein", "milcheiweiß", "milcheiweiss",
     "kondensmilch", "buttermilch",
+    // EN
+    "milk", "cream", "yogurt", "yoghurt", "cheese", "whey", "lactose",
   ],
   lactose: ["laktose", "lactose", "milchzucker"],
-  nuts: ["nuss", "nüsse", "nüssen", "nougat", "krokant"],
-  nuts_almonds: ["mandel", "mandeln", "mandelmehl", "mandelmasse", "mandelpaste", "marzipan", "persipan", "amaretto"],
-  nuts_hazelnuts: ["haselnuss", "haselnüsse", "haselnussmus", "haselnussmasse", "nougat", "gianduja"],
-  nuts_walnuts: ["walnuss", "walnüsse"],
+  nuts: ["nuss", "nüsse", "nüssen", "nougat", "krokant", "tree nut"],
+  nuts_almonds: [
+    "mandel", "mandeln", "mandelmehl", "mandelmasse", "mandelpaste", "marzipan", "persipan", "amaretto",
+    "almond",
+  ],
+  nuts_hazelnuts: [
+    "haselnuss", "haselnüsse", "haselnussmus", "haselnussmasse", "nougat", "gianduja",
+    "hazelnut",
+  ],
+  nuts_walnuts: ["walnuss", "walnüsse", "walnut"],
   nuts_cashews: ["cashew", "cashews", "cashewkern", "cashewkerne"],
   nuts_pecans: ["pekannuss", "pekannüsse", "pecan"],
-  nuts_brazil: ["paranuss", "paranüsse"],
-  nuts_pistachios: ["pistazie", "pistazien", "pistazienpaste"],
-  nuts_macadamia: ["macadamia"],
-  nuts_pine: ["pinienkern", "pinienkerne"],
-  celery: ["sellerie", "selleriesamen"],
-  mustard: ["senf", "senfkörner", "senfsaat"],
-  sesame: ["sesam", "sesamsamen", "sesamöl", "tahin", "tahini"],
-  sulphites: ["sulfit", "sulfite", "schwefeldioxid", "so2", "so₂"],
+  nuts_brazil: ["paranuss", "paranüsse", "brazil nut"],
+  nuts_pistachios: ["pistazie", "pistazien", "pistazienpaste", "pistachio"],
+  nuts_macadamia: ["macadamia", "queensland"],
+  nuts_pine: ["pinienkern", "pinienkerne", "pine nut"],
+  celery: ["sellerie", "selleriesamen", "celery", "celeriac"],
+  mustard: ["senf", "senfkörner", "senfsaat", "mustard"],
+  sesame: ["sesam", "sesamsamen", "sesamöl", "tahin", "tahini", "sesame"],
+  sulphites: [
+    "sulfit", "sulfite", "schwefeldioxid", "so2", "so₂",
+    "sulphite", "sulfite", "sulphur dioxide",
+  ],
   lupin: ["lupin", "lupine", "lupinen", "lupinenmehl"],
-  molluscs: ["weichtier", "muschel", "muscheln", "tintenfisch", "auster", "austern", "miesmuschel", "schnecke"],
-  alcohol: ["alkohol", "rum", "kirsch", "kirschwasser", "weinbrand", "cognac", "likör", "wein", "bier", "amaretto", "grand marnier"],
+  molluscs: [
+    "weichtier", "muschel", "muscheln", "tintenfisch", "auster", "austern", "miesmuschel", "schnecke",
+    "mollusc", "mollusk", "mussel", "oyster", "squid", "snail", "scallop", "clam",
+  ],
+  alcohol: [
+    "alkohol", "rum", "kirsch", "kirschwasser", "weinbrand", "cognac", "likör", "wein", "bier",
+    "amaretto", "grand marnier",
+    "alcohol", "wine", "beer", "liqueur",
+  ],
   // US-specific
-  shellfish: ["schalentier", "garnele", "garnelen", "krabbe", "krabben", "hummer"],
-  wheat: ["weizen", "weizenmehl", "weizenstärke", "weizengrieß", "weichweizen", "hartweizen"],
+  shellfish: ["schalentier", "garnele", "garnelen", "krabbe", "krabben", "hummer", "shellfish", "shrimp"],
+  wheat: ["weizen", "weizenmehl", "weizenstärke", "weizengrieß", "weichweizen", "hartweizen", "wheat"],
 };
 
 /**
@@ -65,4 +96,22 @@ export function nameMatchesAllergenDe(name: string, allergenId: string): boolean
   if (!keywords || keywords.length === 0) return false;
   const lower = name.toLowerCase();
   return keywords.some((kw) => lower.includes(kw));
+}
+
+/**
+ * Returns true when `label` contains a keyword for ANY known allergen.
+ *
+ * Used to decide visual emphasis on customer-facing ingredient labels
+ * independently of the parent ingredient's `allergens` flag — so an entry
+ * named "Zucker" never bolds even if its parent compound was tagged with
+ * almonds, and "Mandeln" always bolds even if the parent flag is missing.
+ */
+export function containsAllergen(label: string): boolean {
+  const lower = label.toLowerCase();
+  for (const keywords of Object.values(DE_ALLERGEN_KEYWORDS)) {
+    for (const kw of keywords) {
+      if (lower.includes(kw)) return true;
+    }
+  }
+  return false;
 }

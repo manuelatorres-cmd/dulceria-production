@@ -6,6 +6,7 @@ import { useFilling, useFillingIngredients, useIngredients, useFillings, saveFil
 import { calculateFillingNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
 import { buildFillingIngredientList } from "@/lib/ingredientList";
 import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
+import { containsAllergen } from "@/lib/allergenKeywordsDe";
 import { calculateFillingCost, formatCost } from "@/lib/costCalculation";
 import { useCurrencySymbol } from "@/lib/hooks";
 import type { FillingArchiveImpact, FillingDeleteImpact } from "@/lib/hooks";
@@ -1140,7 +1141,7 @@ function FillingNutritionTab({
             {ingredientList.map((entry, i) => (
               <span key={i}>
                 {i > 0 ? ", " : ""}
-                {entry.allergens.length > 0 ? <strong>{entry.label}</strong> : entry.label}
+                {containsAllergen(entry.label) ? <strong>{entry.label}</strong> : entry.label}
               </span>
             ))}
             .

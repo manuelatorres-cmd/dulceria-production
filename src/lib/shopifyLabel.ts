@@ -9,13 +9,14 @@
 
 import type { IngredientListEntry } from "./ingredientList";
 import type { NutritionData, NutrientKey } from "./nutrition";
+import { containsAllergen } from "./allergenKeywordsDe";
 
 /** HTML form: allergens wrapped in <strong>. Use for paste into Shopify
  *  rich-text fields and for `dangerouslySetInnerHTML` previews. */
 export function buildShopifyIngredientHtml(entries: IngredientListEntry[]): string {
   if (entries.length === 0) return "";
   const parts = entries.map((e) =>
-    e.allergens.length > 0
+    containsAllergen(e.label)
       ? `<strong>${escapeHtml(e.label)}</strong>`
       : escapeHtml(e.label),
   );

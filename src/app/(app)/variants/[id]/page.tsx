@@ -39,6 +39,7 @@ import { DENSITY_G_PER_ML } from "@/lib/production";
 import { calculateProductNutrition, calculateVariantNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
 import { buildVariantIngredientList, type ProductIngredientListInput } from "@/lib/ingredientList";
 import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
+import { containsAllergen } from "@/lib/allergenKeywordsDe";
 import { ArrowLeft, Plus, Search, X, Trash2, Pencil, Copy, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
@@ -2131,7 +2132,7 @@ function VariantNutritionSection({ productIds }: { productIds: string[] }) {
             {ingredientList.map((entry, i) => (
               <span key={i}>
                 {i > 0 ? ", " : ""}
-                {entry.allergens.length > 0 ? <strong>{entry.label}</strong> : entry.label}
+                {containsAllergen(entry.label) ? <strong>{entry.label}</strong> : entry.label}
               </span>
             ))}
             .
