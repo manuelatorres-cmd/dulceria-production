@@ -141,25 +141,24 @@ export function ProductGroupedChecklist({
                       >
                         <span className="w-4 flex-shrink-0" />
                         {infoOnly ? (
-                          <button
-                            type="button"
-                            onClick={() => onToggle(row.planId)}
-                            title="Filling Prep is informational — cook in /plan/fillings"
-                            className={
-                              "flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase " +
-                              (row.done
-                                ? "bg-status-ok/15 text-status-ok"
-                                : "bg-status-alert/15 text-status-alert")
-                            }
-                            style={{ letterSpacing: "0.06em" }}
+                          // Pure info — no checkbox, no button. Just a
+                          // tiny status dot the operator scans for
+                          // green/red. Click bubbles to the row-body
+                          // button below so the parent's onToggle can
+                          // route to the weekly cook view.
+                          <span
+                            className="flex-shrink-0 inline-flex items-center justify-center"
+                            title={row.done ? (doneLabel ?? "ready") : (notDoneLabel ?? "not ready")}
+                            style={{ width: 12, height: 12 }}
                           >
-                            {row.done ? (
-                              <CheckSquare className="w-3 h-3" />
-                            ) : (
-                              <Square className="w-3 h-3" />
-                            )}
-                            {row.done ? (doneLabel ?? "ready") : (notDoneLabel ?? "not ready")}
-                          </button>
+                            <span
+                              className="inline-block rounded-full"
+                              style={{
+                                width: 10, height: 10,
+                                background: row.done ? "#4a7a5e" : "#9b4f48",
+                              }}
+                            />
+                          </span>
                         ) : (
                           <button
                             type="button"

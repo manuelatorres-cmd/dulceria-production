@@ -1593,17 +1593,41 @@ export default function DailyV2Page() {
                               {sel.batchLabel} · {sel.qty} × {sel.mouldName}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={async () => { await toggleRow(sel.planId); }}
-                            className="text-[11.5px] px-3 py-1.5 rounded-full"
-                            style={{
-                              background: sel.done ? "rgba(74,122,94,0.15)" : tint.ink,
-                              color: sel.done ? "#4a7a5e" : "#fff",
-                            }}
-                          >
-                            {sel.done ? "✓ done — undo" : `Mark ${activeLabel.toLowerCase()} done`}
-                          </button>
+                          {activePhase === "filling" ? (
+                            // Filling Prep is read-only — readiness
+                            // comes from filling stock. Show a status
+                            // pill instead of a Mark-done button.
+                            (() => {
+                              const ready = isFillingReadyForPlan(sel.planId);
+                              return (
+                                <span
+                                  className="text-[11.5px] px-3 py-1.5 rounded-full inline-flex items-center gap-1.5"
+                                  style={{
+                                    background: ready ? "rgba(74,122,94,0.15)" : "rgba(155,79,72,0.15)",
+                                    color: ready ? "#4a7a5e" : "#9b4f48",
+                                  }}
+                                >
+                                  <span
+                                    className="inline-block rounded-full"
+                                    style={{ width: 8, height: 8, background: ready ? "#4a7a5e" : "#9b4f48" }}
+                                  />
+                                  {ready ? "Filling ready" : "Cook in /plan/fillings"}
+                                </span>
+                              );
+                            })()
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={async () => { await toggleRow(sel.planId); }}
+                              className="text-[11.5px] px-3 py-1.5 rounded-full"
+                              style={{
+                                background: sel.done ? "rgba(74,122,94,0.15)" : tint.ink,
+                                color: sel.done ? "#4a7a5e" : "#fff",
+                              }}
+                            >
+                              {sel.done ? "✓ done — undo" : `Mark ${activeLabel.toLowerCase()} done`}
+                            </button>
+                          )}
                         </div>
                         <p className="text-[10px] uppercase opacity-60 mb-1.5" style={{ letterSpacing: "0.1em" }}>
                           {activeLabel} steps
