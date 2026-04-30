@@ -280,7 +280,15 @@ export default function FillingConsolidationPage() {
               </h2>
             </div>
             <ul className="space-y-2">
-              {result.needs.map((need) => {
+              {[...result.needs].sort((a, b) => {
+                // Done (or covered — nothing to cook) sinks to the
+                // bottom. Within each group, alphabetical by name so
+                // the operator scans the same order every time.
+                const aDone = a.toCookBufferedG === 0;
+                const bDone = b.toCookBufferedG === 0;
+                if (aDone !== bDone) return Number(aDone) - Number(bDone);
+                return a.fillingName.localeCompare(b.fillingName);
+              }).map((need) => {
                 const isOpen = expanded.has(need.fillingId);
                 const cookBy = need.cookByDate.toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" });
                 const deadline = need.earliestDeadline.toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" });
