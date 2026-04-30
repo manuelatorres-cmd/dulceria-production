@@ -321,9 +321,16 @@ export default function DailyV2Page() {
   }, [todayPlanProducts, plansById, productById, doneByPlan, activePhase]);
 
   async function toggleRow(planId: string) {
-    // Read with prefix-aware helper so the "currently done" branch
-    // matches what the operator sees in the UI even when the wizard
-    // wrote a per-product key (e.g. "polishing-<planProductId>").
+    // Unmould (and packing for orders linked via packaging) need
+    // side-effects this page can't run inline — yield capture, the
+    // allocation split modal, packaging consumption. Redirect to the
+    // wizard for those phases instead of silently ticking the step;
+    // ticking unmould without an allocation split is what dropped 76
+    // hazelnut into shop stock untagged earlier today.
+    if (activePhase === "unmould" || activePhase === "packing") {
+      window.location.href = `/production/${encodeURIComponent(planId)}`;
+      return;
+    }
     const currentlyDone = planPhaseDone(planId, activePhase);
     await toggleStep(planId, activePhase, !currentlyDone);
   }
@@ -754,6 +761,16 @@ export default function DailyV2Page() {
   //    behaviour) so the prefix-aware reads pick it up everywhere.
   const [bulkBusy, setBulkBusy] = useState(false);
   async function toggleAllForPhase() {
+    // Unmould + packing carry side-effects (yield, allocation split,
+    // packaging consumption) that need the wizard. Block bulk-tick
+    // for those phases.
+    if (activePhase === "unmould" || activePhase === "packing") {
+      alert(
+        `${activeLabel} needs yield + allocation per batch.\n\n` +
+        `Open each batch in the wizard from the right pane to record actual yield and split between orders / POs / surplus.`,
+      );
+      return;
+    }
     setBulkBusy(true);
     try {
       const planIdsForPhase: string[] = [];
