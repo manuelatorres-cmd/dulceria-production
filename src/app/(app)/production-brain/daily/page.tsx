@@ -310,20 +310,32 @@ export default function DailyV2Page() {
   //    cooks the whole batch via /plan/fillings (the weekly cook
   //    view). Treat filling as ready when every required filling for
   //    the plan's products has a fillingStock row with > 0 g left.
+  // Effective filling id: collapses every versioned fork onto its
+  // rootId so a productFilling pointing at v1 still finds stock that
+  // was cooked against v2 (and vice versa). Without this, the
+  // readiness flag stayed red even when the operator had cooked the
+  // current version into stock.
+  function effectiveFillingId(fillingId: string): string {
+    const f = fillings.find((x) => x.id === fillingId);
+    return f?.rootId ?? fillingId;
+  }
   const fillingStockByFilling = useMemo(() => {
     const m = new Map<string, number>();
     for (const fs of allFillingStock) {
-      m.set(fs.fillingId, (m.get(fs.fillingId) ?? 0) + Number(fs.remainingG ?? 0));
+      const key = effectiveFillingId(fs.fillingId);
+      m.set(key, (m.get(key) ?? 0) + Number(fs.remainingG ?? 0));
     }
     return m;
-  }, [allFillingStock]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allFillingStock, fillings]);
   function isFillingReadyForPlan(planId: string): boolean {
     const pps = todayPlanProducts.filter((pp) => pp.planId === planId);
     if (pps.length === 0) return true;
     for (const pp of pps) {
       const layers = productFillingsByProduct.get(pp.productId) ?? [];
       for (const layer of layers) {
-        const have = fillingStockByFilling.get(layer.fillingId) ?? 0;
+        const key = effectiveFillingId(layer.fillingId);
+        const have = fillingStockByFilling.get(key) ?? 0;
         if (have <= 0) return false;
       }
     }
