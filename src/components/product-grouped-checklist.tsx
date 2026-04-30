@@ -36,6 +36,9 @@ export function ProductGroupedChecklist({
   onToggle,
   onSelect,
   selectedPlanProductId,
+  infoOnly,
+  doneLabel,
+  notDoneLabel,
 }: {
   rows: ChecklistRow[];
   tintInk: string;
@@ -44,6 +47,15 @@ export function ProductGroupedChecklist({
    *  Tick + checkbox stay as the toggle target. */
   onSelect?: (row: ChecklistRow) => void;
   selectedPlanProductId?: string;
+  /** When true, the row's checkbox is replaced with a non-clickable
+   *  status pill — for phases where readiness is derived from stock
+   *  (filling prep), not from an explicit tick. Click on the pill or
+   *  row body still routes through `onToggle` so the parent can show
+   *  an info alert / redirect. */
+  infoOnly?: boolean;
+  /** Pill text in infoOnly mode. Defaults: "ready" / "not ready". */
+  doneLabel?: string;
+  notDoneLabel?: string;
 }) {
   // Build groups keyed by productId, preserving incoming order within
   // a group so done items can stay below pending ones.
@@ -128,18 +140,40 @@ export function ProductGroupedChecklist({
                         style={isSelected ? { color: tintInk } : undefined}
                       >
                         <span className="w-4 flex-shrink-0" />
-                        <button
-                          type="button"
-                          onClick={() => onToggle(row.planId)}
-                          title={row.done ? "Mark not done" : "Mark done"}
-                          className="flex-shrink-0 hover:scale-110 transition"
-                        >
-                          {row.done ? (
-                            <CheckSquare className="w-[18px] h-[18px]" style={{ color: "#4a7a5e" }} />
-                          ) : (
-                            <Square className="w-[18px] h-[18px]" style={{ color: tintInk }} />
-                          )}
-                        </button>
+                        {infoOnly ? (
+                          <button
+                            type="button"
+                            onClick={() => onToggle(row.planId)}
+                            title="Filling Prep is informational — cook in /plan/fillings"
+                            className={
+                              "flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase " +
+                              (row.done
+                                ? "bg-status-ok/15 text-status-ok"
+                                : "bg-status-alert/15 text-status-alert")
+                            }
+                            style={{ letterSpacing: "0.06em" }}
+                          >
+                            {row.done ? (
+                              <CheckSquare className="w-3 h-3" />
+                            ) : (
+                              <Square className="w-3 h-3" />
+                            )}
+                            {row.done ? (doneLabel ?? "ready") : (notDoneLabel ?? "not ready")}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onToggle(row.planId)}
+                            title={row.done ? "Mark not done" : "Mark done"}
+                            className="flex-shrink-0 hover:scale-110 transition"
+                          >
+                            {row.done ? (
+                              <CheckSquare className="w-[18px] h-[18px]" style={{ color: "#4a7a5e" }} />
+                            ) : (
+                              <Square className="w-[18px] h-[18px]" style={{ color: tintInk }} />
+                            )}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {

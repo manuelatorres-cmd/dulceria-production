@@ -1356,6 +1356,9 @@ export default function DailyV2Page() {
                     onSelect={(row) => {
                       setSelectedPlanProductId((cur) => cur === row.planProductId ? null : row.planProductId);
                     }}
+                    infoOnly={activePhase === "filling"}
+                    doneLabel="filling ready"
+                    notDoneLabel="cook in weekly"
                   />
                 </div>
                 <div
