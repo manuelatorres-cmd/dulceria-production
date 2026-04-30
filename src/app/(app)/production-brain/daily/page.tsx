@@ -149,6 +149,15 @@ export default function DailyV2Page() {
 
   const plansById = useMemo(() => new Map(plans.map((p) => [p.id!, p])), [plans]);
   const productById = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
+  // Lookup maps used by the filling-readiness helpers below — pulled
+  // up here so the checklist memo (which calls those helpers) doesn't
+  // hit a temporal-dead-zone ReferenceError when filling phase is
+  // active. The duplicate declarations later in the file have been
+  // removed.
+  const mouldById = useMemo(() => new Map(moulds.map((m) => [m.id!, m])), [moulds]);
+  const fillingById = useMemo(() => new Map(fillings.map((f) => [f.id!, f])), [fillings]);
+  const materialById = useMemo(() => new Map(materials.map((m) => [m.id!, m])), [materials]);
+  const ingredientByIdLocal = useMemo(() => new Map(ingredients.map((i) => [i.id!, i])), [ingredients]);
   void campaigns;
 
   const todayPlanProducts = useMemo(
@@ -634,14 +643,19 @@ export default function DailyV2Page() {
     // are simple boolean toggles on planStepStatus.
     if (activePhase === "unmould") {
       const currentlyDone = planPhaseDone(planId, activePhase);
+      console.log(`[daily] unmould click planId=${planId} currentlyDone=${currentlyDone}`);
       if (currentlyDone) {
-        // Already done — second click acts as undo: just clear the
-        // step status. Stock movements stay (their idempotency keys
-        // mean they won't double-fire on a second unmould).
         await toggleStep(planId, activePhase, false);
         return;
       }
+      const planPhases = phasesByPlan.get(planId);
+      const doneSet = doneByPlan.get(planId);
+      console.log(
+        `[daily] unmould guard · phasesByPlan=`, planPhases ? [...planPhases] : null,
+        `· doneKeys=`, doneSet ? [...doneSet] : null,
+      );
       const gap = previousPhaseGap(planId, activePhase);
+      console.log(`[daily] unmould guard result:`, gap);
       if (gap) {
         alert(`Can't unmould yet — "${gap.label}" isn't done for this batch.`);
         return;
@@ -739,22 +753,7 @@ export default function DailyV2Page() {
   // Shell, filling list on Filling/Fill, etc. Without this she had
   // to flip into the wizard to look up which colour goes on which
   // mould.
-  const ingredientByIdLocal = useMemo(
-    () => new Map(ingredients.map((i) => [i.id!, i])),
-    [ingredients],
-  );
-  const materialById = useMemo(
-    () => new Map(materials.map((m) => [m.id!, m])),
-    [materials],
-  );
-  const fillingById = useMemo(
-    () => new Map(fillings.map((f) => [f.id!, f])),
-    [fillings],
-  );
-  const mouldById = useMemo(
-    () => new Map(moulds.map((m) => [m.id!, m])),
-    [moulds],
-  );
+  // (Lookup maps moved up above the filling helpers to avoid TDZ.)
 
   type DetailRow = {
     key: string;
