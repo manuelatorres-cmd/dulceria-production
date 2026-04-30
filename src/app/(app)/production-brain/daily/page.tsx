@@ -24,9 +24,23 @@ import {
   useDecorationMaterials,
   useFillings,
   useProductFillingsForProducts,
+  useOrders,
+  useAllOrderItems,
+  useAllOrderPlanLinks,
+  useProductionOrders,
+  useAllProductionOrderItems,
   toggleStep,
+  recordUnmouldIntake,
+  commitAllocationSplit,
   closeProductionDay,
 } from "@/lib/hooks";
+import { YieldModal, type YieldEntry } from "@/components/yield-modal";
+import {
+  AllocationSplitModal,
+  type AllocationSplitOrderRow,
+  type AllocationSplitPoRow,
+  type AllocationSplitResult,
+} from "@/components/allocation-split-modal";
 import { Thermometer, X } from "lucide-react";
 import { ProductGroupedChecklist, type ChecklistRow } from "@/components/product-grouped-checklist";
 import { scheduleColorSteps, type ColorTask } from "@/lib/production";
@@ -99,6 +113,13 @@ export default function DailyV2Page() {
   const productCategories = useProductCategories(true);
   const materials = useDecorationMaterials(true);
   const fillings = useFillings(true);
+  // For inline unmould flow — yield + allocation split happen on this
+  // page now instead of redirecting to the wizard.
+  const allOrders = useOrders();
+  const allOrderItems = useAllOrderItems();
+  const allOrderPlanLinks = useAllOrderPlanLinks();
+  const allProductionOrders = useProductionOrders();
+  const allProductionOrderItems = useAllProductionOrderItems();
 
   // Tick clock every minute for the header.
   const [now, setNow] = useState(() => new Date());
@@ -320,19 +341,191 @@ export default function DailyV2Page() {
     });
   }, [todayPlanProducts, plansById, productById, doneByPlan, activePhase]);
 
+  // ── Inline unmould flow state. Two modals chain: YieldModal first
+  //    (per-product yield/seconds/scrap), then AllocationSplitModal
+  //    (split delivered yield across linked orders + PO items, pick
+  //    surplus destination). Both run inline so the operator never
+  //    has to leave /production-brain/daily.
+  const [unmouldYield, setUnmouldYield] = useState<
+    | { planId: string; entries: YieldEntry[] }
+    | null
+  >(null);
+  const [unmouldAlloc, setUnmouldAlloc] = useState<
+    | {
+        planId: string;
+        totalYield: number;
+        orders: AllocationSplitOrderRow[];
+        poItems: AllocationSplitPoRow[];
+      }
+    | null
+  >(null);
+
+  function buildYieldEntries(planId: string): YieldEntry[] {
+    const pps = todayPlanProducts.filter((pp) => pp.planId === planId);
+    return pps.map((pp) => {
+      const product = productById.get(pp.productId);
+      const mould = pp.mouldId ? mouldById.get(pp.mouldId) : undefined;
+      const cavities = mould?.numberOfCavities ?? 0;
+      const totalProducts = pp.quantity * cavities;
+      const cat = product?.productCategoryId
+        ? categoryNameById.get(product.productCategoryId)
+        : undefined;
+      // Bonbons don't allow seconds (cosmetic flaws → tasting). Bars
+      // do. Use category name as a heuristic — same rule the wizard
+      // applies.
+      const secondsAllowed = cat ? !/(bonbon|moulded|praline)/i.test(cat) : true;
+      return {
+        planProductId: pp.id ?? `${pp.planId}-${pp.productId}`,
+        productName: product?.name ?? pp.productId.slice(0, 8),
+        totalProducts,
+        yield: totalProducts,
+        seconds: 0,
+        scrap: 0,
+        reason: "",
+        secondsAllowed,
+      };
+    });
+  }
+
+  function buildAllocOrderRows(planId: string): AllocationSplitOrderRow[] {
+    const linksForPlan = allOrderPlanLinks.filter((l) => l.planId === planId);
+    const itemById = new Map(allOrderItems.map((i) => [i.id!, i]));
+    const orderById = new Map(allOrders.map((o) => [o.id!, o]));
+    const rows: AllocationSplitOrderRow[] = [];
+    for (const link of linksForPlan) {
+      const item = itemById.get(link.orderItemId);
+      if (!item) continue;
+      const order = orderById.get(item.orderId);
+      if (!order) continue;
+      rows.push({
+        orderPlanLinkId: link.id!,
+        orderId: order.id!,
+        orderLabel: order.customerName || order.eventName || order.sourceRef || "order",
+        requested: link.allocatedQuantity,
+      });
+    }
+    return rows;
+  }
+
+  function buildAllocPoRows(planId: string): AllocationSplitPoRow[] {
+    const plan = plansById.get(planId);
+    if (!plan) return [];
+    const name = plan.name ?? "";
+    if (!name.startsWith("PO: ")) return [];
+    const rest = name.slice("PO: ".length);
+    const dash = rest.indexOf(" — ");
+    const poName = dash > 0 ? rest.slice(0, dash) : rest;
+    const matchingPos = allProductionOrders.filter((po) => {
+      if (po.status !== "pending" && po.status !== "in_production") return false;
+      return (po.name ?? "") === poName;
+    });
+    if (matchingPos.length === 0) return [];
+    const planProductIds = new Set(
+      todayPlanProducts.filter((pp) => pp.planId === planId).map((pp) => pp.productId),
+    );
+    const rows: AllocationSplitPoRow[] = [];
+    for (const po of matchingPos) {
+      const items = allProductionOrderItems.filter((it) => it.productionOrderId === po.id);
+      for (const it of items) {
+        if (!planProductIds.has(it.productId)) continue;
+        rows.push({
+          productionOrderItemId: it.id!,
+          productionOrderId: po.id!,
+          productId: it.productId,
+          poLabel: po.name ?? "PO",
+          requested: it.targetUnits,
+        });
+      }
+    }
+    return rows;
+  }
+
   async function toggleRow(planId: string) {
-    // Unmould (and packing for orders linked via packaging) need
-    // side-effects this page can't run inline — yield capture, the
-    // allocation split modal, packaging consumption. Redirect to the
-    // wizard for those phases instead of silently ticking the step;
-    // ticking unmould without an allocation split is what dropped 76
-    // hazelnut into shop stock untagged earlier today.
-    if (activePhase === "unmould" || activePhase === "packing") {
+    // Unmould opens the inline yield + allocation flow. Other phases
+    // are simple boolean toggles on planStepStatus.
+    if (activePhase === "unmould") {
+      const currentlyDone = planPhaseDone(planId, activePhase);
+      if (currentlyDone) {
+        // Already done — second click acts as undo: just clear the
+        // step status. Stock movements stay (their idempotency keys
+        // mean they won't double-fire on a second unmould).
+        await toggleStep(planId, activePhase, false);
+        return;
+      }
+      const entries = buildYieldEntries(planId);
+      if (entries.length === 0) {
+        // No plan-products → nothing to record. Just tick.
+        await toggleStep(planId, activePhase, true);
+        return;
+      }
+      setUnmouldYield({ planId, entries });
+      return;
+    }
+    if (activePhase === "packing") {
       window.location.href = `/production/${encodeURIComponent(planId)}`;
       return;
     }
     const currentlyDone = planPhaseDone(planId, activePhase);
     await toggleStep(planId, activePhase, !currentlyDone);
+  }
+
+  async function applyUnmouldYield(yieldEntries: YieldEntry[]) {
+    if (!unmouldYield) return;
+    const planId = unmouldYield.planId;
+    try {
+      // Land the yield: each entry → recordUnmouldIntake (writes
+      // production-storage stock + waste log for shortfall).
+      let totalYield = 0;
+      for (const e of yieldEntries) {
+        const pp = todayPlanProducts.find((p) => (p.id ?? `${p.planId}-${p.productId}`) === e.planProductId);
+        if (!pp) continue;
+        const reasonParts = [
+          e.seconds && e.seconds > 0 ? `${e.seconds} seconds` : null,
+          e.scrap && e.scrap > 0 ? `${e.scrap} scrap` : null,
+          e.reason?.trim() || null,
+        ].filter(Boolean);
+        await recordUnmouldIntake({
+          planProductId: e.planProductId,
+          productId: pp.productId,
+          actualYield: e.yield,
+          planned: e.totalProducts,
+          reason: reasonParts.length > 0 ? reasonParts.join(" · ") : undefined,
+        });
+        totalYield += e.yield;
+      }
+      // Build allocation rows; if none (no orders/POs linked), skip
+      // the split modal and tick unmould done immediately.
+      const orderRows = buildAllocOrderRows(planId);
+      const poRows = buildAllocPoRows(planId);
+      setUnmouldYield(null);
+      if (orderRows.length === 0 && poRows.length === 0) {
+        await toggleStep(planId, "unmould", true);
+        return;
+      }
+      setUnmouldAlloc({ planId, totalYield, orders: orderRows, poItems: poRows });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Yield save failed");
+      setUnmouldYield(null);
+    }
+  }
+
+  async function applyUnmouldAlloc(result: AllocationSplitResult) {
+    if (!unmouldAlloc) return;
+    const planId = unmouldAlloc.planId;
+    try {
+      await commitAllocationSplit({
+        planId,
+        perLink: result.perLink,
+        perPo: result.perPo,
+        surplus: result.surplus,
+        surplusDestination: result.surplusDestination,
+      });
+      await toggleStep(planId, "unmould", true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Allocation save failed");
+    } finally {
+      setUnmouldAlloc(null);
+    }
   }
 
   const activeLabel = PHASES.find((p) => p.id === activePhase)!.label;
@@ -761,13 +954,12 @@ export default function DailyV2Page() {
   //    behaviour) so the prefix-aware reads pick it up everywhere.
   const [bulkBusy, setBulkBusy] = useState(false);
   async function toggleAllForPhase() {
-    // Unmould + packing carry side-effects (yield, allocation split,
-    // packaging consumption) that need the wizard. Block bulk-tick
-    // for those phases.
+    // Bulk-tick is meaningless for phases with per-batch side-effects
+    // (yield + allocation split for unmould, packaging consumption for
+    // packing). Operator clicks each row instead.
     if (activePhase === "unmould" || activePhase === "packing") {
       alert(
-        `${activeLabel} needs yield + allocation per batch.\n\n` +
-        `Open each batch in the wizard from the right pane to record actual yield and split between orders / POs / surplus.`,
+        `${activeLabel} runs per batch — click each row's checkbox to capture yield and split between orders / POs / surplus.`,
       );
       return;
     }
@@ -1522,6 +1714,25 @@ export default function DailyV2Page() {
       </div>
 
       {tempOpen && null /* reserved */}
+
+      {/* Inline unmould flow — yield first, then allocation split. */}
+      {unmouldYield && (
+        <YieldModal
+          entries={unmouldYield.entries}
+          mode={unmouldYield.entries.length === 1 ? "single" : "batch"}
+          onConfirm={(e) => applyUnmouldYield(e)}
+          onCancel={() => setUnmouldYield(null)}
+        />
+      )}
+      {unmouldAlloc && (
+        <AllocationSplitModal
+          totalYield={unmouldAlloc.totalYield}
+          orders={unmouldAlloc.orders}
+          poItems={unmouldAlloc.poItems}
+          onConfirm={applyUnmouldAlloc}
+          onCancel={() => setUnmouldAlloc(null)}
+        />
+      )}
     </div>
   );
 }
