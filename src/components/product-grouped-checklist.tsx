@@ -25,7 +25,10 @@ export interface ChecklistRow {
   chip?: string;
 }
 
-const DEFAULT_EXPAND_THRESHOLD = 5;
+// Always start collapsed. Manuela's working a busy phase doesn't
+// want a wall of pre-expanded product groups — she opens the one
+// she's about to do and leaves the others tucked away.
+const DEFAULT_EXPAND_THRESHOLD = 0;
 
 export function ProductGroupedChecklist({
   rows,
