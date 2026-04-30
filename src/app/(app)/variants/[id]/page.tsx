@@ -38,6 +38,7 @@ import { deriveShellPercentageFromGrams } from "@/lib/costCalculation";
 import { DENSITY_G_PER_ML } from "@/lib/production";
 import { calculateProductNutrition, calculateVariantNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
 import { buildVariantIngredientList, type ProductIngredientListInput } from "@/lib/ingredientList";
+import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
 import { ArrowLeft, Plus, Search, X, Trash2, Pencil, Copy, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
@@ -2138,6 +2139,7 @@ function VariantNutritionSection({ productIds }: { productIds: string[] }) {
         ) : (
           <p className="text-sm text-muted-foreground">No ingredients yet.</p>
         )}
+        <ShopifyFormatBlock entries={ingredientList} per100g={per100g} />
       </div>
     </section>
   );

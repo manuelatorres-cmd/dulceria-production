@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useFilling, useFillingIngredients, useIngredients, useFillings, saveFilling, deleteFilling, deleteFillingWithCleanup, archiveFillingWithCleanup, unarchiveFilling, updateFillingAllergens, useFillingUsage, reorderFillingIngredients, useFillingVersionHistory, forkFillingVersion, getFillingForkImpact, getFillingDeleteImpact, hasProductBeenProduced, hasFillingBeenProduced, getFillingArchiveImpact, useProductsList, saveProduct, addFillingToProduct, duplicateFilling, useAllFillingStatuses, useMarketRegion } from "@/lib/hooks";
 import { calculateFillingNutrition, getNutrientsByMarket, getNutritionPanelTitle, formatNutrientValue } from "@/lib/nutrition";
 import { buildFillingIngredientList } from "@/lib/ingredientList";
+import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
 import { calculateFillingCost, formatCost } from "@/lib/costCalculation";
 import { useCurrencySymbol } from "@/lib/hooks";
 import type { FillingArchiveImpact, FillingDeleteImpact } from "@/lib/hooks";
@@ -1147,6 +1148,7 @@ function FillingNutritionTab({
         ) : (
           <p className="text-sm text-muted-foreground">No ingredients yet.</p>
         )}
+        <ShopifyFormatBlock entries={ingredientList} per100g={per100g} />
       </div>
     </div>
   );
