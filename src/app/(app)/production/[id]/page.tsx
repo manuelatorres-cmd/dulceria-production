@@ -14,6 +14,7 @@ import {
   useAllProductionDayLineItems, useProductionDays, useProductionSteps,
   deductShellForPlanProduct, prepareFillingForBatch, consumeFillingStockForPlanProduct,
   consumeProductStockForPacking, commitAllocationSplit,
+  useProductionOrders, useAllProductionOrderItems,
 } from "@/lib/hooks";
 import { PackingModal } from "@/components/packing-modal";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
@@ -25,6 +26,7 @@ import type { YieldEntry } from "@/components/yield-modal";
 import {
   AllocationSplitModal,
   type AllocationSplitOrderRow,
+  type AllocationSplitPoRow,
   type AllocationSplitResult,
 } from "@/components/allocation-split-modal";
 import { LeftoverModal } from "@/components/leftover-modal";
@@ -243,6 +245,8 @@ function PlanContent({
   const planLinks = useLinksForPlan(planId);
   const allOrders = useOrders();
   const allOrderItems = useAllOrderItems();
+  const allProductionOrders = useProductionOrders();
+  const allProductionOrderItems = useAllProductionOrderItems();
   const linkedOrders = useMemo(() => {
     if (planLinks.length === 0) return [] as Array<{ orderId: string; label: string; allocatedQuantity: number }>;
     const itemById = new Map(allOrderItems.map((oi) => [oi.id!, oi]));
@@ -1424,10 +1428,12 @@ function PlanContent({
         <AllocationSplitModal
           totalYield={splitModal.totalYield}
           orders={buildSplitOrderRows(planLinks, allOrderItems, allOrders)}
+          poItems={buildSplitPoRows(plan, planProducts, allProductionOrders, allProductionOrderItems)}
           onConfirm={async (result: AllocationSplitResult) => {
             await commitAllocationSplit({
               planId: plan.id!,
               perLink: result.perLink,
+              perPo: result.perPo,
               surplus: result.surplus,
               surplusDestination: result.surplusDestination,
             });
@@ -1566,6 +1572,46 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
 }
 
 // ─── Allocation-split helpers ───────────────────────────────────────
+
+/** Build the PO rows for the AllocationSplitModal. Walks the plan's
+ *  name pattern (`PO: <po name> — <product>`) to find which PO this
+ *  plan was seeded for, then includes every productionOrderItem whose
+ *  product matches one of the plan's planProducts. Lets Maca-style
+ *  POs reserve their own pieces at unmould instead of having every
+ *  yield silently dumped into shop stock. */
+function buildSplitPoRows(
+  plan: import("@/types").ProductionPlan,
+  planProducts: import("@/types").PlanProduct[],
+  productionOrders: import("@/types").ProductionOrder[],
+  productionOrderItems: import("@/types").ProductionOrderItem[],
+): AllocationSplitPoRow[] {
+  const name = plan.name ?? "";
+  if (!name.startsWith("PO: ")) return [];
+  const rest = name.slice("PO: ".length);
+  const dash = rest.indexOf(" — ");
+  const poName = dash > 0 ? rest.slice(0, dash) : rest;
+  const matchingPos = productionOrders.filter((po) => {
+    if (po.status !== "pending" && po.status !== "in_production") return false;
+    return (po.name ?? "") === poName;
+  });
+  if (matchingPos.length === 0) return [];
+  const planProductIds = new Set(planProducts.map((pp) => pp.productId));
+  const rows: AllocationSplitPoRow[] = [];
+  for (const po of matchingPos) {
+    const items = productionOrderItems.filter((it) => it.productionOrderId === po.id);
+    for (const it of items) {
+      if (!planProductIds.has(it.productId)) continue;
+      rows.push({
+        productionOrderItemId: it.id!,
+        productionOrderId: po.id!,
+        productId: it.productId,
+        poLabel: `${po.name ?? "PO"}`,
+        requested: it.targetUnits,
+      });
+    }
+  }
+  return rows;
+}
 
 /** Build the row data the AllocationSplitModal renders: one entry per
  *  orderPlanLink, with the order label derived through the line. */

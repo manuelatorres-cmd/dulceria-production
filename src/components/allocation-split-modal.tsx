@@ -12,8 +12,22 @@ export interface AllocationSplitOrderRow {
   requested: number;    // current allocatedQuantity on the link
 }
 
+export interface AllocationSplitPoRow {
+  productionOrderItemId: string;
+  productionOrderId: string;
+  productId: string;
+  poLabel: string;      // "PO Maca · Hazelnut Crunch"
+  requested: number;    // targetUnits on the PO item
+}
+
 export interface AllocationSplitResult {
   perLink: Array<{ orderPlanLinkId: string; delivered: number }>;
+  perPo?: Array<{
+    productionOrderItemId: string;
+    productionOrderId: string;
+    productId: string;
+    delivered: number;
+  }>;
   surplus: number;
   surplusDestination?: SurplusDestination;
 }
@@ -45,38 +59,48 @@ export interface AllocationSplitResult {
  *     captures intent only.)
  */
 export function AllocationSplitModal({
-  totalYield, orders, onConfirm, onCancel,
+  totalYield, orders, poItems = [], onConfirm, onCancel,
 }: {
   totalYield: number;
   orders: AllocationSplitOrderRow[];
+  poItems?: AllocationSplitPoRow[];
   onConfirm: (result: AllocationSplitResult) => void | Promise<void>;
   onCancel: () => void;
 }) {
+  // Treat order rows + PO rows uniformly inside the splitter — each
+  // gets its own delivered count, plus a kind discriminator so the
+  // confirm result can route to the right tagging path.
+  type AnyRow =
+    | { kind: "order"; key: string; row: AllocationSplitOrderRow }
+    | { kind: "po"; key: string; row: AllocationSplitPoRow };
+  const allRows = useMemo<AnyRow[]>(() => [
+    ...orders.map((o) => ({ kind: "order" as const, key: `o:${o.orderPlanLinkId}`, row: o })),
+    ...poItems.map((p) => ({ kind: "po" as const, key: `p:${p.productionOrderItemId}`, row: p })),
+  ], [orders, poItems]);
+
   const totalRequested = useMemo(
-    () => orders.reduce((s, o) => s + o.requested, 0),
-    [orders],
+    () => allRows.reduce((s, r) => s + r.row.requested, 0),
+    [allRows],
   );
   const shortfallMode = totalYield < totalRequested;
 
   const [delivered, setDelivered] = useState<Record<string, number>>(() => {
     const out: Record<string, number> = {};
     if (!shortfallMode) {
-      // Every order fully satisfied; rest goes to surplus.
-      for (const o of orders) out[o.orderPlanLinkId] = o.requested;
+      for (const r of allRows) out[r.key] = r.row.requested;
     } else if (totalRequested > 0) {
-      // Pro-rata shrink so the initial split equals totalYield.
       let remaining = totalYield;
-      for (let i = 0; i < orders.length; i++) {
-        const o = orders[i];
-        const share = i === orders.length - 1
+      for (let i = 0; i < allRows.length; i++) {
+        const r = allRows[i];
+        const share = i === allRows.length - 1
           ? remaining
-          : Math.round(totalYield * (o.requested / totalRequested));
-        const clamped = Math.max(0, Math.min(share, o.requested));
-        out[o.orderPlanLinkId] = clamped;
+          : Math.round(totalYield * (r.row.requested / totalRequested));
+        const clamped = Math.max(0, Math.min(share, r.row.requested));
+        out[r.key] = clamped;
         remaining -= clamped;
       }
     } else {
-      for (const o of orders) out[o.orderPlanLinkId] = 0;
+      for (const r of allRows) out[r.key] = 0;
     }
     return out;
   });
@@ -107,10 +131,10 @@ export function AllocationSplitModal({
   const isOverproduction = totalYield > totalRequested;
   const overproductionAmount = Math.max(0, totalYield - totalRequested);
 
-  function setFor(linkId: string, value: number) {
+  function setFor(key: string, value: number) {
     setDelivered((prev) => ({
       ...prev,
-      [linkId]: Math.max(0, Math.min(value, totalYield)),
+      [key]: Math.max(0, Math.min(value, totalYield)),
     }));
   }
 
@@ -119,8 +143,16 @@ export function AllocationSplitModal({
     onConfirm({
       perLink: orders.map((o) => ({
         orderPlanLinkId: o.orderPlanLinkId,
-        delivered: delivered[o.orderPlanLinkId] ?? 0,
+        delivered: delivered[`o:${o.orderPlanLinkId}`] ?? 0,
       })),
+      perPo: poItems.length > 0
+        ? poItems.map((p) => ({
+            productionOrderItemId: p.productionOrderItemId,
+            productionOrderId: p.productionOrderId,
+            productId: p.productId,
+            delivered: delivered[`p:${p.productionOrderItemId}`] ?? 0,
+          }))
+        : undefined,
       surplus,
       surplusDestination: surplus > 0 ? surplusDestination : undefined,
     });
@@ -159,21 +191,33 @@ export function AllocationSplitModal({
         </div>
 
         <ul className="px-5 py-3 space-y-3 max-h-72 overflow-y-auto">
-          {orders.map((o) => {
-            const v = delivered[o.orderPlanLinkId] ?? 0;
-            const short = v < o.requested;
+          {allRows.map((r) => {
+            const v = delivered[r.key] ?? 0;
+            const short = v < r.row.requested;
+            const label = r.kind === "order" ? r.row.orderLabel : r.row.poLabel;
+            const tagText = r.kind === "order" ? "ORDER" : "PO";
+            const tagBg = r.kind === "order" ? "rgba(43,108,176,0.15)" : "rgba(110,43,50,0.15)";
+            const tagInk = r.kind === "order" ? "#2b6cb0" : "#6e2b32";
             return (
-              <li key={o.orderPlanLinkId} className="space-y-1">
+              <li key={r.key} className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium truncate">{o.orderLabel}</span>
+                  <span className="text-sm font-medium truncate flex items-center gap-1.5">
+                    <span
+                      className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm"
+                      style={{ background: tagBg, color: tagInk, letterSpacing: "0.08em" }}
+                    >
+                      {tagText}
+                    </span>
+                    <span className="truncate">{label}</span>
+                  </span>
                   <span className="text-[11px] text-muted-foreground tabular-nums">
-                    requested {o.requested}
+                    requested {r.row.requested}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setFor(o.orderPlanLinkId, v - 1)}
+                    onClick={() => setFor(r.key, v - 1)}
                     className="w-7 h-7 rounded-sm border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
                   >
                     &minus;
@@ -185,13 +229,13 @@ export function AllocationSplitModal({
                     value={v}
                     onChange={(e) => {
                       const n = parseInt(e.target.value, 10);
-                      setFor(o.orderPlanLinkId, isNaN(n) ? 0 : n);
+                      setFor(r.key, isNaN(n) ? 0 : n);
                     }}
                     className="flex-1 h-8 rounded-md border border-border bg-card text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
                     type="button"
-                    onClick={() => setFor(o.orderPlanLinkId, v + 1)}
+                    onClick={() => setFor(r.key, v + 1)}
                     className="w-7 h-7 rounded-sm border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
                   >
                     +
@@ -200,7 +244,7 @@ export function AllocationSplitModal({
                 {short && (
                   <p className="text-[11px] text-status-warn flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
-                    Falls {o.requested - v} short of the commitment to this order.
+                    Falls {r.row.requested - v} short of the commitment.
                   </p>
                 )}
               </li>

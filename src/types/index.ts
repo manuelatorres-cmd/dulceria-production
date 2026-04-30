@@ -2174,8 +2174,10 @@ export interface StockLocationRow {
   id?: string;
   planProductId: string;
   location: StockLocation;
-  /** Only set when location === 'allocated'. */
+  /** Only set when location === 'allocated' AND it's a customer-order reservation. */
   orderId?: string;
+  /** Only set when location === 'allocated' AND it's a PO-driven reservation. */
+  productionOrderId?: string;
   quantity: number;
   updatedAt: Date;
 }
@@ -2190,6 +2192,11 @@ export interface StockMovement {
   toLocation?: StockLocation;
   quantity: number;
   orderId?: string;
+  /** Set when the movement reserves pieces against an internal
+   *  productionOrder (PO Maca, replen bucket etc). Mutually exclusive
+   *  with orderId in practice — a row tags either a customer order
+   *  or a production order, never both. */
+  productionOrderId?: string;
   reason?: StockMovementReason | string;
   movedBy?: string;
   notes?: string;

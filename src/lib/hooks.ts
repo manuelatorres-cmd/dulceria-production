@@ -5216,6 +5216,16 @@ export async function consumeFillingStockForPlanProduct(
 export async function commitAllocationSplit(args: {
   planId: string;
   perLink: Array<{ orderPlanLinkId: string; delivered: number }>;
+  /** PO-driven allocations — each row reserves pieces against a
+   *  productionOrderItem (Maca PO etc). Tagged with productionOrderId
+   *  on stockLocations + stockMovements so the operator can see
+   *  exactly which PO is holding which pieces. */
+  perPo?: Array<{
+    productionOrderItemId: string;
+    productionOrderId: string;
+    productId: string;
+    delivered: number;
+  }>;
   surplus: number;
   surplusDestination?: "store" | "freezer" | "waste";
 }): Promise<void> {
@@ -5293,6 +5303,36 @@ export async function commitAllocationSplit(args: {
       orderId: item.orderId,
       reason: "allocate",
       notes: "Post-unmould allocation to order",
+    });
+  }
+
+  // 4b. PO-driven allocations: same shape as orderPlanLinks but
+  //     tagged with productionOrderId. Idempotent on (planProductId,
+  //     productionOrderId, fromLocation='production').
+  for (const p of args.perPo ?? []) {
+    if (p.delivered <= 0) continue;
+    const pp = planProducts.find((x) => x.productId === p.productId);
+    if (!pp) continue;
+    const existing = assertOk(
+      await supabase
+        .from("stockMovements")
+        .select("id")
+        .eq("planProductId", pp.id!)
+        .eq("productionOrderId", p.productionOrderId)
+        .eq("reason", "allocate")
+        .eq("fromLocation", "production")
+        .limit(1),
+    ) as Array<{ id: string }>;
+    if (existing.length > 0) continue;
+    await transferBatchStock({
+      planProductId: pp.id!,
+      productId: p.productId,
+      fromLocation: "production",
+      toLocation: "allocated",
+      quantity: p.delivered,
+      productionOrderId: p.productionOrderId,
+      reason: "allocate",
+      notes: "Post-unmould allocation to PO",
     });
   }
 
@@ -8846,16 +8886,17 @@ async function upsertStockLocationRow(
   location: StockLocation,
   orderId: string | null,
   delta: number,
+  productionOrderId: string | null = null,
 ): Promise<void> {
   if (delta === 0) return;
-  const q = supabase
+  let q = supabase
     .from("stockLocations")
     .select("*")
     .eq("planProductId", planProductId)
     .eq("location", location);
-  const existing = assertOk(
-    await (orderId == null ? q.is("orderId", null) : q.eq("orderId", orderId)),
-  ) as StockLocationRow[];
+  q = orderId == null ? q.is("orderId", null) : q.eq("orderId", orderId);
+  q = productionOrderId == null ? q.is("productionOrderId", null) : q.eq("productionOrderId", productionOrderId);
+  const existing = assertOk(await q) as StockLocationRow[];
   const current = existing[0];
   const next = Math.max(0, (current?.quantity ?? 0) + delta);
   if (current) {
@@ -8878,6 +8919,7 @@ async function upsertStockLocationRow(
     planProductId,
     location,
     orderId: orderId ?? null,
+    productionOrderId: productionOrderId ?? null,
     quantity: next,
     updatedAt: new Date(),
   });
@@ -8899,8 +8941,12 @@ export interface TransferBatchStockArgs {
   fromLocation: StockLocation;
   toLocation: StockLocation;
   quantity: number;
-  /** Only required when `fromLocation` or `toLocation` is 'allocated'. */
+  /** Only required when `fromLocation` or `toLocation` is 'allocated'
+   *  AND the reservation is a customer order. */
   orderId?: string;
+  /** Only required when `fromLocation` or `toLocation` is 'allocated'
+   *  AND the reservation is a production order (PO/replen/internal). */
+  productionOrderId?: string;
   reason?: StockMovementReason | string;
   movedBy?: string;
   notes?: string;
@@ -8912,8 +8958,10 @@ export async function transferBatchStock(args: TransferBatchStockArgs): Promise<
   if (qty === 0) return;
   const fromOrderId = args.fromLocation === "allocated" ? args.orderId ?? null : null;
   const toOrderId = args.toLocation === "allocated" ? args.orderId ?? null : null;
-  await upsertStockLocationRow(args.planProductId, args.fromLocation, fromOrderId, -qty);
-  await upsertStockLocationRow(args.planProductId, args.toLocation, toOrderId, qty);
+  const fromPoId = args.fromLocation === "allocated" ? args.productionOrderId ?? null : null;
+  const toPoId = args.toLocation === "allocated" ? args.productionOrderId ?? null : null;
+  await upsertStockLocationRow(args.planProductId, args.fromLocation, fromOrderId, -qty, fromPoId);
+  await upsertStockLocationRow(args.planProductId, args.toLocation, toOrderId, qty, toPoId);
   await logStockMovement({
     planProductId: args.planProductId,
     productId: args.productId,
@@ -8921,6 +8969,7 @@ export async function transferBatchStock(args: TransferBatchStockArgs): Promise<
     toLocation: args.toLocation,
     quantity: qty,
     orderId: args.orderId,
+    productionOrderId: args.productionOrderId,
     reason: args.reason ?? "transfer",
     movedBy: args.movedBy,
     notes: args.notes,
