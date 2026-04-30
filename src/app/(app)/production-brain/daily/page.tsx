@@ -440,6 +440,26 @@ export default function DailyV2Page() {
     return rows;
   }
 
+  // Guard: block ticking a phase ON when an earlier phase the plan's
+  // products actually run isn't done yet. Going OUT of order
+  // (capping before unmoulding etc) is always a mistake — usually the
+  // operator clicked the wrong row. Un-ticking (done → not done) is
+  // never blocked.
+  function previousPhaseGap(planId: string, phase: PhaseId): { phase: PhaseId; label: string } | null {
+    const planPhases = phasesByPlan.get(planId);
+    if (!planPhases) return null;
+    const idx = PHASES.findIndex((p) => p.id === phase);
+    if (idx <= 0) return null;
+    for (let i = 0; i < idx; i++) {
+      const prev = PHASES[i];
+      if (!planPhases.has(prev.id)) continue;
+      if (!planPhaseDone(planId, prev.id)) {
+        return { phase: prev.id, label: prev.label };
+      }
+    }
+    return null;
+  }
+
   async function toggleRow(planId: string) {
     // Unmould opens the inline yield + allocation flow. Other phases
     // are simple boolean toggles on planStepStatus.
@@ -450,6 +470,11 @@ export default function DailyV2Page() {
         // step status. Stock movements stay (their idempotency keys
         // mean they won't double-fire on a second unmould).
         await toggleStep(planId, activePhase, false);
+        return;
+      }
+      const gap = previousPhaseGap(planId, activePhase);
+      if (gap) {
+        alert(`Can't unmould yet — "${gap.label}" isn't done for this batch.`);
         return;
       }
       const entries = buildYieldEntries(planId);
@@ -466,6 +491,13 @@ export default function DailyV2Page() {
       return;
     }
     const currentlyDone = planPhaseDone(planId, activePhase);
+    if (!currentlyDone) {
+      const gap = previousPhaseGap(planId, activePhase);
+      if (gap) {
+        alert(`Can't tick "${activeLabel}" yet — "${gap.label}" isn't done for this batch.`);
+        return;
+      }
+    }
     await toggleStep(planId, activePhase, !currentlyDone);
   }
 
@@ -945,6 +977,13 @@ export default function DailyV2Page() {
   }, [colourWorklist, activePhase]);
 
   async function toggleColourTask(stepKey: string, planId: string, currentlyDone: boolean) {
+    if (!currentlyDone) {
+      const gap = previousPhaseGap(planId, "colour");
+      if (gap) {
+        alert(`Can't paint yet — "${gap.label}" isn't done for this batch.`);
+        return;
+      }
+    }
     await toggleStep(planId, stepKey, !currentlyDone);
   }
 
@@ -975,6 +1014,24 @@ export default function DailyV2Page() {
       }
       const allDone = planIdsForPhase.every((pid) => planPhaseDone(pid, activePhase));
       const target = !allDone; // if all done → uncheck; else → check all
+      // When ticking ON, refuse if any batch still has an earlier
+      // phase pending — blocks "tick everything" from running over
+      // half-finished work. Un-tick (target=false) is unconstrained.
+      if (target) {
+        const blocked: Array<{ pid: string; gap: string }> = [];
+        for (const pid of planIdsForPhase) {
+          if (planPhaseDone(pid, activePhase)) continue;
+          const gap = previousPhaseGap(pid, activePhase);
+          if (gap) blocked.push({ pid, gap: gap.label });
+        }
+        if (blocked.length > 0) {
+          alert(
+            `Can't bulk-check ${activeLabel} — ${blocked.length} batch${blocked.length === 1 ? " has" : "es have"} an earlier phase still pending (e.g. ${blocked[0].gap}).\n\n` +
+            `Finish those first or click each batch individually.`,
+          );
+          return;
+        }
+      }
       for (const pid of planIdsForPhase) {
         const isDone = planPhaseDone(pid, activePhase);
         if (isDone === target) continue;
