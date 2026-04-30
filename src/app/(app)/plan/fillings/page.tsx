@@ -9,6 +9,8 @@ import {
   useFillings, useFillingCategories, useCapacityConfig, useFillingStockItems,
   useIngredients, useAllIngredientStock,
   useCampaigns, useProductionOrders, useAllProductionOrderItems,
+  useProductionPlans, useAllPlanProducts, useAllProductionDayLineItems,
+  useProductionDays, useAllOrderPlanLinks,
   saveFillingStock, adjustIngredientStock,
 } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
@@ -114,6 +116,11 @@ export default function FillingConsolidationPage() {
   const campaigns = useCampaigns();
   const productionOrdersForCook = useProductionOrders();
   const productionOrderItemsForCook = useAllProductionOrderItems();
+  const productionPlans = useProductionPlans();
+  const planProducts = useAllPlanProducts();
+  const productionDayLineItems = useAllProductionDayLineItems();
+  const productionDays = useProductionDays(120);
+  const orderPlanLinks = useAllOrderPlanLinks();
   const result = useMemo(() => {
     const windowEnd = new Date();
     windowEnd.setDate(windowEnd.getDate() + windowDays);
@@ -132,8 +139,15 @@ export default function FillingConsolidationPage() {
       campaigns,
       productionOrders: productionOrdersForCook,
       productionOrderItems: productionOrderItemsForCook,
+      // Plan-driven primary source: cook list reflects what the
+      // reconciler actually scheduled, not raw demand × ceiling.
+      productionPlans,
+      planProducts,
+      productionDayLineItems,
+      productionDays,
+      orderPlanLinks,
     });
-  }, [orders, orderItems, products, productFillings, fillingIngredients, fillings, fillingCategories, moulds, stockItems, config?.fillingBufferPercent, windowDays, campaigns, productionOrdersForCook, productionOrderItemsForCook]);
+  }, [orders, orderItems, products, productFillings, fillingIngredients, fillings, fillingCategories, moulds, stockItems, config?.fillingBufferPercent, windowDays, campaigns, productionOrdersForCook, productionOrderItemsForCook, productionPlans, planProducts, productionDayLineItems, productionDays, orderPlanLinks]);
 
   const ingredientById = useMemo(() => new Map(ingredients.map((i) => [i.id!, i])), [ingredients]);
 
