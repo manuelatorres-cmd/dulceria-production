@@ -34,6 +34,7 @@ import {
   recordUnmouldIntake,
   commitAllocationSplit,
   consumeFillingStockForPlanProduct,
+  adjustFillingStock,
   closeProductionDay,
 } from "@/lib/hooks";
 import { YieldModal, type YieldEntry } from "@/components/yield-modal";
@@ -365,46 +366,85 @@ export default function DailyV2Page() {
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allFillingStock, fillings]);
-  // Quantity-aware readiness: each batch needs a specific grams of
-  // each filling layer. Mirror of consumeFillingStockForPlanProduct's
-  // grams math so we can preview the readiness without a server hit.
+  // Per-mould filling readiness. A pp.quantity > 1 means "this row
+  // is N moulds". We compute per-mould need so the operator can fill
+  // 1 of 2 moulds when there's only enough cooked for one — then
+  // come back later when more is cooked and fill the rest.
   const FILLING_DENSITY_G_PER_ML = 1.2;
   type FillingNeed = {
     fillingId: string;
     fillingName: string;
-    neededG: number;
+    /** Grams to fill ONE mould's worth of this layer. */
+    perMouldG: number;
+    /** Grams on stock (rootId-aware). */
     haveG: number;
-    ok: boolean;
+    /** How many moulds this layer's stock can fill on its own. */
+    mouldsCoverable: number;
   };
   function fillingNeedsForPlanProduct(pp: import("@/types").PlanProduct): FillingNeed[] {
     const product = productById.get(pp.productId);
     const mould = pp.mouldId ? mouldById.get(pp.mouldId) : undefined;
     if (!product || !mould) return [];
     const shellPct = product.shellPercentage ?? 37;
-    const totalCavityMl = mould.cavityWeightG * mould.numberOfCavities * pp.quantity;
-    const totalFillG = totalCavityMl * ((100 - shellPct) / 100) * FILLING_DENSITY_G_PER_ML;
+    // Per-mould (one mould unit) filling grams.
+    const perMouldChocolateG = mould.cavityWeightG * mould.numberOfCavities;
+    const perMouldTotalFillG = perMouldChocolateG * ((100 - shellPct) / 100) * FILLING_DENSITY_G_PER_ML;
     const layers = productFillingsByProduct.get(pp.productId) ?? [];
     const out: FillingNeed[] = [];
     for (const layer of layers) {
       const fillingPct = (layer.fillPercentage ?? 100) / 100;
-      const neededG = Math.round(totalFillG * fillingPct * 10) / 10;
+      const perMouldG = Math.round(perMouldTotalFillG * fillingPct * 10) / 10;
       const key = effectiveFillingId(layer.fillingId);
       const haveG = fillingStockByFilling.get(key) ?? 0;
       const filling = fillings.find((f) => f.id === layer.fillingId);
       out.push({
         fillingId: layer.fillingId,
         fillingName: filling?.name ?? layer.fillingId.slice(0, 6),
-        neededG,
+        perMouldG,
         haveG,
-        ok: haveG >= neededG,
+        mouldsCoverable: perMouldG > 0 ? Math.floor(haveG / perMouldG) : 0,
       });
     }
     return out;
   }
-  function isFillingReadyForPlanProduct(pp: import("@/types").PlanProduct): boolean {
+  /** How many moulds of this pp can be filled with current stock —
+   *  bounded by the tightest layer + the pp's own mould count. */
+  function mouldsFillableForPlanProduct(pp: import("@/types").PlanProduct): number {
     const needs = fillingNeedsForPlanProduct(pp);
-    if (needs.length === 0) return true;
-    return needs.every((n) => n.ok);
+    if (needs.length === 0) return pp.quantity;
+    const tightest = Math.min(...needs.map((n) => n.mouldsCoverable));
+    return Math.max(0, Math.min(pp.quantity, tightest));
+  }
+  /** How many moulds of this pp the operator has already filled —
+   *  read from any `filling-<ppId>` step keys we've written. */
+  function mouldsAlreadyFilled(pp: import("@/types").PlanProduct): number {
+    const ppId = pp.id ?? `${pp.planId}-${pp.productId}`;
+    const set = doneByPlan.get(pp.planId);
+    if (!set) return 0;
+    let max = 0;
+    for (const k of set) {
+      // Match `filling-<ppId>-mould-<n>` to track the highest n.
+      const m = k.match(new RegExp(`^filling-${ppId}-mould-(\\d+)$`));
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!isNaN(n) && n > max) max = n;
+      }
+      // A bare `filling-<ppId>` or plain `filling` counts as fully filled.
+      if (k === `filling-${ppId}` || k === "filling") return pp.quantity;
+    }
+    return max;
+  }
+  function isFillingReadyForPlanProduct(pp: import("@/types").PlanProduct): boolean {
+    const filled = mouldsAlreadyFilled(pp);
+    const fillable = mouldsFillableForPlanProduct(pp);
+    return filled + fillable >= pp.quantity;
+  }
+  /** True when the operator can tick at least ONE more mould right
+   *  now (used for the green dot — partial-fill green). */
+  function canFillAtLeastOneMore(pp: import("@/types").PlanProduct): boolean {
+    const filled = mouldsAlreadyFilled(pp);
+    if (filled >= pp.quantity) return false;
+    return mouldsFillableForPlanProduct(pp) > 0;
   }
   function isFillingReadyForPlan(planId: string): boolean {
     const pps = todayPlanProducts.filter((pp) => pp.planId === planId);
@@ -439,28 +479,26 @@ export default function DailyV2Page() {
       let done = false;
       let filledSubline = `${batchNumber} · ${pp.quantity} pcs`;
       if (activePhase === "filling") {
-        // First check if already explicitly ticked (per-pp or plain).
-        const doneSet = doneByPlan.get(pp.planId) ?? new Set<string>();
-        const ppDbId = pp.id ?? `${pp.planId}-${pp.productId}`;
-        const explicitlyDone = [...doneSet].some(
-          (k) => k === `filling-${ppDbId}` || k === "filling",
-        );
-        if (explicitlyDone) {
+        const filled = mouldsAlreadyFilled(pp);
+        const total = pp.quantity;
+        const fillable = mouldsFillableForPlanProduct(pp);
+        if (filled >= total) {
           done = true;
-          filledSubline = `${batchNumber} · ${pp.quantity} pcs · ✓ used`;
+          filledSubline = `${batchNumber} · ${pp.quantity} pcs · ✓ all ${total} mould${total === 1 ? "" : "s"} filled`;
+        } else if (fillable > 0) {
+          done = true; // green — at least one more mould fillable now
+          const willFill = Math.min(fillable, total - filled);
+          filledSubline = `${batchNumber} · filled ${filled}/${total} · enough for ${willFill} more — tap`;
         } else {
+          done = false;
           const needs = fillingNeedsForPlanProduct(pp);
-          const allOk = needs.every((n) => n.ok);
-          done = allOk;
-          if (allOk) {
-            filledSubline = `${batchNumber} · ${pp.quantity} pcs · enough on stock — tap to use`;
+          const tightest = needs.length > 0
+            ? needs.reduce((min, n) => n.mouldsCoverable < min.mouldsCoverable ? n : min, needs[0])
+            : null;
+          if (tightest) {
+            filledSubline = `${batchNumber} · filled ${filled}/${total} · short on ${tightest.fillingName} (need ${Math.round(tightest.perMouldG)} have ${Math.round(tightest.haveG)} g)`;
           } else {
-            const short = needs.filter((n) => !n.ok);
-            const detail = short
-              .slice(0, 2)
-              .map((n) => `${n.fillingName} need ${Math.round(n.neededG)} have ${Math.round(n.haveG)}g`)
-              .join(" · ");
-            filledSubline = `${batchNumber} · ${pp.quantity} pcs · ${detail}${short.length > 2 ? ` +${short.length - 2}` : ""}`;
+            filledSubline = `${batchNumber} · filled ${filled}/${total} · cook fillings first`;
           }
         }
       } else {
@@ -645,30 +683,31 @@ export default function DailyV2Page() {
     const planId = typeof arg === "string" ? arg : arg.planId;
     const planProductId = typeof arg === "string" ? null : arg.planProductId;
 
-    // Filling Prep: per-batch consumption when the layers have enough
-    // on stock to cover this exact planProduct's needs. Click → deduct
-    // from fillingStock + tick `filling-<ppId>` done. When short,
-    // bounce to the weekly cook view.
+    // Filling Prep: per-mould consumption. Each click fills as many
+    // moulds as stock can cover (up to remaining unfilled). When all
+    // moulds done, also writes the canonical `filling-<ppId>` key
+    // for downstream guards.
     if (activePhase === "filling") {
       const pp = planProductId
         ? todayPlanProducts.find((x) => (x.id ?? `${x.planId}-${x.productId}`) === planProductId)
         : todayPlanProducts.find((x) => x.planId === planId);
       if (!pp) return;
       const ppDbId = pp.id ?? `${pp.planId}-${pp.productId}`;
-      const stepKey = `filling-${ppDbId}`;
-      const doneSet = doneByPlan.get(planId) ?? new Set<string>();
-      const alreadyDone = [...doneSet].some((k) => k === stepKey || k === "filling" || k.startsWith("filling-"));
-      if (alreadyDone) {
-        // Un-tick. Stock movement was already recorded — we don't try
-        // to refund it here (operator can adjust stock manually if
-        // needed; usually the un-tick is a UI correction).
-        await toggleStep(planId, stepKey, false);
+      const fullKey = `filling-${ppDbId}`;
+      const filled = mouldsAlreadyFilled(pp);
+      // Already at or past full → un-tick the latest mould stamp.
+      if (filled >= pp.quantity) {
+        const lastKey = `filling-${ppDbId}-mould-${filled}`;
+        await toggleStep(planId, lastKey, false);
+        await toggleStep(planId, fullKey, false);
         return;
       }
-      const ready = isFillingReadyForPlanProduct(pp);
-      if (!ready) {
+      const fillable = mouldsFillableForPlanProduct(pp);
+      const remaining = pp.quantity - filled;
+      const willFill = Math.min(fillable, remaining);
+      if (willFill <= 0) {
         if (confirm(
-          "Not enough filling on stock for this batch yet. Open the weekly cook view?",
+          `Not enough filling on stock for the next mould of this batch. Open the weekly cook view?`,
         )) {
           window.location.href = "/plan/fillings";
         }
@@ -676,17 +715,38 @@ export default function DailyV2Page() {
       }
       const needs = fillingNeedsForPlanProduct(pp);
       const summary = needs
-        .map((n) => `${n.fillingName}: ${Math.round(n.neededG)} g`)
+        .map((n) => `${n.fillingName}: ${Math.round(n.perMouldG * willFill)} g`)
         .join("\n");
+      const productName = productById.get(pp.productId)?.name ?? "batch";
       if (!confirm(
-        `Use this filling for ${productById.get(pp.productId)?.name ?? "batch"}?\n\n${summary}\n\nWill deduct from filling stock.`,
+        `Fill ${willFill} of ${pp.quantity} mould${pp.quantity === 1 ? "" : "s"} for ${productName}?\n\n${summary}\n\nWill deduct from filling stock.`,
       )) return;
       try {
-        const r = await consumeFillingStockForPlanProduct(ppDbId, planId);
-        if (r.warnings.length > 0) {
-          alert(r.warnings.join("\n"));
+        // Deduct directly per layer × willFill moulds. We don't call
+        // consumeFillingStockForPlanProduct because that consumes
+        // for the WHOLE pp (every mould). Iterate layers, take FIFO
+        // from non-frozen stock.
+        for (const need of needs) {
+          let needLeft = Math.round(need.perMouldG * willFill * 10) / 10;
+          if (needLeft <= 0) continue;
+          const stockRows = allFillingStock
+            .filter((s) => effectiveFillingId(s.fillingId) === effectiveFillingId(need.fillingId) && !s.frozen && Number(s.remainingG) > 0)
+            .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+          for (const row of stockRows) {
+            if (needLeft <= 0) break;
+            const take = Math.min(Number(row.remainingG), needLeft);
+            const nextRem = Math.round((Number(row.remainingG) - take) * 10) / 10;
+            await adjustFillingStock(row.id!, nextRem);
+            needLeft -= take;
+          }
         }
-        await toggleStep(planId, stepKey, true);
+        // Stamp the cumulative mould count so we know how many we've
+        // filled on this pp.
+        const newFilled = filled + willFill;
+        await toggleStep(planId, `filling-${ppDbId}-mould-${newFilled}`, true);
+        if (newFilled >= pp.quantity) {
+          await toggleStep(planId, fullKey, true);
+        }
       } catch (e) {
         alert(e instanceof Error ? e.message : "Filling consumption failed");
       }
