@@ -139,8 +139,9 @@ export default function FillingConsolidationPage() {
       campaigns,
       productionOrders: productionOrdersForCook,
       productionOrderItems: productionOrderItemsForCook,
-      // Plan-driven primary source: cook list reflects what the
-      // reconciler actually scheduled, not raw demand × ceiling.
+      // Plan-driven walk — uses what the reconciler actually decided
+      // to make, so 5 orders sharing 1 consolidated mould count as 1
+      // mould of demand instead of 5.
       productionPlans,
       planProducts,
       productionDayLineItems,

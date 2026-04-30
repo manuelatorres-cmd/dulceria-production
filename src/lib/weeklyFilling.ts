@@ -54,17 +54,19 @@ export interface WeeklyFillingInput {
   windowEnd?: Date;
   /** Optional "now" injection for deterministic tests. */
   now?: Date;
-  /** Internal-demand sources — used only as a fallback when no plan
-   *  data is provided. Plan walk is the primary source. */
+  /** Internal-demand sources. Used as fallback when no live plans
+   *  exist for a product (rare). Primary demand source is now the
+   *  productionPlans + planProducts below — those reflect what the
+   *  reconciler actually decided to make, after deduplication. */
   campaigns?: Campaign[];
   productionOrders?: ProductionOrder[];
   productionOrderItems?: ProductionOrderItem[];
 
   /** Live plans + their plan-products. When provided, the cook list
-   *  walks these (the actual scheduled production after the
-   *  reconciler) instead of summing raw order/PO/campaign demand.
-   *  Avoids the "5 orders × 1 piece each = 5 moulds of demand" bug
-   *  that the order-driven walk had. */
+   *  walks these (the actual scheduled production) instead of summing
+   *  order/PO/campaign demand. Avoids the double-count where a
+   *  customer order AND its borrow-replen PO were both adding grams
+   *  even though the planner only scheduled the replen amount. */
   productionPlans?: ProductionPlan[];
   planProducts?: PlanProduct[];
   productionDayLineItems?: ProductionDayLineItem[];
@@ -171,9 +173,12 @@ export function computeWeeklyFillingNeeds(input: WeeklyFillingInput): WeeklyFill
   const syntheticPlanProducts: PlanProduct[] = [];
   const syntheticIdToOrder = new Map<string, { order: Order; productId: string; pieces: number }>();
 
-  // Plan-driven path — primary. When plans/planProducts are passed,
-  // walk those (post-reconciler truth: 5 orders × 1 piece sharing 1
-  // consolidated mould = 1 mould of filling demand, not 5).
+  // ── Plan-driven path ─────────────────────────────────────────────
+  // When productionPlans + planProducts are passed, walk those —
+  // they reflect what the reconciler actually decided to make after
+  // collapsing orders + POs + campaigns. Each pp.quantity is the
+  // mould count for one production batch, so filling math is
+  // accurate (no per-orderItem-ceiling inflation).
   const usePlanWalk = !!(input.productionPlans && input.planProducts);
   if (usePlanWalk) {
     const dayDateById = new Map<string, string>();
@@ -195,6 +200,10 @@ export function computeWeeklyFillingNeeds(input: WeeklyFillingInput): WeeklyFill
     const winEndIso = windowEnd.toISOString().slice(0, 10);
     for (const plan of livePlans) {
       const earliest = plan.id ? earliestPlanDate.get(plan.id) : undefined;
+      // Plans with no scheduled lineItem yet are still candidates —
+      // fall through to "any open plan" so the cook list shows
+      // upcoming work even before scheduling completes. Filter by
+      // window end when a date is known.
       if (earliest && earliest > winEndIso) continue;
       const planPps = (input.planProducts ?? []).filter((pp) => pp.planId === plan.id);
       for (const pp of planPps) {
@@ -204,8 +213,8 @@ export function computeWeeklyFillingNeeds(input: WeeklyFillingInput): WeeklyFill
         const mould = mouldId ? mouldById.get(mouldId) : undefined;
         if (!mould || !mould.numberOfCavities) continue;
         const syntheticId = `wkf-plan-${pp.id}`;
-        // Build a usedBy-friendly Order stub. Prefer the linked
-        // customer order; fall back to plan name (Campaign / PO).
+        // Build a fake order for usedBy attribution. Prefer linked
+        // customer order; else use plan name (Campaign / PO).
         let order: Order | undefined;
         const link = (input.orderPlanLinks ?? []).find((l) => l.planId === plan.id);
         if (link) {
@@ -217,7 +226,9 @@ export function computeWeeklyFillingNeeds(input: WeeklyFillingInput): WeeklyFill
           order = {
             id: `plan:${plan.id}`,
             channel: "shop",
-            customerName: name,
+            customerName: name.startsWith("Campaign:") || name.startsWith("PO:")
+              ? name.replace(/^(Campaign|PO):\s*/, (m) => m.replace(":", " ·"))
+              : name,
             deadline: earliest ? `${earliest}T12:00:00.000Z` : new Date(windowEndMs).toISOString(),
             priority: "normal",
             status: "pending",
@@ -230,16 +241,18 @@ export function computeWeeklyFillingNeeds(input: WeeklyFillingInput): WeeklyFill
           planId: "weekly-filling-synthetic",
           productId: pp.productId,
           mouldId: mould.id!,
-          quantity: pp.quantity, // mould count straight from the plan
+          quantity: pp.quantity, // already mould count
           sortOrder: 0,
         });
       }
     }
   }
+  // Skip the legacy order/PO/campaign walks when using plan walk —
+  // plans already encode that demand, and walking again would
+  // double-count.
 
-  // Legacy order/PO/campaign walks run only when usePlanWalk is off
-  // (no plans supplied). Otherwise plans cover the demand and these
-  // would double-count.
+  // Skip the legacy order/PO/campaign walks when usePlanWalk is on —
+  // plan-driven walk above already covered everything.
   for (const item of usePlanWalk ? [] : itemsInWindow) {
     const product = productById.get(item.productId);
     if (!product) {
@@ -277,6 +290,7 @@ export function computeWeeklyFillingNeeds(input: WeeklyFillingInput): WeeklyFill
   // the cook window contributes a synthetic planProduct so its
   // fillings show up in the cook list. Without this, replen-only
   // products (Hazelnut Caramel, Kalamansi etc) never appeared.
+  // Skipped when usePlanWalk is on (plans already cover this).
   const todayMs = now.getTime();
   for (const po of usePlanWalk ? [] : (input.productionOrders ?? [])) {
     if (po.status !== "pending" && po.status !== "in_production") continue;
@@ -314,7 +328,8 @@ export function computeWeeklyFillingNeeds(input: WeeklyFillingInput): WeeklyFill
   }
 
   // Campaign productTargets — same expansion. Use startDate as the
-  // demand date (production runs ramp toward go-live).
+  // demand date (production runs ramp toward go-live). Skipped when
+  // usePlanWalk is on (plans already cover this).
   for (const c of usePlanWalk ? [] : (input.campaigns ?? [])) {
     if (c.status !== "planned" && c.status !== "active") continue;
     const startMs = c.startDate ? new Date(`${c.startDate}T12:00:00`).getTime() : todayMs;
