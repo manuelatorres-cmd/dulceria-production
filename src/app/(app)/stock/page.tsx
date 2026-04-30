@@ -1019,6 +1019,30 @@ function FillingStockTab() {
       else g.totalG += item.remainingG;
     }
 
+    // Surface every defined filling — even those with no stock rows
+    // yet — so the operator can see "Mango Chili: 0 g, needs
+    // cooking". Without this, fillings without stock simply
+    // disappeared from the page and looked like configuration loss.
+    // Skip when the freezer filter is active (no stock = nothing
+    // frozen / nothing available, so the row is noise in those tabs).
+    if (filterFreezer === "all") {
+      for (const filling of allFillings) {
+        if (!filling.id) continue;
+        if (map.has(filling.id)) continue;
+        if (filling.archived) continue;
+        if (q && !filling.name.toLowerCase().includes(q)) continue;
+        map.set(filling.id, {
+          fillingId: filling.id,
+          fillingName: filling.name,
+          category: filling.category ?? "",
+          shelfLifeWeeks: filling.shelfLifeWeeks ?? undefined,
+          entries: [],
+          totalG: 0,
+          frozenG: 0,
+        });
+      }
+    }
+
     // Sort entries oldest-first within each group
     for (const g of map.values()) {
       g.entries.sort((a, b) => new Date(a.madeAt).getTime() - new Date(b.madeAt).getTime());
