@@ -33,6 +33,7 @@ import {
   toggleStep,
   recordUnmouldIntake,
   commitAllocationSplit,
+  consumeFillingStockForPlanProduct,
   closeProductionDay,
 } from "@/lib/hooks";
 import { YieldModal, type YieldEntry } from "@/components/yield-modal";
@@ -328,18 +329,51 @@ export default function DailyV2Page() {
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allFillingStock, fillings]);
+  // Quantity-aware readiness: each batch needs a specific grams of
+  // each filling layer. Mirror of consumeFillingStockForPlanProduct's
+  // grams math so we can preview the readiness without a server hit.
+  const FILLING_DENSITY_G_PER_ML = 1.2;
+  type FillingNeed = {
+    fillingId: string;
+    fillingName: string;
+    neededG: number;
+    haveG: number;
+    ok: boolean;
+  };
+  function fillingNeedsForPlanProduct(pp: import("@/types").PlanProduct): FillingNeed[] {
+    const product = productById.get(pp.productId);
+    const mould = pp.mouldId ? mouldById.get(pp.mouldId) : undefined;
+    if (!product || !mould) return [];
+    const shellPct = product.shellPercentage ?? 37;
+    const totalCavityMl = mould.cavityWeightG * mould.numberOfCavities * pp.quantity;
+    const totalFillG = totalCavityMl * ((100 - shellPct) / 100) * FILLING_DENSITY_G_PER_ML;
+    const layers = productFillingsByProduct.get(pp.productId) ?? [];
+    const out: FillingNeed[] = [];
+    for (const layer of layers) {
+      const fillingPct = (layer.fillPercentage ?? 100) / 100;
+      const neededG = Math.round(totalFillG * fillingPct * 10) / 10;
+      const key = effectiveFillingId(layer.fillingId);
+      const haveG = fillingStockByFilling.get(key) ?? 0;
+      const filling = fillings.find((f) => f.id === layer.fillingId);
+      out.push({
+        fillingId: layer.fillingId,
+        fillingName: filling?.name ?? layer.fillingId.slice(0, 6),
+        neededG,
+        haveG,
+        ok: haveG >= neededG,
+      });
+    }
+    return out;
+  }
+  function isFillingReadyForPlanProduct(pp: import("@/types").PlanProduct): boolean {
+    const needs = fillingNeedsForPlanProduct(pp);
+    if (needs.length === 0) return true;
+    return needs.every((n) => n.ok);
+  }
   function isFillingReadyForPlan(planId: string): boolean {
     const pps = todayPlanProducts.filter((pp) => pp.planId === planId);
     if (pps.length === 0) return true;
-    for (const pp of pps) {
-      const layers = productFillingsByProduct.get(pp.productId) ?? [];
-      for (const layer of layers) {
-        const key = effectiveFillingId(layer.fillingId);
-        const have = fillingStockByFilling.get(key) ?? 0;
-        if (have <= 0) return false;
-      }
-    }
-    return true;
+    return pps.every((pp) => isFillingReadyForPlanProduct(pp));
   }
 
   // Mould checklist for the active phase — one row per planProduct on
@@ -362,16 +396,40 @@ export default function DailyV2Page() {
         return n.split(":")[0]?.toLowerCase() ?? "batch";
       })();
       const batchNumber = plan.batchNumber ?? plan.name ?? "—";
-      // Filling Prep: "done" reflects fillings-on-stock readiness,
-      // not an explicit step tick. Rows render with the same green
-      // check the other phases use, but a click bounces to the
-      // weekly cook view (handled in toggleRow).
-      const done = activePhase === "filling"
-        ? isFillingReadyForPlan(pp.planId)
-        : planPhaseDone(pp.planId, activePhase);
-      const filledSubline = activePhase === "filling"
-        ? `${batchNumber} · ${pp.quantity} pcs · ${done ? "filling ready" : "needs cooking"}`
-        : `${batchNumber} · ${pp.quantity} pcs`;
+      // Filling Prep: "done" = enough on stock for THIS specific
+      // batch (rootId-aware quantity check). When green, click ticks
+      // the per-product step + deducts from filling stock; when red,
+      // shows a per-layer shortfall summary in the subline.
+      let done = false;
+      let filledSubline = `${batchNumber} · ${pp.quantity} pcs`;
+      if (activePhase === "filling") {
+        // First check if already explicitly ticked (per-pp or plain).
+        const doneSet = doneByPlan.get(pp.planId) ?? new Set<string>();
+        const ppDbId = pp.id ?? `${pp.planId}-${pp.productId}`;
+        const explicitlyDone = [...doneSet].some(
+          (k) => k === `filling-${ppDbId}` || k === "filling",
+        );
+        if (explicitlyDone) {
+          done = true;
+          filledSubline = `${batchNumber} · ${pp.quantity} pcs · ✓ used`;
+        } else {
+          const needs = fillingNeedsForPlanProduct(pp);
+          const allOk = needs.every((n) => n.ok);
+          done = allOk;
+          if (allOk) {
+            filledSubline = `${batchNumber} · ${pp.quantity} pcs · enough on stock — tap to use`;
+          } else {
+            const short = needs.filter((n) => !n.ok);
+            const detail = short
+              .slice(0, 2)
+              .map((n) => `${n.fillingName} need ${Math.round(n.neededG)} have ${Math.round(n.haveG)}g`)
+              .join(" · ");
+            filledSubline = `${batchNumber} · ${pp.quantity} pcs · ${detail}${short.length > 2 ? ` +${short.length - 2}` : ""}`;
+          }
+        }
+      } else {
+        done = planPhaseDone(pp.planId, activePhase);
+      }
       rows.push({
         planId: pp.planId,
         planProductId: pp.id ?? `${pp.planId}-${pp.productId}`,
@@ -518,19 +576,57 @@ export default function DailyV2Page() {
     return null;
   }
 
-  async function toggleRow(planId: string) {
-    // Filling Prep is informational on this page — cooking happens
-    // via /plan/fillings (weekly cook view). A click bounces the
-    // operator there with a status hint instead of writing a tick.
+  async function toggleRow(arg: string | ChecklistRow) {
+    // Accept either a row (preferred — has planProductId) or a bare
+    // planId for legacy call sites. Filling consumption needs the
+    // planProductId; everything else just uses planId.
+    const planId = typeof arg === "string" ? arg : arg.planId;
+    const planProductId = typeof arg === "string" ? null : arg.planProductId;
+
+    // Filling Prep: per-batch consumption when the layers have enough
+    // on stock to cover this exact planProduct's needs. Click → deduct
+    // from fillingStock + tick `filling-<ppId>` done. When short,
+    // bounce to the weekly cook view.
     if (activePhase === "filling") {
-      const ready = isFillingReadyForPlan(planId);
-      const msg = ready
-        ? "Filling already cooked + on stock. No tick needed here — readiness is read from filling stock."
-        : "Some fillings for this batch aren't on stock yet. Cook them in the Weekly cook view (/plan/fillings).";
-      if (!ready && confirm(`${msg}\n\nOpen the cook list?`)) {
-        window.location.href = "/plan/fillings";
-      } else if (ready) {
-        alert(msg);
+      const pp = planProductId
+        ? todayPlanProducts.find((x) => (x.id ?? `${x.planId}-${x.productId}`) === planProductId)
+        : todayPlanProducts.find((x) => x.planId === planId);
+      if (!pp) return;
+      const ppDbId = pp.id ?? `${pp.planId}-${pp.productId}`;
+      const stepKey = `filling-${ppDbId}`;
+      const doneSet = doneByPlan.get(planId) ?? new Set<string>();
+      const alreadyDone = [...doneSet].some((k) => k === stepKey || k === "filling" || k.startsWith("filling-"));
+      if (alreadyDone) {
+        // Un-tick. Stock movement was already recorded — we don't try
+        // to refund it here (operator can adjust stock manually if
+        // needed; usually the un-tick is a UI correction).
+        await toggleStep(planId, stepKey, false);
+        return;
+      }
+      const ready = isFillingReadyForPlanProduct(pp);
+      if (!ready) {
+        if (confirm(
+          "Not enough filling on stock for this batch yet. Open the weekly cook view?",
+        )) {
+          window.location.href = "/plan/fillings";
+        }
+        return;
+      }
+      const needs = fillingNeedsForPlanProduct(pp);
+      const summary = needs
+        .map((n) => `${n.fillingName}: ${Math.round(n.neededG)} g`)
+        .join("\n");
+      if (!confirm(
+        `Use this filling for ${productById.get(pp.productId)?.name ?? "batch"}?\n\n${summary}\n\nWill deduct from filling stock.`,
+      )) return;
+      try {
+        const r = await consumeFillingStockForPlanProduct(ppDbId, planId);
+        if (r.warnings.length > 0) {
+          alert(r.warnings.join("\n"));
+        }
+        await toggleStep(planId, stepKey, true);
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "Filling consumption failed");
       }
       return;
     }

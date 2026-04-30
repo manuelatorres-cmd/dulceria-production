@@ -42,7 +42,10 @@ export function ProductGroupedChecklist({
 }: {
   rows: ChecklistRow[];
   tintInk: string;
-  onToggle: (planId: string) => void;
+  /** Called with the full row so the parent can use planProductId
+   *  (filling deduction, per-product step keys) without losing the
+   *  planId for plan-level toggles. */
+  onToggle: (row: ChecklistRow) => void;
   /** When set, clicking the row body selects it (right-pane preview).
    *  Tick + checkbox stay as the toggle target. */
   onSelect?: (row: ChecklistRow) => void;
@@ -162,7 +165,7 @@ export function ProductGroupedChecklist({
                         ) : (
                           <button
                             type="button"
-                            onClick={() => onToggle(row.planId)}
+                            onClick={() => onToggle(row)}
                             title={row.done ? "Mark not done" : "Mark done"}
                             className="flex-shrink-0 hover:scale-110 transition"
                           >
@@ -177,7 +180,7 @@ export function ProductGroupedChecklist({
                           type="button"
                           onClick={() => {
                             if (onSelect) onSelect(row);
-                            else onToggle(row.planId);
+                            else onToggle(row);
                           }}
                           className="flex-1 min-w-0 text-left hover:opacity-90 transition flex items-center gap-2"
                         >
