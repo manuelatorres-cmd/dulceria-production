@@ -253,6 +253,28 @@ export default function DailyV2Page() {
     return false;
   }
 
+  // Per-plan-product done check. Used so individual batches inside a
+  // shared plan can be marked done independently — Manuela may need
+  // one of two double-caramel batches done urgently while the other
+  // waits. We treat a key as matching this pp when:
+  //   - it equals "phase-<ppId>" (exact pp tick)
+  //   - it starts with "phase-<ppId>-" (sub-step like color step idx)
+  //   - it equals the bare phase, "phase" (legacy plan-wide tick — keep
+  //     for backwards compat with anything ticked before per-pp keys)
+  function planProductPhaseDone(planId: string, ppId: string, phase: PhaseId): boolean {
+    const set = doneByPlan.get(planId);
+    if (!set) return false;
+    const aliases: string[] = phase === "colour" ? ["colour", "color"] : [phase];
+    for (const k of set) {
+      for (const a of aliases) {
+        if (k === a) return true;                              // legacy plan-wide tick
+        if (k === `${a}-${ppId}`) return true;                 // exact pp tick
+        if (k.startsWith(`${a}-${ppId}-`)) return true;        // pp sub-step (color idx etc)
+      }
+    }
+    return false;
+  }
+
   // Plan → set of phases its products run today. A plan "has" a phase
   // only when at least one of its scheduled products actually has a
   // ProductionStep for that phase. Drives both rollups and the
@@ -274,20 +296,25 @@ export default function DailyV2Page() {
   // Phase rollup — for each phase, count moulds/batches done vs total.
   type PhaseRoll = { phase: PhaseId; doneBatches: number; totalBatches: number; pendingBatches: number };
   const rollups = useMemo<Record<PhaseId, PhaseRoll>>(() => {
+    // Count per plan-product (each row in the checklist is one batch
+    // = one pp). Two pps in the same plan with mixed state should
+    // show as 1/2 done, not 0/1 or 2/2 depending on prefix-match
+    // behaviour.
     const out = {} as Record<PhaseId, PhaseRoll>;
     for (const phase of PHASES) {
       let done = 0;
       let total = 0;
-      for (const planId of todayPlanIds) {
-        const planPhases = phasesByPlan.get(planId);
-        if (!planPhases || !planPhases.has(phase.id)) continue;
+      for (const pp of todayPlanProducts) {
+        if (!pp.id) continue;
+        if (!productHasPhase(pp.productId, phase.id)) continue;
         total += 1;
-        if (planPhaseDone(planId, phase.id)) done += 1;
+        if (planProductPhaseDone(pp.planId, pp.id, phase.id)) done += 1;
       }
       out[phase.id] = { phase: phase.id, doneBatches: done, totalBatches: total, pendingBatches: total - done };
     }
     return out;
-  }, [todayPlanIds, doneByPlan, phasesByPlan]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayPlanProducts, doneByPlan]);
 
   // Default focus = first phase that has any pending batch today.
   const defaultPhase: PhaseId = useMemo(() => {
@@ -437,7 +464,11 @@ export default function DailyV2Page() {
           }
         }
       } else {
-        done = planPhaseDone(pp.planId, activePhase);
+        // Per-plan-product check so two batches in the same plan can
+        // sit at different stages — ticking polish on batch 1
+        // doesn't auto-tick batch 2.
+        const ppDbId = pp.id ?? `${pp.planId}-${pp.productId}`;
+        done = planProductPhaseDone(pp.planId, ppDbId, activePhase);
       }
       rows.push({
         planId: pp.planId,
@@ -473,6 +504,11 @@ export default function DailyV2Page() {
         totalYield: number;
         orders: AllocationSplitOrderRow[];
         poItems: AllocationSplitPoRow[];
+        /** plan-products that just had their yield captured — only
+         *  these get their unmould-<ppId> step ticked when the alloc
+         *  modal saves. Lets a 2-batch plan unmould one batch at a
+         *  time without auto-ticking the other. */
+        ppIds: string[];
       }
     | null
   >(null);
@@ -562,23 +598,40 @@ export default function DailyV2Page() {
   // (capping before unmoulding etc) is always a mistake — usually the
   // operator clicked the wrong row. Un-ticking (done → not done) is
   // never blocked.
-  function previousPhaseGap(planId: string, phase: PhaseId): { phase: PhaseId; label: string } | null {
-    const planPhases = phasesByPlan.get(planId);
-    if (!planPhases) return null;
+  function previousPhaseGap(
+    planId: string,
+    ppId: string | null,
+    productId: string | null,
+    phase: PhaseId,
+  ): { phase: PhaseId; label: string } | null {
     const idx = PHASES.findIndex((p) => p.id === phase);
     if (idx <= 0) return null;
+    // Phase set: prefer per-product (so a category that doesn't run a
+    // phase doesn't false-block), fall back to plan-aggregate.
+    const productPhases = productId
+      ? new Set<PhaseId>(PHASES.filter((p) => productHasPhase(productId, p.id)).map((p) => p.id))
+      : null;
+    const planPhases = phasesByPlan.get(planId);
     for (let i = 0; i < idx; i++) {
       const prev = PHASES[i];
-      if (!planPhases.has(prev.id)) continue;
-      // Filling prep is informational — counts as done when every
-      // required filling has stock available, even if no operator
-      // has explicitly ticked the step.
+      const inSet = productPhases ? productPhases.has(prev.id) : !!planPhases?.has(prev.id);
+      if (!inSet) continue;
+      // Filling prep is informational — counts as done when the
+      // specific batch has enough on stock OR an explicit tick.
       if (prev.id === "filling") {
-        if (isFillingReadyForPlan(planId)) continue;
-        if (planPhaseDone(planId, prev.id)) continue;
+        if (ppId) {
+          const pp = todayPlanProducts.find((x) => (x.id ?? `${x.planId}-${x.productId}`) === ppId);
+          if (pp && isFillingReadyForPlanProduct(pp)) continue;
+          if (planProductPhaseDone(planId, ppId, prev.id)) continue;
+        } else if (isFillingReadyForPlan(planId)) {
+          continue;
+        }
         return { phase: prev.id, label: `${prev.label} (cook in weekly view first)` };
       }
-      if (!planPhaseDone(planId, prev.id)) {
+      const isDone = ppId
+        ? planProductPhaseDone(planId, ppId, prev.id)
+        : planPhaseDone(planId, prev.id);
+      if (!isDone) {
         return { phase: prev.id, label: prev.label };
       }
     }
@@ -642,28 +695,33 @@ export default function DailyV2Page() {
     // Unmould opens the inline yield + allocation flow. Other phases
     // are simple boolean toggles on planStepStatus.
     if (activePhase === "unmould") {
-      const currentlyDone = planPhaseDone(planId, activePhase);
-      console.log(`[daily] unmould click planId=${planId} currentlyDone=${currentlyDone}`);
+      // Per-plan-product unmould. Each batch row has its own ppId
+      // and ticks unmould-<ppId> independently. If no ppId came in
+      // (legacy bare planId) fall back to plan-wide behaviour.
+      const pp = planProductId
+        ? todayPlanProducts.find((x) => (x.id ?? `${x.planId}-${x.productId}`) === planProductId)
+        : todayPlanProducts.find((x) => x.planId === planId);
+      const ppDbId = pp?.id ?? null;
+      const productIdHere = pp?.productId ?? null;
+      const currentlyDone = ppDbId
+        ? planProductPhaseDone(planId, ppDbId, activePhase)
+        : planPhaseDone(planId, activePhase);
       if (currentlyDone) {
-        await toggleStep(planId, activePhase, false);
+        const stepKey = ppDbId ? `unmould-${ppDbId}` : activePhase;
+        await toggleStep(planId, stepKey, false);
         return;
       }
-      const planPhases = phasesByPlan.get(planId);
-      const doneSet = doneByPlan.get(planId);
-      console.log(
-        `[daily] unmould guard · phasesByPlan=`, planPhases ? [...planPhases] : null,
-        `· doneKeys=`, doneSet ? [...doneSet] : null,
-      );
-      const gap = previousPhaseGap(planId, activePhase);
-      console.log(`[daily] unmould guard result:`, gap);
+      const gap = previousPhaseGap(planId, ppDbId, productIdHere, activePhase);
       if (gap) {
         alert(`Can't unmould yet — "${gap.label}" isn't done for this batch.`);
         return;
       }
-      const entries = buildYieldEntries(planId);
+      const entries = ppDbId && pp
+        ? buildYieldEntries(planId).filter((e) => e.planProductId === ppDbId)
+        : buildYieldEntries(planId);
       if (entries.length === 0) {
-        // No plan-products → nothing to record. Just tick.
-        await toggleStep(planId, activePhase, true);
+        const stepKey = ppDbId ? `unmould-${ppDbId}` : activePhase;
+        await toggleStep(planId, stepKey, true);
         return;
       }
       setUnmouldYield({ planId, entries });
@@ -673,15 +731,27 @@ export default function DailyV2Page() {
       window.location.href = `/production/${encodeURIComponent(planId)}`;
       return;
     }
-    const currentlyDone = planPhaseDone(planId, activePhase);
+    // Generic phase tick (polishing / colour / shell / fill / cap):
+    // write per-plan-product step keys so two batches in the same
+    // plan don't share state. Falls back to plan-wide tick when only
+    // a planId is available (legacy / right-pane bare-id call site).
+    const pp = planProductId
+      ? todayPlanProducts.find((x) => (x.id ?? `${x.planId}-${x.productId}`) === planProductId)
+      : null;
+    const ppDbId = pp?.id ?? null;
+    const productIdHere = pp?.productId ?? null;
+    const currentlyDone = ppDbId
+      ? planProductPhaseDone(planId, ppDbId, activePhase)
+      : planPhaseDone(planId, activePhase);
     if (!currentlyDone) {
-      const gap = previousPhaseGap(planId, activePhase);
+      const gap = previousPhaseGap(planId, ppDbId, productIdHere, activePhase);
       if (gap) {
         alert(`Can't tick "${activeLabel}" yet — "${gap.label}" isn't done for this batch.`);
         return;
       }
     }
-    await toggleStep(planId, activePhase, !currentlyDone);
+    const stepKey = ppDbId ? `${activePhase}-${ppDbId}` : activePhase;
+    await toggleStep(planId, stepKey, !currentlyDone);
   }
 
   async function applyUnmouldYield(yieldEntries: YieldEntry[]) {
@@ -709,15 +779,24 @@ export default function DailyV2Page() {
         totalYield += e.yield;
       }
       // Build allocation rows; if none (no orders/POs linked), skip
-      // the split modal and tick unmould done immediately.
+      // the split modal and tick the per-pp unmould keys immediately
+      // so two batches in the same plan can settle independently.
       const orderRows = buildAllocOrderRows(planId);
       const poRows = buildAllocPoRows(planId);
       setUnmouldYield(null);
       if (orderRows.length === 0 && poRows.length === 0) {
-        await toggleStep(planId, "unmould", true);
+        for (const e of yieldEntries) {
+          await toggleStep(planId, `unmould-${e.planProductId}`, true);
+        }
         return;
       }
-      setUnmouldAlloc({ planId, totalYield, orders: orderRows, poItems: poRows });
+      setUnmouldAlloc({
+        planId,
+        totalYield,
+        orders: orderRows,
+        poItems: poRows,
+        ppIds: yieldEntries.map((e) => e.planProductId),
+      });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Yield save failed");
       setUnmouldYield(null);
@@ -735,7 +814,10 @@ export default function DailyV2Page() {
         surplus: result.surplus,
         surplusDestination: result.surplusDestination,
       });
-      await toggleStep(planId, "unmould", true);
+      // Tick exactly the pp(s) that just had their yield captured.
+      for (const ppId of unmouldAlloc.ppIds) {
+        await toggleStep(planId, `unmould-${ppId}`, true);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Allocation save failed");
     } finally {
@@ -851,13 +933,14 @@ export default function DailyV2Page() {
         lines.push(`${pp.actualYield ?? pp.quantity} pcs to pack`);
       }
 
-      const doneSet = doneByPlan.get(pp.planId) ?? new Set<string>();
-      const done = [...doneSet].some(
-        (k) => k === activePhase || k.startsWith(`${activePhase}-`),
-      );
+      // Per-plan-product done check so two batches in the same plan
+      // can show different states in the right pane (one ✓ done, one
+      // pending).
+      const ppDbId = pp.id ?? `${pp.planId}-${pp.productId}`;
+      const done = planProductPhaseDone(pp.planId, ppDbId, activePhase);
 
       rows.push({
-        key: `${pp.planId}|${pp.id ?? pp.productId}`,
+        key: `${pp.planId}|${ppDbId}`,
         planId: pp.planId,
         productName: product.name,
         batchLabel: plan.batchNumber ?? plan.name ?? "Batch",
@@ -1146,7 +1229,14 @@ export default function DailyV2Page() {
 
   async function toggleColourTask(stepKey: string, planId: string, currentlyDone: boolean) {
     if (!currentlyDone) {
-      const gap = previousPhaseGap(planId, "colour");
+      // Colour worklist stepKey shape is `color-<ppId>-<idx>` or
+      // `color-<ppId>` (fallback). Pull the ppId out so the gap check
+      // is per-pp, not plan-wide.
+      const m = stepKey.match(/^color-([^-]+(?:-[^-]+)*?)(?:-\d+)?$/);
+      const ppId = m ? m[1] : null;
+      const pp = ppId ? todayPlanProducts.find((x) => x.id === ppId || (x.id ?? `${x.planId}-${x.productId}`) === ppId) : null;
+      const productIdHere = pp?.productId ?? null;
+      const gap = previousPhaseGap(planId, ppId, productIdHere, "colour");
       if (gap) {
         alert(`Can't paint yet — "${gap.label}" isn't done for this batch.`);
         return;
@@ -1178,25 +1268,22 @@ export default function DailyV2Page() {
     }
     setBulkBusy(true);
     try {
-      const planIdsForPhase: string[] = [];
-      const seen = new Set<string>();
-      for (const pp of todayPlanProducts) {
-        if (seen.has(pp.planId)) continue;
-        if (!productHasPhase(pp.productId, activePhase)) continue;
-        seen.add(pp.planId);
-        planIdsForPhase.push(pp.planId);
-      }
-      const allDone = planIdsForPhase.every((pid) => planPhaseDone(pid, activePhase));
-      const target = !allDone; // if all done → uncheck; else → check all
-      // When ticking ON, refuse if any batch still has an earlier
-      // phase pending — blocks "tick everything" from running over
-      // half-finished work. Un-tick (target=false) is unconstrained.
+      // Iterate per plan-product, not per plan, so two batches in
+      // the same plan can sit at different stages and bulk Check All
+      // ticks each independently with its own previous-phase guard.
+      const ppList = todayPlanProducts.filter(
+        (pp) => pp.id && productHasPhase(pp.productId, activePhase),
+      );
+      const allDone = ppList.every((pp) =>
+        planProductPhaseDone(pp.planId, pp.id!, activePhase),
+      );
+      const target = !allDone;
       if (target) {
-        const blocked: Array<{ pid: string; gap: string }> = [];
-        for (const pid of planIdsForPhase) {
-          if (planPhaseDone(pid, activePhase)) continue;
-          const gap = previousPhaseGap(pid, activePhase);
-          if (gap) blocked.push({ pid, gap: gap.label });
+        const blocked: Array<{ ppId: string; gap: string }> = [];
+        for (const pp of ppList) {
+          if (planProductPhaseDone(pp.planId, pp.id!, activePhase)) continue;
+          const gap = previousPhaseGap(pp.planId, pp.id!, pp.productId, activePhase);
+          if (gap) blocked.push({ ppId: pp.id!, gap: gap.label });
         }
         if (blocked.length > 0) {
           alert(
@@ -1206,10 +1293,10 @@ export default function DailyV2Page() {
           return;
         }
       }
-      for (const pid of planIdsForPhase) {
-        const isDone = planPhaseDone(pid, activePhase);
+      for (const pp of ppList) {
+        const isDone = planProductPhaseDone(pp.planId, pp.id!, activePhase);
         if (isDone === target) continue;
-        await toggleStep(pid, activePhase, target);
+        await toggleStep(pp.planId, `${activePhase}-${pp.id!}`, target);
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Bulk toggle failed");
@@ -1725,7 +1812,24 @@ export default function DailyV2Page() {
                           ) : (
                             <button
                               type="button"
-                              onClick={async () => { await toggleRow(sel.planId); }}
+                              onClick={async () => {
+                                // Build a ChecklistRow stub so toggleRow
+                                // routes through the per-pp path. Pull
+                                // ppId from sel.key (`<planId>|<ppId>`).
+                                const parts = sel.key.split("|");
+                                const ppId = parts[1] ?? "";
+                                const pp = todayPlanProducts.find(
+                                  (x) => (x.id ?? `${x.planId}-${x.productId}`) === ppId,
+                                );
+                                await toggleRow({
+                                  planId: sel.planId,
+                                  planProductId: ppId,
+                                  productId: pp?.productId ?? "",
+                                  productName: sel.productName,
+                                  qty: sel.qty,
+                                  done: sel.done,
+                                });
+                              }}
                               className="text-[11.5px] px-3 py-1.5 rounded-full"
                               style={{
                                 background: sel.done ? "rgba(74,122,94,0.15)" : tint.ink,
