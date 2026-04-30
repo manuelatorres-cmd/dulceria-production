@@ -29,6 +29,7 @@ import {
   useAllOrderPlanLinks,
   useProductionOrders,
   useAllProductionOrderItems,
+  useFillingStockItems,
   toggleStep,
   recordUnmouldIntake,
   commitAllocationSplit,
@@ -120,6 +121,7 @@ export default function DailyV2Page() {
   const allOrderPlanLinks = useAllOrderPlanLinks();
   const allProductionOrders = useProductionOrders();
   const allProductionOrderItems = useAllProductionOrderItems();
+  const allFillingStock = useFillingStockItems();
 
   // Tick clock every minute for the header.
   const [now, setNow] = useState(() => new Date());
@@ -303,6 +305,31 @@ export default function DailyV2Page() {
   // batch on the right.
   const [selectedPlanProductId, setSelectedPlanProductId] = useState<string | null>(null);
 
+  // ── Filling readiness (pulled up so the checklist memo can read
+  //    it). Filling Prep doesn't get ticked from this page — Manuela
+  //    cooks the whole batch via /plan/fillings (the weekly cook
+  //    view). Treat filling as ready when every required filling for
+  //    the plan's products has a fillingStock row with > 0 g left.
+  const fillingStockByFilling = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const fs of allFillingStock) {
+      m.set(fs.fillingId, (m.get(fs.fillingId) ?? 0) + Number(fs.remainingG ?? 0));
+    }
+    return m;
+  }, [allFillingStock]);
+  function isFillingReadyForPlan(planId: string): boolean {
+    const pps = todayPlanProducts.filter((pp) => pp.planId === planId);
+    if (pps.length === 0) return true;
+    for (const pp of pps) {
+      const layers = productFillingsByProduct.get(pp.productId) ?? [];
+      for (const layer of layers) {
+        const have = fillingStockByFilling.get(layer.fillingId) ?? 0;
+        if (have <= 0) return false;
+      }
+    }
+    return true;
+  }
+
   // Mould checklist for the active phase — one row per planProduct on
   // every plan that runs today AND whose product runs the active phase.
   // Click toggles the step done/undone.
@@ -323,14 +350,24 @@ export default function DailyV2Page() {
         return n.split(":")[0]?.toLowerCase() ?? "batch";
       })();
       const batchNumber = plan.batchNumber ?? plan.name ?? "—";
+      // Filling Prep: "done" reflects fillings-on-stock readiness,
+      // not an explicit step tick. Rows render with the same green
+      // check the other phases use, but a click bounces to the
+      // weekly cook view (handled in toggleRow).
+      const done = activePhase === "filling"
+        ? isFillingReadyForPlan(pp.planId)
+        : planPhaseDone(pp.planId, activePhase);
+      const filledSubline = activePhase === "filling"
+        ? `${batchNumber} · ${pp.quantity} pcs · ${done ? "filling ready" : "needs cooking"}`
+        : `${batchNumber} · ${pp.quantity} pcs`;
       rows.push({
         planId: pp.planId,
         planProductId: pp.id ?? `${pp.planId}-${pp.productId}`,
         productId: pp.productId,
         productName: product?.name ?? pp.productId.slice(0, 8),
         qty: pp.quantity,
-        done: planPhaseDone(pp.planId, activePhase),
-        subline: `${batchNumber} · ${pp.quantity} pcs`,
+        done,
+        subline: filledSubline,
         chip,
       });
     }
@@ -339,7 +376,8 @@ export default function DailyV2Page() {
       if (a.done !== b.done) return Number(a.done) - Number(b.done);
       return a.productName.localeCompare(b.productName);
     });
-  }, [todayPlanProducts, plansById, productById, doneByPlan, activePhase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayPlanProducts, plansById, productById, doneByPlan, activePhase, fillingStockByFilling, productFillingsByProduct]);
 
   // ── Inline unmould flow state. Two modals chain: YieldModal first
   //    (per-product yield/seconds/scrap), then AllocationSplitModal
@@ -453,6 +491,14 @@ export default function DailyV2Page() {
     for (let i = 0; i < idx; i++) {
       const prev = PHASES[i];
       if (!planPhases.has(prev.id)) continue;
+      // Filling prep is informational — counts as done when every
+      // required filling has stock available, even if no operator
+      // has explicitly ticked the step.
+      if (prev.id === "filling") {
+        if (isFillingReadyForPlan(planId)) continue;
+        if (planPhaseDone(planId, prev.id)) continue;
+        return { phase: prev.id, label: `${prev.label} (cook in weekly view first)` };
+      }
       if (!planPhaseDone(planId, prev.id)) {
         return { phase: prev.id, label: prev.label };
       }
@@ -461,6 +507,21 @@ export default function DailyV2Page() {
   }
 
   async function toggleRow(planId: string) {
+    // Filling Prep is informational on this page — cooking happens
+    // via /plan/fillings (weekly cook view). A click bounces the
+    // operator there with a status hint instead of writing a tick.
+    if (activePhase === "filling") {
+      const ready = isFillingReadyForPlan(planId);
+      const msg = ready
+        ? "Filling already cooked + on stock. No tick needed here — readiness is read from filling stock."
+        : "Some fillings for this batch aren't on stock yet. Cook them in the Weekly cook view (/plan/fillings).";
+      if (!ready && confirm(`${msg}\n\nOpen the cook list?`)) {
+        window.location.href = "/plan/fillings";
+      } else if (ready) {
+        alert(msg);
+      }
+      return;
+    }
     // Unmould opens the inline yield + allocation flow. Other phases
     // are simple boolean toggles on planStepStatus.
     if (activePhase === "unmould") {
@@ -999,6 +1060,12 @@ export default function DailyV2Page() {
     if (activePhase === "unmould" || activePhase === "packing") {
       alert(
         `${activeLabel} runs per batch — click each row's checkbox to capture yield and split between orders / POs / surplus.`,
+      );
+      return;
+    }
+    if (activePhase === "filling") {
+      alert(
+        "Filling Prep is informational here — cook the whole week's worth in /plan/fillings. The green/red badge per batch reflects whether the filling is on stock.",
       );
       return;
     }
