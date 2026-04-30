@@ -27,6 +27,7 @@ import {
 import type {
   Filling, FillingCategory, FillingIngredient, FillingStock,
   Mould, Order, OrderItem, PlanProduct, Product, ProductFilling,
+  Campaign, ProductionOrder, ProductionOrderItem,
 } from "@/types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -52,6 +53,12 @@ export interface WeeklyFillingInput {
   windowEnd?: Date;
   /** Optional "now" injection for deterministic tests. */
   now?: Date;
+  /** Internal-demand sources. Without these, the cook list only saw
+   *  customer orders — so refill/replen POs (Hazelnut Caramel,
+   *  Kalamansi etc) and campaign targets never showed up. */
+  campaigns?: Campaign[];
+  productionOrders?: ProductionOrder[];
+  productionOrderItems?: ProductionOrderItem[];
 }
 
 /** One row of the weekly cooking list. */
@@ -183,6 +190,82 @@ export function computeWeeklyFillingNeeds(input: WeeklyFillingInput): WeeklyFill
       quantity,
       sortOrder: 0,
     });
+  }
+
+  // PO-driven demand: every productionOrderItem on a pending /
+  // in_production PO (replen, internal) whose due date falls within
+  // the cook window contributes a synthetic planProduct so its
+  // fillings show up in the cook list. Without this, replen-only
+  // products (Hazelnut Caramel, Kalamansi etc) never appeared.
+  const todayMs = now.getTime();
+  for (const po of input.productionOrders ?? []) {
+    if (po.status !== "pending" && po.status !== "in_production") continue;
+    const dueMs = po.dueDate ? new Date(`${po.dueDate}T12:00:00`).getTime() : todayMs;
+    if (dueMs > windowEndMs) continue;
+    const items = (input.productionOrderItems ?? []).filter((it) => it.productionOrderId === po.id);
+    for (const it of items) {
+      const product = productById.get(it.productId);
+      if (!product) continue;
+      const mouldId = product.defaultMouldId;
+      const mould = mouldId ? mouldById.get(mouldId) : undefined;
+      if (!mould || !mould.numberOfCavities || mould.numberOfCavities <= 0) continue;
+      const quantity = Math.max(1, Math.ceil(it.targetUnits / mould.numberOfCavities));
+      const syntheticId = `wkf-po-${it.id}`;
+      // Map back to a synthetic "order" for the usedBy display so the
+      // operator sees which PO is driving the demand.
+      const fakeOrder: Order = {
+        id: `po:${po.id}`,
+        channel: "shop",
+        customerName: po.name ?? `PO · ${po.dueDate}`,
+        deadline: po.dueDate ? `${po.dueDate}T12:00:00.000Z` : new Date(windowEndMs).toISOString(),
+        priority: "normal",
+        status: "pending",
+      };
+      syntheticIdToOrder.set(syntheticId, { order: fakeOrder, productId: it.productId, pieces: it.targetUnits });
+      syntheticPlanProducts.push({
+        id: syntheticId,
+        planId: "weekly-filling-synthetic",
+        productId: it.productId,
+        mouldId: mould.id!,
+        quantity,
+        sortOrder: 0,
+      });
+    }
+  }
+
+  // Campaign productTargets — same expansion. Use startDate as the
+  // demand date (production runs ramp toward go-live).
+  for (const c of input.campaigns ?? []) {
+    if (c.status !== "planned" && c.status !== "active") continue;
+    const startMs = c.startDate ? new Date(`${c.startDate}T12:00:00`).getTime() : todayMs;
+    if (startMs > windowEndMs) continue;
+    const targets = c.productTargets ?? {};
+    for (const [pid, units] of Object.entries(targets)) {
+      const product = productById.get(pid);
+      if (!product || units <= 0) continue;
+      const mouldId = product.defaultMouldId;
+      const mould = mouldId ? mouldById.get(mouldId) : undefined;
+      if (!mould || !mould.numberOfCavities || mould.numberOfCavities <= 0) continue;
+      const quantity = Math.max(1, Math.ceil(units / mould.numberOfCavities));
+      const syntheticId = `wkf-camp-${c.id}-${pid}`;
+      const fakeOrder: Order = {
+        id: `campaign:${c.id}`,
+        channel: "shop",
+        customerName: `Campaign · ${c.name}`,
+        deadline: c.startDate ? `${c.startDate}T12:00:00.000Z` : new Date(windowEndMs).toISOString(),
+        priority: "normal",
+        status: "pending",
+      };
+      syntheticIdToOrder.set(syntheticId, { order: fakeOrder, productId: pid, pieces: units });
+      syntheticPlanProducts.push({
+        id: syntheticId,
+        planId: "weekly-filling-synthetic",
+        productId: pid,
+        mouldId: mould.id!,
+        quantity,
+        sortOrder: 0,
+      });
+    }
   }
 
   const fillingAmounts: FillingAmount[] = calculateFillingAmounts(

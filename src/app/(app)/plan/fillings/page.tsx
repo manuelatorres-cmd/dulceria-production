@@ -8,6 +8,7 @@ import {
   useOrders, useAllOrderItems, useProductsList, useMouldsList,
   useFillings, useFillingCategories, useCapacityConfig, useFillingStockItems,
   useIngredients, useAllIngredientStock,
+  useCampaigns, useProductionOrders, useAllProductionOrderItems,
   saveFillingStock, adjustIngredientStock,
 } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
@@ -110,6 +111,9 @@ export default function FillingConsolidationPage() {
     return amount;
   }
 
+  const campaigns = useCampaigns();
+  const productionOrdersForCook = useProductionOrders();
+  const productionOrderItemsForCook = useAllProductionOrderItems();
   const result = useMemo(() => {
     const windowEnd = new Date();
     windowEnd.setDate(windowEnd.getDate() + windowDays);
@@ -125,8 +129,11 @@ export default function FillingConsolidationPage() {
       fillingStock: stockItems,
       fillingBufferPercent: config?.fillingBufferPercent,
       windowEnd,
+      campaigns,
+      productionOrders: productionOrdersForCook,
+      productionOrderItems: productionOrderItemsForCook,
     });
-  }, [orders, orderItems, products, productFillings, fillingIngredients, fillings, fillingCategories, moulds, stockItems, config?.fillingBufferPercent, windowDays]);
+  }, [orders, orderItems, products, productFillings, fillingIngredients, fillings, fillingCategories, moulds, stockItems, config?.fillingBufferPercent, windowDays, campaigns, productionOrdersForCook, productionOrderItemsForCook]);
 
   const ingredientById = useMemo(() => new Map(ingredients.map((i) => [i.id!, i])), [ingredients]);
 
