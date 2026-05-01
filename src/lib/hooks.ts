@@ -9020,6 +9020,25 @@ export async function saveStockLocationMinimum(
   row: Omit<StockLocationMinimum, "id" | "updatedAt"> & { id?: string },
 ): Promise<string> {
   const now = new Date();
+  // A min of 0 is not a min — leaving the row in the table makes the
+  // replen seeder treat the (product, location) pair as "configured"
+  // and the regen sweep can't tell zombie restock plans apart from
+  // legitimate reduced thresholds. Saving 0 deletes the row.
+  const isZero = (row.minimumUnits ?? 0) <= 0;
+  if (isZero) {
+    if (row.id) {
+      const { error } = await supabase
+        .from("stockLocationMinimums")
+        .delete()
+        .eq("id", row.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["stock-location-minimums"] });
+      return row.id;
+    }
+    // No id + zero → nothing to save and nothing to delete; act as no-op.
+    queryClient.invalidateQueries({ queryKey: ["stock-location-minimums"] });
+    return "";
+  }
   if (row.id) {
     const { error } = await supabase
       .from("stockLocationMinimums")
