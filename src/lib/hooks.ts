@@ -1681,9 +1681,21 @@ export async function moveProductionStepsToDate(args: {
     }
 
     // Find / merge into target day's lineItem for the same plan.
-    const target = allLineItems.find(
-      (li) => li.planId === m.planId && li.productionDayId === targetDayId,
-    );
+    //
+    // Live-query the target row instead of reading from `allLineItems`:
+    // the cache can miss a row that exists in the DB (e.g. created by a
+    // recent regen) which previously caused 23505 on the
+    // (productionDayId, planId) unique constraint when we then tried to
+    // insert. Same fix that replaceProductionPlanning got earlier.
+    const target = assertOkMaybe(
+      await supabase
+        .from("productionDayLineItems")
+        .select("*")
+        .eq("planId", m.planId)
+        .eq("productionDayId", targetDayId)
+        .maybeSingle(),
+    ) as { id: string; stepIds: string[] | null; plannedMinutes: number; sortOrder: number } | null;
+
     if (target) {
       const merged = [...new Set([...(target.stepIds ?? []), m.stepId])];
       await supabase
@@ -1691,7 +1703,16 @@ export async function moveProductionStepsToDate(args: {
         .update({ stepIds: merged, updatedAt: new Date() })
         .eq("id", target.id);
       // Update local cache so subsequent moves see the merge.
-      target.stepIds = merged;
+      const cached = allLineItems.find((li) => li.id === target.id);
+      if (cached) cached.stepIds = merged;
+      else allLineItems.push({
+        id: target.id,
+        planId: m.planId,
+        productionDayId: targetDayId,
+        stepIds: merged,
+        plannedMinutes: target.plannedMinutes ?? 0,
+        sortOrder: target.sortOrder ?? 0,
+      });
     } else {
       const newRow = {
         id: newId(),
@@ -1703,7 +1724,10 @@ export async function moveProductionStepsToDate(args: {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      await supabase.from("productionDayLineItems").insert(newRow);
+      const { error: insertErr } = await supabase
+        .from("productionDayLineItems")
+        .insert(newRow);
+      if (insertErr) throw insertErr;
       allLineItems.push({
         id: newRow.id,
         planId: m.planId,
