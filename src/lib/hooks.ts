@@ -7610,6 +7610,110 @@ async function seedProductionOrderDrivenPlans(): Promise<{ warnings: string[]; d
 }
 
 /**
+ * Drop replen PO items + plans whose product no longer has an active
+ * `stockLocationMinimums` row. Without this step, deleting a min via
+ * /stock left the original Replen PO item + draft plan in place — the
+ * existing zombie sweep keyed off the parent PO **name**, which still
+ * exists if other products in the same daily bucket still have mins.
+ *
+ * Skips items whose plan is already in flight (active, or any planStepStatus
+ * row done). Those get to finish; future regens won't re-create them.
+ */
+async function dropStaleReplenItemsAndPlans(): Promise<void> {
+  const mins = assertOk(
+    await supabase.from("stockLocationMinimums").select("productId, minimumUnits"),
+  ) as Array<{ productId: string; minimumUnits: number }>;
+  const productsWithMin = new Set(
+    mins.filter((m) => (m.minimumUnits ?? 0) > 0).map((m) => m.productId),
+  );
+
+  const replenPos = assertOk(
+    await supabase
+      .from("productionOrders")
+      .select("id, name, status")
+      .eq("channel", "restock")
+      .ilike("name", "Replen ·%")
+      .in("status", ["pending", "in_production"]),
+  ) as Array<{ id: string; name: string; status: string }>;
+  if (replenPos.length === 0) return;
+
+  const poIds = replenPos.map((p) => p.id);
+  const items = assertOk(
+    await supabase
+      .from("productionOrderItems")
+      .select("id, productionOrderId, productId")
+      .in("productionOrderId", poIds),
+  ) as Array<{ id: string; productionOrderId: string; productId: string }>;
+  const staleItems = items.filter((it) => !productsWithMin.has(it.productId));
+  if (staleItems.length === 0) return;
+
+  const poById = new Map(replenPos.map((p) => [p.id, p]));
+
+  const replenPlans = assertOk(
+    await supabase
+      .from("productionPlans")
+      .select("id, name, status")
+      .ilike("name", "PO: Replen ·%")
+      .in("status", ["draft", "active"]),
+  ) as Array<{ id: string; name: string; status: string }>;
+  const replenPlanIds = replenPlans.map((p) => p.id);
+  const ppRows = replenPlanIds.length > 0
+    ? assertOk(
+        await supabase
+          .from("planProducts")
+          .select("planId, productId")
+          .in("planId", replenPlanIds),
+      ) as Array<{ planId: string; productId: string }>
+    : [];
+  const productByPlan = new Map<string, string>();
+  for (const r of ppRows) productByPlan.set(r.planId, r.productId);
+
+  // A plan is "in flight" if its status is active OR any step is done —
+  // mid-run replen batches must not be deleted out from under the
+  // chocolatier even after the user removes the min.
+  const startedPlanIds = new Set<string>();
+  if (replenPlanIds.length > 0) {
+    const stepDone = assertOk(
+      await supabase.from("planStepStatus")
+        .select("planId, done")
+        .in("planId", replenPlanIds),
+    ) as Array<{ planId: string; done: boolean }>;
+    for (const s of stepDone) if (s.done) startedPlanIds.add(s.planId);
+    for (const p of replenPlans) if (p.status === "active") startedPlanIds.add(p.id);
+  }
+
+  const itemsToDelete: string[] = [];
+  const plansToCancel: string[] = [];
+  for (const it of staleItems) {
+    const poName = poById.get(it.productionOrderId)?.name;
+    if (!poName) continue;
+    const namePrefix = `PO: ${poName} — `;
+    const matchingPlans = replenPlans.filter(
+      (pl) => pl.name.startsWith(namePrefix) && productByPlan.get(pl.id) === it.productId,
+    );
+    if (matchingPlans.some((pl) => startedPlanIds.has(pl.id))) continue;
+    itemsToDelete.push(it.id);
+    for (const pl of matchingPlans) plansToCancel.push(pl.id);
+  }
+
+  const CHUNK = 100;
+  for (let i = 0; i < itemsToDelete.length; i += CHUNK) {
+    const slice = itemsToDelete.slice(i, i + CHUNK);
+    await supabase.from("productionOrderItems").delete().in("id", slice);
+  }
+  for (let i = 0; i < plansToCancel.length; i += CHUNK) {
+    const slice = plansToCancel.slice(i, i + CHUNK);
+    await supabase
+      .from("productionPlans")
+      .update({ status: "cancelled", updatedAt: new Date() })
+      .in("id", slice);
+  }
+  console.log(
+    `[regen] dropped ${itemsToDelete.length} stale replen item(s); cancelled ${plansToCancel.length} plan(s)`,
+  );
+}
+
+/**
  * Replenishment seeder — converts (product × location) stock gaps into
  * **production orders**, not raw plans. The PO seeder downstream picks
  * them up and creates the actual plans, so replen work appears in
@@ -8022,6 +8126,7 @@ export async function regenerateAllPlansAndSchedule(staticInputs: {
   const reconcileResult = await step("regenerateAllProductionPlans", regenerateAllProductionPlans);
   const { warnings: campaignWarnings, deadlineByPlanId: campaignDeadlines } =
     await step("seedCampaignDrivenPlans", seedCampaignDrivenPlans);
+  await step("drop stale replen items + plans", dropStaleReplenItemsAndPlans);
   const replenWarnings = await step("seedReplenishmentDrivenPlans", seedReplenishmentDrivenPlans);
   const { warnings: poWarnings, deadlineByPlanId: poDeadlines } =
     await step("seedProductionOrderDrivenPlans", seedProductionOrderDrivenPlans);
