@@ -331,10 +331,17 @@ export default function DailyV2Page() {
     if (!userPicked) setActivePhase(defaultPhase);
   }, [defaultPhase, userPicked]);
 
+  // Per-phase product-category filter. null = "All". Cleared on phase
+  // switch so a filter set on Polishing doesn't carry over to Painting
+  // and silently hide everything (categories don't all share the same
+  // phase set).
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+
   function pickPhase(p: PhaseId) {
     setUserPicked(true);
     setActivePhase(p);
     setSelectedPlanProductId(null);
+    setCategoryFilter(null);
   }
 
   // Right-pane preview: tracks the planProductId the operator clicked
@@ -452,6 +459,26 @@ export default function DailyV2Page() {
     return pps.every((pp) => isFillingReadyForPlanProduct(pp));
   }
 
+  // Distinct product categories present in the active phase today —
+  // drives the filter chip row in the focus card header. Computed
+  // BEFORE applying `categoryFilter` so the chips themselves don't
+  // disappear when the filter narrows the visible list.
+  const availableCategoriesForPhase = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const pp of todayPlanProducts) {
+      if (!productHasPhase(pp.productId, activePhase)) continue;
+      const catId = productById.get(pp.productId)?.productCategoryId;
+      if (!catId) continue;
+      const name = categoryNameById.get(catId);
+      if (!name) continue;
+      byId.set(catId, name);
+    }
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayPlanProducts, productById, activePhase, categoryNameById]);
+
   // Mould checklist for the active phase — one row per planProduct on
   // every plan that runs today AND whose product runs the active phase.
   // Click toggles the step done/undone.
@@ -461,8 +488,9 @@ export default function DailyV2Page() {
       const plan = plansById.get(pp.planId);
       if (!plan) continue;
       if (!productHasPhase(pp.productId, activePhase)) continue;
-      const doneSet = doneByPlan.get(pp.planId) ?? new Set<string>();
       const product = productById.get(pp.productId);
+      if (categoryFilter && product?.productCategoryId !== categoryFilter) continue;
+      const doneSet = doneByPlan.get(pp.planId) ?? new Set<string>();
       const chip = (() => {
         const n = plan.name ?? "";
         const camp = n.match(/^Campaign:\s*(.+?)\s*—/i)?.[1];
@@ -525,7 +553,7 @@ export default function DailyV2Page() {
       return a.productName.localeCompare(b.productName);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayPlanProducts, plansById, productById, doneByPlan, activePhase, fillingStockByFilling, productFillingsByProduct]);
+  }, [todayPlanProducts, plansById, productById, doneByPlan, activePhase, categoryFilter, fillingStockByFilling, productFillingsByProduct]);
 
   // ── Inline unmould flow state. Two modals chain: YieldModal first
   //    (per-product yield/seconds/scrap), then AllocationSplitModal
@@ -1590,6 +1618,43 @@ export default function DailyV2Page() {
                 }}
               />
             </div>
+
+            {/* Category filter chips — only shown when this phase has
+                products from more than one category today, so single-
+                category phases (e.g. all-bar Packing days) don't show
+                a useless 1-chip row. */}
+            {availableCategoriesForPhase.length > 1 && (
+              <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+                <span
+                  className="text-[11px] uppercase opacity-75 mr-1"
+                  style={{ letterSpacing: "0.08em" }}
+                >
+                  Filter
+                </span>
+                {[
+                  { id: null as string | null, name: "All" },
+                  ...availableCategoriesForPhase,
+                ].map((c) => {
+                  const active = categoryFilter === c.id;
+                  return (
+                    <button
+                      key={c.id ?? "all"}
+                      type="button"
+                      onClick={() => setCategoryFilter(c.id)}
+                      className="text-[11.5px] px-2.5 py-0.5 rounded-full transition"
+                      style={{
+                        background: active ? tint.ink : "rgba(255,255,255,0.6)",
+                        color: active ? "#fff" : tint.ink,
+                        border: active ? "none" : `1px solid ${tint.ink}`,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* 2-column layout — checklist on the left, full step
                 detail for the selected batch on the right. Without a
