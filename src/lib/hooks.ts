@@ -7668,22 +7668,34 @@ async function dropStaleReplenItemsAndPlans(): Promise<void> {
   const productByPlan = new Map<string, string>();
   for (const r of ppRows) productByPlan.set(r.planId, r.productId);
 
-  // A plan is "in flight" if its status is active OR any step is done —
-  // mid-run replen batches must not be deleted out from under the
-  // chocolatier even after the user removes the min.
+  // A plan is "in flight" if its status is active OR any **per-pp** step
+  // key is done. Bare keys like `polishing` / `shell` (no `-` suffix) are
+  // legacy plan-wide markers from before the per-pp model and don't count
+  // as in-flight — without this, an old plan whose user once ticked the
+  // legacy bare keys is forever undeletable even after the underlying
+  // demand has been removed.
   const startedPlanIds = new Set<string>();
   if (replenPlanIds.length > 0) {
     const stepDone = assertOk(
       await supabase.from("planStepStatus")
-        .select("planId, done")
+        .select("planId, stepKey, done")
         .in("planId", replenPlanIds),
-    ) as Array<{ planId: string; done: boolean }>;
-    for (const s of stepDone) if (s.done) startedPlanIds.add(s.planId);
+    ) as Array<{ planId: string; stepKey: string; done: boolean }>;
+    for (const s of stepDone) {
+      if (!s.done) continue;
+      // Per-pp step keys all contain a hyphen (e.g. `polishing-<ppId>`,
+      // `colour-<ppId>-<idx>`, `filling-<ppId>-mould-<n>`). Bare-word keys
+      // are pre-per-pp legacy.
+      if (!s.stepKey || !s.stepKey.includes("-")) continue;
+      startedPlanIds.add(s.planId);
+    }
     for (const p of replenPlans) if (p.status === "active") startedPlanIds.add(p.id);
   }
 
+  // Pass 1 — items whose product no longer has a min: delete the item
+  // and cancel its linked plan (when one exists and isn't in flight).
   const itemsToDelete: string[] = [];
-  const plansToCancel: string[] = [];
+  const plansToCancel = new Set<string>();
   for (const it of staleItems) {
     const poName = poById.get(it.productionOrderId)?.name;
     if (!poName) continue;
@@ -7693,7 +7705,41 @@ async function dropStaleReplenItemsAndPlans(): Promise<void> {
     );
     if (matchingPlans.some((pl) => startedPlanIds.has(pl.id))) continue;
     itemsToDelete.push(it.id);
-    for (const pl of matchingPlans) plansToCancel.push(pl.id);
+    for (const pl of matchingPlans) plansToCancel.add(pl.id);
+  }
+
+  // Pass 2 — replen plans that are orphans because their PO item was
+  // already deleted (e.g. by an earlier cleanup, manual delete, or
+  // legacy code path). Detection: plan's planProducts.productId not
+  // present in any item of the parent PO whose name matches the plan
+  // name's prefix. Same in-flight guard.
+  const itemsByPo = new Map<string, Array<{ productId: string }>>();
+  for (const it of items) {
+    const arr = itemsByPo.get(it.productionOrderId) ?? [];
+    arr.push({ productId: it.productId });
+    itemsByPo.set(it.productionOrderId, arr);
+  }
+  const poByName = new Map(replenPos.map((p) => [p.name, p]));
+  for (const pl of replenPlans) {
+    if (startedPlanIds.has(pl.id)) continue;
+    if (plansToCancel.has(pl.id)) continue;
+    if (!pl.name.startsWith("PO: ")) continue;
+    const rest = pl.name.slice("PO: ".length);
+    const dash = rest.indexOf(" — ");
+    if (dash < 0) continue;
+    const parentName = rest.slice(0, dash);
+    const parent = poByName.get(parentName);
+    if (!parent) continue; // existing zombie sweep handles missing parent
+    const planProductId = productByPlan.get(pl.id);
+    if (!planProductId) {
+      // No planProducts row at all — definite orphan, cancel.
+      plansToCancel.add(pl.id);
+      continue;
+    }
+    const itemsOnParent = itemsByPo.get(parent.id) ?? [];
+    if (!itemsOnParent.some((it) => it.productId === planProductId)) {
+      plansToCancel.add(pl.id);
+    }
   }
 
   const CHUNK = 100;
@@ -7701,15 +7747,16 @@ async function dropStaleReplenItemsAndPlans(): Promise<void> {
     const slice = itemsToDelete.slice(i, i + CHUNK);
     await supabase.from("productionOrderItems").delete().in("id", slice);
   }
-  for (let i = 0; i < plansToCancel.length; i += CHUNK) {
-    const slice = plansToCancel.slice(i, i + CHUNK);
+  const cancelIds = [...plansToCancel];
+  for (let i = 0; i < cancelIds.length; i += CHUNK) {
+    const slice = cancelIds.slice(i, i + CHUNK);
     await supabase
       .from("productionPlans")
       .update({ status: "cancelled", updatedAt: new Date() })
       .in("id", slice);
   }
   console.log(
-    `[regen] dropped ${itemsToDelete.length} stale replen item(s); cancelled ${plansToCancel.length} plan(s)`,
+    `[regen] dropped ${itemsToDelete.length} stale replen item(s); cancelled ${cancelIds.length} plan(s)`,
   );
 }
 
