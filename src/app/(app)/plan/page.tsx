@@ -29,6 +29,21 @@ import {
 const CARD = "bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
 const INNER = "rounded-[12px] border border-border";
 
+/** Render Error / Supabase / unknown into a single human-readable line.
+ *  PostgREST errors aren't Error instances; rendering them via err.message
+ *  alone drops the .code/.details/.hint that explain the actual cause. */
+function formatError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const o = e as { message?: string; details?: string; hint?: string; code?: string };
+    const core = o.message || o.details || "Operation failed";
+    const code = o.code ? ` (code ${o.code})` : "";
+    const hint = o.hint ? ` — ${o.hint}` : "";
+    return `${core}${code}${hint}`;
+  }
+  return String(e);
+}
+
 type Level = "ok" | "warn" | "critical" | "over";
 
 const LEVEL_TINT: Record<Level, string> = {
@@ -1232,7 +1247,8 @@ function WeekView(props: {
         });
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Move failed");
+      console.error("[week] move failed:", err);
+      alert(`Move failed: ${formatError(err)}`);
     } finally {
       setPendingDrop(null);
     }
@@ -3457,7 +3473,7 @@ function PivotView(props: {
       console.log(`[pivot] refetch done — UI should now reflect new day`);
     } catch (err) {
       console.error("[pivot] move failed:", err);
-      alert(err instanceof Error ? err.message : "Move failed");
+      alert(`Move failed: ${formatError(err)}`);
     }
   }
 
@@ -4252,7 +4268,7 @@ function MonthView(props: {
       setOpenIsos((cur) => (cur.includes(targetDate) ? cur : [...cur, targetDate]));
     } catch (err) {
       console.error("[month] move failed:", err);
-      alert(err instanceof Error ? err.message : "Move failed");
+      alert(`Move failed: ${formatError(err)}`);
     }
   }
 
