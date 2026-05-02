@@ -1516,9 +1516,11 @@ export default function DailyV2Page() {
 
       {/* Horizontal step progress bar — every phase as a tinted
           segment showing done / pending counts so the workshop
-          floor sees the day's shape at a glance. Click to focus. */}
+          floor sees the day's shape at a glance. Click to focus.
+          Phases with no batches today are hidden so the strip stays
+          tight (e.g. Packing only appears on bar-production days). */}
       <div className="flex gap-1 mb-4 overflow-x-auto">
-        {PHASES.map((ph) => {
+        {PHASES.filter((ph) => rollups[ph.id].totalBatches > 0).map((ph) => {
           const r = rollups[ph.id];
           const phTint = PHASE_TINT[ph.id];
           const isActive = activePhase === ph.id;
@@ -1997,10 +1999,12 @@ export default function DailyV2Page() {
             )}
           </div>
 
-          {/* Phase peek-card grid — compact, click to focus. */}
+          {/* Phase peek-card grid — compact, click to focus. Same
+              hide-empty rule as the top strip: phases without batches
+              today drop out so the grid only shows active work. */}
           <section className="rounded-[14px] bg-white/65 backdrop-blur-2xl border border-white/60 p-2">
             <ul className="grid grid-cols-4 lg:grid-cols-8 gap-1.5">
-              {PHASES.map((ph) => {
+              {PHASES.filter((ph) => rollups[ph.id].totalBatches > 0).map((ph) => {
                 const r = rollups[ph.id];
                 const pct = r.totalBatches === 0 ? 0 : Math.round((r.doneBatches / r.totalBatches) * 100);
                 const status: "done" | "active" | "todo" =
