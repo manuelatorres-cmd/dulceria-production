@@ -4771,12 +4771,15 @@ export async function boxUpVariant(args: {
   count: number;
   /** Where the boxed inventory lands. Usually 'store'. */
   destination: StockLocation;
-  /** Where loose pieces are pulled from. Defaults to 'production'. */
-  sourceLocation?: "production" | "store";
+  /** Locations to pull loose pieces from, in priority order. Default
+   *  drains 'production' first (fresh from unmould) then falls back to
+   *  'store' (already on shop floor) so the operator can box pieces
+   *  wherever they happen to be. */
+  sourceLocations?: Array<"production" | "store">;
 }): Promise<void> {
   const count = Math.max(0, Math.round(args.count));
   if (count === 0) return;
-  const sourceLocation = args.sourceLocation ?? "production";
+  const sourceLocations = args.sourceLocations ?? ["production", "store"];
   if (args.destination === "allocated") {
     throw new Error("boxUpVariant: cannot land boxes directly in 'allocated' — that's reserved for sale-time tagging.");
   }
@@ -4796,7 +4799,7 @@ export async function boxUpVariant(args: {
   ) as VariantPackagingComponent[];
 
   // 2. Validate piece availability per product. Sum across all batches
-  //    in the source location.
+  //    across every source location in priority order.
   const productIds = [...new Set(composition.map((c) => c.productId))];
   if (productIds.length === 0) {
     throw new Error("boxUpVariant: variant has no composition — cannot box up an empty variant.");
@@ -4804,32 +4807,24 @@ export async function boxUpVariant(args: {
   const planProducts = assertOk(
     await supabase.from("planProducts").select("id, productId").in("productId", productIds),
   ) as Array<{ id: string; productId: string }>;
-  const planProductIdsByProduct = new Map<string, string[]>();
-  for (const pp of planProducts) {
-    const arr = planProductIdsByProduct.get(pp.productId) ?? [];
-    arr.push(pp.id);
-    planProductIdsByProduct.set(pp.productId, arr);
-  }
   const allPpIds = planProducts.map((p) => p.id);
   const stockRows = allPpIds.length > 0
     ? assertOk(
         await supabase
           .from("stockLocations")
-          .select("planProductId, quantity")
-          .eq("location", sourceLocation)
+          .select("planProductId, location, quantity")
+          .in("location", sourceLocations)
           .is("orderId", null)
           .is("productionOrderId", null)
           .in("planProductId", allPpIds),
-      ) as Array<{ planProductId: string; quantity: number }>
+      ) as Array<{ planProductId: string; location: StockLocation; quantity: number }>
     : [];
-  const onHandByPp = new Map<string, number>();
-  for (const r of stockRows) {
-    onHandByPp.set(r.planProductId, (onHandByPp.get(r.planProductId) ?? 0) + (r.quantity ?? 0));
-  }
+  const ppToProduct = new Map(planProducts.map((p) => [p.id, p.productId]));
   const onHandByProduct = new Map<string, number>();
-  for (const pp of planProducts) {
-    const have = onHandByPp.get(pp.id) ?? 0;
-    onHandByProduct.set(pp.productId, (onHandByProduct.get(pp.productId) ?? 0) + have);
+  for (const r of stockRows) {
+    const pid = ppToProduct.get(r.planProductId);
+    if (!pid) continue;
+    onHandByProduct.set(pid, (onHandByProduct.get(pid) ?? 0) + (r.quantity ?? 0));
   }
 
   for (const c of composition) {
@@ -4837,7 +4832,7 @@ export async function boxUpVariant(args: {
     const have = onHandByProduct.get(c.productId) ?? 0;
     if (have < need) {
       throw new Error(
-        `boxUpVariant: short on product ${c.productId} — need ${need} pieces in ${sourceLocation}, have ${have}.`,
+        `boxUpVariant: short on product ${c.productId} — need ${need} pieces (any of ${sourceLocations.join(" / ")}), have ${have}.`,
       );
     }
   }
@@ -4856,30 +4851,43 @@ export async function boxUpVariant(args: {
     }
   }
 
-  // 4. Consume pieces FIFO per composition product. Each call also
-  //    inserts a regular stockMovement; we follow with a variant-tagged
-  //    movement so HACCP can join target=variantPackagingId back to
-  //    source planProductId.
+  // 4. Consume pieces FIFO per composition product, walking the source
+  //    locations in priority order until the need is met. Each
+  //    moveProductStockFifo call inserts a regular stockMovement; we
+  //    follow with a variant-tagged movement so HACCP can join
+  //    target=variantPackagingId back to source planProductId.
   for (const c of composition) {
-    const need = c.qty * count;
-    const moves = await moveProductStockFifo({
-      productId: c.productId,
-      fromLocation: sourceLocation,
-      toLocation: null,
-      quantity: need,
-      reason: "box_up",
-      notes: `Box up ${count} × ${args.variantPackagingId}`,
-    });
-    for (const m of moves) {
-      await logStockMovement({
-        planProductId: m.planProductId,
+    let remaining = c.qty * count;
+    for (const loc of sourceLocations) {
+      if (remaining <= 0) break;
+      const moves = await moveProductStockFifo({
         productId: c.productId,
-        fromLocation: sourceLocation,
-        quantity: m.quantity,
-        variantPackagingId: args.variantPackagingId,
-        reason: "box_up_link",
-        notes: `Box-up trace: ${m.quantity} pcs of ${c.productId} → variant ${args.variantPackagingId}`,
+        fromLocation: loc,
+        toLocation: null,
+        quantity: remaining,
+        reason: "box_up",
+        notes: `Box up ${count} × ${args.variantPackagingId}`,
       });
+      let drained = 0;
+      for (const m of moves) {
+        drained += m.quantity;
+        await logStockMovement({
+          planProductId: m.planProductId,
+          productId: c.productId,
+          fromLocation: loc,
+          quantity: m.quantity,
+          variantPackagingId: args.variantPackagingId,
+          reason: "box_up_link",
+          notes: `Box-up trace: ${m.quantity} pcs of ${c.productId} from ${loc} → variant ${args.variantPackagingId}`,
+        });
+      }
+      remaining -= drained;
+    }
+    if (remaining > 0) {
+      // Validation should have caught this, but defensive — bail loud.
+      throw new Error(
+        `boxUpVariant: ran short mid-flight on product ${c.productId} (${remaining} pieces unaccounted). State may need manual reconciliation.`,
+      );
     }
   }
 
@@ -4904,7 +4912,7 @@ export async function boxUpVariant(args: {
     quantity: count,
     variantPackagingId: args.variantPackagingId,
     reason: "box_up",
-    notes: `Built ${count} box${count === 1 ? "" : "es"} from ${sourceLocation} pieces`,
+    notes: `Built ${count} box${count === 1 ? "" : "es"} from ${sourceLocations.join(" / ")} pieces`,
   });
 
   queryClient.invalidateQueries({ queryKey: ["variant-stock-locations"] });
