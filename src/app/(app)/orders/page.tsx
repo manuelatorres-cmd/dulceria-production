@@ -32,6 +32,7 @@ import { Plus, Search, AlertTriangle, ShoppingBag, X, Warehouse, Flame } from "l
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   pending: "bg-muted text-muted-foreground",
+  ready_to_pack: "bg-status-ok-bg text-status-ok",
   in_production: "bg-status-warn-bg text-status-warn",
   done: "bg-status-ok-bg text-status-ok",
   cancelled: "bg-muted text-muted-foreground/60 line-through",
@@ -172,7 +173,7 @@ export default function OrdersPage() {
   const statusCounts = useMemo(() => {
     const counts: Record<FilterStatus, number> = {
       all: orders.length,
-      pending: 0, in_production: 0, done: 0, cancelled: 0,
+      pending: 0, ready_to_pack: 0, in_production: 0, done: 0, cancelled: 0,
     };
     for (const o of orders) counts[o.status] += 1;
     return counts;

@@ -1791,11 +1791,12 @@ export const ORDER_PRIORITY_LABELS: Record<OrderPriority, string> = {
   urgent: "Urgent",
 };
 
-export const ORDER_STATUSES = ["pending", "in_production", "done", "cancelled"] as const;
+export const ORDER_STATUSES = ["pending", "ready_to_pack", "in_production", "done", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending: "Pending",
+  ready_to_pack: "Ready to pack",
   in_production: "In production",
   done: "Done",
   cancelled: "Cancelled",

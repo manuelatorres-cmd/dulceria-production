@@ -6910,6 +6910,89 @@ async function onOrderItemChanged(orderId: string): Promise<void> {
   // we never recursively generate children for children.
   if (order.channel === "shop" && order.sourceOrderId) return;
   await syncReplenishmentOrder(orderId);
+  await refreshOrderReadyStatus(orderId);
+}
+
+/**
+ * Flip order.status between 'pending' and 'ready_to_pack' based on
+ * whether every line is fully fulfilled from stock. Does not touch
+ * orders in terminal states (in_production / done / cancelled) — those
+ * have their own life cycle.
+ *
+ * "Ready to pack" =
+ *   - At least one orderItem exists.
+ *   - Every orderItem is fulfilmentMode='borrow' (no production demand).
+ *   - Every borrow line has allocated stockLocations rows for this order
+ *     summing to ≥ the line quantity (per product).
+ *
+ * If those conditions stop holding (e.g. an allocation later released),
+ * status demotes back to 'pending'.
+ */
+async function refreshOrderReadyStatus(orderId: string): Promise<void> {
+  const order = assertOkMaybe(
+    await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
+  ) as Order | null;
+  if (!order) return;
+  if (order.status !== "pending" && order.status !== "ready_to_pack") return;
+
+  const items = assertOk(
+    await supabase
+      .from("orderItems")
+      .select("productId, quantity, fulfilmentMode")
+      .eq("orderId", orderId),
+  ) as Array<{ productId: string; quantity: number; fulfilmentMode: string | null }>;
+
+  const allBorrow = items.length > 0
+    && items.every((i) => (i.fulfilmentMode ?? "produce") === "borrow");
+
+  let ready = false;
+  if (allBorrow) {
+    // Sum allocated stock per product for this order. Stock rows are
+    // keyed by planProductId; join via planProducts to get productId.
+    const allocatedRows = assertOk(
+      await supabase
+        .from("stockLocations")
+        .select("planProductId, quantity")
+        .eq("orderId", orderId)
+        .eq("location", "allocated"),
+    ) as Array<{ planProductId: string; quantity: number }>;
+    const ppIds = [...new Set(allocatedRows.map((r) => r.planProductId))];
+    const pps = ppIds.length > 0
+      ? assertOk(
+          await supabase
+            .from("planProducts")
+            .select("id, productId")
+            .in("id", ppIds),
+        ) as Array<{ id: string; productId: string }>
+      : [];
+    const productByPp = new Map(pps.map((p) => [p.id, p.productId]));
+    const allocatedByProduct = new Map<string, number>();
+    for (const row of allocatedRows) {
+      const pid = productByPp.get(row.planProductId);
+      if (!pid) continue;
+      allocatedByProduct.set(pid, (allocatedByProduct.get(pid) ?? 0) + row.quantity);
+    }
+    // Aggregate requested per product across multiple lines for the same SKU.
+    const requestedByProduct = new Map<string, number>();
+    for (const it of items) {
+      requestedByProduct.set(
+        it.productId,
+        (requestedByProduct.get(it.productId) ?? 0) + it.quantity,
+      );
+    }
+    ready = [...requestedByProduct.entries()].every(
+      ([pid, qty]) => (allocatedByProduct.get(pid) ?? 0) >= qty,
+    );
+  }
+
+  const nextStatus = ready ? "ready_to_pack" : "pending";
+  if (nextStatus === order.status) return;
+  const { error } = await supabase
+    .from("orders")
+    .update({ status: nextStatus, updatedAt: new Date() })
+    .eq("id", orderId);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
 }
 
 // =====================================================================
@@ -10143,9 +10226,42 @@ export async function importOnlineOrders(input: OnlineOrderImportInput[]): Promi
     if (insItemsErr) throw insItemsErr;
   }
 
+  // Borrow lines need stock allocated against the order. saveOrderItem
+  // does this on the native form path, but the import batches the
+  // inserts so we walk the rows here. Failures are caught per-line so
+  // one short SKU doesn't abort the whole import — the order stays
+  // 'pending' and refreshOrderReadyStatus will skip the promotion.
+  for (const row of productItemRows) {
+    if (row.fulfilmentMode !== "borrow") continue;
+    try {
+      await allocateLineFromStore({
+        orderId: row.orderId,
+        productId: row.productId,
+        quantity: row.quantity,
+      });
+    } catch (e) {
+      console.warn(
+        `[importOnlineOrders] borrow allocation failed for order ${row.orderId}, product ${row.productId}:`,
+        e,
+      );
+    }
+  }
+
+  // Promote any fully-allocated orders to ready_to_pack so the operator
+  // sees a clear "ship me" badge without drilling in.
+  const newOrderIds = orderRows.map((o) => o.id);
+  for (const oid of newOrderIds) {
+    try {
+      await refreshOrderReadyStatus(oid);
+    } catch (e) {
+      console.warn(`[importOnlineOrders] refreshOrderReadyStatus failed for ${oid}:`, e);
+    }
+  }
+
   queryClient.invalidateQueries({ queryKey: ["orders"] });
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
   queryClient.invalidateQueries({ queryKey: ["order-variant-lines"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
   return fresh.length;
 }
 
