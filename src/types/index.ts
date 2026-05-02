@@ -2209,10 +2209,27 @@ export interface StockMovement {
    *  with orderId in practice — a row tags either a customer order
    *  or a production order, never both. */
   productionOrderId?: string;
+  /** Set when pieces are consumed by box-up into a variant size, or
+   *  when a variant unit is sold / returned. Lets HACCP trace
+   *  bars-from-batch-X → boxes-of-variant-Y in either direction
+   *  (mig 0084). */
+  variantPackagingId?: string;
   reason?: StockMovementReason | string;
   movedBy?: string;
   notes?: string;
   movedAt: Date;
+}
+
+/** Per-variant, per-location pre-built box inventory. Mirrors
+ *  `stockLocations` shape but keys on variantPackagingId. Mig 0084. */
+export interface VariantStockLocation {
+  id?: string;
+  variantPackagingId: string;
+  location: StockLocation;
+  orderId?: string | null;
+  productionOrderId?: string | null;
+  quantity: number;
+  updatedAt?: Date;
 }
 
 /** Per-product, per-location minimum stock level. Supersedes the

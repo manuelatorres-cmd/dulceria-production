@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, VariantStockLocation, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, CHANNEL_FULFILMENT_DEFAULTS, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -4643,6 +4643,274 @@ export async function replaceVariantPackagingProducts(
     if (ins.error) throw ins.error;
   }
   queryClient.invalidateQueries({ queryKey: ["variant-packaging-products"] });
+}
+
+// --- Variant on-hand inventory (pre-built boxes) ---
+//
+// `variantStockLocations` (mig 0084) tracks how many pre-built boxes of
+// a given variant size are sitting in each location (shop store /
+// production storage / freezer / allocated-to-order). Operator triggers
+// box-up via /picking tab 2: composition products + packaging
+// components are consumed, variant on-hand goes up.
+//
+// Sale paths read variant on-hand FIRST when fulfilling boxed-variant
+// orders, falling through to loose product pieces only if no pre-built
+// box exists.
+
+/** All variant-on-hand rows. Caller can group / filter. */
+export function useVariantStockLocations(): VariantStockLocation[] {
+  const { data } = useQuery({
+    queryKey: ["variant-stock-locations"],
+    queryFn: async () => {
+      const r = await supabase.from("variantStockLocations").select("*");
+      return assertOk(r) as VariantStockLocation[];
+    },
+  });
+  return data ?? [];
+}
+
+/** Sum on-hand across all locations for one variant size. */
+export function useVariantStockTotal(variantPackagingId: string | undefined): number {
+  const rows = useVariantStockLocations();
+  if (!variantPackagingId) return 0;
+  return rows
+    .filter((r) => r.variantPackagingId === variantPackagingId)
+    .reduce((s, r) => s + (r.quantity ?? 0), 0);
+}
+
+/** Add `delta` (signed) to the unallocated `(variantPackagingId, location)`
+ *  row, creating it on first write. Negative delta clamps at 0. */
+async function adjustVariantStockLocation(
+  variantPackagingId: string,
+  location: StockLocation,
+  delta: number,
+): Promise<void> {
+  if (delta === 0) return;
+  const existing = assertOkMaybe(
+    await supabase
+      .from("variantStockLocations")
+      .select("*")
+      .eq("variantPackagingId", variantPackagingId)
+      .eq("location", location)
+      .is("orderId", null)
+      .is("productionOrderId", null)
+      .maybeSingle(),
+  ) as VariantStockLocation | null;
+  const now = new Date();
+  if (existing) {
+    const next = Math.max(0, (existing.quantity ?? 0) + delta);
+    const { error } = await supabase
+      .from("variantStockLocations")
+      .update({ quantity: next, updatedAt: now })
+      .eq("id", existing.id!);
+    if (error) throw error;
+  } else if (delta > 0) {
+    const { error } = await supabase.from("variantStockLocations").insert({
+      id: newId(),
+      variantPackagingId,
+      location,
+      quantity: delta,
+      updatedAt: now,
+    });
+    if (error) throw error;
+  }
+  queryClient.invalidateQueries({ queryKey: ["variant-stock-locations"] });
+}
+
+/** Manual on-hand adjustment for a single (variantPackagingId, location).
+ *  Sets the absolute count rather than applying a delta — used by the
+ *  variant detail page when the operator types a count to fix drift.
+ *  Logs an audit row with reason='recount'. */
+export async function setVariantStockOnHand(args: {
+  variantPackagingId: string;
+  location: StockLocation;
+  quantity: number;
+  notes?: string;
+}): Promise<void> {
+  const wanted = Math.max(0, Math.round(args.quantity));
+  const existing = assertOkMaybe(
+    await supabase
+      .from("variantStockLocations")
+      .select("*")
+      .eq("variantPackagingId", args.variantPackagingId)
+      .eq("location", args.location)
+      .is("orderId", null)
+      .is("productionOrderId", null)
+      .maybeSingle(),
+  ) as VariantStockLocation | null;
+  const current = existing?.quantity ?? 0;
+  if (wanted === current) return;
+  const delta = wanted - current;
+  await adjustVariantStockLocation(args.variantPackagingId, args.location, delta);
+  // Audit row — direction depends on sign of delta.
+  await logStockMovement({
+    planProductId: "" as unknown as string, // no batch source for manual recount
+    productId: "" as unknown as string,
+    fromLocation: delta < 0 ? args.location : undefined,
+    toLocation: delta > 0 ? args.location : undefined,
+    quantity: Math.abs(delta),
+    variantPackagingId: args.variantPackagingId,
+    reason: "recount",
+    notes: args.notes ?? `Manual on-hand correction (${current} → ${wanted})`,
+  });
+}
+
+/**
+ * Box up `count` units of one variant size: consume the composition
+ * products + packaging components, increment variant on-hand at the
+ * chosen destination, and log audit movements tagged with the variant
+ * for HACCP trace.
+ *
+ * Validates availability before mutating — throws cleanly if any
+ * composition product or packaging component is short. Source location
+ * for pieces defaults to 'production' (where unmould lands them) but can
+ * be overridden when boxing pieces already in 'store'.
+ */
+export async function boxUpVariant(args: {
+  variantPackagingId: string;
+  count: number;
+  /** Where the boxed inventory lands. Usually 'store'. */
+  destination: StockLocation;
+  /** Where loose pieces are pulled from. Defaults to 'production'. */
+  sourceLocation?: "production" | "store";
+}): Promise<void> {
+  const count = Math.max(0, Math.round(args.count));
+  if (count === 0) return;
+  const sourceLocation = args.sourceLocation ?? "production";
+  if (args.destination === "allocated") {
+    throw new Error("boxUpVariant: cannot land boxes directly in 'allocated' — that's reserved for sale-time tagging.");
+  }
+
+  // 1. Read composition + components.
+  const composition = assertOk(
+    await supabase
+      .from("variantPackagingProducts")
+      .select("*")
+      .eq("variantPackagingId", args.variantPackagingId),
+  ) as VariantPackagingProduct[];
+  const components = assertOk(
+    await supabase
+      .from("variantPackagingComponents")
+      .select("*")
+      .eq("variantPackagingId", args.variantPackagingId),
+  ) as VariantPackagingComponent[];
+
+  // 2. Validate piece availability per product. Sum across all batches
+  //    in the source location.
+  const productIds = [...new Set(composition.map((c) => c.productId))];
+  if (productIds.length === 0) {
+    throw new Error("boxUpVariant: variant has no composition — cannot box up an empty variant.");
+  }
+  const planProducts = assertOk(
+    await supabase.from("planProducts").select("id, productId").in("productId", productIds),
+  ) as Array<{ id: string; productId: string }>;
+  const planProductIdsByProduct = new Map<string, string[]>();
+  for (const pp of planProducts) {
+    const arr = planProductIdsByProduct.get(pp.productId) ?? [];
+    arr.push(pp.id);
+    planProductIdsByProduct.set(pp.productId, arr);
+  }
+  const allPpIds = planProducts.map((p) => p.id);
+  const stockRows = allPpIds.length > 0
+    ? assertOk(
+        await supabase
+          .from("stockLocations")
+          .select("planProductId, quantity")
+          .eq("location", sourceLocation)
+          .is("orderId", null)
+          .is("productionOrderId", null)
+          .in("planProductId", allPpIds),
+      ) as Array<{ planProductId: string; quantity: number }>
+    : [];
+  const onHandByPp = new Map<string, number>();
+  for (const r of stockRows) {
+    onHandByPp.set(r.planProductId, (onHandByPp.get(r.planProductId) ?? 0) + (r.quantity ?? 0));
+  }
+  const onHandByProduct = new Map<string, number>();
+  for (const pp of planProducts) {
+    const have = onHandByPp.get(pp.id) ?? 0;
+    onHandByProduct.set(pp.productId, (onHandByProduct.get(pp.productId) ?? 0) + have);
+  }
+
+  for (const c of composition) {
+    const need = c.qty * count;
+    const have = onHandByProduct.get(c.productId) ?? 0;
+    if (have < need) {
+      throw new Error(
+        `boxUpVariant: short on product ${c.productId} — need ${need} pieces in ${sourceLocation}, have ${have}.`,
+      );
+    }
+  }
+
+  // 3. Validate packaging-component availability.
+  for (const k of components) {
+    const need = k.qtyPerVariant * count;
+    const row = assertOkMaybe(
+      await supabase.from("packaging").select("quantityOnHand").eq("id", k.packagingId).maybeSingle(),
+    ) as { quantityOnHand?: number } | null;
+    const have = row?.quantityOnHand ?? 0;
+    if (have < need) {
+      throw new Error(
+        `boxUpVariant: short on packaging ${k.packagingId} — need ${need} units, have ${have}.`,
+      );
+    }
+  }
+
+  // 4. Consume pieces FIFO per composition product. Each call also
+  //    inserts a regular stockMovement; we follow with a variant-tagged
+  //    movement so HACCP can join target=variantPackagingId back to
+  //    source planProductId.
+  for (const c of composition) {
+    const need = c.qty * count;
+    const moves = await moveProductStockFifo({
+      productId: c.productId,
+      fromLocation: sourceLocation,
+      toLocation: null,
+      quantity: need,
+      reason: "box_up",
+      notes: `Box up ${count} × ${args.variantPackagingId}`,
+    });
+    for (const m of moves) {
+      await logStockMovement({
+        planProductId: m.planProductId,
+        productId: c.productId,
+        fromLocation: sourceLocation,
+        quantity: m.quantity,
+        variantPackagingId: args.variantPackagingId,
+        reason: "box_up_link",
+        notes: `Box-up trace: ${m.quantity} pcs of ${c.productId} → variant ${args.variantPackagingId}`,
+      });
+    }
+  }
+
+  // 5. Consume packaging components.
+  for (const k of components) {
+    const need = k.qtyPerVariant * count;
+    await consumePackaging({
+      packagingId: k.packagingId,
+      quantity: need,
+      note: `Box up ${count} × variant ${args.variantPackagingId}`,
+    });
+  }
+
+  // 6. Increment variant on-hand at destination.
+  await adjustVariantStockLocation(args.variantPackagingId, args.destination, count);
+
+  // 7. Headline audit row for the box-up event itself.
+  await logStockMovement({
+    planProductId: "" as unknown as string,
+    productId: "" as unknown as string,
+    toLocation: args.destination,
+    quantity: count,
+    variantPackagingId: args.variantPackagingId,
+    reason: "box_up",
+    notes: `Built ${count} box${count === 1 ? "" : "es"} from ${sourceLocation} pieces`,
+  });
+
+  queryClient.invalidateQueries({ queryKey: ["variant-stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+  queryClient.invalidateQueries({ queryKey: ["packaging"] });
 }
 
 // --- Variant Pricing Snapshots (margin history) ---
