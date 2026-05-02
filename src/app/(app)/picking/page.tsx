@@ -331,22 +331,22 @@ function BoxTab() {
     return { max: max === Infinity ? 0 : max, bottleneck };
   }
 
-  // Only show variant sizes with at least one packaging component OR a
-  // packagingId set — loose variants stay outside this flow.
+  // Show every variant size that has packaging (packagingId set OR at
+  // least one component). Loose variants (no packaging at all) stay
+  // outside this flow — they're sold straight from product loose stock.
+  // Packaged variants without a composition still render with a
+  // "needs composition" notice so the operator knows what to fix.
   const boxableVps = useMemo(() => {
     return packagings
       .filter((vp) => {
-        const hasPackaging = !!vp.packagingId || (compsByVp.get(vp.id!)?.length ?? 0) > 0;
-        if (!hasPackaging) return false;
-        const hasComp = (compByVp.get(vp.id!)?.length ?? 0) > 0;
-        return hasComp;
+        return !!vp.packagingId || (compsByVp.get(vp.id!)?.length ?? 0) > 0;
       })
       .sort((a, b) => {
         const an = variantById.get(a.variantId)?.name ?? "";
         const bn = variantById.get(b.variantId)?.name ?? "";
         return an.localeCompare(bn);
       });
-  }, [packagings, compsByVp, compByVp, variantById]);
+  }, [packagings, compsByVp, variantById]);
 
   async function handleBoxUp(vpId: string) {
     const count = counts[vpId] ?? 0;
@@ -433,15 +433,22 @@ function BoxTab() {
                 {bottleneck && max < 100 ? ` (limited by ${bottleneck})` : ""}
               </span>
             </div>
-            <p className="text-[11px] text-muted-foreground mb-2">
-              Per box: {comp.map((c) => `${c.qty}× ${productById.get(c.productId)?.name ?? c.productId.slice(0, 8)}`).join(", ")}
-              {comps.length > 0 && (
-                <>
-                  {" + "}
-                  {comps.map((k) => `${k.qtyPerVariant}× ${packagingById.get(k.packagingId)?.name ?? k.packagingId.slice(0, 8)}`).join(", ")}
-                </>
-              )}
-            </p>
+            {comp.length === 0 ? (
+              <p className="text-[11px] text-status-blush mb-2 flex items-start gap-1">
+                <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                No composition set on this variant yet. Open the variant page to fill it before box-up.
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground mb-2">
+                Per box: {comp.map((c) => `${c.qty}× ${productById.get(c.productId)?.name ?? c.productId.slice(0, 8)}`).join(", ")}
+                {comps.length > 0 && (
+                  <>
+                    {" + "}
+                    {comps.map((k) => `${k.qtyPerVariant}× ${packagingById.get(k.packagingId)?.name ?? k.packagingId.slice(0, 8)}`).join(", ")}
+                  </>
+                )}
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <input
                 type="number"
