@@ -7610,6 +7610,61 @@ async function seedProductionOrderDrivenPlans(): Promise<{ warnings: string[]; d
 }
 
 /**
+ * Update planProducts.mouldId to match products.defaultMouldId for
+ * draft plans. Plans cache the mould at creation time, so a later
+ * mould change on the product doesn't propagate. The daily view's
+ * capacity math reads planProducts.mouldId × moulds.numberOfCavities,
+ * so the wrong mould silently shows the wrong cavity count.
+ *
+ * Active / done plans are left alone — those are mid-run and must
+ * not move.
+ */
+async function syncDraftPlanMoulds(): Promise<void> {
+  const draftPlans = assertOk(
+    await supabase
+      .from("productionPlans")
+      .select("id")
+      .eq("status", "draft"),
+  ) as Array<{ id: string }>;
+  if (draftPlans.length === 0) return;
+
+  const draftPlanIds = draftPlans.map((p) => p.id);
+  const pps = assertOk(
+    await supabase
+      .from("planProducts")
+      .select("id, planId, productId, mouldId")
+      .in("planId", draftPlanIds),
+  ) as Array<{ id: string; planId: string; productId: string; mouldId: string }>;
+  if (pps.length === 0) return;
+
+  const productIds = [...new Set(pps.map((p) => p.productId))];
+  const products = assertOk(
+    await supabase
+      .from("products")
+      .select("id, defaultMouldId")
+      .in("id", productIds),
+  ) as Array<{ id: string; defaultMouldId: string | null }>;
+  const defaultMouldByProduct = new Map(products.map((p) => [p.id, p.defaultMouldId]));
+
+  const updates: Array<{ id: string; mouldId: string }> = [];
+  for (const pp of pps) {
+    const want = defaultMouldByProduct.get(pp.productId);
+    if (!want) continue; // product has no default mould — leave existing alone
+    if (pp.mouldId === want) continue;
+    updates.push({ id: pp.id, mouldId: want });
+  }
+  if (updates.length === 0) return;
+
+  for (const u of updates) {
+    await supabase
+      .from("planProducts")
+      .update({ mouldId: u.mouldId })
+      .eq("id", u.id);
+  }
+  console.log(`[regen] synced mouldId on ${updates.length} draft planProduct row(s)`);
+}
+
+/**
  * Drop replen PO items + plans whose product no longer has an active
  * `stockLocationMinimums` row. Without this step, deleting a min via
  * /stock left the original Replen PO item + draft plan in place — the
@@ -8182,6 +8237,14 @@ export async function regenerateAllPlansAndSchedule(staticInputs: {
     const cur = campaignDeadlines.get(k);
     if (cur === undefined || v < cur) campaignDeadlines.set(k, v);
   }
+
+  // Sync planProducts.mouldId ← products.defaultMouldId for any plan
+  // still in draft. PlanProducts copy the mould at insert time, so when
+  // the user later changes a product's default mould (different
+  // cavity count), existing draft plans go stale and the daily view
+  // computes capacity off the old mould. Active / done plans are
+  // skipped — those are mid-run and must not move.
+  await step("sync planProducts.mouldId from products.defaultMouldId", syncDraftPlanMoulds);
 
   // Fresh reads — the post-reconcile state is what the scheduler must
   // see. Hook state at this point is stale (invalidation is async).
