@@ -5330,13 +5330,37 @@ export async function commitAllocationSplit(args: {
     });
   }
 
-  // 4b. PO-driven allocations: same shape as orderPlanLinks but
-  //     tagged with productionOrderId. Idempotent on (planProductId,
-  //     productionOrderId, fromLocation='production').
+  // 4b. PO-driven allocations: tagged with productionOrderId. When the
+  //     PO has a `targetLocation` set ("store" / "production" /
+  //     "storage"), deliver pieces straight there instead of parking
+  //     them in `allocated` — that's what the PO author asked for at
+  //     creation time. No targetLocation → fall back to `allocated`
+  //     so the existing per-PO reservation semantics still hold.
+  //     Idempotent on (planProductId, productionOrderId, fromLocation).
+  let poById = new Map<string, ProductionOrder>();
+  if ((args.perPo ?? []).length > 0) {
+    const poIds = [...new Set((args.perPo ?? []).map((p) => p.productionOrderId))];
+    const pos = assertOk(
+      await supabase
+        .from("productionOrders")
+        .select("*")
+        .in("id", poIds),
+    ) as ProductionOrder[];
+    poById = new Map(pos.map((p) => [p.id!, p]));
+  }
+  function poTargetToStockLocation(t?: string | null): StockLocation | null {
+    if (!t) return null;
+    if (t === "store" || t === "production") return t;
+    if (t === "storage") return "freezer"; // form label "Storage" maps to back-of-house freezer
+    return null;
+  }
   for (const p of args.perPo ?? []) {
     if (p.delivered <= 0) continue;
     const pp = planProducts.find((x) => x.productId === p.productId);
     if (!pp) continue;
+    const po = poById.get(p.productionOrderId);
+    const target = poTargetToStockLocation(po?.targetLocation ?? null);
+    const toLocation: StockLocation = target ?? "allocated";
     const existing = assertOk(
       await supabase
         .from("stockMovements")
@@ -5352,11 +5376,13 @@ export async function commitAllocationSplit(args: {
       planProductId: pp.id!,
       productId: p.productId,
       fromLocation: "production",
-      toLocation: "allocated",
+      toLocation,
       quantity: p.delivered,
-      productionOrderId: p.productionOrderId,
+      productionOrderId: toLocation === "allocated" ? p.productionOrderId : undefined,
       reason: "allocate",
-      notes: "Post-unmould allocation to PO",
+      notes: target
+        ? `Post-unmould PO delivery → ${toLocation} (PO targetLocation)`
+        : "Post-unmould allocation to PO",
     });
   }
 
