@@ -30,6 +30,8 @@ import {
   useProductFillingsForProducts,
   useFillingIngredientsForFillings,
   useMarketRegion,
+  useVariantStockLocations,
+  setVariantStockOnHand,
 } from "@/lib/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -1493,6 +1495,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       productMap={productMap}
                       sym={sym}
                     />
+                    <VariantOnHandRow variantPackagingId={cpId} />
                     <div className="mt-1">
                       <button
                         type="button"
@@ -1551,6 +1554,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       productMap={productMap}
                       sym={sym}
                     />
+                    <VariantOnHandRow variantPackagingId={cpId} />
                     <div className="mt-1 ml-3">
                       <button
                         type="button"
@@ -2143,5 +2147,90 @@ function VariantNutritionSection({ productIds }: { productIds: string[] }) {
         <ShopifyFormatBlock entries={ingredientList} per100g={per100g} />
       </div>
     </section>
+  );
+}
+
+// ─── Variant on-hand row (per packaging size) ──────────────────────
+//
+// Renders inline under each box card. Shows current count per
+// stock location with editable inputs. On blur (or Enter) persists
+// the new count via setVariantStockOnHand. Manual entry is the path
+// for tonight's pre-built inventory; box-up via /picking is the
+// ongoing path.
+
+const ON_HAND_LOCATIONS: Array<{ id: import("@/types").StockLocation; label: string }> = [
+  { id: "store",      label: "Shop" },
+  { id: "production", label: "Production" },
+  { id: "freezer",    label: "Freezer" },
+];
+
+function VariantOnHandRow({ variantPackagingId }: { variantPackagingId: string }) {
+  const allRows = useVariantStockLocations();
+  const rows = useMemo(
+    () => allRows.filter((r) => r.variantPackagingId === variantPackagingId && !r.orderId && !r.productionOrderId),
+    [allRows, variantPackagingId],
+  );
+  const byLoc = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) m.set(r.location, (m.get(r.location) ?? 0) + (r.quantity ?? 0));
+    return m;
+  }, [rows]);
+
+  // Local edit state per location — only persists on blur / Enter.
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [err, setErr] = useState<string>("");
+
+  async function commit(location: import("@/types").StockLocation) {
+    const raw = edits[location];
+    if (raw === undefined) return;
+    const n = Math.max(0, Math.floor(Number(raw) || 0));
+    setBusy((b) => ({ ...b, [location]: true }));
+    setErr("");
+    try {
+      await setVariantStockOnHand({ variantPackagingId, location, quantity: n });
+      setEdits((e) => {
+        const next = { ...e };
+        delete next[location];
+        return next;
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy((b) => ({ ...b, [location]: false }));
+    }
+  }
+
+  return (
+    <div className="mt-2 px-3 py-2 rounded-sm bg-muted/30 border border-border">
+      <p className="text-[10.5px] font-medium uppercase text-muted-foreground tracking-wide mb-1.5">
+        On hand
+      </p>
+      <div className="flex items-center gap-3 flex-wrap">
+        {ON_HAND_LOCATIONS.map((loc) => {
+          const current = byLoc.get(loc.id) ?? 0;
+          const editing = edits[loc.id] !== undefined;
+          const value = editing ? edits[loc.id]! : String(current);
+          return (
+            <label key={loc.id} className="flex items-center gap-1.5 text-xs">
+              <span className="text-muted-foreground">{loc.label}:</span>
+              <input
+                type="number"
+                min={0}
+                value={value}
+                onChange={(e) => setEdits((p) => ({ ...p, [loc.id]: e.target.value }))}
+                onBlur={() => editing && commit(loc.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                disabled={busy[loc.id]}
+                className="w-16 rounded border border-border bg-card px-2 py-0.5 tabular-nums text-right disabled:opacity-50"
+              />
+            </label>
+          );
+        })}
+      </div>
+      {err && <p className="text-[11px] text-status-blush mt-1.5">{err}</p>}
+    </div>
   );
 }
