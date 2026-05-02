@@ -4742,10 +4742,11 @@ export async function setVariantStockOnHand(args: {
   if (wanted === current) return;
   const delta = wanted - current;
   await adjustVariantStockLocation(args.variantPackagingId, args.location, delta);
-  // Audit row — direction depends on sign of delta.
+  // Audit row — direction depends on sign of delta. No
+  // planProductId / productId since manual recount has no batch source.
   await logStockMovement({
-    planProductId: "" as unknown as string, // no batch source for manual recount
-    productId: "" as unknown as string,
+    planProductId: undefined as unknown as string,
+    productId: undefined as unknown as string,
     fromLocation: delta < 0 ? args.location : undefined,
     toLocation: delta > 0 ? args.location : undefined,
     quantity: Math.abs(delta),
@@ -4904,10 +4905,13 @@ export async function boxUpVariant(args: {
   // 6. Increment variant on-hand at destination.
   await adjustVariantStockLocation(args.variantPackagingId, args.destination, count);
 
-  // 7. Headline audit row for the box-up event itself.
+  // 7. Headline audit row for the box-up event itself. No
+  //    planProductId / productId — this row represents the variant
+  //    creation, not a batch movement. Per-composition trace rows
+  //    above carry the batch lineage.
   await logStockMovement({
-    planProductId: "" as unknown as string,
-    productId: "" as unknown as string,
+    planProductId: undefined as unknown as string,
+    productId: undefined as unknown as string,
     toLocation: args.destination,
     quantity: count,
     variantPackagingId: args.variantPackagingId,
