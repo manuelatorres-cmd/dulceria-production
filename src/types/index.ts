@@ -1899,6 +1899,17 @@ export interface OrderPackagingLine {
 export const FULFILMENT_MODES = ["produce", "borrow"] as const;
 export type FulfilmentMode = (typeof FULFILMENT_MODES)[number];
 
+/** Default fulfilment mode per order channel. Online + shop sales pull
+ *  from existing shop stock (borrow); B2B + event orders create fresh
+ *  production demand (produce). Override per line in the order form
+ *  when needed (e.g. a B2B walk-in that takes shelf stock). */
+export const CHANNEL_FULFILMENT_DEFAULTS: Record<OrderChannel, FulfilmentMode> = {
+  b2b:    "produce",
+  event:  "produce",
+  online: "borrow",
+  shop:   "borrow",
+};
+
 /** Customer-facing variant line on an order. The price the customer
  *  sees per unit. Brain ignores this — production demand still flows
  *  via `orderItems`. Saving a variant line auto-creates derived

@@ -50,9 +50,11 @@ export default function ShopifyImportPage() {
   const [manualAssignments, setManualAssignments] = useState<Map<string, PickerValue>>(new Map());
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   /** Per-line fulfilment mode picked by the operator on the preview.
-   *  Default = produce (new batch). Switching to "borrow" makes the
-   *  brain skip new production and ship from existing stock. */
-  const [borrowSet, setBorrowSet] = useState<Set<string>>(new Set());
+   *  Online channel default = borrow (ship from existing stock; the
+   *  shop is the source of truth for online sales). Operator flips
+   *  individual lines to "produce" when stock is short or the order
+   *  spec requires a fresh batch. */
+  const [produceSet, setProduceSet] = useState<Set<string>>(new Set());
   const productLocationTotals = useProductLocationTotals();
   /** Lines where the user clicked "Different variant…" to broaden the
    *  dropdown beyond the matched variant's sizes. Keyed by lineKey. */
@@ -215,7 +217,7 @@ export default function ShopifyImportPage() {
           deadline: deadline.toISOString(),
           items: o.lineItems.map((li, i) => {
             const dec = decodePicker(getPick(o.name, i, li)!)!;
-            const fulfilmentMode = borrowSet.has(lineKey(o.name, i)) ? "borrow" as const : "produce" as const;
+            const fulfilmentMode = produceSet.has(lineKey(o.name, i)) ? "produce" as const : "borrow" as const;
             if (dec.kind === "product") {
               return {
                 kind: "product" as const,
@@ -558,7 +560,7 @@ export default function ShopifyImportPage() {
                                 toggle there applies the choice to all derived
                                 lines on import. */}
                             {dec && (() => {
-                              const isBorrow = borrowSet.has(lk);
+                              const isBorrow = !produceSet.has(lk);
                               let stockLabel: string;
                               let stockClass: string;
                               if (dec.kind === "product") {
@@ -579,7 +581,7 @@ export default function ShopifyImportPage() {
                                   <div className="ml-auto inline-flex rounded-full border border-border bg-card overflow-hidden text-[10.5px]">
                                     <button
                                       type="button"
-                                      onClick={() => setBorrowSet((p) => { const n = new Set(p); n.delete(lk); return n; })}
+                                      onClick={() => setProduceSet((p) => { const n = new Set(p); n.add(lk); return n; })}
                                       className={
                                         "px-2.5 py-0.5 transition " +
                                         (!isBorrow
@@ -591,7 +593,7 @@ export default function ShopifyImportPage() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => setBorrowSet((p) => { const n = new Set(p); n.add(lk); return n; })}
+                                      onClick={() => setProduceSet((p) => { const n = new Set(p); n.delete(lk); return n; })}
                                       className={
                                         "px-2.5 py-0.5 transition " +
                                         (isBorrow

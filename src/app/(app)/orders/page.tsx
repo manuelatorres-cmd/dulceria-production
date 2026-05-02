@@ -24,6 +24,7 @@ import {
   ORDER_PRIORITIES, ORDER_PRIORITY_LABELS,
   ORDER_STATUSES, ORDER_STATUS_LABELS,
   STOCK_LOCATION_SHORT_LABELS,
+  CHANNEL_FULFILMENT_DEFAULTS,
   type OrderChannel, type OrderPriority, type OrderStatus,
   type StockLocation,
 } from "@/types";
@@ -564,7 +565,7 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
           productName: prod?.name ?? "",
           quantity: vpp.qty * pickedBoxCount,
           unitPrice: perPieceUnitPrice,
-          fulfilmentMode: "produce",
+          fulfilmentMode: CHANNEL_FULFILMENT_DEFAULTS[channel],
           variantId: pickedVariantId,
           variantPackagingId: pickedSizeId,
         };
@@ -590,7 +591,7 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
         productName: "",
         quantity: 1,
         unitPrice: perPieceUnitPrice,
-        fulfilmentMode: "produce",
+        fulfilmentMode: CHANNEL_FULFILMENT_DEFAULTS[channel],
         variantId: pickedVariantId,
         variantPackagingId: pickedSizeId,
       };
@@ -693,7 +694,7 @@ function NewOrderForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: ()
           sortOrder: sortOrder++,
           notes: line.notes?.trim() || undefined,
           unitPrice: line.unitPrice,
-          fulfilmentMode: line.fulfilmentMode ?? "produce",
+          fulfilmentMode: line.fulfilmentMode ?? CHANNEL_FULFILMENT_DEFAULTS[channel],
           variantId: line.variantId,
           variantPackagingId: line.variantPackagingId,
         });
