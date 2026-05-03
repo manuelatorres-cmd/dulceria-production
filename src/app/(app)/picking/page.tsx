@@ -329,28 +329,64 @@ function BoxTab() {
     return (byLoc.production ?? 0) + (byLoc.store ?? 0);
   }
 
+  // Live-reserved consumption from OTHER rows' current count inputs.
+  // Recomputed per render so typing in one row instantly tightens the
+  // max on every other row that shares a product or packaging.
+  const reservedProducts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const [otherVp, otherCount] of Object.entries(counts)) {
+      if (!otherCount || otherCount <= 0) continue;
+      const otherComp = compByVp.get(otherVp) ?? [];
+      for (const c of otherComp) {
+        m.set(c.productId, (m.get(c.productId) ?? 0) + c.qty * otherCount);
+      }
+    }
+    return m;
+  }, [counts, compByVp]);
+
+  const reservedPackaging = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const [otherVp, otherCount] of Object.entries(counts)) {
+      if (!otherCount || otherCount <= 0) continue;
+      const otherComps = compsByVp.get(otherVp) ?? [];
+      for (const k of otherComps) {
+        m.set(k.packagingId, (m.get(k.packagingId) ?? 0) + k.qtyPerVariant * otherCount);
+      }
+    }
+    return m;
+  }, [counts, compsByVp]);
+
   function maxBuildable(vpId: string): { max: number; bottleneck: string | null } {
     const comp = compByVp.get(vpId) ?? [];
     const comps = compsByVp.get(vpId) ?? [];
     if (comp.length === 0) return { max: 0, bottleneck: "no composition defined" };
+    const ownCount = counts[vpId] ?? 0;
     let max = Infinity;
     let bottleneck: string | null = null;
     for (const c of comp) {
       if (c.qty <= 0) continue;
-      const avail = looseAvailable(c.productId);
-      const n = Math.floor(avail / c.qty);
+      const stock = looseAvailable(c.productId);
+      // Reserved by other rows = total reserved minus what THIS row's
+      // current input has reserved for itself.
+      const ownReserved = c.qty * ownCount;
+      const reservedElsewhere = (reservedProducts.get(c.productId) ?? 0) - ownReserved;
+      const free = stock - reservedElsewhere;
+      const n = Math.floor(Math.max(0, free) / c.qty);
       if (n < max) {
         max = n;
-        bottleneck = `${productById.get(c.productId)?.name ?? c.productId.slice(0, 8)} (${avail} pcs)`;
+        bottleneck = `${productById.get(c.productId)?.name ?? c.productId.slice(0, 8)} (${free} pcs free)`;
       }
     }
     for (const k of comps) {
       if (k.qtyPerVariant <= 0) continue;
-      const have = packagingById.get(k.packagingId)?.quantityOnHand ?? 0;
-      const n = Math.floor(have / k.qtyPerVariant);
+      const stock = packagingById.get(k.packagingId)?.quantityOnHand ?? 0;
+      const ownReserved = k.qtyPerVariant * ownCount;
+      const reservedElsewhere = (reservedPackaging.get(k.packagingId) ?? 0) - ownReserved;
+      const free = stock - reservedElsewhere;
+      const n = Math.floor(Math.max(0, free) / k.qtyPerVariant);
       if (n < max) {
         max = n;
-        bottleneck = `${packagingById.get(k.packagingId)?.name ?? k.packagingId.slice(0, 8)} (${have} units)`;
+        bottleneck = `${packagingById.get(k.packagingId)?.name ?? k.packagingId.slice(0, 8)} (${free} units free)`;
       }
     }
     return { max: max === Infinity ? 0 : max, bottleneck };
