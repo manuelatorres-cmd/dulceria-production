@@ -565,9 +565,15 @@ export default function ShopifyImportPage() {
                               let stockClass: string;
                               if (dec.kind === "product") {
                                 const t = productLocationTotals.get(dec.productId);
-                                const avail = t?.production ?? 0;
+                                // Borrow allocator pulls shop store first, then
+                                // production. Reflect both — a line that has
+                                // 30 in shop should not flag as short just
+                                // because production has 0.
+                                const shop = t?.store ?? 0;
+                                const prod = t?.production ?? 0;
+                                const avail = shop + prod;
                                 const enough = avail >= li.quantity;
-                                stockLabel = `${avail} in stock`;
+                                stockLabel = `${avail} in stock (${shop} shop · ${prod} prod)`;
                                 stockClass = enough ? "text-[#4a7a5e]" : "text-[#9b4f48]";
                               } else {
                                 stockLabel = "stock varies per chocolate";
