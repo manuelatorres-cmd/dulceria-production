@@ -8297,13 +8297,27 @@ async function seedReplenishmentDrivenPlans(): Promise<string[]> {
     return { defer: false, reason: null };
   }
 
-  // Current pieces on hand per (product, location).
-  const stockRows = assertOk(
-    await supabase.from("productStock").select("*"),
-  ) as Array<{ productId: string; locationId: string; quantity: number }>;
+  // Current pieces on hand per (product, location). Read from
+  // stockLocations (single source of truth — every transfer / box-up
+  // / allocation / mark-as-packed writes here). The legacy productStock
+  // table from mig 0053 is no longer kept in sync; reading it caused
+  // seeded replens to ignore manual /shop/transfer moves.
+  const slRows = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("planProductId, location, quantity")
+      .is("orderId", null)
+      .is("productionOrderId", null),
+  ) as Array<{ planProductId: string; location: string; quantity: number }>;
+  const allPP = assertOk(
+    await supabase.from("planProducts").select("id, productId"),
+  ) as Array<{ id: string; productId: string }>;
+  const ppToProd = new Map(allPP.map((p) => [p.id, p.productId]));
   const onHand = new Map<string, number>();
-  for (const r of stockRows) {
-    const key = `${r.productId}|${r.locationId}`;
+  for (const r of slRows) {
+    const pid = ppToProd.get(r.planProductId);
+    if (!pid) continue;
+    const key = `${pid}|${r.location}`;
     onHand.set(key, (onHand.get(key) ?? 0) + Number(r.quantity ?? 0));
   }
 
