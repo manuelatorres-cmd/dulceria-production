@@ -4,7 +4,7 @@ import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
 import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, VariantStockLocation, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun } from "@/types";
-import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, CHANNEL_FULFILMENT_DEFAULTS, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, getCurrencySymbol } from "@/types";
+import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, CHANNEL_FULFILMENT_DEFAULTS, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, type FulfilmentMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
 
@@ -296,6 +296,15 @@ export async function attachBoxContents(
   picks: Array<{ productId: string; quantity: number }>,
 ): Promise<number> {
   if (picks.length === 0) return 0;
+  // Read the order so we can inherit its channel-driven fulfilment
+  // default. Online + shop default to borrow → picks pull from shop
+  // stock automatically; b2b + event default to produce → batches
+  // get spawned on next regen.
+  const order = assertOkMaybe(
+    await supabase.from("orders").select("*").eq("id", orderId).maybeSingle(),
+  ) as Order | null;
+  const channel = (order?.channel ?? "online") as OrderChannel;
+  const defaultMode = (CHANNEL_FULFILMENT_DEFAULTS[channel] ?? "produce") as FulfilmentMode;
   // Find an existing variant line we can attach to. Prefer the first
   // free-pick variant on the order.
   const variantLines = assertOk(
@@ -340,14 +349,44 @@ export async function attachBoxContents(
       sortOrder: s++,
       variantId: preferredVariantId ?? undefined,
       variantPackagingId: preferredVpId ?? undefined,
-      fulfilmentMode: "produce",
+      fulfilmentMode: defaultMode,
     } as OrderItem & { id: string });
   }
   if (inserts.length === 0) return 0;
   const { error } = await supabase.from("orderItems").insert(inserts);
   if (error) throw error;
+
+  // Borrow picks need stock allocated against the order — same flow
+  // saveOrderItem runs on the native form path. Per-pick failure is
+  // logged + skipped so a single shortage doesn't abort the whole
+  // box-content import. After all picks land the order's
+  // ready_to_pack status is re-evaluated.
+  if (defaultMode === "borrow") {
+    for (const ins of inserts) {
+      try {
+        await allocateLineFromStore({
+          orderId: ins.orderId,
+          productId: ins.productId,
+          quantity: ins.quantity,
+        });
+      } catch (e) {
+        console.warn(
+          `[attachBoxContents] borrow allocation failed for order ${orderId}, product ${ins.productId}:`,
+          e,
+        );
+      }
+    }
+    try {
+      await refreshOrderReadyStatus(orderId);
+    } catch (e) {
+      console.warn(`[attachBoxContents] refreshOrderReadyStatus failed:`, e);
+    }
+  }
+
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
   queryClient.invalidateQueries({ queryKey: ["orderItems"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["orders"] });
   return inserts.length;
 }
 
