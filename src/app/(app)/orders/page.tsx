@@ -4,7 +4,6 @@ import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
 import {
   useOrders, saveOrder, saveOrderItem, deleteOrder,
   useProductsList, useAllOrderItems, useCustomers,
@@ -30,12 +29,16 @@ import {
 } from "@/types";
 import { Plus, Search, AlertTriangle, ShoppingBag, X, Warehouse, Flame } from "lucide-react";
 
+/* iOS-glass design tokens — match /dashboard, /plan, /production-brain. */
+const CARD = "bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+const SECTION_TITLE = "text-[10px] tracking-[0.08em] uppercase text-muted-foreground font-semibold mb-3 flex items-center gap-2";
+
 const STATUS_STYLE: Record<OrderStatus, string> = {
-  pending: "bg-muted text-muted-foreground",
-  ready_to_pack: "bg-status-ok-bg text-status-ok",
-  in_production: "bg-status-warn-bg text-status-warn",
-  done: "bg-status-ok-bg text-status-ok",
-  cancelled: "bg-muted text-muted-foreground/60 line-through",
+  pending:       "bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)]",
+  ready_to_pack: "bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)]",
+  in_production: "bg-[var(--accent-sky-bg)] text-[var(--accent-sky-ink)]",
+  done:          "bg-[var(--accent-sage-bg)] text-[var(--accent-sage-ink)]",
+  cancelled:     "bg-muted text-muted-foreground/60 line-through",
 };
 
 const PRIORITY_STYLE: Record<OrderPriority, string> = {
@@ -197,12 +200,38 @@ export default function OrdersPage() {
   }, [orders, search, filterStatus]);
 
   return (
-    <div>
-      <PageHeader title="Orders" description="Customer orders that feed the production scheduler" />
+    <div className="px-4 pt-5 pb-6">
+      <div className="flex items-baseline gap-3 mb-4 flex-wrap">
+        <h1
+          className="text-3xl"
+          style={{ fontFamily: "var(--font-serif)", fontWeight: 400, letterSpacing: "-0.02em" }}
+        >
+          Orders
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Customer orders feeding the production scheduler.
+        </p>
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            href="/orders/online"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white/65 backdrop-blur-2xl px-3 py-1.5 text-sm font-medium hover:bg-white/85 transition"
+          >
+            <ShoppingBag className="w-3.5 h-3.5" /> Online
+          </Link>
+          {!adding && (
+            <button
+              onClick={() => setAdding(true)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-3 py-1.5 text-sm font-medium hover:opacity-90 transition"
+            >
+              <Plus className="w-3.5 h-3.5" /> New order
+            </button>
+          )}
+        </div>
+      </div>
 
-      <div className="px-4 pb-6 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-xs">
+      <div className={CARD + " mb-4"}>
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <div className="relative flex-1 max-w-xs min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input
               type="text"
@@ -212,52 +241,39 @@ export default function OrdersPage() {
               className="input !pl-8 text-sm"
             />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              href="/orders/online"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-primary hover:text-primary"
-            >
-              <ShoppingBag className="w-3.5 h-3.5" /> Online
-            </Link>
-            {!adding && (
+          {/* Status tabs as pastel chips, count badges reflect the
+              unfiltered-by-search totals. */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {(["all", ...ORDER_STATUSES] as const).map((s) => (
               <button
-                onClick={() => setAdding(true)}
-                className="flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  filterStatus === s
+                    ? "bg-foreground text-background"
+                    : "bg-white/60 text-muted-foreground border border-border hover:bg-white/85"
+                }`}
               >
-                <Plus className="w-3.5 h-3.5" /> New order
+                {s === "all" ? "All" : ORDER_STATUS_LABELS[s]}
+                <span className="ml-1.5 opacity-70 tabular-nums">
+                  {statusCounts[s]}
+                </span>
               </button>
-            )}
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* Status tabs. "All" plus each of the four statuses; count
-            badges reflect the unfiltered-by-search totals so the user
-            can always see where work is parked. */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {(["all", ...ORDER_STATUSES] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilterStatus(s)}
-              className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
-                filterStatus === s
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-muted-foreground border-border hover:bg-muted"
-              }`}
-            >
-              {s === "all" ? "All" : ORDER_STATUS_LABELS[s]}
-              <span className="ml-1.5 opacity-70 tabular-nums">
-                {statusCounts[s]}
-              </span>
-            </button>
-          ))}
-        </div>
+      <div className="space-y-4">
 
         {adding && <NewOrderForm onSaved={() => setAdding(false)} onCancel={() => setAdding(false)} />}
 
         {filtered.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-sm">
-            {orders.length === 0 ? "No orders yet." : "No orders match the filters."}
-          </p>
+          <div className={CARD + " text-center"}>
+            <p className="text-sm text-muted-foreground py-4">
+              {orders.length === 0 ? "No orders yet." : "No orders match the filters."}
+            </p>
+          </div>
         ) : (() => {
           // Section orders by channel so online / b2b / event / shop
           // each read as their own block. Within each, sorted by
@@ -277,9 +293,9 @@ export default function OrdersPage() {
               ),
             }));
           return sections.map(({ channel, orders: chOrders }) => (
-            <section key={channel} className="space-y-2 mb-5">
-              <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold flex items-baseline gap-2">
-                {ORDER_CHANNEL_LABELS[channel]}
+            <section key={channel} className={CARD}>
+              <h2 className={SECTION_TITLE}>
+                <span>{ORDER_CHANNEL_LABELS[channel]}</span>
                 <span className="opacity-60 tabular-nums normal-case font-normal">
                   · {chOrders.length}
                 </span>
@@ -308,7 +324,7 @@ export default function OrdersPage() {
                 <li key={order.id}>
                   <Link
                     href={`/orders/${encodeURIComponent(order.id!)}`}
-                    className="block rounded-sm border border-border bg-card p-3 hover:border-primary/40 transition-colors"
+                    className="block rounded-[14px] bg-white/60 border border-white/60 p-3 hover:bg-white/85 transition"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
