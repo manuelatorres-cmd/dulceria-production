@@ -8065,8 +8065,8 @@ async function syncDraftPlanMoulds(): Promise<void> {
  */
 async function dropStaleReplenItemsAndPlans(): Promise<void> {
   const mins = assertOk(
-    await supabase.from("stockLocationMinimums").select("productId, minimumUnits"),
-  ) as Array<{ productId: string; minimumUnits: number }>;
+    await supabase.from("stockLocationMinimums").select("productId, location, minimumUnits"),
+  ) as Array<{ productId: string; location: string; minimumUnits: number }>;
   const productsWithMin = new Set(
     mins.filter((m) => (m.minimumUnits ?? 0) > 0).map((m) => m.productId),
   );
@@ -8088,7 +8088,45 @@ async function dropStaleReplenItemsAndPlans(): Promise<void> {
       .select("id, productionOrderId, productId")
       .in("productionOrderId", poIds),
   ) as Array<{ id: string; productionOrderId: string; productId: string }>;
-  const staleItems = items.filter((it) => !productsWithMin.has(it.productId));
+
+  // Compute current unallocated stock per (product, location) so we can
+  // tell whether an open replen item is still needed. An item is
+  // "satisfied" when summed (min - current) across every (product, *)
+  // min row drops to ≤ 0 — i.e. operator topped up the shop manually
+  // since the replen was seeded.
+  const stockRows = assertOk(
+    await supabase
+      .from("stockLocations")
+      .select("planProductId, location, quantity")
+      .is("orderId", null)
+      .is("productionOrderId", null),
+  ) as Array<{ planProductId: string; location: string; quantity: number }>;
+  const allPlanProducts = assertOk(
+    await supabase.from("planProducts").select("id, productId"),
+  ) as Array<{ id: string; productId: string }>;
+  const ppToProduct = new Map(allPlanProducts.map((pp) => [pp.id, pp.productId]));
+  const stockByProductLocation = new Map<string, number>();
+  for (const r of stockRows) {
+    const pid = ppToProduct.get(r.planProductId);
+    if (!pid) continue;
+    const key = `${pid}|${r.location}`;
+    stockByProductLocation.set(key, (stockByProductLocation.get(key) ?? 0) + (r.quantity ?? 0));
+  }
+  const productsSatisfied = new Set<string>();
+  for (const pid of productsWithMin) {
+    const productMins = mins.filter((m) => m.productId === pid && (m.minimumUnits ?? 0) > 0);
+    let totalGap = 0;
+    for (const m of productMins) {
+      const cur = stockByProductLocation.get(`${pid}|${m.location}`) ?? 0;
+      totalGap += Math.max(0, (m.minimumUnits ?? 0) - cur);
+    }
+    if (totalGap === 0) productsSatisfied.add(pid);
+  }
+
+  // Stale = product has no active min OR product's mins are now fully covered.
+  const staleItems = items.filter(
+    (it) => !productsWithMin.has(it.productId) || productsSatisfied.has(it.productId),
+  );
   if (staleItems.length === 0) return;
 
   const poById = new Map(replenPos.map((p) => [p.id, p]));
