@@ -111,6 +111,10 @@ export default function ShopTransferPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [suggestions, productById, categoryNameById]);
 
+  // Local override per row so the operator can move more (or less)
+  // than the auto-suggested qty. Capped at production stock.
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+
   async function doTransfer(productId: string, qty: number) {
     setPending((p) => ({ ...p, [productId]: true }));
     try {
@@ -252,15 +256,27 @@ export default function ShopTransferPage() {
                     {s.productionStock}
                   </div>
                 </div>
-                <span
-                  className="text-[11px] uppercase font-medium"
-                  style={{ letterSpacing: "0.08em" }}
-                >
-                  Move {s.suggestedQty}
-                </span>
+                <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  Move
+                  <input
+                    type="number"
+                    min={0}
+                    max={s.productionStock}
+                    value={overrides[s.productId] ?? String(s.suggestedQty)}
+                    onChange={(e) => setOverrides((p) => ({ ...p, [s.productId]: e.target.value }))}
+                    className="w-16 rounded border border-border bg-card px-2 py-0.5 text-right tabular-nums"
+                  />
+                  <span className="text-[10px]">/ {s.productionStock} avail</span>
+                </label>
                 <button
                   type="button"
-                  onClick={() => doTransfer(s.productId, s.suggestedQty)}
+                  onClick={() => {
+                    const raw = overrides[s.productId];
+                    const requested = raw !== undefined ? Math.max(0, Math.floor(Number(raw) || 0)) : s.suggestedQty;
+                    const capped = Math.min(requested, s.productionStock);
+                    if (capped <= 0) return;
+                    doTransfer(s.productId, capped);
+                  }}
                   disabled={pending[s.productId]}
                   className="btn-primary"
                 >
