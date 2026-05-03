@@ -362,7 +362,16 @@ export async function attachBoxContents(
   // box-content import. After all picks land the order's
   // ready_to_pack status is re-evaluated.
   if (defaultMode === "borrow") {
+    // Try variant-stock first — pre-built free-pick boxes (rare, but
+    // possible) cover the line without touching loose pieces.
+    let covered = new Set<string>();
+    try {
+      covered = await tryAllocateVariantLinesFromStock(orderId);
+    } catch (e) {
+      console.warn(`[attachBoxContents] variant allocation failed:`, e);
+    }
     for (const ins of inserts) {
+      if (ins.variantPackagingId && covered.has(ins.variantPackagingId)) continue;
       try {
         await allocateLineFromStore({
           orderId: ins.orderId,
@@ -4684,6 +4693,170 @@ export async function replaceVariantPackagingProducts(
   queryClient.invalidateQueries({ queryKey: ["variant-packaging-products"] });
 }
 
+// --- Variant-aware borrow allocation helpers ---
+
+/** Reserve `count` pre-built variant boxes for an order. Moves rows
+ *  from `(variantPackagingId, store, null, null)` → `(variantPackagingId,
+ *  allocated, orderId, null)`. Throws when shop on-hand < count. */
+async function allocateVariantBoxesToOrder(args: {
+  orderId: string;
+  variantPackagingId: string;
+  count: number;
+}): Promise<void> {
+  const need = Math.max(0, Math.round(args.count));
+  if (need === 0) return;
+  const shopRow = assertOkMaybe(
+    await supabase
+      .from("variantStockLocations")
+      .select("*")
+      .eq("variantPackagingId", args.variantPackagingId)
+      .eq("location", "store")
+      .is("orderId", null)
+      .is("productionOrderId", null)
+      .maybeSingle(),
+  ) as VariantStockLocation | null;
+  const shop = shopRow?.quantity ?? 0;
+  if (shop < need) {
+    throw new Error(
+      `Variant stock short: need ${need} boxes, only ${shop} on shop shelf.`,
+    );
+  }
+  const now = new Date();
+  await supabase
+    .from("variantStockLocations")
+    .update({ quantity: shop - need, updatedAt: now })
+    .eq("id", shopRow!.id!);
+  // Insert (or top up) the per-order allocated reservation.
+  const allocRow = assertOkMaybe(
+    await supabase
+      .from("variantStockLocations")
+      .select("*")
+      .eq("variantPackagingId", args.variantPackagingId)
+      .eq("location", "allocated")
+      .eq("orderId", args.orderId)
+      .is("productionOrderId", null)
+      .maybeSingle(),
+  ) as VariantStockLocation | null;
+  if (allocRow) {
+    await supabase
+      .from("variantStockLocations")
+      .update({ quantity: (allocRow.quantity ?? 0) + need, updatedAt: now })
+      .eq("id", allocRow.id!);
+  } else {
+    await supabase.from("variantStockLocations").insert({
+      id: newId(),
+      variantPackagingId: args.variantPackagingId,
+      location: "allocated",
+      orderId: args.orderId,
+      productionOrderId: null,
+      quantity: need,
+      updatedAt: now,
+    });
+  }
+  // Audit trail.
+  await logStockMovement({
+    planProductId: undefined as unknown as string,
+    productId: undefined as unknown as string,
+    fromLocation: "store",
+    toLocation: "allocated",
+    quantity: need,
+    orderId: args.orderId,
+    variantPackagingId: args.variantPackagingId,
+    reason: "allocate",
+    notes: `Variant box reserved for order`,
+  });
+  queryClient.invalidateQueries({ queryKey: ["variant-stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+}
+
+/** Walk every orderVariantLine on the order, try to reserve variant
+ *  boxes from shop on-hand. Returns the set of variantPackagingIds
+ *  that ended up FULLY covered (so callers can skip per-orderItem
+ *  loose allocation for those lines). */
+export async function tryAllocateVariantLinesFromStock(orderId: string): Promise<Set<string>> {
+  const covered = new Set<string>();
+  const lines = assertOk(
+    await supabase
+      .from("orderVariantLines")
+      .select("*")
+      .eq("orderId", orderId),
+  ) as OrderVariantLine[];
+  for (const line of lines) {
+    if (!line.variantPackagingId) continue;
+    if ((line.quantity ?? 0) <= 0) continue;
+    try {
+      await allocateVariantBoxesToOrder({
+        orderId,
+        variantPackagingId: line.variantPackagingId,
+        count: line.quantity,
+      });
+      covered.add(line.variantPackagingId);
+    } catch (e) {
+      // Not enough variant stock — fall through to loose allocation.
+      console.warn(`[tryAllocateVariantLines] ${line.variantPackagingId}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  return covered;
+}
+
+/** Release all variant-stock allocations tied to an order back to
+ *  shop. Called by revertBorrowsForOrder + cancel flows. */
+async function revertVariantAllocationsForOrder(orderId: string): Promise<void> {
+  const allocRows = assertOk(
+    await supabase
+      .from("variantStockLocations")
+      .select("*")
+      .eq("orderId", orderId)
+      .eq("location", "allocated"),
+  ) as VariantStockLocation[];
+  if (allocRows.length === 0) return;
+  const now = new Date();
+  for (const row of allocRows) {
+    if ((row.quantity ?? 0) <= 0) continue;
+    // Top up shop on-hand by the released amount.
+    const shopRow = assertOkMaybe(
+      await supabase
+        .from("variantStockLocations")
+        .select("*")
+        .eq("variantPackagingId", row.variantPackagingId)
+        .eq("location", "store")
+        .is("orderId", null)
+        .is("productionOrderId", null)
+        .maybeSingle(),
+    ) as VariantStockLocation | null;
+    if (shopRow) {
+      await supabase
+        .from("variantStockLocations")
+        .update({ quantity: (shopRow.quantity ?? 0) + row.quantity, updatedAt: now })
+        .eq("id", shopRow.id!);
+    } else {
+      await supabase.from("variantStockLocations").insert({
+        id: newId(),
+        variantPackagingId: row.variantPackagingId,
+        location: "store",
+        orderId: null,
+        productionOrderId: null,
+        quantity: row.quantity,
+        updatedAt: now,
+      });
+    }
+    await supabase.from("variantStockLocations").delete().eq("id", row.id!);
+    await logStockMovement({
+      planProductId: undefined as unknown as string,
+      productId: undefined as unknown as string,
+      fromLocation: "allocated",
+      toLocation: "store",
+      quantity: row.quantity,
+      orderId,
+      variantPackagingId: row.variantPackagingId,
+      reason: "unallocate",
+      notes: `Variant box released back to shop on order revert`,
+    });
+  }
+  queryClient.invalidateQueries({ queryKey: ["variant-stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+}
+
 // --- Variant on-hand inventory (pre-built boxes) ---
 //
 // `variantStockLocations` (mig 0084) tracks how many pre-built boxes of
@@ -6168,11 +6341,58 @@ export async function markOrderAsPacked(orderId: string): Promise<{
     piecesMoved += row.quantity;
   }
 
-  // 2. Deduct each orderPackagingLine from packaging stock.
+  // 2. Drain variant boxes that were reserved against this order.
+  //    These represent pre-built variant boxes coming off the shelf
+  //    and going out the door — pieces + their packaging components
+  //    were already consumed at box-up, so this just zeroes the
+  //    allocated reservation.
+  const variantAllocRows = assertOk(
+    await supabase
+      .from("variantStockLocations")
+      .select("*")
+      .eq("orderId", orderId)
+      .eq("location", "allocated"),
+  ) as VariantStockLocation[];
+  for (const row of variantAllocRows) {
+    if ((row.quantity ?? 0) <= 0) continue;
+    await supabase.from("variantStockLocations").delete().eq("id", row.id!);
+    await logStockMovement({
+      planProductId: undefined as unknown as string,
+      productId: undefined as unknown as string,
+      fromLocation: "allocated",
+      quantity: row.quantity,
+      orderId,
+      variantPackagingId: row.variantPackagingId,
+      reason: "sold",
+      notes: "Variant box shipped (Mark as packed)",
+    });
+  }
+
+  // 3. Deduct each orderPackagingLine from packaging stock — but only
+  //    for packaging that's NOT bundled inside a variant box that was
+  //    already drained above. Variant box packaging was consumed at
+  //    box-up time. Outer shipping packaging (mailers, fillers) still
+  //    deducts here.
+  const variantPackagingIdsCovered = new Set<string>();
+  if (variantAllocRows.length > 0) {
+    // Read the components for each covered variant size — these
+    // packagingIds were already consumed at box-up, so skip them now.
+    const vpIds = [...new Set(variantAllocRows.map((r) => r.variantPackagingId))];
+    if (vpIds.length > 0) {
+      const comps = assertOk(
+        await supabase
+          .from("variantPackagingComponents")
+          .select("packagingId")
+          .in("variantPackagingId", vpIds),
+      ) as Array<{ packagingId: string }>;
+      for (const c of comps) variantPackagingIdsCovered.add(c.packagingId);
+    }
+  }
   const packagingLines = assertOk(
     await supabase.from("orderPackagingLines").select("*").eq("orderId", orderId),
   ) as OrderPackagingLine[];
   for (const line of packagingLines) {
+    if (variantPackagingIdsCovered.has(line.packagingId)) continue;
     const actual = await consumePackaging({
       packagingId: line.packagingId,
       quantity: line.quantity,
@@ -6190,6 +6410,7 @@ export async function markOrderAsPacked(orderId: string): Promise<{
   queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
   queryClient.invalidateQueries({ queryKey: ["packaging"] });
   queryClient.invalidateQueries({ queryKey: ["order-packaging-lines"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-stock-locations"] });
   return { piecesMoved, warnings };
 }
 
@@ -7257,17 +7478,31 @@ async function refreshOrderReadyStatus(orderId: string): Promise<void> {
   const items = assertOk(
     await supabase
       .from("orderItems")
-      .select("productId, quantity, fulfilmentMode")
+      .select("productId, quantity, fulfilmentMode, variantPackagingId")
       .eq("orderId", orderId),
-  ) as Array<{ productId: string; quantity: number; fulfilmentMode: string | null }>;
+  ) as Array<{ productId: string; quantity: number; fulfilmentMode: string | null; variantPackagingId: string | null }>;
 
   const allBorrow = items.length > 0
     && items.every((i) => (i.fulfilmentMode ?? "produce") === "borrow");
 
   let ready = false;
   if (allBorrow) {
-    // Sum allocated stock per product for this order. Stock rows are
-    // keyed by planProductId; join via planProducts to get productId.
+    // Variant boxes already reserved against the order cover every
+    // derived orderItem whose parent variantPackagingId matches —
+    // those lines are physically inside the variant box.
+    const variantAllocRows = assertOk(
+      await supabase
+        .from("variantStockLocations")
+        .select("variantPackagingId, quantity")
+        .eq("orderId", orderId)
+        .eq("location", "allocated"),
+    ) as Array<{ variantPackagingId: string; quantity: number }>;
+    const variantCovered = new Set<string>();
+    for (const r of variantAllocRows) {
+      if ((r.quantity ?? 0) > 0) variantCovered.add(r.variantPackagingId);
+    }
+
+    // Sum allocated loose stock per product for this order.
     const allocatedRows = assertOk(
       await supabase
         .from("stockLocations")
@@ -7291,9 +7526,11 @@ async function refreshOrderReadyStatus(orderId: string): Promise<void> {
       if (!pid) continue;
       allocatedByProduct.set(pid, (allocatedByProduct.get(pid) ?? 0) + row.quantity);
     }
-    // Aggregate requested per product across multiple lines for the same SKU.
+    // Aggregate requested per product, EXCLUDING items whose parent
+    // variantPackagingId is variant-covered (already in a box).
     const requestedByProduct = new Map<string, number>();
     for (const it of items) {
+      if (it.variantPackagingId && variantCovered.has(it.variantPackagingId)) continue;
       requestedByProduct.set(
         it.productId,
         (requestedByProduct.get(it.productId) ?? 0) + it.quantity,
@@ -7302,6 +7539,8 @@ async function refreshOrderReadyStatus(orderId: string): Promise<void> {
     ready = [...requestedByProduct.entries()].every(
       ([pid, qty]) => (allocatedByProduct.get(pid) ?? 0) >= qty,
     );
+    // If every line was variant-covered → requestedByProduct is empty
+    // → .every returns true → ready = true. Good.
   }
 
   const nextStatus = ready ? "ready_to_pack" : "pending";
@@ -9073,6 +9312,15 @@ export async function drainAllocatedForOrder(orderId: string): Promise<void> {
  *  its linked replenishment order. Called from deleteOrder and from the
  *  status flip to 'cancelled'. Idempotent. */
 export async function revertBorrowsForOrder(orderId: string): Promise<void> {
+  // 0. Release any pre-built variant boxes reserved for this order
+  //    back to shop on-hand. Done before the loose-stock revert so
+  //    audit ordering reads variant first → loose second.
+  try {
+    await revertVariantAllocationsForOrder(orderId);
+  } catch (e) {
+    console.warn(`[revertBorrowsForOrder] variant revert failed for ${orderId}:`, e);
+  }
+
   // 1. Flip any borrowed orderItems back to produce first — so UI shows
   //    the correct state even if the transfer step fails.
   await supabase
@@ -10597,13 +10845,50 @@ export async function importOnlineOrders(input: OnlineOrderImportInput[]): Promi
     if (insItemsErr) throw insItemsErr;
   }
 
-  // Borrow lines need stock allocated against the order. saveOrderItem
-  // does this on the native form path, but the import batches the
-  // inserts so we walk the rows here. Failures are caught per-line so
-  // one short SKU doesn't abort the whole import — the order stays
-  // 'pending' and refreshOrderReadyStatus will skip the promotion.
-  for (const row of productItemRows) {
-    if (row.fulfilmentMode !== "borrow") continue;
+  // Variant-aware allocation:
+  //   1. For each new order, try to reserve pre-built variant boxes
+  //      from variantStockLocations.store. Returns the set of variant
+  //      sizes that ended up fully covered.
+  //   2. Loose-piece allocation runs only for derived orderItems whose
+  //      parent variantLine is NOT covered (or for non-variant items).
+  //      Avoids double-counting when a Mothersday Box of 4 already
+  //      sits pre-built on the shelf.
+  const newOrderIds = orderRows.map((o) => o.id);
+  const coveredByOrder = new Map<string, Set<string>>();
+  for (const oid of newOrderIds) {
+    try {
+      coveredByOrder.set(oid, await tryAllocateVariantLinesFromStock(oid));
+    } catch (e) {
+      console.warn(`[importOnlineOrders] tryAllocateVariantLines failed for ${oid}:`, e);
+      coveredByOrder.set(oid, new Set<string>());
+    }
+  }
+
+  // Loose piece allocation for derived orderItems on the same orders.
+  // Read all derived rows so we can check parent-variant coverage; the
+  // batched insert above has already written productItemRows, but
+  // variant-driven items came through addVariantToOrder.
+  const derivedItems = newOrderIds.length > 0
+    ? assertOk(
+        await supabase
+          .from("orderItems")
+          .select("id, orderId, productId, quantity, fulfilmentMode, variantPackagingId")
+          .in("orderId", newOrderIds),
+      ) as Array<{
+        id: string;
+        orderId: string;
+        productId: string;
+        quantity: number;
+        fulfilmentMode: string | null;
+        variantPackagingId: string | null;
+      }>
+    : [];
+  for (const row of derivedItems) {
+    if ((row.fulfilmentMode ?? "produce") !== "borrow") continue;
+    if (row.variantPackagingId) {
+      const covered = coveredByOrder.get(row.orderId);
+      if (covered?.has(row.variantPackagingId)) continue; // already covered by box stock
+    }
     try {
       await allocateLineFromStore({
         orderId: row.orderId,
@@ -10620,7 +10905,6 @@ export async function importOnlineOrders(input: OnlineOrderImportInput[]): Promi
 
   // Promote any fully-allocated orders to ready_to_pack so the operator
   // sees a clear "ship me" badge without drilling in.
-  const newOrderIds = orderRows.map((o) => o.id);
   for (const oid of newOrderIds) {
     try {
       await refreshOrderReadyStatus(oid);
@@ -10633,6 +10917,7 @@ export async function importOnlineOrders(input: OnlineOrderImportInput[]): Promi
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
   queryClient.invalidateQueries({ queryKey: ["order-variant-lines"] });
   queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+  queryClient.invalidateQueries({ queryKey: ["variant-stock-locations"] });
   return fresh.length;
 }
 
