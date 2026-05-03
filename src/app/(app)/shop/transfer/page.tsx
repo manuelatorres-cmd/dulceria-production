@@ -115,6 +115,65 @@ export default function ShopTransferPage() {
   // than the auto-suggested qty. Capped at production stock.
   const [overrides, setOverrides] = useState<Record<string, string>>({});
 
+  // Manual transfer form state — any product, any source/dest, any qty.
+  const [manualProductId, setManualProductId] = useState<string>("");
+  const [manualFrom, setManualFrom] = useState<"production" | "store" | "freezer">("production");
+  const [manualTo, setManualTo] = useState<"production" | "store" | "freezer">("store");
+  const [manualQty, setManualQty] = useState<string>("");
+  const [manualBusy, setManualBusy] = useState(false);
+  const [manualErr, setManualErr] = useState<string>("");
+
+  async function doManualTransfer() {
+    setManualErr("");
+    if (!manualProductId) {
+      setManualErr("Pick a product.");
+      return;
+    }
+    if (manualFrom === manualTo) {
+      setManualErr("Pick different source and destination.");
+      return;
+    }
+    const qty = Math.max(0, Math.floor(Number(manualQty) || 0));
+    if (qty <= 0) {
+      setManualErr("Enter a quantity > 0.");
+      return;
+    }
+    setManualBusy(true);
+    try {
+      const moves = await moveProductStockFifo({
+        productId: manualProductId,
+        fromLocation: manualFrom,
+        toLocation: manualTo,
+        quantity: qty,
+        reason: "transfer",
+        notes: `Manual transfer ${manualFrom} → ${manualTo}`,
+      });
+      const moved = moves.reduce((s, m) => s + m.quantity, 0);
+      if (moved < qty) {
+        setManualErr(`Only ${moved} pieces available — transferred what was there.`);
+      }
+      if (moved > 0) {
+        await saveStockTransfer({
+          entityType: "product",
+          entityId: manualProductId,
+          quantity: moved,
+          fromLocationId: manualFrom,
+          toLocationId: manualTo,
+          transferredAt: new Date(),
+          reason: "manual",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["product-location-totals"] });
+      setManualQty("");
+    } catch (e) {
+      setManualErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setManualBusy(false);
+    }
+  }
+
   async function doTransfer(productId: string, qty: number) {
     setPending((p) => ({ ...p, [productId]: true }));
     try {
@@ -285,6 +344,92 @@ export default function ShopTransferPage() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section
+        className="border border-border bg-card p-4 mb-6"
+        style={{ borderRadius: 4 }}
+      >
+        <h3
+          className="text-[13px] mb-3"
+          style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
+        >
+          Manual transfer
+          <span className="ml-2 text-[10px] uppercase text-muted-foreground font-normal" style={{ letterSpacing: "0.12em" }}>
+            any product · any direction
+          </span>
+        </h3>
+        <p className="text-[11px] text-muted-foreground mb-3">
+          Move pieces between locations even when no shortfall is flagged. Useful for stocking the shop ahead, returning unused stock, or reversing a mistaken transfer.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+            Product
+            <select
+              value={manualProductId}
+              onChange={(e) => setManualProductId(e.target.value)}
+              className="rounded border border-border bg-card px-2 py-1 text-sm min-w-[200px]"
+            >
+              <option value="">— pick product —</option>
+              {products
+                .filter((p) => !p.archived)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((p) => {
+                  const t = totals.get(p.id!);
+                  const counts = t ? `(${t.production} prod / ${t.store} shop / ${t.freezer} freezer)` : "";
+                  return (
+                    <option key={p.id} value={p.id}>{p.name} {counts}</option>
+                  );
+                })}
+            </select>
+          </label>
+          <label className="flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+            From
+            <select
+              value={manualFrom}
+              onChange={(e) => setManualFrom(e.target.value as typeof manualFrom)}
+              className="rounded border border-border bg-card px-2 py-1 text-sm"
+            >
+              <option value="production">Production</option>
+              <option value="store">Shop</option>
+              <option value="freezer">Freezer</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+            To
+            <select
+              value={manualTo}
+              onChange={(e) => setManualTo(e.target.value as typeof manualTo)}
+              className="rounded border border-border bg-card px-2 py-1 text-sm"
+            >
+              <option value="store">Shop</option>
+              <option value="production">Production</option>
+              <option value="freezer">Freezer</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+            Qty
+            <input
+              type="number"
+              min={0}
+              value={manualQty}
+              onChange={(e) => setManualQty(e.target.value)}
+              placeholder="0"
+              className="w-20 rounded border border-border bg-card px-2 py-1 text-sm tabular-nums"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={doManualTransfer}
+            disabled={manualBusy}
+            className="btn-primary"
+          >
+            {manualBusy ? "Transferring…" : "Transfer"}
+          </button>
+        </div>
+        {manualErr && (
+          <p className="text-[11px] text-status-blush mt-2">{manualErr}</p>
         )}
       </section>
 
