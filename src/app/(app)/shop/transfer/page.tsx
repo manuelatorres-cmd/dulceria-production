@@ -9,8 +9,10 @@ import {
   useStockTransfers,
   useProductCategories,
   saveStockTransfer,
+  moveProductStockFifo,
   DEFAULT_LOCATION_MINIMUM,
 } from "@/lib/hooks";
+import { queryClient } from "@/lib/query-client";
 
 /**
  * Shop transfer screen — move finished goods from production to shop.
@@ -112,15 +114,35 @@ export default function ShopTransferPage() {
   async function doTransfer(productId: string, qty: number) {
     setPending((p) => ({ ...p, [productId]: true }));
     try {
-      await saveStockTransfer({
-        entityType: "product",
-        entityId: productId,
+      // 1. Actually move pieces production → store via FIFO across the
+      //    product's batches. Each draining batch logs its own
+      //    stockMovement audit row.
+      const moves = await moveProductStockFifo({
+        productId,
+        fromLocation: "production",
+        toLocation: "store",
         quantity: qty,
-        fromLocationId: "production",
-        toLocationId: "store",
-        transferredAt: new Date(),
-        reason: "shop-request",
+        reason: "transfer",
+        notes: "Transfer to shop",
       });
+      const moved = moves.reduce((s, m) => s + m.quantity, 0);
+      // 2. Append the user-facing transfer history row (drives the
+      //    "Recent transfers" panel + reports). Quantity = whatever
+      //    actually moved, not the requested amount.
+      if (moved > 0) {
+        await saveStockTransfer({
+          entityType: "product",
+          entityId: productId,
+          quantity: moved,
+          fromLocationId: "production",
+          toLocationId: "store",
+          transferredAt: new Date(),
+          reason: "shop-request",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["product-location-totals"] });
     } finally {
       setPending((p) => ({ ...p, [productId]: false }));
     }

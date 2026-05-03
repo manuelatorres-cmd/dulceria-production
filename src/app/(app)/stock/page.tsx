@@ -16,13 +16,16 @@ import {
   DEFAULT_LOCATION_MINIMUM,
   moveProductStockFifo,
   intakeBatchStock,
+  useStockMovements,
+  useVariants,
+  useAllVariantPackagings,
 } from "@/lib/hooks";
 import { STOCK_LOCATION_SHORT_LABELS, STOCK_LOCATIONS, type StockLocation } from "@/types";
 import { TransferModal } from "@/components/transfer-modal";
 import { Move } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Search, SlidersHorizontal, X, Plus, ClipboardList, Snowflake, ChevronDown, ChevronRight } from "lucide-react";
-import type { PlanProduct, ProductionPlan, Product, Mould, FillingStock } from "@/types";
+import type { PlanProduct, ProductionPlan, Product, Mould, FillingStock, StockMovement } from "@/types";
 import { reconcileStockCount } from "@/lib/stockCount";
 import { remainingShelfLifeDays, defrostedSellBy, WEEK_MS } from "@/lib/freezer";
 import { FreezeModal, DefrostConfirmModal } from "@/components/freeze-modal";
@@ -105,7 +108,7 @@ function formatCountedAt(ts: number | undefined): string | null {
 }
 
 export default function StockPage() {
-  const [activeTab, setActiveTab] = useState<"products" | "fillings">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "fillings" | "movements">("products");
 
   return (
     <div>
@@ -114,7 +117,7 @@ export default function StockPage() {
       {/* Tab strip + adjust link */}
       <div className="px-4 pb-3 flex items-center gap-2">
         <div className="flex gap-1">
-          {(["products", "fillings"] as const).map((tab) => (
+          {(["products", "fillings", "movements"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -124,7 +127,7 @@ export default function StockPage() {
                   : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab === "products" ? "Products" : "Fillings"}
+              {tab === "products" ? "Products" : tab === "fillings" ? "Fillings" : "Movements"}
             </button>
           ))}
         </div>
@@ -137,7 +140,13 @@ export default function StockPage() {
         </Link>
       </div>
 
-      {activeTab === "products" ? <ProductStockTab /> : <FillingStockTab />}
+      {activeTab === "products" ? (
+        <ProductStockTab />
+      ) : activeTab === "fillings" ? (
+        <FillingStockTab />
+      ) : (
+        <MovementsTab />
+      )}
     </div>
   );
 }
@@ -1426,6 +1435,162 @@ function FillingStockTab() {
           />
         );
       })()}
+    </div>
+  );
+}
+
+// ─── Movements Tab ─────────────────────────────────────────────────
+//
+// Read-only feed of recent stockMovements rows. Joins planProductId →
+// product name, variantPackagingId → variant + size for display.
+// Filterable by location + reason. Most-recent-first.
+
+function MovementsTab() {
+  const movements = useStockMovements();
+  const products = useProductsList();
+  const allPlanProducts = useAllPlanProducts();
+  const variants = useVariants();
+  const variantPackagings = useAllVariantPackagings();
+
+  const [locationFilter, setLocationFilter] = useState<"all" | StockLocation>("all");
+  const [reasonFilter, setReasonFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+
+  const productByPlanProduct = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const pp of allPlanProducts) {
+      if (pp.id && pp.productId) m.set(pp.id, pp.productId);
+    }
+    return m;
+  }, [allPlanProducts]);
+  const productById = useMemo(
+    () => new Map(products.map((p) => [p.id!, p])),
+    [products],
+  );
+  const variantById = useMemo(
+    () => new Map(variants.map((v) => [v.id!, v])),
+    [variants],
+  );
+  const vpById = useMemo(
+    () => new Map(variantPackagings.map((vp) => [vp.id!, vp])),
+    [variantPackagings],
+  );
+
+  const allReasons = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of movements) if (m.reason) set.add(m.reason);
+    return [...set].sort();
+  }, [movements]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return movements.filter((m) => {
+      if (locationFilter !== "all") {
+        if (m.fromLocation !== locationFilter && m.toLocation !== locationFilter) return false;
+      }
+      if (reasonFilter !== "all" && m.reason !== reasonFilter) return false;
+      if (q) {
+        const pid = m.planProductId ? productByPlanProduct.get(m.planProductId) : undefined;
+        const product = pid ? productById.get(pid) : undefined;
+        const vp = m.variantPackagingId ? vpById.get(m.variantPackagingId) : undefined;
+        const variant = vp ? variantById.get(vp.variantId) : undefined;
+        const haystack = `${product?.name ?? ""} ${variant?.name ?? ""} ${m.notes ?? ""} ${m.reason ?? ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    }).slice(0, 200);
+  }, [movements, locationFilter, reasonFilter, search, productByPlanProduct, productById, vpById, variantById]);
+
+  function labelFor(m: StockMovement): string {
+    if (m.variantPackagingId) {
+      const vp = vpById.get(m.variantPackagingId);
+      const variant = vp ? variantById.get(vp.variantId) : undefined;
+      return `${variant?.name ?? "Variant"} (box)`;
+    }
+    if (m.planProductId) {
+      const pid = productByPlanProduct.get(m.planProductId);
+      const product = pid ? productById.get(pid) : undefined;
+      return product?.name ?? `Batch ${m.planProductId.slice(0, 8)}`;
+    }
+    return "—";
+  }
+
+  function arrowFor(m: StockMovement): string {
+    const from = m.fromLocation ?? "—";
+    const to = m.toLocation ?? "—";
+    return `${from} → ${to}`;
+  }
+
+  return (
+    <div className="px-4 pb-6">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <div className="flex items-center gap-1 text-xs">
+          <Search className="w-3.5 h-3.5 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Filter by product / variant / note…"
+            className="w-64 rounded border border-border bg-card px-2 py-1"
+          />
+        </div>
+        <select
+          value={locationFilter}
+          onChange={(e) => setLocationFilter(e.target.value as typeof locationFilter)}
+          className="rounded border border-border bg-card px-2 py-1 text-xs"
+        >
+          <option value="all">All locations</option>
+          {STOCK_LOCATIONS.map((loc) => (
+            <option key={loc} value={loc}>{STOCK_LOCATION_SHORT_LABELS[loc] ?? loc}</option>
+          ))}
+        </select>
+        <select
+          value={reasonFilter}
+          onChange={(e) => setReasonFilter(e.target.value)}
+          className="rounded border border-border bg-card px-2 py-1 text-xs"
+        >
+          <option value="all">All reasons</option>
+          {allReasons.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+        <span className="text-[11px] text-muted-foreground ml-auto">
+          {filtered.length} of {movements.length} movements
+        </span>
+      </div>
+
+      <div className="rounded-sm border border-border bg-card overflow-hidden">
+        <div className="grid grid-cols-[150px_1fr_140px_60px_120px_1fr] gap-2 px-3 py-2 bg-muted/40 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+          <span>When</span>
+          <span>Item</span>
+          <span>Move</span>
+          <span className="text-right">Qty</span>
+          <span>Reason</span>
+          <span>Note</span>
+        </div>
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic px-3 py-6 text-center">
+            No movements match these filters.
+          </p>
+        ) : (
+          filtered.map((m, i) => (
+            <div
+              key={m.id ?? i}
+              className="grid grid-cols-[150px_1fr_140px_60px_120px_1fr] gap-2 px-3 py-1.5 text-xs border-b border-border last:border-b-0"
+            >
+              <span className="text-muted-foreground tabular-nums">
+                {new Date(m.movedAt).toLocaleString("de-AT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </span>
+              <span className="truncate">{labelFor(m)}</span>
+              <span className="text-muted-foreground">{arrowFor(m)}</span>
+              <span className="text-right tabular-nums">{m.quantity}</span>
+              <span className="text-muted-foreground">{m.reason ?? "—"}</span>
+              <span className="text-muted-foreground truncate" title={m.notes ?? ""}>
+                {m.notes ?? ""}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
