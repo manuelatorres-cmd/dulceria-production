@@ -13,6 +13,7 @@ import {
   usePackagingList,
   useProductLocationTotals,
   useVariantStockLocations,
+  useAllOrderVariantLines,
   markOrderAsPacked,
   saveOrder,
   boxUpVariant,
@@ -245,6 +246,8 @@ function BoxTab() {
   const packagingList = usePackagingList(true);
   const productLocations = useProductLocationTotals();
   const variantStock = useVariantStockLocations();
+  const variantLines = useAllOrderVariantLines();
+  const orders = useOrders();
 
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [destinations, setDestinations] = useState<Record<string, StockLocation>>({});
@@ -296,6 +299,28 @@ function BoxTab() {
     }
     return m;
   }, [variantStock]);
+
+  // Demand per variant size from open orders. Sum orderVariantLines
+  // quantity for non-terminal orders (pending / ready_to_pack /
+  // in_production). 'done' + 'cancelled' don't count.
+  const demandByVp = useMemo(() => {
+    const openOrderIds = new Set(
+      orders
+        .filter((o) => o.status !== "done" && o.status !== "cancelled")
+        .map((o) => o.id!)
+        .filter(Boolean),
+    );
+    const m = new Map<string, number>();
+    for (const line of variantLines) {
+      if (!line.variantPackagingId) continue;
+      if (!openOrderIds.has(line.orderId)) continue;
+      m.set(
+        line.variantPackagingId,
+        (m.get(line.variantPackagingId) ?? 0) + (line.quantity ?? 0),
+      );
+    }
+    return m;
+  }, [variantLines, orders]);
 
   // Loose product pieces in production + store across all batches.
   function looseAvailable(productId: string): number {
@@ -428,6 +453,18 @@ function BoxTab() {
                   </>
                 )}
               </span>
+              {(() => {
+                const demand = demandByVp.get(vp.id!) ?? 0;
+                if (demand === 0) return null;
+                const short = Math.max(0, demand - onHandTotal);
+                const cls = short > 0 ? "text-status-blush font-medium" : "text-status-ok";
+                return (
+                  <span className={"text-[11px] " + cls}>
+                    Need {demand} for orders
+                    {short > 0 ? ` · short ${short}` : " · ✓ covered"}
+                  </span>
+                );
+              })()}
               <span className={"text-[11px] ml-auto " + (max > 0 ? "text-muted-foreground" : "text-status-blush")}>
                 Can build {max}
                 {bottleneck && max < 100 ? ` (limited by ${bottleneck})` : ""}
