@@ -87,6 +87,7 @@ export default function ShopifyImportPage() {
         products,
         variants,
         variantPackagings,
+        packagings: packagingList,
         existingOrderNames: existingRefs,
       });
       setParsed(p);

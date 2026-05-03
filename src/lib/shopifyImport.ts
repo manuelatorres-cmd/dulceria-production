@@ -19,7 +19,7 @@
  * the product list and get back a preview.
  */
 
-import type { Product, Variant, VariantPackaging } from "@/types";
+import type { Product, Variant, VariantPackaging, Packaging } from "@/types";
 
 export interface ShopifyLineItem {
   /** Product name as it appeared in the Shopify storefront. */
@@ -211,6 +211,11 @@ export interface ParseShopifyOptions {
    *  match O(1). */
   variants?: Variant[];
   variantPackagings?: VariantPackaging[];
+  /** Packaging rows (capacity + name) used to auto-pick a size from
+   *  the line item name when the variant has multiple. E.g. "Box of 4"
+   *  in the Lineitem name → match the variantPackaging whose
+   *  packaging.capacity = 4. */
+  packagings?: Packaging[];
   /** Order names (Shopify "Name" field) already in the database — rows
    *  whose Name matches are still parsed (so the user sees them) but
    *  flagged as duplicates so the import step skips them. */
@@ -262,24 +267,46 @@ export function parseShopifyCsv(text: string, opts: ParseShopifyOptions): Shopif
   // bundled boxes, not individual chocolates.
   const variants = opts.variants ?? [];
   const variantPackagings = opts.variantPackagings ?? [];
+  const packagings = opts.packagings ?? [];
+  const packagingById = new Map(packagings.map((p) => [p.id!, p]));
   const vpsByVariant = new Map<string, VariantPackaging[]>();
   for (const vp of variantPackagings) {
     const arr = vpsByVariant.get(vp.variantId) ?? [];
     arr.push(vp);
     vpsByVariant.set(vp.variantId, arr);
   }
-  const byVariantName = new Map<string, { variant: Variant; packagingId: string | null }>();
+  const byVariantName = new Map<string, { variant: Variant; sizes: VariantPackaging[] }>();
   for (const v of variants) {
     if (!v.id) continue;
     const sizes = vpsByVariant.get(v.id) ?? [];
-    // Default size pick = the only size, or undefined if multiple
-    // (user picks the size in the preview).
-    const defaultSize = sizes.length === 1 ? (sizes[0].id ?? null) : null;
-    const entry = { variant: v, packagingId: defaultSize };
+    const entry = { variant: v, sizes };
     byVariantName.set(v.name.toLowerCase().trim(), entry);
     for (const alias of v.aliases ?? []) {
       if (alias.trim()) byVariantName.set(alias.toLowerCase().trim(), entry);
     }
+  }
+
+  /** Pick the right variant size for a line item name. If the variant
+   *  has only one size → pick it. If multiple → look for an integer in
+   *  the line name (e.g. "Box of 4", "Pralinen 8er", "16 piece gift")
+   *  and match it to a packaging.capacity. Falls back to null when
+   *  ambiguous so the operator can resolve in the preview UI. */
+  function pickSize(sizes: VariantPackaging[], lineName: string): string | null {
+    if (sizes.length === 0) return null;
+    if (sizes.length === 1) return sizes[0].id ?? null;
+    // Collect every integer in the line name. Common patterns:
+    //   "Box of 4", "8er", "Box of 16 Pralinen", "4 piece gift"
+    const numbers = [...lineName.matchAll(/\b(\d+)\b/g)]
+      .map((m) => parseInt(m[1], 10))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    for (const n of numbers) {
+      const matches = sizes.filter((vp) => {
+        const pkg = vp.packagingId ? packagingById.get(vp.packagingId) : undefined;
+        return pkg?.capacity === n;
+      });
+      if (matches.length === 1) return matches[0].id ?? null;
+    }
+    return null;
   }
 
   const ordersByName = new Map<string, ShopifyParsedOrder>();
@@ -340,13 +367,19 @@ export function parseShopifyCsv(text: string, opts: ParseShopifyOptions): Shopif
     let resolutionNote: string | undefined;
 
     const normalized = liName.toLowerCase().trim();
-    resolvedVariantEntry = byVariantName.get(normalized);
-    if (!resolvedVariantEntry) {
+    let variantHit = byVariantName.get(normalized);
+    if (!variantHit) {
       const dashIdx = normalized.indexOf(" - ");
       if (dashIdx > 0) {
         const base = normalized.slice(0, dashIdx).trim();
-        resolvedVariantEntry = byVariantName.get(base);
+        variantHit = byVariantName.get(base);
       }
+    }
+    if (variantHit) {
+      resolvedVariantEntry = {
+        variant: variantHit.variant,
+        packagingId: pickSize(variantHit.sizes, liName),
+      };
     }
 
     if (!resolvedVariantEntry) {
