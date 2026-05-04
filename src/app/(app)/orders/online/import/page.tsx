@@ -604,7 +604,7 @@ export default function ShopifyImportPage() {
                                       className={
                                         "px-2.5 py-0.5 transition " +
                                         (isBorrow
-                                          ? "bg-[#f6c6cb] text-[#6e2b32]"
+                                          ? "bg-[#e3ebe6] text-[#2e4839]"
                                           : "text-muted-foreground hover:text-foreground")
                                       }
                                     >

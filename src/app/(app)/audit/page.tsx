@@ -10,7 +10,7 @@ import {
 import { AlertTriangle, CheckCircle, ChevronRight } from "lucide-react";
 
 const CARD = "bg-white/70 backdrop-blur-2xl border border-white/60 rounded-[18px] p-5 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
-const PINK_INK = "text-[#6e2b32]";
+const PINK_INK = "text-[#2e4839]";
 
 type Issue = {
   entity: string;       // table name e.g. "Product"

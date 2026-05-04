@@ -423,7 +423,7 @@ export default function PlanPage() {
           {totalBatches} batch{totalBatches === 1 ? "" : "es"} · {daySummary.length} day{daySummary.length === 1 ? "" : "s"}
         </span>
         {focusLabel && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fdf2f4] text-[#6e2b32] text-[11px] font-medium border border-[#f0c6c0]">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#e3ebe6] text-[#2e4839] text-[11px] font-medium border border-[#c8d4cc]">
             Focus: {focusLabel}
             <button
               type="button"
@@ -1292,7 +1292,7 @@ function WeekView(props: {
     summaryByDate.set(ds.day.date, ds);
   }
 
-  const PINK_INK = "#6e2b32";
+  const PINK_INK = "#2e4839";
   const LEVEL_BAR_LOCAL: Record<string, string> = {
     ok: "#4a7a5e",
     warn: "#8a7030",
@@ -1309,7 +1309,7 @@ function WeekView(props: {
         ref={setNodeRef}
         className={
           "transition rounded-[12px] " +
-          (isOver ? "ring-2 ring-[#f6c6cb] ring-offset-1" : "")
+          (isOver ? "ring-2 ring-[#4a6b5b] ring-offset-1" : "")
         }
       >
         {children}
@@ -1442,7 +1442,7 @@ function WeekView(props: {
             {totalUsed} / {totalAvail} min
           </p>
           <div className="h-[3px] rounded-sm mt-1 overflow-hidden" style={{ background: "rgba(0,0,0,0.05)" }}>
-            <div style={{ width: `${Math.min(100, weekUtil)}%`, height: "100%", background: weekUtil >= 100 ? "#6e2b32" : weekUtil >= 80 ? "#8a7030" : "#4a7a5e" }} />
+            <div style={{ width: `${Math.min(100, weekUtil)}%`, height: "100%", background: weekUtil >= 100 ? "#2e4839" : weekUtil >= 80 ? "#8a7030" : "#4a7a5e" }} />
           </div>
         </div>
         <div>
@@ -1581,7 +1581,7 @@ function WeekView(props: {
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => applyDrop(true)}
-                className="rounded-full bg-[#f6c6cb] text-[#6e2b32] px-4 py-1.5 text-[12px] font-medium inline-flex items-center gap-1.5 hover:bg-[#f0b3ba]"
+                className="rounded-full bg-[#4a6b5b] text-white px-4 py-1.5 text-[12px] font-medium inline-flex items-center gap-1.5 hover:bg-[#3d5b4d]"
               >
                 <Lock className="w-3.5 h-3.5" /> Move + lock
               </button>
@@ -1750,7 +1750,7 @@ function WeekView(props: {
                                     }
                                   }}
                                   title={allPinned ? "Unlock all batches in this step" : "Lock all batches in this step to current day"}
-                                  className={allPinned ? "text-[#6e2b32] hover:opacity-70" : "opacity-30 hover:opacity-100"}
+                                  className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-30 hover:opacity-100"}
                                 >
                                   <Lock className="w-3 h-3" />
                                 </button>
@@ -1810,7 +1810,7 @@ function WeekView(props: {
                                                   }
                                                 }}
                                                 title={pinned ? `Pinned to ${planRow?.pinnedDate} — click to unpin` : "Click to lock to current day"}
-                                                className={pinned ? "text-[#6e2b32] hover:opacity-70" : "opacity-30 hover:opacity-100"}
+                                                className={pinned ? "text-[#2e4839] hover:opacity-70" : "opacity-30 hover:opacity-100"}
                                               >
                                                 <Lock className="w-3 h-3" />
                                               </button>
@@ -1944,7 +1944,7 @@ function WeekView(props: {
                                                           }
                                                         }}
                                                         title={pinned ? `Pinned to ${planRow?.pinnedDate} — click to unpin` : "Click to lock to current day"}
-                                                        className={pinned ? "text-[#6e2b32] hover:opacity-70" : "opacity-30 hover:opacity-100"}
+                                                        className={pinned ? "text-[#2e4839] hover:opacity-70" : "opacity-30 hover:opacity-100"}
                                                       >
                                                         <Lock className="w-3 h-3" />
                                                       </button>
@@ -2088,7 +2088,7 @@ function ScheduledPanel({
   const KIND_TINT: Record<Source["kind"], { bg: string; ink: string }> = {
     campaign: { bg: "#fdf8e2", ink: "#8a7030" },
     po: { bg: "#eff5fb", ink: "#4b6b8f" },
-    order: { bg: "#fdf2f4", ink: "#6e2b32" },
+    order: { bg: "#e3ebe6", ink: "#2e4839" },
   };
   const KIND_LABEL: Record<Source["kind"], string> = {
     campaign: "Campaigns",
@@ -2271,7 +2271,7 @@ function ScheduledPanel({
           </span>
         </div>
         {focusTokens.length > 0 && (
-          <span className="text-[11px] text-[#6e2b32]">
+          <span className="text-[11px] text-[#2e4839]">
             {focusTokens.length} selected
           </span>
         )}
@@ -2336,7 +2336,7 @@ function DemandByUrgency({
     other: "Other",
   };
   const CHANNEL_TINT: Record<string, { bg: string; ink: string }> = {
-    online: { bg: "#fdf2f4", ink: "#6e2b32" },
+    online: { bg: "#e3ebe6", ink: "#2e4839" },
     b2b: { bg: "#eff5fb", ink: "#4b6b8f" },
     event: { bg: "#fdf8e2", ink: "#8a7030" },
     shop: { bg: "#f1faf4", ink: "#4a7a5e" },
@@ -2600,7 +2600,7 @@ function DemandByUrgency({
             <span
               key={p.name}
               className="inline-flex items-baseline gap-1 text-[10.5px] rounded-full px-2 py-0.5 border border-white/60"
-              style={{ background: p.net > 0 ? "linear-gradient(180deg,#fdf2f4,#fdf1e2)" : "rgba(255,255,255,0.55)" }}
+              style={{ background: p.net > 0 ? "linear-gradient(180deg,#e3ebe6,#fdf1e2)" : "rgba(255,255,255,0.55)" }}
               title={`${p.qty} ordered · ${p.stock} in stock · make ${p.net}`}
             >
               <span className="truncate max-w-[120px]" style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}>
@@ -2620,7 +2620,7 @@ function DemandByUrgency({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
         {orderRows.map((o) => {
           const tint = o.bucket === "overdue"
-            ? { bg: "linear-gradient(180deg,#fdf2f4,#fdf1e2)", ink: "#6e2b32" }
+            ? { bg: "linear-gradient(180deg,#e3ebe6,#fdf1e2)", ink: "#2e4839" }
             : o.bucket === "today"
               ? { bg: "linear-gradient(180deg,#fdf8e2,#fdf1e2)", ink: "#8a7030" }
               : o.bucket === "tomorrow"
@@ -3161,7 +3161,7 @@ function PivotCellDrop({
         borderRadius: 8,
         padding: 4,
         background: isOver ? "rgba(246,198,203,0.45)" : "transparent",
-        outline: isOver ? "2px solid #f6c6cb" : undefined,
+        outline: isOver ? "2px solid #4a6b5b" : undefined,
         outlineOffset: isOver ? -1 : undefined,
         transition: "background-color 80ms ease, outline-color 80ms ease",
       }}
@@ -3236,7 +3236,7 @@ function PivotView(props: {
     packing:   { bg: "linear-gradient(180deg,#fdf1e2,#fdeeea)", ink: "#9b4f48" },
   };
   const SRC_COLOR: Record<"order" | "campaign" | "po", string> = {
-    order: "#2b6cb0", campaign: "#6a3a8c", po: "#6e2b32",
+    order: "#2b6cb0", campaign: "#6a3a8c", po: "#2e4839",
   };
 
   // ── 14-day window starting today (matches WeekView convention). ─
@@ -3546,7 +3546,7 @@ function PivotView(props: {
                   >
                     <div
                       className="text-[13px]"
-                      style={{ fontFamily: "var(--font-serif)", fontWeight: 500, color: isToday ? "#6e2b32" : "#1c1d1f" }}
+                      style={{ fontFamily: "var(--font-serif)", fontWeight: 500, color: isToday ? "#2e4839" : "#1c1d1f" }}
                     >
                       {d.label}
                     </div>
@@ -3559,7 +3559,7 @@ function PivotView(props: {
           <tbody>
             {focusedSources.map((src) => {
               const accent = SRC_COLOR[src.kind];
-              const rowBg = src.isShared ? "#fdf2f4" : "#fff";
+              const rowBg = src.isShared ? "#e3ebe6" : "#fff";
               return (
                 <tr key={src.token}>
                   <td
@@ -3567,7 +3567,7 @@ function PivotView(props: {
                       padding: "8px 10px",
                       background: rowBg,
                       borderRadius: "12px 0 0 12px",
-                      borderLeft: `4px solid ${src.isShared ? "#f6c6cb" : accent}`,
+                      borderLeft: `4px solid ${src.isShared ? "#4a6b5b" : accent}`,
                       verticalAlign: "top",
                     }}
                   >
@@ -3587,7 +3587,7 @@ function PivotView(props: {
                               className="ml-1.5 align-middle"
                               style={{
                                 fontSize: 9.5, padding: "1px 6px", borderRadius: 999,
-                                background: "#f6c6cb", color: "#6e2b32", fontFamily: "system-ui",
+                                background: "#4a6b5b", color: "#ffffff", fontFamily: "system-ui",
                               }}
                             >
                               shared
@@ -3654,8 +3654,8 @@ function PivotView(props: {
                                     fontSize: 10.5,
                                     lineHeight: 1.2,
                                     outline: expandedCellKey === `${src.token}|${d.iso}|${phase}`
-                                      ? "2px solid #6e2b32"
-                                      : isDeadline ? "1.5px solid #6e2b32" : undefined,
+                                      ? "2px solid #2e4839"
+                                      : isDeadline ? "1.5px solid #2e4839" : undefined,
                                     outlineOffset: isDeadline || expandedCellKey === `${src.token}|${d.iso}|${phase}` ? 1 : undefined,
                                     opacity: allDone ? 0.4 : 1,
                                     textDecoration: allDone ? "line-through" : undefined,
@@ -3671,8 +3671,8 @@ function PivotView(props: {
                                 style={{
                                   display: "inline-block",
                                   fontSize: 9.5, padding: "2px 6px", borderRadius: 6,
-                                  outline: "1.5px solid #6e2b32",
-                                  color: "#6e2b32",
+                                  outline: "1.5px solid #2e4839",
+                                  color: "#2e4839",
                                 }}
                               >
                                 due
@@ -3758,7 +3758,7 @@ function PivotView(props: {
                                     ? `Pinned to ${plan?.pinnedDate} — click to unpin`
                                     : "Click to lock to current day"
                                 }
-                                className={pinned ? "text-[#6e2b32]" : "opacity-40 hover:opacity-100"}
+                                className={pinned ? "text-[#2e4839]" : "opacity-40 hover:opacity-100"}
                               >
                                 <Lock className="w-3 h-3" />
                               </button>
@@ -3833,7 +3833,7 @@ function MonthDayDrop({
       className="rounded-[14px] p-4"
       style={{
         background: isOver ? "rgba(246,198,203,0.45)" : "rgba(255,255,255,0.85)",
-        border: isOver ? "2px solid #6e2b32" : "1px solid var(--border)",
+        border: isOver ? "2px solid #2e4839" : "1px solid var(--border)",
         transition: "background-color 80ms ease, border-color 80ms ease",
       }}
     >
@@ -3866,7 +3866,7 @@ function CalendarCellDrop({
         ...baseStyle,
         ...(isOver ? {
           background: "rgba(246,198,203,0.55)",
-          borderColor: "#6e2b32",
+          borderColor: "#2e4839",
           borderWidth: 2,
         } : {}),
       }}
@@ -3937,7 +3937,7 @@ function MonthView(props: {
     packing:   { bg: "linear-gradient(180deg,#fdf1e2,#fdeeea)", ink: "#9b4f48" },
   };
   const SRC_COLOR: Record<"order" | "campaign" | "po", string> = {
-    order: "#2b6cb0", campaign: "#6a3a8c", po: "#6e2b32",
+    order: "#2b6cb0", campaign: "#6a3a8c", po: "#2e4839",
   };
 
   // ── Month navigation. monthOffset 0 = current. ──────────────────
@@ -4350,7 +4350,7 @@ function MonthView(props: {
                       : c.isToday
                       ? "rgba(253,242,244,0.7)"
                       : "rgba(255,255,255,0.7)",
-                    borderColor: isOpen ? "#6e2b32" : c.isToday ? "#f6c6cb" : "rgba(255,255,255,0.6)",
+                    borderColor: isOpen ? "#2e4839" : c.isToday ? "#4a6b5b" : "rgba(255,255,255,0.6)",
                     borderStyle: closed ? "dashed" : "solid",
                     borderWidth: isOpen ? 2 : 1,
                     opacity: dimmed ? 0.45 : 1,
@@ -4364,7 +4364,7 @@ function MonthView(props: {
                     <span
                       style={{
                         fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 14,
-                        color: c.isToday ? "#6e2b32" : "#1c1d1f",
+                        color: c.isToday ? "#2e4839" : "#1c1d1f",
                       }}
                     >
                       {c.date.getDate()}
@@ -4384,7 +4384,7 @@ function MonthView(props: {
                           style={{
                             width: 6, height: 6,
                             background: SRC_COLOR[s.kind],
-                            outline: s.isMustDo ? "1.5px solid #6e2b32" : undefined,
+                            outline: s.isMustDo ? "1.5px solid #2e4839" : undefined,
                             outlineOffset: 1,
                           }}
                         />
@@ -4418,7 +4418,7 @@ function MonthView(props: {
                   {hasMustDo && (
                     <span
                       className="text-[9px]"
-                      style={{ color: "#6e2b32", fontWeight: 500 }}
+                      style={{ color: "#2e4839", fontWeight: 500 }}
                     >
                       ⚠ must-do
                     </span>
@@ -4457,7 +4457,7 @@ function MonthView(props: {
                     style={{
                       fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 22,
                       letterSpacing: "-0.012em",
-                      color: isToday ? "#6e2b32" : "#1c1d1f",
+                      color: isToday ? "#2e4839" : "#1c1d1f",
                     }}
                   >
                     {dayLabel}
@@ -4465,7 +4465,7 @@ function MonthView(props: {
                   {isToday && (
                     <span
                       className="text-[10px] uppercase px-2 py-0.5 rounded-full"
-                      style={{ background: "#fdf2f4", color: "#6e2b32", letterSpacing: "0.08em" }}
+                      style={{ background: "#e3ebe6", color: "#2e4839", letterSpacing: "0.08em" }}
                     >
                       today
                     </span>
@@ -4491,7 +4491,7 @@ function MonthView(props: {
                         type="button"
                         onClick={() => toggleSection(iso, "must-do")}
                         className="w-full flex items-baseline gap-1.5 text-left text-[10px] uppercase mb-1.5 hover:opacity-80"
-                        style={{ letterSpacing: "0.1em", color: "#6e2b32" }}
+                        style={{ letterSpacing: "0.1em", color: "#2e4839" }}
                       >
                         <span className="opacity-70">{expanded ? "▾" : "▸"}</span>
                         <span style={{ fontWeight: 600 }}>Must do · {mustDo.length}</span>
@@ -4503,8 +4503,8 @@ function MonthView(props: {
                               key={s.token}
                               className="flex items-baseline gap-2 px-2 py-1.5 rounded-[6px]"
                               style={{
-                                background: "#fdf2f4",
-                                borderLeft: "2px solid #6e2b32",
+                                background: "#e3ebe6",
+                                borderLeft: "2px solid #2e4839",
                               }}
                             >
                               <span
@@ -4512,12 +4512,12 @@ function MonthView(props: {
                                 style={{ width: 7, height: 7, background: SRC_COLOR[s.kind], marginTop: 4, alignSelf: "flex-start" }}
                               />
                               <div className="flex-1 min-w-0">
-                                <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 13.5, color: "#6e2b32" }}>
+                                <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 13.5, color: "#2e4839" }}>
                                   {s.label}
                                   {s.qty != null && <span className="opacity-70 font-normal ml-1.5 text-[11px]">{s.qty} pcs</span>}
                                 </div>
                                 {s.subline && (
-                                  <div className="text-[10.5px]" style={{ color: "#6e2b32", opacity: 0.85 }}>{s.subline}</div>
+                                  <div className="text-[10.5px]" style={{ color: "#2e4839", opacity: 0.85 }}>{s.subline}</div>
                                 )}
                               </div>
                             </li>

@@ -864,11 +864,11 @@ function BuyRowWithBreakdown({ r }: {
                     background:
                       b.kind === "order" ? "rgba(43,108,176,0.12)"
                       : b.kind === "campaign" ? "rgba(106,58,140,0.12)"
-                      : "rgba(110,43,50,0.12)",
+                      : "rgba(74,107,91,0.12)",
                     color:
                       b.kind === "order" ? "#2b6cb0"
                       : b.kind === "campaign" ? "#6a3a8c"
-                      : "#6e2b32",
+                      : "#2e4839",
                   }}
                 >
                   {b.kind}

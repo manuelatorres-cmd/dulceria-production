@@ -4,36 +4,19 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 /**
- * Maps route prefixes to a pastel accent. Each pastel is defined in
- * `globals.css` via `--accent-<name>-bg` / `--accent-<name>-ink`, and the
- * `body[data-accent="<name>"]` rules rewire `--color-primary` so every
- * `bg-primary` / `text-primary-foreground` / `btn-primary` / active-tab
- * style in the app picks it up automatically.
+ * v6 (Atelier Sage): single brand accent app-wide. The previous per-section
+ * pastel routing was retired with the v5→v6 palette migration — every route
+ * now inherits the default `--color-accent` (deep sage) from globals.css.
  *
- * To add a new accent:
- *   1. Define tokens in globals.css (`--accent-foo-bg` + `--accent-foo-ink`)
- *   2. Add a `body[data-accent="foo"] { … }` rule in globals.css
- *   3. Add one line to the map below
+ * Legacy `--accent-*-bg` / `--accent-*-ink` tokens still exist for any
+ * stragglers reading them directly (e.g. order-channel pills); the
+ * `body[data-accent="…"]` overrides are intentionally not triggered.
  *
- * The most-specific prefix wins (longest match), so `/pantry/decoration`
- * can override `/pantry`.
+ * To bring section-level accents back: re-populate this map and define
+ * matching `body[data-accent="<name>"]` rules in globals.css.
  */
 const ROUTE_ACCENTS: Record<string, string> = {
-  "/products": "cocoa",
-  "/fillings": "peach",
-  "/ingredients": "sage",
-  "/moulds": "blue",
-  "/packaging": "lilac",
-  "/variants": "butter",
-  "/collections": "butter",
-  "/pantry/decoration": "mint",
-  "/workshop": "terracotta",
-  "/production": "terracotta",
-  "/stock": "taupe",
-  "/production-brain": "butter",
-  "/shop-counter": "mint",
-  // Lab, Observatory, Pricing, Stats, Settings, Shopping → no accent (falls
-  // back to black). Add an entry here if a section should get a color.
+  // intentionally empty — single brand accent across the app
 };
 
 function resolveAccent(pathname: string): string | null {

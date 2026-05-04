@@ -285,7 +285,7 @@ function CampaignView({
         {campaign.name && (
           <Link
             href={`/plan?focus=campaign:${encodeURIComponent(campaign.name)}`}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#f6c6cb] text-[#6e2b32] px-3 py-1 text-[12px] font-medium hover:bg-[#f0b3ba]"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#e3ebe6] text-[#2e4839] px-3 py-1 text-[12px] font-medium hover:bg-[#d4e0d8]"
           >
             Plan this in /plan →
           </Link>

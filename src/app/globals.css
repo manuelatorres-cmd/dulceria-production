@@ -15,33 +15,37 @@
 @theme {
   --animate-demo-ripple: demo-ripple 0.55s ease-out forwards;
 
-  /* ─── Site-wide palette — v5 (2026-04-24 late, iOS-glass direction) ──
-     Pulled from the screenshots Manuela annotated with "LOVE THIS" /
-     "apple vibes" / "teal and the blush" (CoachPro, Crextio salary,
-     MindMate, Dashboard/Google). Their common thread: soft pastel
-     *gradient* bg, pure-white translucent cards, big rounded corners
-     (16–20 px), per-category pastel tiles. v1–v4 all failed because
-     the chrome was solid warm paper → read as beige. v5 flips to a
-     near-white base with a very subtle warm→cool gradient applied
-     on `body` below in `@layer base`, cards stay pure white.
+  /* ─── Site-wide palette — v6 (2026-05-04, Atelier Sage) ──────────────
+     v5's pastel-blush + iOS-glass identity skewed boutique. v6 keeps
+     the glass surfaces but swaps the warm-paper base for a cool
+     near-white with a faint green undertone, and the section accent
+     to a single restrained deep sage. Cards stay translucent over
+     the body wash; the blush wallpaper blobs are replaced by very
+     subtle sage + cool-grey washes so the page reads "tool" not
+     "boutique". One brand accent everywhere; per-section pastel
+     identity retired (kept as legacy tokens for any callers that
+     haven't migrated yet — see legacy block below).
      ──────────────────────────────────────────────────────────────────── */
-  --color-background: #fdfbf9;            /* near-white with a whisper of warmth */
-  --color-foreground: #1c1d1f;            /* iOS near-black */
-  --color-muted: #f5f3ef;                 /* barely-there panel */
-  --color-muted-foreground: #7b7a7e;      /* neutral warm grey */
-  --color-border: rgba(28, 29, 31, 0.08); /* soft edge */
-  --color-primary: #1c1d1f;
-  --color-primary-foreground: #fdfbf9;
-  /* Accent = per-section pastel surface. Overridden per-section by
-     body[data-accent=…] rules in @layer base. */
-  --color-accent: #1c1d1f;
-  --color-accent-foreground: #fdfbf9;
+  --color-background: #f5f6f4;            /* cool off-white, faint sage */
+  --color-foreground: #1d2421;            /* deep ink with green undertone */
+  --color-muted: #ebede9;                 /* barely-there panel */
+  --color-muted-foreground: #6b7570;      /* neutral cool grey */
+  --color-border: rgba(29, 36, 33, 0.10); /* soft cool edge */
+  --color-primary: #1d2421;
+  --color-primary-foreground: #f5f6f4;
+  --color-accent: #4a6b5b;                /* deep sage — the one accent */
+  --color-accent-foreground: #ffffff;
   --color-card: #ffffff;
-  --color-card-foreground: #1c1d1f;
-  /* Destructive — brick tone (#A36361). Sophisticated alert, not
-     shouty red. Retained as the signature warm-alert colour. */
+  --color-card-foreground: #1d2421;
+  /* Destructive — brick tone retained as warm alert. */
   --color-destructive: #a36361;
   --color-destructive-foreground: #ffffff;
+
+  /* Brand accent tints — deep, soft, ring (translucent) — used by
+     buttons, active pills, focus rings, and section-accent chips. */
+  --color-accent-soft: #e3ebe6;           /* light sage tint for soft pills */
+  --color-accent-soft-ink: #2e4839;       /* deep sage ink — readable on tint */
+  --color-accent-ring: rgba(74, 107, 91, 0.30);
 
   /* Side-nav surface — translucent white over the gradient body. Set
      to white + 60% alpha in @layer base so it reads as frosted glass
@@ -269,31 +273,22 @@
   body {
     letter-spacing: -0.005em;
     font-weight: 400;
-    /* iOS-glass wallpaper: two soft pastel blobs (blush top-right,
-       teal/mint bottom-left) over a near-white base. Matches the
-       CoachPro / Crextio / Google-apple-vibes references Manuela
-       annotated with "LOVE THIS". Radial gradients give the
-       "transparent-but-isn't" feeling when paired with blurred cards
-       overlaying them. `background-attachment: fixed` keeps the
-       wallpaper stationary so scrolled content feels like it slides
-       over glass. */
+    /* v6 wallpaper — Atelier Sage. Quiet sage + cool-grey washes over
+       a near-white base. Glass cards keep their depth without the
+       wallpaper screaming. `background-attachment: fixed` so scrolled
+       content feels like it slides over glass. */
     background:
       radial-gradient(
         circle at 85% 15%,
-        rgba(245, 201, 196, 0.65) 0%,   /* blush blob */
-        rgba(245, 201, 196, 0) 42%
+        rgba(74, 107, 91, 0.10) 0%,    /* faint sage wash, top-right */
+        rgba(74, 107, 91, 0) 45%
       ),
       radial-gradient(
         circle at 15% 85%,
-        rgba(200, 230, 212, 0.65) 0%,   /* teal/mint blob */
-        rgba(200, 230, 212, 0) 45%
+        rgba(107, 117, 112, 0.08) 0%,  /* cool-grey wash, bottom-left */
+        rgba(107, 117, 112, 0) 50%
       ),
-      radial-gradient(
-        circle at 60% 55%,
-        rgba(220, 203, 233, 0.35) 0%,   /* lilac wash middle */
-        rgba(220, 203, 233, 0) 55%
-      ),
-      linear-gradient(180deg, #fdfbf9 0%, #f8f5f1 100%);
+      linear-gradient(180deg, #f5f6f4 0%, #eef0ed 100%);
     background-attachment: fixed;
     min-height: 100vh;
   }

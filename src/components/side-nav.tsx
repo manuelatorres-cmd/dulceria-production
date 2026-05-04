@@ -205,17 +205,17 @@ export function SideNav() {
         href={item.href}
         className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
           active
-            ? "bg-[#f6c6cb] text-[#6e2b32] font-medium"
+            ? "bg-[#4a6b5b] text-white font-medium"
             : "text-[#cfd2dc] hover:text-white hover:bg-white/5"
         }`}
       >
         {active ? (
-          <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#f6c6cb]" />
+          <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#7a9988]" />
         ) : null}
         <div className="relative shrink-0">
           <item.icon className="w-[18px] h-[18px]" />
           {badge > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[#f6c6cb] text-[#6e2b32] text-[9px] font-semibold flex items-center justify-center leading-none">
+            <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[#7a9988] text-white text-[9px] font-semibold flex items-center justify-center leading-none">
               {badge > 9 ? "9+" : badge}
             </span>
           )}
@@ -231,7 +231,7 @@ export function SideNav() {
     <nav
       className={`fixed top-0 left-0 h-full z-40 flex flex-col transition-[width] duration-200 text-[#cfd2dc] ${widthClass}`}
       style={{
-        backgroundColor: "#1f2230",
+        backgroundColor: "#1f2624",
         borderRight: "1px solid rgba(255, 255, 255, 0.06)",
       }}
     >
@@ -256,7 +256,7 @@ export function SideNav() {
         onClick={() => setCollapsed((c) => !c)}
         title={collapsed ? "Expand nav" : "Collapse nav"}
         aria-label={collapsed ? "Expand nav" : "Collapse nav"}
-        className="hidden sm:flex absolute top-5 -right-3 z-50 w-6 h-6 items-center justify-center rounded-full bg-[#1f2230] border border-white/15 text-[#cfd2dc] hover:text-white hover:border-white/40 transition-colors"
+        className="hidden sm:flex absolute top-5 -right-3 z-50 w-6 h-6 items-center justify-center rounded-full bg-[#1f2624] border border-white/15 text-[#cfd2dc] hover:text-white hover:border-white/40 transition-colors"
       >
         <ChevronIcon className={`w-3 h-3 transition-transform ${collapsed ? "rotate-180" : ""}`} />
       </button>
@@ -309,12 +309,12 @@ export function SideNav() {
               title="Dashboard"
               className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
                 isActive(pathname, "/dashboard")
-                  ? "bg-[#f6c6cb] text-[#6e2b32] font-medium"
+                  ? "bg-[#4a6b5b] text-white font-medium"
                   : "text-[#cfd2dc] hover:text-white hover:bg-white/5"
               }`}
             >
               {isActive(pathname, "/dashboard") ? (
-                <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#f6c6cb]" />
+                <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#7a9988]" />
               ) : null}
               <HomeIcon className="w-[18px] h-[18px] shrink-0" />
               <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Dashboard</span>
@@ -336,17 +336,17 @@ export function SideNav() {
             href="/shopping"
             className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
               isActive(pathname, "/shopping")
-                ? "bg-[#f6c6cb] text-[#6e2b32] font-medium"
+                ? "bg-[#4a6b5b] text-white font-medium"
                 : "text-[#cfd2dc] hover:text-white hover:bg-white/5"
             }`}
           >
             {isActive(pathname, "/shopping") ? (
-              <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#f6c6cb]" />
+              <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#7a9988]" />
             ) : null}
             <div className="relative shrink-0">
               <ShoppingIcon className="w-[18px] h-[18px]" />
               {pendingShoppingCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[#f6c6cb] text-[#6e2b32] text-[9px] font-semibold flex items-center justify-center leading-none">
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-sm bg-[#7a9988] text-white text-[9px] font-semibold flex items-center justify-center leading-none">
                   {pendingShoppingCount > 9 ? "9+" : pendingShoppingCount}
                 </span>
               )}
@@ -361,12 +361,12 @@ export function SideNav() {
           href="/settings"
           className={`relative flex items-center gap-3 px-3 py-2 rounded-sm transition-colors ${
             pathname.startsWith("/settings")
-              ? "bg-[#f6c6cb] text-[#6e2b32] font-medium"
+              ? "bg-[#4a6b5b] text-white font-medium"
               : "text-[#cfd2dc] hover:text-white hover:bg-white/5"
           }`}
         >
           {pathname.startsWith("/settings") ? (
-            <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#f6c6cb]" />
+            <span aria-hidden className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-[#7a9988]" />
           ) : null}
           <SettingsIcon className="w-[18px] h-[18px] shrink-0" />
           <span className={`${labelClass} text-[13px] truncate tracking-tight`}>Settings</span>

@@ -19,8 +19,8 @@ const WEEKDAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "F
 
 /* Same glass card pattern as /plan + /dashboard. */
 const CARD = "bg-white/70 backdrop-blur-2xl border border-white/60 rounded-[18px] p-5 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
-const PINK = "bg-[#f6c6cb] text-[#6e2b32] hover:bg-[#f0b3ba]";
-const PINK_INK = "text-[#6e2b32]";
+const PINK = "bg-[#e3ebe6] text-[#2e4839] hover:bg-[#d4e0d8]";
+const PINK_INK = "text-[#2e4839]";
 
 export default function ShopPage() {
   const hours = useShopOpeningHours();
@@ -91,7 +91,7 @@ function LiveStatusInline({ live }: { live: ReturnType<typeof computeLiveShopSta
       style={{
         background: open ? "#f1faf4" : "#fdeeea",
         color: open ? "#4a7a5e" : "#9b4f48",
-        border: `1px solid ${open ? "#cfe5d9" : "#f0c6c0"}`,
+        border: `1px solid ${open ? "#cfe5d9" : "#c8d4cc"}`,
       }}
     >
       <span
@@ -163,7 +163,7 @@ function PickupsTodayCard() {
             const oItems = itemsByOrder.get(o.id!) ?? [];
             const totalPcs = oItems.reduce((s, it) => s + it.quantity, 0);
             const dueTime = o.deadline ? new Date(o.deadline).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }) : "";
-            const tag = o.channel === "online" ? { bg: "#fdf2f4", ink: "#6e2b32", t: "Online" }
+            const tag = o.channel === "online" ? { bg: "#e3ebe6", ink: "#2e4839", t: "Online" }
               : o.channel === "b2b" ? { bg: "#eff5fb", ink: "#4b6b8f", t: "B2B" }
                 : { bg: "#fdf8e2", ink: "#8a7030", t: "Walk-in" };
             return (
@@ -691,7 +691,7 @@ function ClosuresEditor({ closures }: {
   return (
     <div className="space-y-1.5">
       {closures.map((c) => (
-        <div key={c.id} className="flex items-center gap-2 rounded-[10px] border border-[#fdeeea] bg-[#fdf2f4] px-2.5 py-1.5">
+        <div key={c.id} className="flex items-center gap-2 rounded-[10px] border border-[#dfe6e0] bg-[#e9efe9] px-2.5 py-1.5">
           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#9b4f48" }} />
           <span className="flex-1 min-w-0 text-[12px]" style={{ color: "#9b4f48" }}>
             {new Date(c.startDate).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}

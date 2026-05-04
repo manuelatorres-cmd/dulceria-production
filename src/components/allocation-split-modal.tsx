@@ -196,8 +196,8 @@ export function AllocationSplitModal({
             const short = v < r.row.requested;
             const label = r.kind === "order" ? r.row.orderLabel : r.row.poLabel;
             const tagText = r.kind === "order" ? "ORDER" : "PO";
-            const tagBg = r.kind === "order" ? "rgba(43,108,176,0.15)" : "rgba(110,43,50,0.15)";
-            const tagInk = r.kind === "order" ? "#2b6cb0" : "#6e2b32";
+            const tagBg = r.kind === "order" ? "rgba(43,108,176,0.15)" : "rgba(74,107,91,0.15)";
+            const tagInk = r.kind === "order" ? "#2b6cb0" : "#2e4839";
             return (
               <li key={r.key} className="space-y-1">
                 <div className="flex items-center justify-between gap-2">

@@ -156,7 +156,7 @@ export default function ProductionOrderDetailPage({
         {order.name && (
           <Link
             href={`/plan?focus=po:${encodeURIComponent(order.name)}`}
-            className="text-[11.5px] px-3 py-1 rounded-full bg-[#f6c6cb] text-[#6e2b32] font-medium hover:bg-[#f0b3ba]"
+            className="text-[11.5px] px-3 py-1 rounded-full bg-[#e3ebe6] text-[#2e4839] font-medium hover:bg-[#d4e0d8]"
           >
             Plan this in /plan →
           </Link>

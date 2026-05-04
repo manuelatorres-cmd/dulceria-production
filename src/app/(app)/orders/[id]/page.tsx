@@ -523,7 +523,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </Link>
             <Link
               href={`/plan?focus=order:${encodeURIComponent(orderId)}`}
-              className="inline-flex items-center gap-2 rounded-[14px] bg-[#f6c6cb] text-[#6e2b32] px-4 py-2.5 text-sm font-medium hover:bg-[#f0b3ba]"
+              className="inline-flex items-center gap-2 rounded-[14px] bg-[#e3ebe6] text-[#2e4839] px-4 py-2.5 text-sm font-medium hover:bg-[#d4e0d8]"
             >
               Plan this in /plan →
             </Link>

@@ -232,7 +232,7 @@ function DeliveryPill({ type }: { type?: string | null }) {
       style={
         isShip
           ? { background: "#eff5fb", color: "#4b6b8f", border: "1px solid #cfe0f0" }
-          : { background: "#fdf2f4", color: "#6e2b32", border: "1px solid #f0c6c0" }
+          : { background: "#e3ebe6", color: "#2e4839", border: "1px solid #c8d4cc" }
       }
     >
       {isShip ? "🚚 Ship" : "🛍 Pickup"}

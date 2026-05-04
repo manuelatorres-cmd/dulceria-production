@@ -73,6 +73,6 @@ const PILL_CLS = [
   "transition-all duration-200 ease-out",
   "hover:bg-white/85 hover:text-foreground hover:border-foreground/20",
   "hover:shadow-[0_1px_2px_rgba(16,18,24,0.06),0_4px_12px_rgba(16,18,24,0.06)]",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6c6cb] focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4a6b5b]/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
   "active:scale-[0.97]",
 ].join(" ");
