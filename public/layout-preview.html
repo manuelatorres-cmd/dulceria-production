@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dulceria — Layout Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(circle at 85% 15%, rgba(74,107,91,0.10) 0%, rgba(74,107,91,0) 45%),
+      radial-gradient(circle at 15% 85%, rgba(107,117,112,0.08) 0%, rgba(107,117,112,0) 50%),
+      linear-gradient(180deg,#f5f6f4 0%,#eef0ed 100%);
+    background-attachment: fixed;
+    color: #1d2421;
+    padding: 32px 24px 80px;
+    min-height: 100vh;
+    letter-spacing: -0.005em;
+  }
+  .serif { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.02em; }
+  h1.page { font-size: 26px; margin: 0 0 4px; }
+  p.lead { color: #6b7570; font-size: 13px; margin: 0 0 32px; max-width: 640px; }
+
+  section.proposal { margin-bottom: 56px; }
+  h2.proposal-title { font-size: 19px; margin: 0 0 4px; }
+  p.proposal-vibe { color: #6b7570; font-size: 12.5px; margin: 0 0 14px; }
+
+  .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 980px) { .ba-grid { grid-template-columns: 1fr; } }
+
+  .frame {
+    border-radius: 14px;
+    border: 1px solid rgba(29,36,33,0.10);
+    background: rgba(255,255,255,0.45);
+    overflow: hidden;
+  }
+  .frame-label {
+    padding: 8px 14px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(29,36,33,0.08);
+  }
+  .frame-label.bad  { background: #fdeeea; color: #9b4f48; }
+  .frame-label.good { background: #e3ebe6; color: #2e4839; }
+  .frame-body { padding: 18px; }
+
+  .muted { color: #6b7570; }
+  .num { font-variant-numeric: tabular-nums; }
+  .pill {
+    display: inline-flex; align-items: center;
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .p-prog    { background: #dbe6f2; color: #2e4870; }
+  .p-ready   { background: #d8e6d8; color: #355a35; }
+  .p-pending { background: #ece3d0; color: #5e553b; }
+  .p-done    { background: #e2e4e0; color: #4d544c; }
+  .p-online  { background: #e3ebe6; color: #2e4839; }
+
+  /* ─── BEFORE patterns (current pain) ─── */
+  .before-row {
+    background: rgba(255,255,255,0.7); backdrop-filter: blur(8px);
+    border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 12px;
+    padding: 12px 16px; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px;
+    width: 100%;
+  }
+  .before-row .name { font-weight: 500; }
+  .before-row .right { margin-left: auto; display: inline-flex; align-items: center; gap: 12px; }
+
+  /* ─── AFTER A: list (orders / picking) ─── */
+  .after-list { max-width: 640px; }
+  .a-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 14px;
+    align-items: baseline;
+    background: rgba(255,255,255,0.7); backdrop-filter: blur(8px);
+    border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 12px;
+    padding: 10px 14px; margin-bottom: 6px;
+  }
+  .a-row .primary { font-weight: 500; font-size: 13.5px; }
+  .a-row .total   { font-weight: 500; font-size: 13.5px; }
+  .a-row .meta    { font-size: 11px; color: #6b7570; }
+  .a-row .due     { font-size: 11px; color: #6b7570; text-align: right; }
+  .a-row .status  { grid-column: 1 / -1; padding-top: 4px; }
+
+  /* ─── AFTER B: tabular line items ─── */
+  .after-table { max-width: 800px; border-radius: 14px; overflow: hidden;
+    background: rgba(255,255,255,0.7); backdrop-filter: blur(8px);
+    border: 1px solid rgba(29,36,33,0.08);
+  }
+  .b-head, .b-row {
+    display: grid; grid-template-columns: 1fr 60px 80px 80px 78px;
+    gap: 12px; padding: 8px 14px; align-items: baseline;
+  }
+  .b-head {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em;
+    color: #6b7570; font-weight: 500;
+    border-bottom: 1px solid rgba(29,36,33,0.10);
+    background: rgba(74,107,91,0.04);
+  }
+  .b-row { border-bottom: 1px solid rgba(29,36,33,0.06); padding: 10px 14px; }
+  .b-row:last-child { border-bottom: 0; }
+  .b-head .ralign, .b-row .ralign { text-align: right; }
+  .b-row .name { font-size: 13px; font-weight: 500; }
+  .b-row .num { font-size: 13px; }
+  .b-actions { display: inline-flex; gap: 4px; justify-content: flex-end; }
+  .icon-btn {
+    width: 26px; height: 26px; border-radius: 6px;
+    border: 1px solid rgba(29,36,33,0.10); background: rgba(255,255,255,0.6);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+
+  /* ─── AFTER C: card grid (products) ─── */
+  .after-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+    max-width: 800px;
+  }
+  .c-card {
+    background: rgba(255,255,255,0.7); backdrop-filter: blur(8px);
+    border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 12px;
+    padding: 11px;
+  }
+  .c-card .swatch {
+    height: 64px; border-radius: 8px; margin-bottom: 8px;
+    background: linear-gradient(135deg, #e3ebe6 0%, #d4e0d8 100%);
+    border: 1px solid rgba(74,107,91,0.10);
+  }
+  .c-card .name { font-size: 13px; font-weight: 500; }
+  .c-card .cat  { font-size: 11px; color: #6b7570; }
+  .c-card .stat-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-top: 8px;
+  }
+  .c-card .stock { font-size: 12.5px; }
+  .c-card .cost  { font-size: 10.5px; color: #6b7570; }
+
+  /* rules block */
+  .rules {
+    margin-top: 24px; max-width: 760px;
+    background: rgba(255,255,255,0.65); backdrop-filter: blur(8px);
+    border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+  .rules h3 { margin: 0 0 8px; font-size: 14px; }
+  .rules ol { margin: 0; padding-left: 22px; font-size: 12.5px; line-height: 1.65; }
+  .rules li b { color: #2e4839; }
+</style>
+</head>
+<body>
+  <h1 class="page serif">Dulceria — Layout proposals</h1>
+  <p class="lead">Each block: BEFORE on the left (current full-width row), AFTER on the right (tightened pattern). All three live alongside Atelier Sage palette.</p>
+
+  <!-- ────────────── A: list page (orders / picking) ────────────── -->
+  <section class="proposal">
+    <h2 class="proposal-title serif">A · List page (Orders, Picking)</h2>
+    <p class="proposal-vibe">Cap card width to <code>max-w-2xl</code> (~640px). Cluster name + meta on left, total + due on right — both clusters tight, no edge-to-edge gap. Status pill drops to its own line under the row.</p>
+    <div class="ba-grid">
+      <div class="frame">
+        <div class="frame-label bad">BEFORE — full-width</div>
+        <div class="frame-body">
+          <div class="before-row">
+            <span class="name">Mira Bellanova</span>
+            <span class="pill p-online">Online</span>
+            <span class="muted">12 pcs</span>
+            <div class="right">
+              <span class="num">€ 48.00</span>
+              <span class="muted">Tue 12 May</span>
+              <span class="pill p-prog">In production</span>
+            </div>
+          </div>
+          <div class="before-row">
+            <span class="name">Café Henri</span>
+            <span class="pill p-online">Wholesale</span>
+            <span class="muted">36 pcs</span>
+            <div class="right">
+              <span class="num">€ 132.00</span>
+              <span class="muted">Wed 13 May</span>
+              <span class="pill p-ready">Ready</span>
+            </div>
+          </div>
+          <div class="before-row">
+            <span class="name">Anna Voss</span>
+            <span class="pill p-online">Walk-in</span>
+            <span class="muted">4 pcs</span>
+            <div class="right">
+              <span class="num">€ 16.00</span>
+              <span class="muted">today</span>
+              <span class="pill p-pending">Pending</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="frame-label good">AFTER — capped + clustered</div>
+        <div class="frame-body">
+          <div class="after-list">
+            <div class="a-row">
+              <span class="primary">Mira Bellanova</span>
+              <span class="total num">€ 48.00</span>
+              <span class="meta">Online · 12 pcs</span>
+              <span class="due">Tue 12 May</span>
+              <span class="status"><span class="pill p-prog">In production</span></span>
+            </div>
+            <div class="a-row">
+              <span class="primary">Café Henri</span>
+              <span class="total num">€ 132.00</span>
+              <span class="meta">Wholesale · 36 pcs</span>
+              <span class="due">Wed 13 May</span>
+              <span class="status"><span class="pill p-ready">Ready</span></span>
+            </div>
+            <div class="a-row">
+              <span class="primary">Anna Voss</span>
+              <span class="total num">€ 16.00</span>
+              <span class="meta">Walk-in · 4 pcs</span>
+              <span class="due">today</span>
+              <span class="status"><span class="pill p-pending">Pending</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────── B: tabular line items ────────────── -->
+  <section class="proposal">
+    <h2 class="proposal-title serif">B · Detail line items (Order edit, Batch products, Picking)</h2>
+    <p class="proposal-vibe">One outer card, internal grid with fixed numeric columns. Header row defines meaning so each line stays tight. Numbers tabular-aligned vertically — eye scans down columns, not across rows.</p>
+    <div class="ba-grid">
+      <div class="frame">
+        <div class="frame-label bad">BEFORE — flex justify-between</div>
+        <div class="frame-body">
+          <div class="before-row">
+            <span class="name">Gianduja square</span>
+            <div class="right">
+              <span class="muted">qty 12</span>
+              <span class="num">€ 4.00</span>
+              <span class="num">€ 48.00</span>
+              <button class="icon-btn">✎</button>
+              <button class="icon-btn">✕</button>
+            </div>
+          </div>
+          <div class="before-row">
+            <span class="name">Caramel praline</span>
+            <div class="right">
+              <span class="muted">qty 6</span>
+              <span class="num">€ 3.50</span>
+              <span class="num">€ 21.00</span>
+              <button class="icon-btn">✎</button>
+              <button class="icon-btn">✕</button>
+            </div>
+          </div>
+          <div class="before-row">
+            <span class="name">Strawberry nougat</span>
+            <div class="right">
+              <span class="muted">qty 24</span>
+              <span class="num">€ 2.75</span>
+              <span class="num">€ 66.00</span>
+              <button class="icon-btn">✎</button>
+              <button class="icon-btn">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="frame-label good">AFTER — tabular grid</div>
+        <div class="frame-body">
+          <div class="after-table">
+            <div class="b-head">
+              <span>Product</span>
+              <span class="ralign">Qty</span>
+              <span class="ralign">Unit €</span>
+              <span class="ralign">Total €</span>
+              <span class="ralign">&nbsp;</span>
+            </div>
+            <div class="b-row">
+              <span class="name">Gianduja square</span>
+              <span class="num ralign">12</span>
+              <span class="num ralign">4.00</span>
+              <span class="num ralign">48.00</span>
+              <div class="b-actions"><button class="icon-btn">✎</button><button class="icon-btn">✕</button></div>
+            </div>
+            <div class="b-row">
+              <span class="name">Caramel praline</span>
+              <span class="num ralign">6</span>
+              <span class="num ralign">3.50</span>
+              <span class="num ralign">21.00</span>
+              <div class="b-actions"><button class="icon-btn">✎</button><button class="icon-btn">✕</button></div>
+            </div>
+            <div class="b-row">
+              <span class="name">Strawberry nougat</span>
+              <span class="num ralign">24</span>
+              <span class="num ralign">2.75</span>
+              <span class="num ralign">66.00</span>
+              <div class="b-actions"><button class="icon-btn">✎</button><button class="icon-btn">✕</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────── C: card grid (products) ────────────── -->
+  <section class="proposal">
+    <h2 class="proposal-title serif">C · Card grid (Products, Variants, Batches dashboard)</h2>
+    <p class="proposal-vibe">Auto-fill grid of compact ~190px tiles. All info per product in one tight tile — visual, name, category, stock, cost. 4 visible at once instead of 4 rows; eye compares horizontally without scanning across page width.</p>
+    <div class="ba-grid">
+      <div class="frame">
+        <div class="frame-label bad">BEFORE — full-width rows</div>
+        <div class="frame-body">
+          <div class="before-row">
+            <span class="name">Gianduja square</span>
+            <span class="muted">Bonbons</span>
+            <div class="right">
+              <span class="num muted">stock 84 pcs</span>
+              <span class="num muted">€ 0.92/pc</span>
+            </div>
+          </div>
+          <div class="before-row">
+            <span class="name">Caramel praline</span>
+            <span class="muted">Bonbons</span>
+            <div class="right">
+              <span class="num muted">stock 22 pcs</span>
+              <span class="num muted">€ 0.78/pc</span>
+            </div>
+          </div>
+          <div class="before-row">
+            <span class="name">Strawberry nougat</span>
+            <span class="muted">Bars</span>
+            <div class="right">
+              <span class="num muted">stock 0 pcs</span>
+              <span class="num muted">€ 1.10/pc</span>
+            </div>
+          </div>
+          <div class="before-row">
+            <span class="name">Hazelnut ganache</span>
+            <span class="muted">Bonbons</span>
+            <div class="right">
+              <span class="num muted">stock 156 pcs</span>
+              <span class="num muted">€ 0.85/pc</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="frame-label good">AFTER — card grid</div>
+        <div class="frame-body">
+          <div class="after-grid">
+            <div class="c-card">
+              <div class="swatch"></div>
+              <div class="name">Gianduja square</div>
+              <div class="cat">Bonbons</div>
+              <div class="stat-row"><span class="stock num">84 pcs</span><span class="cost num">€ 0.92/pc</span></div>
+            </div>
+            <div class="c-card">
+              <div class="swatch"></div>
+              <div class="name">Caramel praline</div>
+              <div class="cat">Bonbons</div>
+              <div class="stat-row"><span class="stock num">22 pcs</span><span class="cost num">€ 0.78/pc</span></div>
+            </div>
+            <div class="c-card">
+              <div class="swatch"></div>
+              <div class="name">Strawberry nougat</div>
+              <div class="cat">Bars</div>
+              <div class="stat-row"><span class="stock num">0 pcs</span><span class="cost num">€ 1.10/pc</span></div>
+            </div>
+            <div class="c-card">
+              <div class="swatch"></div>
+              <div class="name">Hazelnut ganache</div>
+              <div class="cat">Bonbons</div>
+              <div class="stat-row"><span class="stock num">156 pcs</span><span class="cost num">€ 0.85/pc</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────── rules ────────────── -->
+  <section class="proposal">
+    <h2 class="proposal-title serif">House rules — content density</h2>
+    <div class="rules">
+      <ol>
+        <li><b>Cap content measure.</b> Lists max-w-2xl (640px). Tables max-w-3xl–4xl (768–896px). Grids max-w-5xl (1024px). Never let a row span 1440px.</li>
+        <li><b>Cluster, don't span.</b> Secondary meta (channel, qty, due) sits BESIDE or BELOW the primary, not at the far edge. Eye reads vertically in a column, not horizontally across air.</li>
+        <li><b>Tabular numbers, right-aligned, fixed columns.</b> Every <code>€</code>/qty/count uses <code>tabular-nums</code> + right-align so digits stack vertically across rows.</li>
+        <li><b>Header rows for grids.</b> One small uppercase header (<code>10px</code>, <code>letter-spacing 0.10em</code>) makes the columns self-explaining — no per-row "qty:" / "€" labels needed.</li>
+        <li><b>One typeface scale.</b> Body 13–13.5px, sub-meta 11px, h2 19–22px serif, table head 10px caps. Five sizes, used consistently. No mid-row variation.</li>
+      </ol>
+    </div>
+  </section>
+</body>
+</html>
