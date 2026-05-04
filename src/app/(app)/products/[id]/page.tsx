@@ -2933,7 +2933,7 @@ function ProductFillingRow({
           <GripVertical className="w-4 h-4" />
         </button>
       )}
-      <Link href={`/fillings/${encodeURIComponent(filling.id ?? '')}`} className="flex-1 min-w-0">
+      <Link href={`/fillings/${encodeURIComponent(filling.id ?? '')}?from=products&fromId=${encodeURIComponent(productFilling.productId)}`} className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <h3 className="font-medium text-sm">{filling.name}</h3>
           <span className="rounded-sm bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-semibold shrink-0 tabular-nums">

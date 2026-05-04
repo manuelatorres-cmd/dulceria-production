@@ -653,7 +653,7 @@ export default function DashboardPage() {
                 return (
                   <li key={order.id}>
                     <Link
-                      href={`/orders/${encodeURIComponent(order.id!)}`}
+                      href={`/orders/${encodeURIComponent(order.id!)}?from=dashboard`}
                       className="flex items-center gap-3 rounded-[8px] px-2 py-1.5 hover:bg-muted/40"
                     >
                       <div className="flex-1 min-w-0">
@@ -953,7 +953,7 @@ function StepCard({ group }: {
             return (
               <li key={r.planId}>
                 <Link
-                  href={`/production/${encodeURIComponent(r.planId)}`}
+                  href={`/production/${encodeURIComponent(r.planId)}?from=dashboard`}
                   className="flex items-center gap-3 rounded-[10px] bg-white/60 backdrop-blur-sm border border-white/40 px-3 py-2 hover:bg-white/80"
                 >
                   <div className="flex-1 min-w-0">
@@ -1055,7 +1055,7 @@ function PipelineList({
 
         return (
           <li key={pid} className={`${INNER} bg-muted/30 px-3 py-2.5`}>
-            <Link href={`/production/${encodeURIComponent(pid)}`} className="block">
+            <Link href={`/production/${encodeURIComponent(pid)}?from=dashboard`} className="block">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <p className="text-[12.5px] font-semibold truncate">
                   {productLabel}

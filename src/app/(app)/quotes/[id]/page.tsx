@@ -111,7 +111,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             )}
             {quote.convertedToOrderId && (
               <Link
-                href={`/orders/${encodeURIComponent(quote.convertedToOrderId)}`}
+                href={`/orders/${encodeURIComponent(quote.convertedToOrderId)}?from=quotes&fromId=${encodeURIComponent(id)}`}
                 className="inline-flex items-center gap-1 rounded-sm border border-border px-3 py-1.5 text-xs text-primary hover:border-primary"
               >
                 View order →

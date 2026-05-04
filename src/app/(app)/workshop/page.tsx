@@ -133,7 +133,7 @@ export default function WorkshopPage() {
                   return (
                     <li key={p.id}>
                       <Link
-                        href={`/production/${p.id}`}
+                        href={`/production/${p.id}?from=workshop`}
                         className="flex items-center gap-3 px-1 py-2 hover:bg-muted/30 rounded-sm"
                       >
                         <StatusDot status={p.status} />
@@ -174,7 +174,7 @@ export default function WorkshopPage() {
                   return (
                     <li key={o.id}>
                       <Link
-                        href={`/orders/${o.id}`}
+                        href={`/orders/${o.id}?from=workshop`}
                         className="flex items-center gap-3 px-1 py-2 hover:bg-muted/30 rounded-sm"
                       >
                         <div className="w-10 shrink-0 text-center">

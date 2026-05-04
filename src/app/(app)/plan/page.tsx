@@ -2636,7 +2636,7 @@ function DemandByUrgency({
               {/* Header: customer + total */}
               <div className="flex items-baseline gap-1.5">
                 <Link
-                  href={`/orders/${encodeURIComponent(o.orderId)}`}
+                  href={`/orders/${encodeURIComponent(o.orderId)}?from=plan`}
                   className="flex-1 min-w-0 truncate hover:underline"
                   style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 13.5, letterSpacing: "-0.01em" }}
                 >
@@ -2933,7 +2933,7 @@ function BatchGroupRow({
     return (
       <li>
         <Link
-          href={`/production/${encodeURIComponent(b.planId)}`}
+          href={`/production/${encodeURIComponent(b.planId)}?from=plan`}
           className="flex items-center gap-3 rounded-[10px] px-3 py-2 transition hover:opacity-90 border border-transparent hover:border-foreground/15"
           style={{ background: tint.bg, color: tint.ink }}
         >
@@ -3002,7 +3002,7 @@ function BatchGroupRow({
           {group.batches.map((b) => (
             <li key={b.lineItemId}>
               <Link
-                href={`/production/${encodeURIComponent(b.planId)}`}
+                href={`/production/${encodeURIComponent(b.planId)}?from=plan`}
                 className="block px-3 py-2 hover:bg-white/60 transition border-b border-white/30 last:border-b-0"
               >
                 <div className="flex items-center justify-between gap-2">
@@ -3759,7 +3759,7 @@ function PivotView(props: {
                                 <Lock className="w-3 h-3" />
                               </button>
                               <Link
-                                href={`/production/${pid}`}
+                                href={`/production/${pid}?from=plan`}
                                 className="inline-flex items-center gap-1 hover:opacity-90"
                                 style={{ color: tint.ink }}
                               >
@@ -4686,7 +4686,7 @@ function MonthView(props: {
                                             ⋮⋮
                                           </span>
                                           <Link
-                                            href={`/production/${pid}`}
+                                            href={`/production/${pid}?from=plan`}
                                             className="hover:underline"
                                             style={{ color: "#1c1d1f", fontWeight: 500 }}
                                           >

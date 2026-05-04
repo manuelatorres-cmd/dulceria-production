@@ -609,7 +609,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 const value = items.reduce((acc, it) => acc + (it.unitPrice ?? 0) * it.quantity, 0);
                 return (
                   <li key={o.id}>
-                    <Link href={`/orders/${encodeURIComponent(o.id!)}`} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/30">
+                    <Link href={`/orders/${encodeURIComponent(o.id!)}?from=customers&fromId=${encodeURIComponent(customer.id!)}`} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/30">
                       <div className="min-w-0">
                         <p className="text-sm truncate">
                           {items.length > 0

@@ -340,7 +340,7 @@ function CampaignView({
       ) : (
         <div className="space-y-3">
           {blocks.map((b) => (
-            <CategoryBlock key={b.categoryName} block={b} />
+            <CategoryBlock key={b.categoryName} block={b} campaignId={campaign.id!} />
           ))}
         </div>
       )}
@@ -368,6 +368,7 @@ function CampaignView({
 
 function CategoryBlock({
   block,
+  campaignId,
 }: {
   block: {
     categoryName: string;
@@ -381,6 +382,7 @@ function CategoryBlock({
       planId?: string;
     }>;
   };
+  campaignId: string;
 }) {
   const [open, setOpen] = useState(false);
   const total = block.items.length;
@@ -439,7 +441,7 @@ function CategoryBlock({
           {block.items.map((i) => (
             <li key={i.productId}>
               <Link
-                href={i.planId ? `/production/${encodeURIComponent(i.planId)}` : `/products/${encodeURIComponent(i.productId)}`}
+                href={i.planId ? `/production/${encodeURIComponent(i.planId)}?from=campaigns&fromId=${encodeURIComponent(campaignId)}` : `/products/${encodeURIComponent(i.productId)}?from=campaigns&fromId=${encodeURIComponent(campaignId)}`}
                 className="flex items-center gap-3 rounded-[10px] border border-border bg-card px-3 py-2 hover:border-foreground/30 transition-colors"
               >
                 <div className="flex-1 min-w-0">
@@ -515,7 +517,7 @@ function OrdersInCampaign({
           return (
             <li key={o.id}>
               <Link
-                href={`/orders/${encodeURIComponent(o.id!)}`}
+                href={`/orders/${encodeURIComponent(o.id!)}?from=campaigns&fromId=${encodeURIComponent(campaign.id!)}`}
                 className="flex items-center gap-3 rounded-[10px] border border-border bg-card/80 px-3 py-2 hover:border-foreground/30"
               >
                 <div className="flex-1 min-w-0">

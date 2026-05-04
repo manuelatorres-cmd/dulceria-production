@@ -1986,7 +1986,7 @@ export default function DailyV2Page() {
                           </ol>
                         )}
                         <Link
-                          href={`/production/${encodeURIComponent(sel.planId)}`}
+                          href={`/production/${encodeURIComponent(sel.planId)}?from=daily`}
                           className="inline-block mt-3 text-[11.5px] underline opacity-75 hover:opacity-100"
                         >
                           → open full wizard

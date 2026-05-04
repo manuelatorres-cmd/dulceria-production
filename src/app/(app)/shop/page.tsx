@@ -169,7 +169,7 @@ function PickupsTodayCard() {
             return (
               <li key={o.id} className="rounded-[10px] border border-white/60 bg-white/55 px-3 py-2">
                 <div className="flex items-baseline justify-between gap-2">
-                  <Link href={`/orders/${encodeURIComponent(o.id!)}`} className="flex-1 min-w-0 hover:underline">
+                  <Link href={`/orders/${encodeURIComponent(o.id!)}?from=shop`} className="flex-1 min-w-0 hover:underline">
                     <span style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 14 }}>
                       {o.customerName || o.eventName || "(no name)"}
                     </span>
@@ -315,7 +315,7 @@ function NewOnlineCard() {
         <ul className="space-y-1">
           {newOnline.map((o) => (
             <li key={o.id} className="flex items-baseline justify-between gap-2 text-[12px] px-2 py-1.5">
-              <Link href={`/orders/${encodeURIComponent(o.id!)}`} className="truncate flex-1 min-w-0 hover:underline">
+              <Link href={`/orders/${encodeURIComponent(o.id!)}?from=shop`} className="truncate flex-1 min-w-0 hover:underline">
                 <span style={{ fontFamily: "var(--font-serif)", fontSize: 13 }}>
                   {o.sourceRef || o.customerName || "—"}
                 </span>

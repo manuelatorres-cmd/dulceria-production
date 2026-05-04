@@ -1027,7 +1027,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 return (
                   <li key={cr.id} className="rounded-sm border border-border bg-card flex items-center gap-2 px-3 py-2.5">
                     <Link
-                      href={`/products/${encodeURIComponent(cr.productId)}`}
+                      href={`/products/${encodeURIComponent(cr.productId)}?from=variants&fromId=${encodeURIComponent(variantId)}`}
                       className="flex-1 min-w-0 text-sm font-medium truncate hover:underline"
                     >
                       {productMap.get(cr.productId) ?? cr.productId}

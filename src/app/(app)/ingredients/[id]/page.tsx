@@ -515,7 +515,7 @@ function IngredientDeletePanel({
         <ul className="space-y-1">
           {activeFillings.map((l) => (
             <li key={l.id} className="text-xs font-medium flex items-center gap-1.5">
-              <Link href={`/fillings/${encodeURIComponent(l.id ?? '')}`} className="text-primary underline underline-offset-2 hover:text-primary/80">
+              <Link href={`/fillings/${encodeURIComponent(l.id ?? '')}?from=ingredients`} className="text-primary underline underline-offset-2 hover:text-primary/80">
                 {l.name}
               </Link>
             </li>

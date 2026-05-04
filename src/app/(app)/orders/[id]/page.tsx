@@ -1752,7 +1752,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
                   <span className="text-muted-foreground">from</span>
                   {plan ? (
                     <Link
-                      href={`/production/${encodeURIComponent(plan.id!)}`}
+                      href={`/production/${encodeURIComponent(plan.id!)}?from=orders&fromId=${encodeURIComponent(item.orderId)}`}
                       className="font-medium hover:underline truncate max-w-[30ch]"
                     >
                       {batchLabel}

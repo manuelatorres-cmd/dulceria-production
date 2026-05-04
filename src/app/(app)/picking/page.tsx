@@ -176,7 +176,7 @@ function PackTab() {
                   </span>
                 )}
                 <Link
-                  href={`/orders/${o.id}`}
+                  href={`/orders/${o.id}?from=picking`}
                   className="ml-auto text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                 >
                   open <ExternalLink className="w-3 h-3" />
