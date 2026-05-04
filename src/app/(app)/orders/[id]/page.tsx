@@ -52,7 +52,8 @@ import {
   type OrderPlanLink, type ProductionPlan,
   type Order,
 } from "@/types";
-import { ArrowLeft, Plus, Trash2, X, Pencil, AlertTriangle, Check, Calendar, Package, UserPlus, User, Copy } from "lucide-react";
+import { Plus, Trash2, X, Pencil, AlertTriangle, Check, Calendar, Package, UserPlus, User, Copy } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { newId } from "@/lib/supabase";
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -431,12 +432,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <div>
       <div className="px-4 pt-6 pb-2">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
+        <BackButton fallbackHref="/orders" fallbackLabel="All orders" onBack={() => router.back()} />
       </div>
 
       <div className="px-4 pb-8 space-y-6">

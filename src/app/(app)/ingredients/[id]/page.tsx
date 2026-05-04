@@ -7,7 +7,8 @@ import { useIngredient, useIngredients, useIngredientUsage, saveIngredient, dele
 import type { IngredientDeleteCheck } from "@/lib/hooks";
 import { IngredientForm } from "@/components/ingredient-form";
 import { COMPOSITION_FIELDS, allergenLabel, type Ingredient } from "@/types";
-import { ArrowLeft, Pencil, Layers, Trash2, ChevronDown, X, AlertTriangle, Archive, ArchiveRestore } from "lucide-react";
+import { Pencil, Layers, Trash2, ChevronDown, X, AlertTriangle, Archive, ArchiveRestore } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
@@ -97,9 +98,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
   return (
     <div>
       <div className="px-4 pt-6 pb-2 space-y-2">
-        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
-        </button>
+        <BackButton fallbackHref="/ingredients" fallbackLabel="All ingredients" onBack={() => safeBack()} />
         <DetailNav
           items={[...allIngredients].sort((a, b) => a.name.localeCompare(b.name))}
           currentId={ingredient.id ?? ""}

@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { PageHeader } from "@/components/page-header";
 import {
   useSubscriptionTemplate,
@@ -94,13 +94,11 @@ export default function SubscriptionTemplateDetail({
   return (
     <div>
       <div className="mb-3">
-        <Link
-          href="/subscriptions"
-          className="inline-flex items-center gap-1 text-[11px] uppercase text-muted-foreground hover:text-foreground"
-          style={{ letterSpacing: "0.1em" }}
-        >
-          <ArrowLeft className="w-3 h-3" /> Subscriptions
-        </Link>
+        <BackButton
+          fallbackHref="/subscriptions"
+          fallbackLabel="Subscriptions"
+          className="inline-flex items-center gap-1 text-[11px] uppercase text-muted-foreground hover:text-foreground tracking-[0.1em]"
+        />
       </div>
 
       <PageHeader

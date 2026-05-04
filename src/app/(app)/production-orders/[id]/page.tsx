@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import {
   useProductionOrder,
   useProductionOrders,
@@ -136,12 +137,7 @@ export default function ProductionOrderDetailPage({
   return (
     <div className="px-6 sm:px-10 pt-6 pb-12 max-w-[1500px] mx-auto">
       <div className="space-y-2 mb-3">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
+        <BackButton fallbackHref="/production-orders" fallbackLabel="All production orders" onBack={() => router.back()} />
         <DetailNav
           items={[...allOrders].sort((a, b) => a.dueDate.localeCompare(b.dueDate))}
           currentId={id}

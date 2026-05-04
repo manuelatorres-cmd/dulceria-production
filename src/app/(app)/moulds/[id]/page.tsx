@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, use, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMould, useMoulds, saveMould, deleteMould, archiveMould, unarchiveMould, isMouldInUse, useMouldUsage } from "@/lib/hooks";
 import { UsedInPanel } from "@/components/pantry";
-import { ArrowLeft, Camera, Pencil, Trash2, Archive, ArchiveRestore } from "lucide-react";
+import { Camera, Pencil, Trash2, Archive, ArchiveRestore } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { DetailNav } from "@/components/detail-nav";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { FILL_FACTOR } from "@/lib/production";
@@ -153,9 +154,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <div>
       <div className="px-4 pt-6 pb-2 space-y-2">
-        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
-        </button>
+        <BackButton fallbackHref="/moulds" fallbackLabel="All moulds" onBack={() => safeBack()} />
         <DetailNav
           items={[...allMoulds].filter((m) => !m.archived).sort((a, b) => a.name.localeCompare(b.name))}
           currentId={mouldId}

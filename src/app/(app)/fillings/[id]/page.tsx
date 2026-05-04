@@ -17,7 +17,8 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSe
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { CategoryPicker } from "@/components/category-picker";
-import { ArrowLeft, Pencil, Trash2, Lock, LockOpen, GitBranch, Plus, Search, Copy, ArchiveRestore, Archive, AlertTriangle } from "lucide-react";
+import { Pencil, Trash2, Lock, LockOpen, GitBranch, Plus, Search, Copy, ArchiveRestore, Archive, AlertTriangle } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { StepListEditor, StepList } from "@/components/step-list-editor";
@@ -237,12 +238,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div>
       <div className="px-4 pt-6 pb-2 space-y-2">
-        <button
-          onClick={() => safeBack()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground"
-        >
-          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
-        </button>
+        <BackButton fallbackHref="/fillings" fallbackLabel="All fillings" onBack={() => safeBack()} />
         <DetailNav
           items={[...allFillings].sort((a, b) => a.name.localeCompare(b.name))}
           currentId={fillingId}

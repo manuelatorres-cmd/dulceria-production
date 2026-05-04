@@ -10,8 +10,10 @@ import {
 } from "@/lib/hooks";
 import { QUOTE_STATUS_LABELS, type QuoteStatus } from "@/types";
 import {
-  ArrowLeft, Printer, Check, Trash2, Package,
+  Printer, Check, Trash2, Package,
 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 
 export default function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);
@@ -90,9 +92,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
       <div className="px-4 pb-10 space-y-4 print:pb-0">
         {/* Toolbar — hidden in print view */}
         <div className="flex items-center justify-between print:hidden">
-          <Link href="/quotes" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-            <ArrowLeft className="w-3.5 h-3.5" /> All quotes
-          </Link>
+          <BackButton fallbackHref="/quotes" fallbackLabel="All quotes" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1" />
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.print()}

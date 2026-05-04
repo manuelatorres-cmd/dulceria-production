@@ -20,7 +20,8 @@ import { PackingModal } from "@/components/packing-modal";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
 import type { Filling, Mould, PlanProduct, Product, DecorationMaterial } from "@/types";
 import { normalizeApplyAt } from "@/types";
-import { ArrowLeft, RotateCcw, Pencil, Check, X, BookOpen, StickyNote, Plus, ClipboardList, Printer, Play } from "lucide-react";
+import { RotateCcw, Pencil, Check, X, BookOpen, StickyNote, Plus, ClipboardList, Printer, Play } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { YieldModal } from "@/components/yield-modal";
 import type { YieldEntry } from "@/components/yield-modal";
 import {
@@ -877,9 +878,9 @@ function PlanContent({
   return (
     <div>
       <div className="px-4 pt-6 pb-2">
-        <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-3">
-          <ArrowLeft className="w-4 h-4" /> {backLabel}
-        </Link>
+        <div className="mb-3">
+          <BackButton fallbackHref={backHref} fallbackLabel={backLabel} />
+        </div>
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             {editingName ? (

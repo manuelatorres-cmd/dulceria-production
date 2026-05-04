@@ -3,7 +3,8 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { PageHeader } from "@/components/page-header";
 import { phaseKeyFromStepName } from "@/lib/production";
 import {
@@ -60,13 +61,12 @@ export default function CampaignDetailPage({
   return (
     <div className="px-6 sm:px-10 pt-8 pb-12 max-w-[1400px] mx-auto">
       <div className="mb-3">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-[11px] uppercase text-muted-foreground hover:text-foreground"
-          style={{ letterSpacing: "0.1em" }}
-        >
-          <ArrowLeft className="w-3 h-3" /> Back
-        </button>
+        <BackButton
+          fallbackHref="/campaigns"
+          fallbackLabel="Campaigns"
+          onBack={() => router.back()}
+          className="inline-flex items-center gap-1 text-[11px] uppercase text-muted-foreground hover:text-foreground tracking-[0.1em]"
+        />
       </div>
 
       {editing ? (

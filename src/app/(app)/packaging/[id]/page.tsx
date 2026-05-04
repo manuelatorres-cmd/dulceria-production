@@ -8,7 +8,8 @@ import {
   savePackagingOrder, deletePackagingOrder,
   setPackagingLowStock, setPackagingOutOfStock, markPackagingOrdered, useCurrencySymbol,
 } from "@/lib/hooks";
-import { ArrowLeft, Pencil, Trash2, Plus, Package, Archive, ArchiveRestore } from "lucide-react";
+import { Pencil, Trash2, Plus, Package, Archive, ArchiveRestore } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
 import { StockStatusPanel } from "@/components/stock-status-panel";
@@ -187,9 +188,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
   return (
     <div>
       <div className="px-4 pt-6 pb-2 space-y-2">
-        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
+        <BackButton fallbackHref="/packaging" fallbackLabel="All packaging" onBack={() => safeBack()} />
         <DetailNav
           items={[...allPackaging].sort((a, b) => a.name.localeCompare(b.name))}
           currentId={packagingId}

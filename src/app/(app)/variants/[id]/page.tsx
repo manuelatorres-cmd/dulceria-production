@@ -42,7 +42,8 @@ import { calculateProductNutrition, calculateVariantNutrition, getNutrientsByMar
 import { buildVariantIngredientList, type ProductIngredientListInput } from "@/lib/ingredientList";
 import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
 import { containsAllergen } from "@/lib/allergenKeywordsDe";
-import { ArrowLeft, Plus, Search, X, Trash2, Pencil, Copy, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
+import { Plus, Search, X, Trash2, Pencil, Copy, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
@@ -661,12 +662,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
     <div>
       {/* Back */}
       <div className="px-4 pt-6 pb-2 space-y-2">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
-        </button>
+        <BackButton fallbackHref="/variants" fallbackLabel="All variants" onBack={() => router.back()} />
         <DetailNav
           items={[...allVariants].sort((a, b) => a.name.localeCompare(b.name))}
           currentId={variantId}

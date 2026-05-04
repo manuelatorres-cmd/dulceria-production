@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { usePendingShoppingCount } from "@/lib/hooks";
+import { sectionForFrom } from "@/lib/navContext";
 
 type NavItem = {
   href: string;
@@ -114,19 +115,26 @@ const SECTION_BY_HOME_HREF: Record<string, string> = {
   "/observatory": "The Observatory",
 };
 
+/** Legacy from-code overrides (predates navContext). New flows should use
+ *  the navContext FromCode set, which side-nav reads via sectionForFrom(). */
 const FROM_TO_ROUTE: Record<string, string> = {
   pricing: "/pricing",
   stats: "/stats",
   "product-cost": "/observatory/product-cost",
-  production: "/production",
-  stock: "/stock",
 };
 
 function getActiveSection(pathname: string, from?: string | null): SectionDef | null {
+  // 1. legacy ?from= overrides
   if (from) {
     const overrideRoute = FROM_TO_ROUTE[from];
     if (overrideRoute) {
       const match = SECTIONS.find((s) => s.routes.some((r) => overrideRoute === r || overrideRoute.startsWith(r + "/")));
+      if (match) return match;
+    }
+    // 2. navContext from-codes (Workshop ↔ Pantry cross-section keep-sidebar)
+    const navContextRoute = sectionForFrom(from);
+    if (navContextRoute) {
+      const match = SECTIONS.find((s) => s.routes.some((r) => navContextRoute === r || navContextRoute.startsWith(r + "/")));
       if (match) return match;
     }
   }

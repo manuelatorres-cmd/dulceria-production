@@ -16,8 +16,10 @@ import { DetailNav } from "@/components/detail-nav";
 import { computeCustomerAnalytics } from "@/lib/customerAnalytics";
 import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
 import {
-  ArrowLeft, Phone, Mail, Users, ClipboardList, Plus, Trash2, Check, Archive, FileText, AlertTriangle, Tag,
+  Phone, Mail, Users, ClipboardList, Plus, Trash2, Check, Archive, FileText, AlertTriangle, Tag,
 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import {
   CUSTOMER_CONTACT_KINDS, CUSTOMER_CONTACT_LABELS,
   type CustomerContactKind,
@@ -205,9 +207,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           labelFor={(c) => c.companyName}
         />
         <div className="flex items-center justify-between">
-          <Link href="/customers" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-            <ArrowLeft className="w-3.5 h-3.5" /> All customers
-          </Link>
+          <BackButton fallbackHref="/customers" fallbackLabel="All customers" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1" />
           <div className="flex items-center gap-2">
             <Link
               href={`/quotes/new?customerId=${encodeURIComponent(customer.id!)}`}

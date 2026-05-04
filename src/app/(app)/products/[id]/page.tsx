@@ -13,7 +13,8 @@ import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
 import { containsAllergen } from "@/lib/allergenKeywordsDe";
 import { calculateShellWeightG, calculateCapWeightG } from "@/lib/costCalculation";
 import type { MarketRegion } from "@/types";
-import { ArrowLeft, Camera, Plus, X, Search, Trash2, Pencil, ChevronRight, StickyNote, RefreshCw, AlertTriangle, Undo2, Copy, Archive, ArchiveRestore, GripVertical, Snowflake } from "lucide-react";
+import { Camera, Plus, X, Search, Trash2, Pencil, ChevronRight, StickyNote, RefreshCw, AlertTriangle, Undo2, Copy, Archive, ArchiveRestore, GripVertical, Snowflake } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -463,9 +464,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     <div>
       {/* Back + prev/next pager */}
       <div className="px-4 pt-6 pb-2 space-y-2">
-        <button onClick={() => safeBack()} className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
-        </button>
+        <BackButton fallbackHref="/products" fallbackLabel="All products" onBack={() => safeBack()} />
         <DetailNav
           items={[...allProducts].filter((p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name))}
           currentId={productId}
