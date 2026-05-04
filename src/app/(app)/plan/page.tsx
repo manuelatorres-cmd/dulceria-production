@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, Fragment } from "react";
+import { useMemo, useState, useCallback, Fragment } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -18,6 +18,7 @@ import { capacityConfigStatus, effectiveDailyCapacityMinutes } from "@/lib/capac
 import { queryClient } from "@/lib/query-client";
 import { RefreshCw, AlertTriangle, CheckCircle, Flame, Lock } from "lucide-react";
 import { BackButton } from "@/components/back-button";
+import { PlanTabs } from "@/components/plan-tabs";
 import {
   DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors,
   closestCenter, pointerWithin,
@@ -44,8 +45,6 @@ function formatError(e: unknown): string {
   }
   return String(e);
 }
-
-type PlanView = "weekly" | "pivot" | "daily";
 
 type Level = "ok" | "warn" | "critical" | "over";
 
@@ -102,10 +101,13 @@ export default function PlanPage() {
   const router = useRouter();
   const focusParam = searchParams.get("focus");
   // ── View tab (Weekly / Pivot / Daily) ────────────────────────────
-  // Phase 1: tab shell only. Weekly = existing /plan content; Pivot +
-  // Daily are stubs that link to the source pages until phases 2 + 3
-  // port their content in.
-  const viewParam = (searchParams.get("view") ?? "weekly") as PlanView;
+  // Weekly + Pivot render here. Daily lives at /production-brain/daily
+  // (route kept; PlanTabs strip rendered there too). The internal
+  // viewMode state is now URL-driven so PlanTabs at the top + the
+  // legacy day/week/pivot/month toggle stay in sync. URL value
+  // "weekly" maps to internal "week" (other internal modes pass
+  // through unchanged).
+  const viewParamRaw = searchParams.get("view");
   // Multi-source: focus param can carry several sources, comma
   // separated (e.g. `campaign:Veganmania,po:Replen · 2026-04-27`).
   // The week / day grids show batches matching ANY of the sources.
@@ -290,7 +292,22 @@ export default function PlanPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [lastResult, setLastResult] = useState<{ warnings: string[]; unscheduledPlanIds: string[]; count: number } | null>(null);
   const [regenerateError, setRegenerateError] = useState("");
-  const [viewMode, setViewMode] = useState<"day" | "week" | "pivot" | "month">("day");
+  // viewMode derived from URL so PlanTabs at top + the existing
+  // day/week/pivot/month toggle stay in sync. Default = "day" (current
+  // unchanged default for /plan with no ?view).
+  const viewMode: "day" | "week" | "pivot" | "month" = useMemo(() => {
+    if (viewParamRaw === "weekly" || viewParamRaw === "week") return "week";
+    if (viewParamRaw === "pivot") return "pivot";
+    if (viewParamRaw === "month") return "month";
+    if (viewParamRaw === "day") return "day";
+    return "day";
+  }, [viewParamRaw]);
+  const setViewMode = useCallback((next: "day" | "week" | "pivot" | "month") => {
+    const urlView = next === "week" ? "weekly" : next;
+    const qs = new URLSearchParams(searchParams.toString());
+    qs.set("view", urlView);
+    router.push("/plan?" + qs.toString());
+  }, [router, searchParams]);
 
   const configStatus = capacityConfigStatus(config, people);
 
@@ -413,25 +430,12 @@ export default function PlanPage() {
     }
   }
 
-  // Non-weekly views: render shell + stub. Weekly stays full-fledged below.
-  if (viewParam !== "weekly") {
-    return (
-      <div className="px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto">
-        <div className="mb-2">
-          <BackButton />
-        </div>
-        <PlanTabs view={viewParam} focusParam={focusParam} />
-        <PlanViewStub view={viewParam} />
-      </div>
-    );
-  }
-
   return (
     <div className="px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto">
       <div className="mb-2">
         <BackButton />
       </div>
-      <PlanTabs view={viewParam} focusParam={focusParam} />
+      <PlanTabs focusParam={focusParam} />
       {/* ─── Header row: title + summary pills + controls ─────────── */}
       <div className="mb-4 flex flex-wrap items-baseline gap-3">
         <h1
@@ -4758,76 +4762,6 @@ function MonthView(props: {
       </div>
     </section>
     </DndContext>
-  );
-}
-
-/** Segmented tab switcher rendered above the plan view. URL-driven so
- *  refresh/bookmark preserve the active tab. */
-function PlanTabs({ view, focusParam }: { view: PlanView; focusParam: string | null }) {
-  const qs = focusParam ? `&focus=${encodeURIComponent(focusParam)}` : "";
-  const tabs: Array<{ key: PlanView; label: string; href: string }> = [
-    { key: "weekly", label: "Weekly", href: `/plan?view=weekly${qs}` },
-    { key: "pivot",  label: "Pivot",  href: `/plan?view=pivot${qs}`  },
-    { key: "daily",  label: "Daily",  href: `/plan?view=daily${qs}`  },
-  ];
-  return (
-    <div className="mb-3 inline-flex rounded-full border border-border bg-card overflow-hidden text-[12px]">
-      {tabs.map((t) => {
-        const active = view === t.key;
-        return (
-          <Link
-            key={t.key}
-            href={t.href}
-            className={
-              "px-3.5 py-1.5 font-medium transition-colors " +
-              (active
-                ? "bg-[#4a6b5b] text-white"
-                : "text-muted-foreground hover:text-foreground hover:bg-white/60")
-            }
-            aria-current={active ? "page" : undefined}
-          >
-            {t.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Phase-1 placeholder for Pivot / Daily tabs. Renders a stub card that
- *  links to the canonical legacy page until phases 2-3 port content. */
-function PlanViewStub({ view }: { view: "pivot" | "daily" }) {
-  const copy = view === "daily"
-    ? {
-        title: "Daily view",
-        body: "Phase-grouped today schedule. Currently lives at /production-brain/daily — porting in next phase.",
-        href: "/production-brain/daily?from=plan",
-        cta: "Open daily page",
-      }
-    : {
-        title: "Pivot view",
-        body: "Product × day coverage matrix. Scheduled for phase 3 — see `/plan-preview.html` for the layout.",
-        href: "/plan-preview.html",
-        cta: "Open mockup",
-      };
-  return (
-    <div className="max-w-2xl mx-auto rounded-[14px] border border-border bg-card/65 backdrop-blur-md p-8 text-center">
-      <h2
-        className="text-[19px] mb-2"
-        style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.02em" }}
-      >
-        {copy.title}
-      </h2>
-      <p className="text-[13px] text-muted-foreground mb-5 max-w-md mx-auto">
-        {copy.body}
-      </p>
-      <Link
-        href={copy.href}
-        className="inline-flex items-center gap-1.5 rounded-full bg-[#4a6b5b] text-white px-4 py-1.5 text-[12px] font-medium hover:bg-[#3d5b4d]"
-      >
-        {copy.cta} →
-      </Link>
-    </div>
   );
 }
 

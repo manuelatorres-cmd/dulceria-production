@@ -46,6 +46,7 @@ import {
 } from "@/components/allocation-split-modal";
 import { Thermometer, X } from "lucide-react";
 import { BackButton } from "@/components/back-button";
+import { PlanTabs } from "@/components/plan-tabs";
 import { ProductGroupedChecklist, type ChecklistRow } from "@/components/product-grouped-checklist";
 import { scheduleColorSteps, type ColorTask } from "@/lib/production";
 
@@ -1487,6 +1488,7 @@ export default function DailyV2Page() {
       <div className="mb-2">
         <BackButton />
       </div>
+      <PlanTabs />
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap mb-4">
         <h1
