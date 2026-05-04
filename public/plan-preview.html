@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dulceria — Plan views</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(circle at 85% 15%, rgba(74,107,91,0.10) 0%, rgba(74,107,91,0) 45%),
+      radial-gradient(circle at 15% 85%, rgba(107,117,112,0.08) 0%, rgba(107,117,112,0) 50%),
+      linear-gradient(180deg,#f5f6f4 0%,#eef0ed 100%);
+    background-attachment: fixed;
+    color: #1d2421;
+    padding: 32px 24px 80px;
+    min-height: 100vh;
+    letter-spacing: -0.005em;
+  }
+  .serif { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.02em; }
+  h1.page { font-size: 26px; margin: 0 0 4px; }
+  p.lead  { color: #6b7570; font-size: 13px; margin: 0 0 28px; max-width: 700px; }
+
+  section.proposal { margin-bottom: 56px; }
+  h2.proposal-title { font-size: 19px; margin: 0 0 4px; }
+  p.proposal-vibe  { color: #6b7570; font-size: 12.5px; margin: 0 0 14px; max-width: 760px; }
+
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: #6b7570; }
+
+  .pill {
+    display: inline-flex; align-items: center;
+    font-size: 9.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .p-prog    { background: #dbe6f2; color: #2e4870; }
+  .p-ready   { background: #d8e6d8; color: #355a35; }
+  .p-pending { background: #ece3d0; color: #5e553b; }
+  .p-done    { background: #e2e4e0; color: #4d544c; }
+
+  .glass {
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.6);
+    box-shadow: 0 1px 2px rgba(16,18,24,0.04), 0 8px 24px rgba(16,18,24,0.05);
+    border-radius: 14px;
+  }
+
+  /* ───────── filter / view-switch toolbar (shared) ───────── */
+  .toolbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .seg { display: inline-flex; border-radius: 999px; overflow: hidden;
+    background: rgba(255,255,255,0.6); border: 1px solid rgba(29,36,33,0.10);
+  }
+  .seg button {
+    padding: 5px 12px; font-size: 11.5px; border: 0; background: transparent;
+    color: #6b7570; cursor: pointer; font-weight: 500;
+  }
+  .seg button.on { background: #4a6b5b; color: #fff; }
+  .chip {
+    padding: 4px 10px; font-size: 11px; border-radius: 999px;
+    background: rgba(255,255,255,0.6); border: 1px solid rgba(29,36,33,0.10);
+    color: #6b7570; cursor: pointer;
+  }
+  .chip.on { background: #e3ebe6; border-color: #c8d4cc; color: #2e4839; }
+
+  /* ───────── A · WEEKLY ───────── */
+  .week {
+    max-width: 1200px;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .week-head, .week-body {
+    display: grid;
+    grid-template-columns: 60px repeat(6, 1fr);
+  }
+  .week-head {
+    border-bottom: 1px solid rgba(29,36,33,0.10);
+    background: rgba(74,107,91,0.04);
+  }
+  .week-head > div {
+    padding: 8px 10px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em;
+    color: #6b7570; font-weight: 500;
+    text-align: center;
+    border-right: 1px solid rgba(29,36,33,0.06);
+  }
+  .week-head > div:last-child { border-right: 0; }
+  .week-head .today { color: #2e4839; }
+  .week-head .today .date { color: #4a6b5b; }
+  .week-head .date { display: block; font-size: 13px; font-weight: 500;
+    text-transform: none; letter-spacing: -0.01em; color: #1d2421;
+    margin-top: 2px;
+  }
+  .week-body { min-height: 240px; }
+  .week-body > .time-col {
+    background: rgba(255,255,255,0.40);
+    border-right: 1px solid rgba(29,36,33,0.06);
+    padding: 8px 6px;
+    font-size: 10px; color: #6b7570; text-align: right;
+    line-height: 2.3;
+  }
+  .week-body > .day {
+    padding: 6px;
+    border-right: 1px solid rgba(29,36,33,0.06);
+    background: rgba(255,255,255,0.30);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .week-body > .day:last-child { border-right: 0; }
+  .week-body > .day.today { background: rgba(74,107,91,0.05); }
+  .batch-card {
+    border-radius: 8px;
+    padding: 5px 8px;
+    background: #fff;
+    border: 1px solid rgba(29,36,33,0.08);
+    border-left: 3px solid #4a6b5b;
+    font-size: 11px; line-height: 1.3;
+  }
+  .batch-card .name { font-weight: 500; color: #1d2421; }
+  .batch-card .meta { font-size: 10px; color: #6b7570; margin-top: 1px; }
+  .batch-card.prog    { border-left-color: #5a7aa0; }
+  .batch-card.ready   { border-left-color: #6b8e6b; }
+  .batch-card.pending { border-left-color: #a89a72; }
+  .batch-card.done    { border-left-color: #8a9088; opacity: 0.55; }
+
+  /* ───────── B · PIVOT ───────── */
+  .pivot-wrap { max-width: 1200px; }
+  .pivot {
+    border-radius: 14px; overflow: hidden;
+  }
+  .pivot-grid {
+    display: grid;
+    grid-template-columns: 200px repeat(6, minmax(70px, 1fr)) 80px;
+  }
+  .pivot-grid > .ph {
+    padding: 8px 10px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em;
+    color: #6b7570; font-weight: 500;
+    background: rgba(74,107,91,0.04);
+    border-bottom: 1px solid rgba(29,36,33,0.10);
+    border-right: 1px solid rgba(29,36,33,0.06);
+  }
+  .pivot-grid > .ph.right { text-align: right; }
+  .pivot-grid > .pp,
+  .pivot-grid > .pc,
+  .pivot-grid > .pt {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(29,36,33,0.06);
+    border-right: 1px solid rgba(29,36,33,0.06);
+    font-size: 12.5px;
+    background: rgba(255,255,255,0.50);
+  }
+  .pivot-grid > .pp { font-weight: 500; }
+  .pivot-grid > .pp .cat { font-size: 10px; color: #6b7570; font-weight: 400; display: block; }
+  .pivot-grid > .pc { text-align: right; font-variant-numeric: tabular-nums; color: #1d2421; }
+  .pivot-grid > .pc.zero { color: rgba(29,36,33,0.20); }
+  .pivot-grid > .pc.full { background: rgba(74,107,91,0.10); color: #2e4839; font-weight: 500; }
+  .pivot-grid > .pc.partial { background: rgba(165,148,114,0.12); color: #5e553b; }
+  .pivot-grid > .pc.short { background: rgba(155,79,72,0.10); color: #9b4f48; font-weight: 500; }
+  .pivot-grid > .pt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .pivot-grid .row-end { border-right: 0; }
+  .pivot-grid .last-row { border-bottom: 0; }
+
+  /* ───────── C · DAILY ───────── */
+  .daily { max-width: 880px; }
+  .day-head {
+    display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px;
+  }
+  .day-head h3 { margin: 0; font-size: 22px; font-family: 'Fraunces', serif; font-weight: 500; letter-spacing: -0.02em; }
+  .day-head .meta { font-size: 12px; color: #6b7570; }
+
+  .phase {
+    margin-bottom: 14px;
+  }
+  .phase-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px;
+    border-radius: 12px 12px 0 0;
+    background: rgba(74,107,91,0.06);
+    border: 1px solid rgba(29,36,33,0.08);
+    border-bottom: 0;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.10em;
+    color: #2e4839; font-weight: 600;
+  }
+  .phase-head .count {
+    margin-left: auto; font-size: 11px; color: #6b7570; font-weight: 500;
+    text-transform: none; letter-spacing: 0;
+  }
+  .phase-body {
+    background: rgba(255,255,255,0.65); backdrop-filter: blur(10px);
+    border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 0 0 12px 12px;
+  }
+  .step-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 90px 90px 60px;
+    gap: 12px;
+    padding: 10px 14px;
+    align-items: baseline;
+    border-bottom: 1px solid rgba(29,36,33,0.06);
+  }
+  .step-row:last-child { border-bottom: 0; }
+  .step-row .time { font-size: 11px; color: #6b7570; font-variant-numeric: tabular-nums; }
+  .step-row .desc { }
+  .step-row .desc .name { font-size: 13px; font-weight: 500; }
+  .step-row .desc .meta { font-size: 11px; color: #6b7570; margin-top: 1px; }
+  .step-row .who  { font-size: 11.5px; color: #6b7570; }
+  .step-row .qty  { font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; }
+  .step-row .check {
+    width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid rgba(29,36,33,0.20);
+    background: transparent; cursor: pointer; justify-self: end;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .step-row.done .check { background: #4a6b5b; border-color: #4a6b5b; color: #fff; }
+  .step-row.done .desc .name { color: #6b7570; text-decoration: line-through; text-decoration-color: rgba(107,117,112,0.4); }
+
+</style>
+</head>
+<body>
+
+  <h1 class="page serif">Dulceria — Plan views</h1>
+  <p class="lead">Three plan-page archetypes under Atelier Sage palette + the layout rules from <code>/layout-preview.html</code>: weekly board, product × day pivot, and a single-day phase-grouped schedule.</p>
+
+  <!-- view switcher (visual only) -->
+  <div class="toolbar">
+    <div class="seg">
+      <button class="on">Weekly</button>
+      <button>Pivot</button>
+      <button>Daily</button>
+    </div>
+    <span class="muted" style="font-size:11.5px">Week of 4 May 2026 · 24 batches · 5 days</span>
+    <span class="chip on">All categories</span>
+    <span class="chip">Bonbons</span>
+    <span class="chip">Bars</span>
+    <span class="chip">Filled</span>
+  </div>
+
+  <!-- ───────────────────── A · WEEKLY ───────────────────── -->
+  <section class="proposal">
+    <h2 class="proposal-title serif">A · Weekly board</h2>
+    <p class="proposal-vibe">Mon–Sat columns, today highlighted in sage. Each batch = compact card with sage-tinted left bar (status). 60px time gutter on left for orientation. Capped at 1200px so nothing stretches edge-to-edge on big screens.</p>
+    <div class="glass week">
+      <div class="week-head">
+        <div></div>
+        <div>Mon<span class="date">4</span></div>
+        <div class="today">Tue<span class="date">5</span></div>
+        <div>Wed<span class="date">6</span></div>
+        <div>Thu<span class="date">7</span></div>
+        <div>Fri<span class="date">8</span></div>
+        <div>Sat<span class="date">9</span></div>
+      </div>
+      <div class="week-body">
+        <div class="time-col">
+          09<br/>11<br/>13<br/>15<br/>17
+        </div>
+        <div class="day">
+          <div class="batch-card prog"><div class="name">Gianduja square</div><div class="meta">12 pcs · polishing</div></div>
+          <div class="batch-card prog"><div class="name">Hazelnut ganache</div><div class="meta">36 pcs · filling</div></div>
+          <div class="batch-card done"><div class="name">Caramel praline</div><div class="meta">24 pcs · packed</div></div>
+        </div>
+        <div class="day today">
+          <div class="batch-card ready"><div class="name">Gianduja square</div><div class="meta">12 pcs · ready</div></div>
+          <div class="batch-card prog"><div class="name">Strawberry nougat</div><div class="meta">8 pcs · decoration</div></div>
+          <div class="batch-card pending"><div class="name">Cocoa truffle</div><div class="meta">48 pcs · scheduled</div></div>
+          <div class="batch-card pending"><div class="name">Dark bar 70%</div><div class="meta">10 pcs · scheduled</div></div>
+        </div>
+        <div class="day">
+          <div class="batch-card pending"><div class="name">Hazelnut ganache</div><div class="meta">36 pcs · polishing</div></div>
+          <div class="batch-card pending"><div class="name">Almond praline</div><div class="meta">18 pcs · filling</div></div>
+        </div>
+        <div class="day">
+          <div class="batch-card pending"><div class="name">Cocoa truffle</div><div class="meta">48 pcs · packing</div></div>
+          <div class="batch-card pending"><div class="name">Dark bar 70%</div><div class="meta">10 pcs · packing</div></div>
+        </div>
+        <div class="day">
+          <div class="batch-card pending"><div class="name">Mira Bellanova box</div><div class="meta">3 boxes · campaign</div></div>
+        </div>
+        <div class="day">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────── B · PIVOT ───────────────────── -->
+  <section class="proposal">
+    <h2 class="proposal-title serif">B · Pivot · Product × Day</h2>
+    <p class="proposal-vibe">Rows = products, columns = days. Each cell shows planned qty + colour-coded coverage state (full = sage, partial = butter, short = brick). Right-most "Total" column. Sticky-able first column (product name) and header. Tabular numbers stack vertically — eye scans down a product's row OR down a day's column.</p>
+    <div class="pivot-wrap">
+      <div class="glass pivot">
+        <div class="pivot-grid">
+          <div class="ph">Product</div>
+          <div class="ph right">Mon 4</div>
+          <div class="ph right">Tue 5</div>
+          <div class="ph right">Wed 6</div>
+          <div class="ph right">Thu 7</div>
+          <div class="ph right">Fri 8</div>
+          <div class="ph right">Sat 9</div>
+          <div class="ph right row-end">Total</div>
+
+          <div class="pp">Gianduja square<span class="cat">Bonbons · 12g</span></div>
+          <div class="pc full">12</div>
+          <div class="pc full">12</div>
+          <div class="pc zero">·</div>
+          <div class="pc zero">·</div>
+          <div class="pc partial">6</div>
+          <div class="pc zero row-end">·</div>
+          <div class="pt row-end">30</div>
+
+          <div class="pp">Caramel praline<span class="cat">Bonbons · 10g</span></div>
+          <div class="pc partial">12</div>
+          <div class="pc zero">·</div>
+          <div class="pc full">24</div>
+          <div class="pc zero">·</div>
+          <div class="pc zero">·</div>
+          <div class="pc zero row-end">·</div>
+          <div class="pt row-end">36</div>
+
+          <div class="pp">Hazelnut ganache<span class="cat">Bonbons · 14g</span></div>
+          <div class="pc full">36</div>
+          <div class="pc zero">·</div>
+          <div class="pc full">36</div>
+          <div class="pc zero">·</div>
+          <div class="pc partial">12</div>
+          <div class="pc zero row-end">·</div>
+          <div class="pt row-end">84</div>
+
+          <div class="pp">Strawberry nougat<span class="cat">Bars · 50g</span></div>
+          <div class="pc zero">·</div>
+          <div class="pc partial">8</div>
+          <div class="pc zero">·</div>
+          <div class="pc short">4</div>
+          <div class="pc zero">·</div>
+          <div class="pc zero row-end">·</div>
+          <div class="pt row-end">12</div>
+
+          <div class="pp">Cocoa truffle<span class="cat">Bonbons · 8g</span></div>
+          <div class="pc zero">·</div>
+          <div class="pc full">48</div>
+          <div class="pc zero">·</div>
+          <div class="pc full">48</div>
+          <div class="pc zero">·</div>
+          <div class="pc zero row-end">·</div>
+          <div class="pt row-end">96</div>
+
+          <div class="pp last-row">Dark bar 70%<span class="cat">Bars · 60g</span></div>
+          <div class="pc last-row zero">·</div>
+          <div class="pc last-row partial">10</div>
+          <div class="pc last-row zero">·</div>
+          <div class="pc last-row partial">10</div>
+          <div class="pc last-row zero">·</div>
+          <div class="pc last-row zero row-end">·</div>
+          <div class="pt last-row row-end">20</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────── C · DAILY ───────────────────── -->
+  <section class="proposal">
+    <h2 class="proposal-title serif">C · Daily · Today (Tue 5 May)</h2>
+    <p class="proposal-vibe">Single-day vertical schedule, grouped by phase (polishing → filling → decoration → packing). Each row: time block, batch name + meta, assigned person, qty, check. Capped 880px so the line stays readable. Empty phases hidden.</p>
+    <div class="daily">
+      <div class="day-head">
+        <h3>Tuesday · 5 May</h3>
+        <span class="meta">4 batches · 14 steps · 2 done</span>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head">
+          Polishing
+          <span class="count">2 batches</span>
+        </div>
+        <div class="phase-body">
+          <div class="step-row done">
+            <span class="time">09:00</span>
+            <div class="desc">
+              <div class="name">Gianduja square</div>
+              <div class="meta">mould #12 · 1 sheet</div>
+            </div>
+            <span class="who">M.</span>
+            <span class="qty">12 pcs</span>
+            <span class="check">✓</span>
+          </div>
+          <div class="step-row">
+            <span class="time">10:30</span>
+            <div class="desc">
+              <div class="name">Strawberry nougat</div>
+              <div class="meta">mould #6 · 2 sheets</div>
+            </div>
+            <span class="who">M.</span>
+            <span class="qty">8 pcs</span>
+            <span class="check"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head">
+          Filling
+          <span class="count">3 batches</span>
+        </div>
+        <div class="phase-body">
+          <div class="step-row done">
+            <span class="time">11:00</span>
+            <div class="desc">
+              <div class="name">Hazelnut ganache</div>
+              <div class="meta">90g/pc · cooled overnight</div>
+            </div>
+            <span class="who">M.</span>
+            <span class="qty">36 pcs</span>
+            <span class="check">✓</span>
+          </div>
+          <div class="step-row">
+            <span class="time">11:45</span>
+            <div class="desc">
+              <div class="name">Cocoa truffle</div>
+              <div class="meta">cream filling · 60% chocolate</div>
+            </div>
+            <span class="who">M.</span>
+            <span class="qty">48 pcs</span>
+            <span class="check"></span>
+          </div>
+          <div class="step-row">
+            <span class="time">13:00</span>
+            <div class="desc">
+              <div class="name">Almond praline</div>
+              <div class="meta">tempering · 32°C</div>
+            </div>
+            <span class="who">M.</span>
+            <span class="qty">18 pcs</span>
+            <span class="check"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head">
+          Decoration
+          <span class="count">1 batch</span>
+        </div>
+        <div class="phase-body">
+          <div class="step-row">
+            <span class="time">14:30</span>
+            <div class="desc">
+              <div class="name">Strawberry nougat</div>
+              <div class="meta">gold leaf · pink shimmer</div>
+            </div>
+            <span class="who">M.</span>
+            <span class="qty">8 pcs</span>
+            <span class="check"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-head">
+          Packing
+          <span class="count">2 boxes</span>
+        </div>
+        <div class="phase-body">
+          <div class="step-row">
+            <span class="time">15:30</span>
+            <div class="desc">
+              <div class="name">Mira Bellanova · Box of 12</div>
+              <div class="meta">2 boxes · ribbon + tag</div>
+            </div>
+            <span class="who">M.</span>
+            <span class="qty">2 boxes</span>
+            <span class="check"></span>
+          </div>
+          <div class="step-row">
+            <span class="time">16:15</span>
+            <div class="desc">
+              <div class="name">Café Henri · wholesale tray</div>
+              <div class="meta">labelled · ready Wed AM</div>
+            </div>
+            <span class="who">M.</span>
+            <span class="qty">3 trays</span>
+            <span class="check"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>
