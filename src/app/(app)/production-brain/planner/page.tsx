@@ -25,6 +25,7 @@ import {
   dismissProposal,
 } from "@/lib/hooks";
 import type { ReplenishmentProposal } from "@/types";
+import { BackButton } from "@/components/back-button";
 
 /**
  * Production Brain · Planner — drag-drop scheduling.
@@ -111,6 +112,9 @@ export default function ProductionBrainPlannerPage() {
       onDragEnd={handleDragEnd}
     >
       <div>
+        <div className="px-4 pt-4">
+          <BackButton />
+        </div>
         <PageHeader
           title="Planner"
           description="Drag a proposal onto a day to schedule it. Campaigns + holidays shown across the top. Brain runs daily + on order changes."

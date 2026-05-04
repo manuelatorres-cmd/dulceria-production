@@ -9,6 +9,7 @@ import {
   useOrders,
 } from "@/lib/hooks";
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalIcon } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 
 /**
  * Master calendar — focused month view with a side panel showing the
@@ -152,6 +153,9 @@ export default function CalendarPage() {
 
   return (
     <div className="px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto">
+      <div className="mb-2">
+        <BackButton />
+      </div>
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-baseline gap-3">
         <h1

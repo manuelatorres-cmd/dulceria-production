@@ -14,6 +14,10 @@ import { resolveBack } from "@/lib/navContext";
  * dirty-state confirm still fires on the fallback. Anchor clicks are already
  * intercepted by the guard's capture-phase handler, so the `<Link>` path is
  * safe without further wrapping.
+ *
+ * On hub pages, omit `fallbackHref`/`onBack` so the button only renders when
+ * the user actually arrived via a `?from=` link — avoids a meaningless Back on
+ * a section root.
  */
 export function BackButton({
   fallbackHref,
@@ -46,9 +50,13 @@ export function BackButton({
       </Link>
     );
   }
-  return (
-    <button type="button" onClick={onBack} className={cls}>
-      <ArrowLeft aria-hidden="true" className="w-4 h-4" /> {fallbackLabel}
-    </button>
-  );
+  if (onBack) {
+    return (
+      <button type="button" onClick={onBack} className={cls}>
+        <ArrowLeft aria-hidden="true" className="w-4 h-4" /> {fallbackLabel}
+      </button>
+    );
+  }
+  // Hub-page mode: render nothing unless a ?from= was supplied.
+  return null;
 }

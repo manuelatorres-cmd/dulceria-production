@@ -14,6 +14,7 @@ import {
 } from "@/lib/hooks";
 import { MachineLoadModal } from "@/components/machine-load-modal";
 import type { EquipmentInstance, MachineLoad, MouldPoolInstance } from "@/types";
+import { BackButton } from "@/components/back-button";
 
 /**
  * Production Brain · Equipment dashboard (phase 2 UI)
@@ -122,6 +123,9 @@ export default function ProductionBrainEquipmentPage() {
 
   return (
     <div>
+      <div className="px-4 pt-4">
+        <BackButton />
+      </div>
       <PageHeader
         title="Equipment"
         description="Live workshop snapshot — machines, mould pool, cold storage."

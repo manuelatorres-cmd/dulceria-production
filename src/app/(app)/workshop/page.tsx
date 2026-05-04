@@ -19,6 +19,7 @@ import {
   Plus,
   Package,
 } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 
 export default function WorkshopPage() {
   const plans = useProductionPlans();
@@ -75,6 +76,9 @@ export default function WorkshopPage() {
 
   return (
     <div>
+      <div className="px-4 pt-4">
+        <BackButton />
+      </div>
       <PageHeader
         title="Workshop"
         description="Today's batches, upcoming deadlines, campaigns — everything running through production."

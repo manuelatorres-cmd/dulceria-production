@@ -22,6 +22,7 @@ import {
   ArrowRight,
   AlertTriangle,
 } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 
 export default function PantryPage() {
   const products = useProductsList();
@@ -81,6 +82,9 @@ export default function PantryPage() {
 
   return (
     <div>
+      <div className="px-4 pt-4">
+        <BackButton />
+      </div>
       <PageHeader
         title="Pantry"
         description="Products, fillings, ingredients, moulds, packaging — the building blocks."

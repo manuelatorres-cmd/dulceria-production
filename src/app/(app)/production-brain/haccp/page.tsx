@@ -13,6 +13,7 @@ import {
 } from "@/lib/hooks";
 import type { ColdStorageUnit, TemperatureReading } from "@/types";
 import { COLD_STORAGE_LOCATIONS, COLD_STORAGE_TYPES } from "@/types";
+import { BackButton } from "@/components/back-button";
 
 /**
  * Production Brain · HACCP (phase 3 UI)
@@ -28,6 +29,9 @@ export default function ProductionBrainHaccpPage() {
 
   return (
     <div>
+      <div className="px-4 pt-4">
+        <BackButton />
+      </div>
       <PageHeader
         title="HACCP"
         description="Temperature logs per cold storage unit + open incidents."

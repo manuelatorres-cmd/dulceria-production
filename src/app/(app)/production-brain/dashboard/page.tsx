@@ -12,6 +12,7 @@ import {
 } from "@/lib/hooks";
 import { runEngine, type EngineRunSummary } from "@/lib/engineRunner";
 import type { ReplenishmentProposal } from "@/types";
+import { BackButton } from "@/components/back-button";
 
 /**
  * Production Brain · Dashboard (phase 1 scaffold)
@@ -82,6 +83,9 @@ export default function ProductionBrainDashboardPage() {
 
   return (
     <div>
+      <div className="px-4 pt-4">
+        <BackButton />
+      </div>
       <PageHeader
         title="Production Brain — Dashboard"
         description="Strategic overview: pipeline, alerts, replenishment proposals, capacity outlook."

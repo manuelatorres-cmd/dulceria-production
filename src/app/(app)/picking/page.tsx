@@ -21,6 +21,7 @@ import {
 import { ORDER_CHANNEL_LABELS } from "@/types";
 import type { StockLocation } from "@/types";
 import { Package, AlertTriangle, Check, ExternalLink, Box } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 
 type Tab = "pack" | "box";
 
@@ -40,6 +41,9 @@ export default function PickingPage() {
 
   return (
     <div className="px-6 py-5 max-w-5xl mx-auto">
+      <div className="mb-2">
+        <BackButton />
+      </div>
       <div className="flex items-baseline gap-3 mb-4">
         <h1
           className="text-3xl"

@@ -17,6 +17,7 @@ import {
 import { capacityConfigStatus, effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import { queryClient } from "@/lib/query-client";
 import { RefreshCw, AlertTriangle, CheckCircle, Flame, Lock } from "lucide-react";
+import { BackButton } from "@/components/back-button";
 import {
   DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors,
   closestCenter, pointerWithin,
@@ -407,6 +408,9 @@ export default function PlanPage() {
 
   return (
     <div className="px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto">
+      <div className="mb-2">
+        <BackButton />
+      </div>
       {/* ─── Header row: title + summary pills + controls ─────────── */}
       <div className="mb-4 flex flex-wrap items-baseline gap-3">
         <h1
