@@ -380,9 +380,15 @@ export async function attachBoxContents(
         });
       } catch (e) {
         console.warn(
-          `[attachBoxContents] borrow allocation failed for order ${orderId}, product ${ins.productId}:`,
+          `[attachBoxContents] borrow allocation failed for order ${orderId}, product ${ins.productId} — flipping to produce:`,
           e,
         );
+        // Stock short → flip to produce so reconciler creates a batch
+        // on next regen. Otherwise the pick stays borrow + stuck.
+        await supabase
+          .from("orderItems")
+          .update({ fulfilmentMode: "produce" })
+          .eq("id", ins.id);
       }
     }
     try {
@@ -10897,9 +10903,19 @@ export async function importOnlineOrders(input: OnlineOrderImportInput[]): Promi
       });
     } catch (e) {
       console.warn(
-        `[importOnlineOrders] borrow allocation failed for order ${row.orderId}, product ${row.productId}:`,
+        `[importOnlineOrders] borrow allocation failed for order ${row.orderId}, product ${row.productId} — flipping to produce so reconciler picks it up:`,
         e,
       );
+      // Stock short → flip this orderItem to fulfilmentMode='produce'
+      // so the next Regenerate creates a batch. Without this the line
+      // stays in borrow mode forever and the order is stuck pending.
+      const flipErr = await supabase
+        .from("orderItems")
+        .update({ fulfilmentMode: "produce" })
+        .eq("id", row.id);
+      if (flipErr.error) {
+        console.warn(`[importOnlineOrders] failed to flip orderItem ${row.id} to produce:`, flipErr.error);
+      }
     }
   }
 
