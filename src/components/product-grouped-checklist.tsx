@@ -60,17 +60,30 @@ export function ProductGroupedChecklist({
   doneLabel?: string;
   notDoneLabel?: string;
 }) {
-  // Build groups keyed by productId, preserving incoming order within
-  // a group so done items can stay below pending ones.
+  // Build groups keyed by productId. Within each group, sort done
+  // rows to the bottom so the operator sees outstanding work first.
+  // Across groups, fully-done products also sink to the bottom for
+  // the same reason — pending products stay on top.
   const groups = new Map<string, { name: string; rows: ChecklistRow[] }>();
   for (const r of rows) {
     const g = groups.get(r.productId) ?? { name: r.productName, rows: [] };
     g.rows.push(r);
     groups.set(r.productId, g);
   }
+  for (const g of groups.values()) {
+    g.rows.sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return 0;
+    });
+  }
   const sorted = [...groups.entries()]
     .map(([productId, g]) => ({ productId, ...g }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      const aAllDone = a.rows.every((r) => r.done);
+      const bAllDone = b.rows.every((r) => r.done);
+      if (aAllDone !== bAllDone) return aAllDone ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const isOpen = (pid: string, batchCount: number) =>
