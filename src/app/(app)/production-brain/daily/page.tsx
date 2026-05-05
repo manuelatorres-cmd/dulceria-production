@@ -239,6 +239,33 @@ export default function DailyV2Page() {
     return m;
   }, [allStatuses]);
 
+  // Number of distinct paint sub-steps a plan-product is expected to
+  // tick before its left-side colour checklist counts as done. Mirrors
+  // the design-step filter that builds the right-side worklist —
+  // products with no usable design steps get a single wildcard task
+  // (umbrella key, no idx) and don't appear in this map (count 0).
+  const colourSubStepCountByPp = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const pp of todayPlanProducts) {
+      const product = productById.get(pp.productId);
+      if (!product) continue;
+      if (!productHasPhase(pp.productId, "colour")) continue;
+      const ppId = pp.id ?? `${pp.planId}-${pp.productId}`;
+      const designSteps = (product.shellDesign ?? []).filter((d) => {
+        const apply = d.applyAt ?? "on_mould";
+        if (apply === "after_cap") return false;
+        const allTransfer = (d.materialIds ?? []).every(
+          (mid) => materialById.get(mid)?.type === "transfer_sheet",
+        );
+        if (allTransfer && (d.materialIds?.length ?? 0) > 0) return false;
+        return true;
+      });
+      m.set(ppId, designSteps.length);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayPlanProducts, productById, materialById]);
+
   // Prefix-aware done check. Wizard writes per-product keys like
   // `polishing-<planProductId>`; this view's PhaseId is the bare
   // phase. Match either form so a tick on /production propagates.
@@ -261,18 +288,43 @@ export default function DailyV2Page() {
   // one of two double-caramel batches done urgently while the other
   // waits. We treat a key as matching this pp when:
   //   - it equals "phase-<ppId>" (exact pp tick)
-  //   - it starts with "phase-<ppId>-" (sub-step like color step idx)
   //   - it equals the bare phase, "phase" (legacy plan-wide tick — keep
   //     for backwards compat with anything ticked before per-pp keys)
+  //   - for non-colour phases: any "phase-<ppId>-..." sub-step counts
+  //   - for colour: only when ALL expected design-step sub-ticks are
+  //     present (one per shell-design step). Ticking a single colour
+  //     task on the right pane previously closed the left checklist
+  //     even when the second design step was still pending.
   function planProductPhaseDone(planId: string, ppId: string, phase: PhaseId): boolean {
     const set = doneByPlan.get(planId);
     if (!set) return false;
     const aliases: string[] = phase === "colour" ? ["colour", "color"] : [phase];
+    if (phase === "colour") {
+      // Umbrella ticks always win.
+      for (const k of set) {
+        for (const a of aliases) {
+          if (k === a) return true;
+          if (k === `${a}-${ppId}`) return true;
+        }
+      }
+      const expected = colourSubStepCountByPp.get(ppId) ?? 0;
+      if (expected === 0) return false;
+      const seen = new Set<number>();
+      for (const a of aliases) {
+        const prefix = `${a}-${ppId}-`;
+        for (const k of set) {
+          if (!k.startsWith(prefix)) continue;
+          const idx = Number(k.slice(prefix.length));
+          if (Number.isFinite(idx)) seen.add(idx);
+        }
+      }
+      return seen.size >= expected;
+    }
     for (const k of set) {
       for (const a of aliases) {
         if (k === a) return true;                              // legacy plan-wide tick
         if (k === `${a}-${ppId}`) return true;                 // exact pp tick
-        if (k.startsWith(`${a}-${ppId}-`)) return true;        // pp sub-step (color idx etc)
+        if (k.startsWith(`${a}-${ppId}-`)) return true;        // pp sub-step (e.g. filling-mould-i)
       }
     }
     return false;
