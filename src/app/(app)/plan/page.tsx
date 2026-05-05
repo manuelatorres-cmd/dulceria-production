@@ -219,7 +219,7 @@ export default function PlanPage() {
   // Earliest-linked-order label per batch.
   const batchOrderRef = useMemo(() => {
     const itemById = new Map(orderItems.map((oi) => [oi.id!, oi]));
-    const best = new Map<string, { ref: string; deadline: string }>();
+    const best = new Map<string, { ref: string; deadline: string; fulfillmentType?: import("@/types").FulfillmentType }>();
     for (const link of orderPlanLinks) {
       const item = itemById.get(link.orderItemId);
       if (!item) continue;
@@ -230,6 +230,7 @@ export default function PlanPage() {
         best.set(link.planId, {
           ref: order.customerName || order.eventName || order.sourceRef || "order",
           deadline: order.deadline,
+          fulfillmentType: order.fulfillmentType,
         });
       }
     }
@@ -818,6 +819,7 @@ export default function PlanPage() {
                     batchNumber?: string;
                     mouldCount: number;
                     orderRef?: string;
+                    fulfillmentType?: import("@/types").FulfillmentType;
                     plannedMinutes: number;
                     lineItemId: string;
                   };
@@ -831,7 +833,9 @@ export default function PlanPage() {
                     const plan = planMap.get(li.planId);
                     const pps = planProductsByPlan.get(li.planId) ?? [];
                     if (pps.length === 0) return null;
-                    const orderRef = batchOrderRef.get(li.planId)?.ref;
+                    const refRow = batchOrderRef.get(li.planId);
+                    const orderRef = refRow?.ref;
+                    const fulfillmentType = refRow?.fulfillmentType;
                     const primary = pps[0];
                     const productId = pps.length === 1
                       ? primary.productId
@@ -849,6 +853,7 @@ export default function PlanPage() {
                         batchNumber: plan?.batchNumber,
                         mouldCount,
                         orderRef,
+                        fulfillmentType,
                         plannedMinutes: li.plannedMinutes,
                         lineItemId: li.id ?? `${li.productionDayId}-${li.planId}`,
                       },
@@ -1187,7 +1192,7 @@ function WeekView(props: {
   planMap: Map<string, import("@/types").ProductionPlan>;
   planProductsByPlan: Map<string, import("@/types").PlanProduct[]>;
   productMap: Map<string, { name: string; productCategoryId?: string }>;
-  batchOrderRef: Map<string, { ref: string; deadline: string }>;
+  batchOrderRef: Map<string, { ref: string; deadline: string; fulfillmentType?: import("@/types").FulfillmentType }>;
   stepDoneFor: (planId: string, stepId: string) => boolean;
   expandedSections: Set<string>;
   toggleSection: (key: string) => void;
@@ -1644,7 +1649,7 @@ function WeekView(props: {
   function renderActiveDayColumn(d: { date: string; label: string }, ds: DaySummaryEntry) {
     return (() => {
           // Build step buckets for this day, mirroring the day-view logic.
-          type Group = { productId: string; productName: string; batches: Array<{ planId: string; planName: string; batchNumber?: string; mouldCount: number; orderRef?: string; plannedMinutes: number; lineItemId: string }> };
+          type Group = { productId: string; productName: string; batches: Array<{ planId: string; planName: string; batchNumber?: string; mouldCount: number; orderRef?: string; fulfillmentType?: import("@/types").FulfillmentType; plannedMinutes: number; lineItemId: string }> };
           type StepBucket = { stepId: string; stepName: string; productType: string; sortOrder: number; groups: Map<string, Group> };
           const dayLineItems = lineItems.filter((li) => li.productionDayId === ds.day.id);
           const stepBuckets = new Map<string, StepBucket>();
@@ -1652,7 +1657,9 @@ function WeekView(props: {
             const pps = planProductsByPlan.get(li.planId) ?? [];
             if (pps.length === 0) continue;
             const plan = planMap.get(li.planId);
-            const orderRef = batchOrderRef.get(li.planId)?.ref;
+            const refRow = batchOrderRef.get(li.planId);
+            const orderRef = refRow?.ref;
+            const fulfillmentType = refRow?.fulfillmentType;
             const primary = pps[0];
             const productId = pps.length === 1 ? primary.productId : `_mixed:${li.planId}`;
             const productName = pps.length === 1
@@ -1665,6 +1672,7 @@ function WeekView(props: {
               batchNumber: plan?.batchNumber,
               mouldCount,
               orderRef,
+              fulfillmentType,
               plannedMinutes: li.plannedMinutes,
               lineItemId: li.id ?? `${li.productionDayId}-${li.planId}`,
             };
@@ -3021,6 +3029,7 @@ function BatchGroupRow({
       batchNumber?: string;
       mouldCount: number;
       orderRef?: string;
+      fulfillmentType?: import("@/types").FulfillmentType;
       plannedMinutes: number;
       lineItemId: string;
     }>;
@@ -3150,7 +3159,17 @@ function BatchGroupRow({
                       </span>
                     </p>
                     {b.orderRef && (
-                      <p className="text-[10.5px] opacity-70 truncate" style={{ color: "#1c1d1f" }}>for {b.orderRef}</p>
+                      <p className="text-[10.5px] opacity-70 truncate flex items-center gap-1" style={{ color: "#1c1d1f" }}>
+                        <span className="truncate">for {b.orderRef}</span>
+                        {b.fulfillmentType && (
+                          <span
+                            className="rounded-full border border-current/20 bg-white/40 px-1 py-[0px] text-[9.5px] capitalize shrink-0"
+                            title="Fulfilment type"
+                          >
+                            {b.fulfillmentType}
+                          </span>
+                        )}
+                      </p>
                     )}
                   </div>
                   <span className="text-[10.5px] tabular-nums shrink-0 opacity-70" style={{ color: "#1c1d1f" }}>

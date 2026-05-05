@@ -340,6 +340,14 @@ export default function OrdersPage() {
                           <span className="text-xs text-muted-foreground">
                             {ORDER_CHANNEL_LABELS[order.channel]}
                           </span>
+                          {order.fulfillmentType && (
+                            <span
+                              className="text-[10.5px] rounded-full border border-border bg-card/70 px-1.5 py-[1px] text-muted-foreground capitalize"
+                              title="Fulfilment type"
+                            >
+                              {order.fulfillmentType}
+                            </span>
+                          )}
                           <span className={`text-xs rounded-full px-2 py-0.5 ${STATUS_STYLE[order.status]}`}>
                             {ORDER_STATUS_LABELS[order.status]}
                           </span>
