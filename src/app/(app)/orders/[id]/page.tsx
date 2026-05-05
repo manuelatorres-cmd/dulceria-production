@@ -439,8 +439,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold truncate">
-              {order.customerName || order.eventName || "(unnamed)"}
+            <h1 className="text-xl font-bold truncate inline-flex items-center gap-2">
+              <span className="truncate">{order.customerName || order.eventName || "(unnamed)"}</span>
+              {order.sourceRef && (
+                <span
+                  className="text-[12px] font-mono tabular-nums font-normal text-muted-foreground rounded-sm bg-muted px-2 py-0.5 shrink-0"
+                  title="Source order reference (Shopify, etc.)"
+                >
+                  {order.sourceRef}
+                </span>
+              )}
             </h1>
             <p className="text-sm text-muted-foreground">
               {ORDER_CHANNEL_LABELS[order.channel]}

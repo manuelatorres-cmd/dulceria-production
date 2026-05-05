@@ -332,6 +332,11 @@ export default function OrdersPage() {
                           <span className="text-sm font-medium truncate">
                             {order.customerName || order.eventName || "(unnamed)"}
                           </span>
+                          {order.sourceRef && (
+                            <span className="text-[11px] font-mono tabular-nums text-muted-foreground rounded-sm bg-muted px-1.5 py-[1px]" title="Source order reference (Shopify, etc.)">
+                              {order.sourceRef}
+                            </span>
+                          )}
                           <span className="text-xs text-muted-foreground">
                             {ORDER_CHANNEL_LABELS[order.channel]}
                           </span>
