@@ -1775,7 +1775,7 @@ function WeekView(props: {
                                     }
                                   }}
                                   title={allPinned ? "Unlock all batches in this step" : "Lock all batches in this step to current day"}
-                                  className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-30 hover:opacity-100"}
+                                  className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                                 >
                                   <Lock className="w-3 h-3" />
                                 </button>
@@ -1809,6 +1809,30 @@ function WeekView(props: {
                                         </span>
                                         <span className="ml-auto text-[9.5px] tabular-nums opacity-70 shrink-0">{gMoulds}m</span>
                                       </button>
+                                      {(() => {
+                                        const allPinned = productPlanIds.every((pid) => !!planMap.get(pid)?.pinnedDate);
+                                        return (
+                                          <button
+                                            type="button"
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              try {
+                                                if (allPinned) {
+                                                  for (const pid of productPlanIds) await unpinProductionPlan(pid);
+                                                } else {
+                                                  await pinProductionPlans(productPlanIds);
+                                                }
+                                              } catch (err) {
+                                                alert(err instanceof Error ? err.message : "Toggle failed");
+                                              }
+                                            }}
+                                            title={allPinned ? `Unlock all ${g.productName} batches` : `Lock all ${g.productName} batches to current day`}
+                                            className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                          >
+                                            <Lock className="w-3 h-3" />
+                                          </button>
+                                        );
+                                      })()}
                                     </div>
                                     {pExpanded && (
                                       <ul className="mt-1 space-y-0.5 text-[10px]">
@@ -1835,7 +1859,7 @@ function WeekView(props: {
                                                   }
                                                 }}
                                                 title={pinned ? `Pinned to ${planRow?.pinnedDate} — click to unpin` : "Click to lock to current day"}
-                                                className={pinned ? "text-[#2e4839] hover:opacity-70" : "opacity-30 hover:opacity-100"}
+                                                className={pinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                                               >
                                                 <Lock className="w-3 h-3" />
                                               </button>
@@ -1884,6 +1908,30 @@ function WeekView(props: {
                               {list.length}cat·{totalMoulds}m
                             </span>
                           </button>
+                          {(() => {
+                            const allPinned = megaPlanIds.every((pid) => !!planMap.get(pid)?.pinnedDate);
+                            return (
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    if (allPinned) {
+                                      for (const pid of megaPlanIds) await unpinProductionPlan(pid);
+                                    } else {
+                                      await pinProductionPlans(megaPlanIds);
+                                    }
+                                  } catch (err) {
+                                    alert(err instanceof Error ? err.message : "Toggle failed");
+                                  }
+                                }}
+                                title={allPinned ? `Unlock all ${name.toLowerCase()} batches` : `Lock all ${name.toLowerCase()} batches to current day`}
+                                className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                              >
+                                <Lock className="w-3 h-3" />
+                              </button>
+                            );
+                          })()}
                         </div>
                         {megaExpanded && (
                           <div className="mt-1.5 space-y-1">
@@ -1915,6 +1963,30 @@ function WeekView(props: {
                                         {groupsArr.length}·{innerMoulds}m
                                       </span>
                                     </button>
+                                    {(() => {
+                                      const allPinned = innerPlanIds.every((pid) => !!planMap.get(pid)?.pinnedDate);
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            try {
+                                              if (allPinned) {
+                                                for (const pid of innerPlanIds) await unpinProductionPlan(pid);
+                                              } else {
+                                                await pinProductionPlans(innerPlanIds);
+                                              }
+                                            } catch (err) {
+                                              alert(err instanceof Error ? err.message : "Toggle failed");
+                                            }
+                                          }}
+                                          title={allPinned ? "Unlock all batches in this category step" : "Lock all batches in this category step to current day"}
+                                          className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                        >
+                                          <Lock className="w-3 h-3" />
+                                        </button>
+                                      );
+                                    })()}
                                   </div>
                                   {innerExpanded && (
                                     <ul className="mt-1 space-y-1 text-[10px]">
@@ -1943,6 +2015,30 @@ function WeekView(props: {
                                                 </span>
                                                 <span className="ml-auto tabular-nums opacity-70 shrink-0">{gMoulds}m</span>
                                               </button>
+                                              {(() => {
+                                                const allPinned = gPlanIds.every((pid) => !!planMap.get(pid)?.pinnedDate);
+                                                return (
+                                                  <button
+                                                    type="button"
+                                                    onClick={async (e) => {
+                                                      e.stopPropagation();
+                                                      try {
+                                                        if (allPinned) {
+                                                          for (const pid of gPlanIds) await unpinProductionPlan(pid);
+                                                        } else {
+                                                          await pinProductionPlans(gPlanIds);
+                                                        }
+                                                      } catch (err) {
+                                                        alert(err instanceof Error ? err.message : "Toggle failed");
+                                                      }
+                                                    }}
+                                                    title={allPinned ? `Unlock all ${g.productName} batches` : `Lock all ${g.productName} batches to current day`}
+                                                    className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                                  >
+                                                    <Lock className="w-3 h-3" />
+                                                  </button>
+                                                );
+                                              })()}
                                             </div>
                                             {pExpanded && (
                                               <ul className="mt-0.5 space-y-0.5 pl-2">
@@ -1969,7 +2065,7 @@ function WeekView(props: {
                                                           }
                                                         }}
                                                         title={pinned ? `Pinned to ${planRow?.pinnedDate} — click to unpin` : "Click to lock to current day"}
-                                                        className={pinned ? "text-[#2e4839] hover:opacity-70" : "opacity-30 hover:opacity-100"}
+                                                        className={pinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                                                       >
                                                         <Lock className="w-3 h-3" />
                                                       </button>
