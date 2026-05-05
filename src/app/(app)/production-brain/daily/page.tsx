@@ -1590,16 +1590,17 @@ export default function DailyV2Page() {
         <div className="space-y-3">
           {/* Right now focus card */}
           <div
-            className="rounded-[24px] p-5 sm:p-6 shadow-[0_4px_24px_rgba(138,112,48,0.12)]"
+            className="rounded-[24px] p-5 sm:p-6 bg-white/65 backdrop-blur-md border border-white/60 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]"
             style={{
-              background: `linear-gradient(135deg, ${tint.from}, ${tint.to})`,
-              color: tint.ink,
+              borderLeft: `4px solid ${tint.ink}`,
+              color: "#1d2421",
             }}
           >
             <p
-              className="text-[11px] font-semibold uppercase opacity-80 mb-1"
-              style={{ letterSpacing: "0.1em" }}
+              className="text-[11px] font-semibold uppercase opacity-80 mb-1 inline-flex items-center gap-1.5"
+              style={{ letterSpacing: "0.1em", color: tint.ink }}
             >
+              <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: tint.ink }} />
               Right now · in progress
             </p>
             <h2
@@ -1611,6 +1612,7 @@ export default function DailyV2Page() {
                 letterSpacing: "-0.03em",
                 lineHeight: 1,
                 marginBottom: 10,
+                color: "#1d2421",
               }}
             >
               {activeLabel}
@@ -1638,7 +1640,7 @@ export default function DailyV2Page() {
                 );
               })()}
             </div>
-            <div className="h-2 bg-white/50 rounded-md overflow-hidden mb-4">
+            <div className="h-2 rounded-md overflow-hidden mb-4" style={{ background: "rgba(29,36,33,0.08)" }}>
               <div
                 className="h-full"
                 style={{
