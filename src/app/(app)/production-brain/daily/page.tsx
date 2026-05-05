@@ -1504,66 +1504,89 @@ export default function DailyV2Page() {
           {now.toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" })} · {now.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Link
-            href="/production-brain/haccp"
-            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted inline-flex items-center gap-1.5"
-          >
-            <Thermometer className="w-3.5 h-3.5" /> Log temperatures
-          </Link>
           <button
             onClick={handleClose}
             disabled={closing}
-            className="rounded-full px-3 py-1.5 text-xs font-medium border border-blush-border bg-blush-bg text-blush-ink hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
+            className="rounded-full px-3 py-1.5 text-xs font-medium border border-border bg-card hover:bg-muted disabled:opacity-50 inline-flex items-center gap-1.5"
           >
             <X className="w-3.5 h-3.5" /> {closing ? "Closing…" : "Close production day"}
           </button>
         </div>
       </div>
 
-      {/* Horizontal step progress bar — every phase as a tinted
-          segment showing done / pending counts so the workshop
-          floor sees the day's shape at a glance. Click to focus.
-          Phases with no batches today are hidden so the strip stays
-          tight (e.g. Packing only appears on bar-production days). */}
-      <div className="flex gap-1 mb-4 overflow-x-auto">
-        {PHASES.filter((ph) => rollups[ph.id].totalBatches > 0).map((ph) => {
+      {/* Progress dots — all phases at a glance, click to jump. Done/
+          active/upcoming colour-coded. Replaces the heavy tinted strip
+          (layout C migration). Phases with no batches today are still
+          shown as upcoming so total day shape stays consistent. */}
+      <div className="mb-3 flex gap-1.5 items-center bg-card/60 backdrop-blur-md border border-border rounded-full px-2.5 py-1.5 overflow-x-auto">
+        {PHASES.map((ph) => {
           const r = rollups[ph.id];
-          const phTint = PHASE_TINT[ph.id];
-          const isActive = activePhase === ph.id;
           const total = r.totalBatches;
           const done = r.doneBatches;
-          const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+          const isActive = activePhase === ph.id;
+          const allDone = total > 0 && done === total;
+          const hasBatches = total > 0;
+          const empty = !hasBatches;
+          let cls: string;
+          let dotCls: string;
+          if (isActive) {
+            cls = "bg-[#4a6b5b] text-white";
+            dotCls = "bg-white";
+          } else if (allDone) {
+            cls = "text-[#355a35]";
+            dotCls = "bg-[#6b8e6b]";
+          } else if (hasBatches) {
+            cls = "text-foreground/70 hover:text-foreground";
+            dotCls = "bg-foreground/30";
+          } else {
+            cls = "text-muted-foreground/60";
+            dotCls = "bg-foreground/15";
+          }
           return (
             <button
               key={ph.id}
+              type="button"
               onClick={() => pickPhase(ph.id)}
+              disabled={empty}
+              title={empty ? `${ph.label} — no batches today` : `${ph.label} · ${done}/${total}`}
               className={
-                "flex-1 min-w-[90px] text-left rounded-[10px] px-2 py-1.5 transition border " +
-                (isActive ? "border-foreground" : "border-transparent hover:border-foreground/20")
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition whitespace-nowrap " +
+                cls +
+                (empty ? " cursor-not-allowed opacity-60" : " cursor-pointer")
               }
-              style={{
-                background: `linear-gradient(180deg, ${phTint.from}, ${phTint.to})`,
-                color: phTint.ink,
-              }}
             >
-              <div className="flex items-baseline justify-between gap-1">
-                <span className="text-[10.5px] font-medium uppercase truncate" style={{ letterSpacing: "0.06em" }}>
-                  {ph.label}
-                </span>
-                <span className="text-[10.5px] tabular-nums opacity-75">
+              <span className={"w-1.5 h-1.5 rounded-full shrink-0 " + dotCls} />
+              {ph.label}
+              {hasBatches && (
+                <span className="tabular-nums opacity-70 text-[10px]">
                   {done}/{total}
                 </span>
-              </div>
-              <div className="h-[3px] mt-1 rounded-sm overflow-hidden" style={{ background: "rgba(0,0,0,0.06)" }}>
-                <div style={{ width: `${pct}%`, height: "100%", background: phTint.ink }} />
-              </div>
+              )}
             </button>
           );
         })}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
-        {/* LEFT */}
+      {/* HACCP strip — pinned just under the dots. One-click into the
+          full HACCP page. Layout C migration: HACCP becomes a permanent
+          orientation strip rather than a header link. */}
+      <div className="mb-4 flex items-center gap-2.5 rounded-full bg-[#f5e1d6]/55 border border-[#cfa68a]/40 px-3.5 py-1.5">
+        <Thermometer className="w-3.5 h-3.5 text-[#804d2a] shrink-0" />
+        <span className="text-[10px] font-semibold uppercase text-[#804d2a] tracking-[0.08em]">HACCP</span>
+        <span className="text-[11.5px] text-foreground/70">Log cold-storage temperatures + open incidents</span>
+        <Link
+          href="/production-brain/haccp"
+          className="ml-auto text-[11px] font-medium text-[#4a6b5b] hover:underline"
+        >
+          Log →
+        </Link>
+      </div>
+
+      <div className="max-w-[960px]">
+        {/* Side rail (machines / mould pool / staff / live event feed)
+            removed in layout C migration. Snapshots live at
+            /production-brain/equipment; live event feed deferred to a
+            future log page. */}
         <div className="space-y-3">
           {/* Right now focus card */}
           <div
@@ -2057,157 +2080,7 @@ export default function DailyV2Page() {
           </section>
         </div>
 
-        {/* RIGHT rail */}
-        <aside className="space-y-3">
-          <div className="rounded-[18px] bg-white/65 backdrop-blur-2xl border border-white/60 p-4">
-            <p
-              className="text-[10px] font-semibold uppercase text-muted-foreground mb-2.5"
-              style={{ letterSpacing: "0.08em" }}
-            >
-              Workshop floor
-            </p>
-            {tempering.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No machines configured.</p>
-            ) : (
-              <ul className="space-y-2">
-                {tempering.map((inst) => {
-                  const load = loadsByInstance.get(inst.id!);
-                  const ing = load ? ingredientById.get(load.ingredientId) : undefined;
-                  const dotColor = !load
-                    ? "#bdbcc1"
-                    : inst.status === "running"
-                    ? "#4a7a5e"
-                    : "#8a7030";
-                  const fillPct = load && load.loadedQuantityG > 0
-                    ? Math.round((load.remainingQuantityG / load.loadedQuantityG) * 100)
-                    : 0;
-                  return (
-                    <li key={inst.id} className="rounded-[12px] bg-white/50 px-3 py-2.5">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }} />
-                        <span className="text-[12px] font-medium flex-1 truncate">{inst.name}</span>
-                        <span className="text-[11px] text-muted-foreground capitalize">{inst.status}</span>
-                      </div>
-                      {load && ing ? (
-                        <>
-                          <div className="text-[11px] text-muted-foreground truncate">
-                            {ing.name} · {(load.remainingQuantityG / 1000).toFixed(1)} kg
-                          </div>
-                          <div className="h-[3px] bg-foreground/10 rounded-sm overflow-hidden mt-1">
-                            <div className="h-full" style={{ background: "#5a3522", width: `${fillPct}%` }} />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-[11px] text-muted-foreground italic">empty</div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
 
-          <div className="rounded-[18px] bg-white/65 backdrop-blur-2xl border border-white/60 p-4">
-            <p
-              className="text-[10px] font-semibold uppercase text-muted-foreground mb-1.5"
-              style={{ letterSpacing: "0.08em" }}
-            >
-              Mould pool · {mouldPool.length}
-            </p>
-            <p className="text-[11px] text-muted-foreground mb-2">
-              {dotCounts.available} free · {dotCounts.busy} busy · {dotCounts.sealed} sealed · {dotCounts.wash} wash
-              {dotCounts.broken > 0 ? ` · ${dotCounts.broken} out` : ""}
-            </p>
-            <div className="grid gap-[2px]" style={{ gridTemplateColumns: "repeat(20, 1fr)" }}>
-              {dots.map((m, i) => {
-                const c = (() => {
-                  switch (m.currentState) {
-                    case "available": return "#f1faf4";
-                    case "loaded":
-                    case "filled": return "#fdf8e2";
-                    case "sealed": return "#eff5fb";
-                    case "needs-wash":
-                    case "in-deep-wash": return "#fdeeea";
-                    default: return "rgba(28,29,31,0.08)";
-                  }
-                })();
-                return <span key={m.id ?? i} className="aspect-square rounded-sm" style={{ background: c }} />;
-              })}
-            </div>
-          </div>
-
-          <div className="rounded-[18px] bg-white/65 backdrop-blur-2xl border border-white/60 p-4">
-            <p
-              className="text-[10px] font-semibold uppercase text-muted-foreground mb-1.5"
-              style={{ letterSpacing: "0.08em" }}
-            >
-              On shift
-            </p>
-            {staff.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No staff configured.</p>
-            ) : (
-              <ul>
-                {staff.map((p) => (
-                  <li
-                    key={p.id}
-                    className={
-                      "flex items-center gap-2.5 py-2 border-b border-border last:border-b-0 " +
-                      (p.off ? "opacity-50" : "")
-                    }
-                  >
-                    <span
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-[13px] font-semibold flex-shrink-0"
-                      style={{ background: "#fdf1e2", color: "#9a6640" }}
-                    >
-                      {p.name?.[0]?.toUpperCase() ?? "?"}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[12.5px] font-medium truncate">{p.name}</div>
-                      <div className="text-[10.5px] text-muted-foreground truncate">
-                        {p.off ? "Off today" : `${p.defaultHoursPerDay ?? 8}h day · ${(p.roles?.[0]) ?? p.primaryRole ?? "production"}`}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="rounded-[18px] bg-white/65 backdrop-blur-2xl border border-white/60 p-4">
-            <p
-              className="text-[10px] font-semibold uppercase text-muted-foreground mb-1.5"
-              style={{ letterSpacing: "0.08em" }}
-            >
-              Live event feed
-            </p>
-            {feed.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No events logged yet today.</p>
-            ) : (
-              <ul>
-                {feed.map((f) => (
-                  <li
-                    key={f.id}
-                    className="flex items-center gap-2.5 py-1.5 border-b border-border last:border-b-0 text-[11.5px]"
-                  >
-                    <span className="w-10 text-[10px] text-muted-foreground tabular-nums flex-shrink-0">
-                      {f.time}
-                    </span>
-                    <span
-                      className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] flex-shrink-0"
-                      style={{ background: "#f1faf4", color: "#4a7a5e" }}
-                    >
-                      ✓
-                    </span>
-                    <span className="flex-1 min-w-0 truncate">
-                      <b className="font-medium">{f.label}</b>
-                      <span className="text-muted-foreground"> · {f.plan}</span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </aside>
       </div>
 
       {tempOpen && null /* reserved */}
