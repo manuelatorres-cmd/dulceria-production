@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dulceria — Daily redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(circle at 85% 15%, rgba(74,107,91,0.10) 0%, rgba(74,107,91,0) 45%),
+      radial-gradient(circle at 15% 85%, rgba(107,117,112,0.08) 0%, rgba(107,117,112,0) 50%),
+      linear-gradient(180deg,#f5f6f4 0%,#eef0ed 100%);
+    background-attachment: fixed;
+    color: #1d2421;
+    padding: 28px 20px 80px;
+    min-height: 100vh;
+    letter-spacing: -0.005em;
+  }
+  .serif { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.02em; }
+  h1.page { font-size: 24px; margin: 0 0 4px; }
+  p.lead  { color: #6b7570; font-size: 13px; margin: 0 0 24px; max-width: 720px; }
+
+  .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 1180px) { .ba-grid { grid-template-columns: 1fr; } }
+
+  .frame {
+    border-radius: 14px;
+    border: 1px solid rgba(29,36,33,0.10);
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(8px);
+    overflow: hidden;
+  }
+  .frame-label {
+    padding: 10px 16px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(29,36,33,0.10);
+    background: rgba(74,107,91,0.06);
+    color: #2e4839;
+  }
+  .frame-body { padding: 16px; }
+
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: #6b7570; }
+
+  /* shared visual atoms */
+  .pill {
+    display: inline-flex; align-items: center;
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .p-prog    { background: #dbe6f2; color: #2e4870; }
+  .p-ready   { background: #d8e6d8; color: #355a35; }
+  .p-pending { background: #ece3d0; color: #5e553b; }
+  .p-done    { background: #e2e4e0; color: #4d544c; }
+  .p-haccp   { background: #f5e1d6; color: #804d2a; }
+
+  .check {
+    width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid rgba(29,36,33,0.20);
+    background: transparent; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .check.done { background: #4a6b5b; border-color: #4a6b5b; color: #fff; font-size: 13px; }
+  .check.partial { border-color: #4a6b5b; color: #4a6b5b; font-size: 11px; }
+
+  .btn {
+    border-radius: 999px; padding: 6px 13px; font-size: 11.5px; font-weight: 500;
+    border: 1px solid transparent; cursor: pointer;
+    transition: all .2s ease;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-primary { background: #4a6b5b; color: #fff; }
+  .btn-primary:hover { background: #3d5b4d; }
+  .btn-secondary { background: rgba(255,255,255,0.7); color: #1d2421; border-color: rgba(29,36,33,0.10); }
+  .btn-secondary:hover { background: rgba(255,255,255,0.9); }
+
+  /* ─── Header bar (shared) ─── */
+  .head {
+    display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .head h2 {
+    font-family: 'Fraunces', serif; font-weight: 500; letter-spacing: -0.02em;
+    font-size: 22px; margin: 0;
+  }
+  .head .date { font-size: 12.5px; color: #6b7570; }
+  .head .right { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ──────────────────────────────────────────────────────────────────── */
+  /* MOCKUP A — single-column timeline                                    */
+  /* ──────────────────────────────────────────────────────────────────── */
+  .a-summary {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin-bottom: 16px;
+  }
+  .a-stat {
+    background: rgba(255,255,255,0.7); border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 10px; padding: 8px 12px;
+  }
+  .a-stat .lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.10em; color: #6b7570; font-weight: 500; }
+  .a-stat .v   { font-size: 18px; font-weight: 600; font-family: 'Fraunces', serif; letter-spacing: -0.02em; margin-top: 2px; }
+  .a-stat .sub { font-size: 11px; color: #6b7570; margin-top: 1px; }
+
+  .a-phase {
+    margin-bottom: 14px;
+  }
+  .a-phase-head {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 8px 14px;
+    background: rgba(74,107,91,0.07);
+    border: 1px solid rgba(29,36,33,0.08);
+    border-bottom: 0;
+    border-radius: 10px 10px 0 0;
+  }
+  .a-phase-head .name {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.10em;
+    font-weight: 600; color: #2e4839;
+  }
+  .a-phase-head .pct { font-size: 11.5px; color: #6b7570; font-variant-numeric: tabular-nums; }
+  .a-phase-head .actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .a-phase-head .bar {
+    flex: 1; height: 3px; background: rgba(29,36,33,0.10); border-radius: 2px; overflow: hidden;
+    max-width: 180px;
+  }
+  .a-phase-head .bar > span { display: block; height: 100%; background: #4a6b5b; }
+  .a-phase.done .a-phase-head { background: rgba(74,107,91,0.04); opacity: 0.65; }
+
+  .a-phase-body {
+    background: rgba(255,255,255,0.6);
+    border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 0 0 10px 10px;
+  }
+  .a-row {
+    display: grid;
+    grid-template-columns: 26px 1fr 90px 60px 60px;
+    gap: 12px;
+    padding: 10px 14px;
+    align-items: center;
+    border-bottom: 1px solid rgba(29,36,33,0.06);
+  }
+  .a-row:last-child { border-bottom: 0; }
+  .a-row .name { font-size: 13px; font-weight: 500; line-height: 1.3; }
+  .a-row .meta { font-size: 11px; color: #6b7570; margin-top: 1px; }
+  .a-row .who  { font-size: 11.5px; color: #6b7570; }
+  .a-row .qty  { font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; color: #1d2421; }
+  .a-row .moulds { font-size: 10.5px; color: #6b7570; text-align: right; font-variant-numeric: tabular-nums; }
+  .a-row.done .name { color: #6b7570; text-decoration: line-through; text-decoration-color: rgba(107,117,112,0.4); }
+
+  .a-empty {
+    padding: 14px; text-align: center; color: #6b7570; font-size: 11.5px; font-style: italic;
+  }
+
+  .a-haccp {
+    background: rgba(245,225,214,0.45); border: 1px solid rgba(128,77,42,0.18);
+    border-radius: 10px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 16px;
+  }
+  .a-haccp .lbl { font-size: 11px; font-weight: 600; color: #804d2a; text-transform: uppercase; letter-spacing: 0.08em; }
+  .a-haccp .ok  { font-size: 11.5px; color: #355a35; }
+  .a-haccp .right { margin-left: auto; }
+
+  .a-close-row {
+    display: flex; align-items: center; gap: 10px; margin-top: 16px;
+    padding: 12px 16px; background: rgba(255,255,255,0.4); border: 1px dashed rgba(29,36,33,0.15); border-radius: 10px;
+  }
+  .a-close-row .info { font-size: 11.5px; color: #6b7570; flex: 1; }
+
+  /* ──────────────────────────────────────────────────────────────────── */
+  /* MOCKUP B — focused single phase, factory-floor                       */
+  /* ──────────────────────────────────────────────────────────────────── */
+  .b-progress {
+    display: flex; gap: 6px; align-items: center;
+    background: rgba(255,255,255,0.6); border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 999px; padding: 6px 10px;
+    margin-bottom: 14px; overflow-x: auto;
+  }
+  .b-step {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 500; color: #6b7570;
+    white-space: nowrap;
+  }
+  .b-step .dot {
+    width: 7px; height: 7px; border-radius: 999px;
+    background: rgba(29,36,33,0.20); flex-shrink: 0;
+  }
+  .b-step.done   { color: #355a35; }
+  .b-step.done .dot { background: #6b8e6b; }
+  .b-step.active { background: #4a6b5b; color: #fff; }
+  .b-step.active .dot { background: #fff; }
+  .b-step.upcoming .dot { background: rgba(29,36,33,0.20); }
+
+  .b-current {
+    background: rgba(255,255,255,0.7); border: 1px solid rgba(29,36,33,0.10);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .b-current .crumb {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.10em;
+    color: #6b7570; font-weight: 500; margin-bottom: 4px;
+  }
+  .b-current h3 {
+    font-family: 'Fraunces', serif; font-size: 32px; font-weight: 500;
+    letter-spacing: -0.025em; margin: 0 0 8px; line-height: 1;
+  }
+  .b-current .sub { display: flex; gap: 12px; font-size: 12px; color: #6b7570; flex-wrap: wrap; align-items: baseline; }
+  .b-current .sub b { color: #1d2421; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .b-current .progress-bar {
+    height: 6px; background: rgba(74,107,91,0.15); border-radius: 999px; overflow: hidden;
+    margin-top: 10px;
+  }
+  .b-current .progress-bar > span { display: block; height: 100%; background: #4a6b5b; }
+  .b-current .actions { display: flex; gap: 8px; margin-top: 12px; }
+
+  .b-categories {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .b-cat {
+    padding: 4px 11px; border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+    background: rgba(255,255,255,0.6); border: 1px solid rgba(29,36,33,0.10);
+    color: #6b7570; cursor: pointer;
+  }
+  .b-cat.on { background: #e3ebe6; border-color: #c8d4cc; color: #2e4839; }
+
+  .b-rows {
+    background: rgba(255,255,255,0.6); border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 12px; overflow: hidden;
+  }
+  .b-row {
+    display: grid;
+    grid-template-columns: 28px 56px 1fr 90px 60px;
+    gap: 12px;
+    padding: 12px 14px;
+    align-items: center;
+    border-bottom: 1px solid rgba(29,36,33,0.06);
+  }
+  .b-row:last-child { border-bottom: 0; }
+  .b-row .swatch {
+    width: 44px; height: 44px; border-radius: 8px;
+    background: linear-gradient(135deg, #efe6dc, #e3d4c4);
+    border: 1px solid rgba(29,36,33,0.10);
+  }
+  .b-row .swatch.choc { background: linear-gradient(135deg, #6b4a30, #3d2a1c); }
+  .b-row .swatch.straw { background: linear-gradient(135deg, #d99c9c, #b86a6a); }
+  .b-row .swatch.haz { background: linear-gradient(135deg, #b8967a, #8a6d52); }
+  .b-row .name { font-size: 14px; font-weight: 500; }
+  .b-row .meta { font-size: 11.5px; color: #6b7570; margin-top: 2px; }
+  .b-row .qty  { font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+  .b-row .moulds { font-size: 10.5px; color: #6b7570; }
+  .b-row.done .name { color: #6b7570; text-decoration: line-through; text-decoration-color: rgba(107,117,112,0.4); }
+
+  .b-bottom {
+    display: flex; gap: 10px; align-items: center; margin-top: 14px;
+    padding: 12px 16px; background: rgba(255,255,255,0.4); border: 1px dashed rgba(29,36,33,0.15); border-radius: 12px;
+  }
+  .b-bottom .info { font-size: 12px; color: #6b7570; flex: 1; }
+  .b-bottom .next-btn {
+    background: #4a6b5b; color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 500;
+    border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .b-bottom .next-btn:disabled { background: rgba(29,36,33,0.10); color: #6b7570; cursor: not-allowed; }
+
+  .b-haccp-strip {
+    display: flex; gap: 8px; align-items: center;
+    background: rgba(245,225,214,0.45); border: 1px solid rgba(128,77,42,0.18);
+    border-radius: 999px; padding: 6px 14px;
+    margin-bottom: 14px;
+    font-size: 11.5px;
+  }
+  .b-haccp-strip .lbl { color: #804d2a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; }
+  .b-haccp-strip .ok  { color: #355a35; }
+  .b-haccp-strip .right { margin-left: auto; }
+
+  /* notes block at bottom */
+  .notes {
+    margin-top: 24px; max-width: 760px;
+    background: rgba(255,255,255,0.65);
+    border: 1px solid rgba(29,36,33,0.08);
+    border-radius: 14px;
+    padding: 16px 20px;
+  }
+  .notes h3 { margin: 0 0 8px; font-size: 13px; }
+  .notes ul { margin: 0; padding-left: 22px; font-size: 12.5px; line-height: 1.7; }
+  .notes ul li b { color: #2e4839; }
+</style>
+</head>
+<body>
+  <h1 class="page serif">Daily — two redesigns</h1>
+  <p class="lead">Same data, two layouts. Mockup A keeps the whole day visible; Mockup B focuses on the active phase, terminal-style. Both use Atelier Sage palette + drop the side rail (machines/mould/staff/feed). Pick one (or mix).</p>
+
+  <div class="ba-grid">
+    <!-- ────────────────────────────── MOCKUP A ────────────────────────────── -->
+    <section class="frame">
+      <header class="frame-label">A · Single-column timeline (whole day visible)</header>
+      <div class="frame-body">
+        <div class="head">
+          <h2>Tuesday · 5 May</h2>
+          <span class="date">14:23 · 4 batches · 2 done</span>
+          <div class="right">
+            <button class="btn btn-secondary">Log temps</button>
+            <button class="btn btn-secondary">Close day</button>
+          </div>
+        </div>
+
+        <div class="a-summary">
+          <div class="a-stat"><div class="lbl">Phases</div><div class="v">2/4</div><div class="sub">Polishing + Filling done</div></div>
+          <div class="a-stat"><div class="lbl">Steps</div><div class="v">8/14</div><div class="sub">57% done</div></div>
+          <div class="a-stat"><div class="lbl">Mould pool</div><div class="v">38/60</div><div class="sub">22 free praline</div></div>
+          <div class="a-stat"><div class="lbl">HACCP</div><div class="v">✓</div><div class="sub">Logged 09:14</div></div>
+        </div>
+
+        <!-- POLISHING (done) -->
+        <div class="a-phase done">
+          <div class="a-phase-head">
+            <span class="name">Polishing</span>
+            <div class="bar"><span style="width:100%"></span></div>
+            <span class="pct">2/2</span>
+          </div>
+          <div class="a-phase-body">
+            <div class="a-row done">
+              <button class="check done">✓</button>
+              <div><div class="name">Gianduja square</div><div class="meta">mould #12 · 1 sheet</div></div>
+              <span class="who">M. · 09:00</span>
+              <span class="qty">12 pcs</span>
+              <span class="moulds">1m</span>
+            </div>
+            <div class="a-row done">
+              <button class="check done">✓</button>
+              <div><div class="name">Strawberry nougat</div><div class="meta">mould #6 · 2 sheets</div></div>
+              <span class="who">M. · 10:30</span>
+              <span class="qty">8 pcs</span>
+              <span class="moulds">2m</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FILLING (in progress) -->
+        <div class="a-phase">
+          <div class="a-phase-head">
+            <span class="name">Filling</span>
+            <div class="bar"><span style="width:33%"></span></div>
+            <span class="pct">1/3</span>
+            <div class="actions">
+              <button class="btn btn-secondary">Check all</button>
+            </div>
+          </div>
+          <div class="a-phase-body">
+            <div class="a-row done">
+              <button class="check done">✓</button>
+              <div><div class="name">Hazelnut ganache</div><div class="meta">90g/pc · cooled overnight</div></div>
+              <span class="who">M. · 11:00</span>
+              <span class="qty">36 pcs</span>
+              <span class="moulds">3m</span>
+            </div>
+            <div class="a-row">
+              <button class="check"></button>
+              <div><div class="name">Cocoa truffle</div><div class="meta">60% chocolate · cream filling</div></div>
+              <span class="who">M.</span>
+              <span class="qty">48 pcs</span>
+              <span class="moulds">4m</span>
+            </div>
+            <div class="a-row">
+              <button class="check"></button>
+              <div><div class="name">Almond praline</div><div class="meta">tempering · 32°C</div></div>
+              <span class="who">M.</span>
+              <span class="qty">18 pcs</span>
+              <span class="moulds">2m</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DECORATION (pending) -->
+        <div class="a-phase">
+          <div class="a-phase-head">
+            <span class="name">Decoration</span>
+            <div class="bar"><span style="width:0%"></span></div>
+            <span class="pct">0/1</span>
+          </div>
+          <div class="a-phase-body">
+            <div class="a-row">
+              <button class="check"></button>
+              <div><div class="name">Strawberry nougat</div><div class="meta">gold leaf · pink shimmer</div></div>
+              <span class="who">M.</span>
+              <span class="qty">8 pcs</span>
+              <span class="moulds">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PACKING (pending) -->
+        <div class="a-phase">
+          <div class="a-phase-head">
+            <span class="name">Packing</span>
+            <div class="bar"><span style="width:0%"></span></div>
+            <span class="pct">0/2</span>
+          </div>
+          <div class="a-phase-body">
+            <div class="a-row">
+              <button class="check"></button>
+              <div><div class="name">Mira Bellanova · Box of 12</div><div class="meta">ribbon + tag · 2 boxes</div></div>
+              <span class="who">M.</span>
+              <span class="qty">2 box</span>
+              <span class="moulds">—</span>
+            </div>
+            <div class="a-row">
+              <button class="check"></button>
+              <div><div class="name">Café Henri · wholesale tray</div><div class="meta">labelled · ready Wed AM</div></div>
+              <span class="who">M.</span>
+              <span class="qty">3 trays</span>
+              <span class="moulds">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="a-haccp">
+          <span class="lbl">HACCP</span>
+          <span class="ok">All temps logged · last 09:14</span>
+          <span class="right"><button class="btn btn-secondary">Log next</button></span>
+        </div>
+
+        <div class="a-close-row">
+          <span class="info">6 of 14 steps still open. Close ends the day; remaining steps roll forward.</span>
+          <button class="btn btn-primary">Close production day</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────────────────────────────── MOCKUP B ────────────────────────────── -->
+    <section class="frame">
+      <header class="frame-label">B · Focused single phase (factory-floor terminal)</header>
+      <div class="frame-body">
+        <div class="head">
+          <h2>Tuesday · 5 May</h2>
+          <span class="date">14:23 · step 8 of 14</span>
+          <div class="right">
+            <button class="btn btn-secondary">Close day</button>
+          </div>
+        </div>
+
+        <!-- progress dots -->
+        <div class="b-progress">
+          <span class="b-step done"><span class="dot"></span>Polishing</span>
+          <span class="b-step done"><span class="dot"></span>Painting</span>
+          <span class="b-step done"><span class="dot"></span>Shelling</span>
+          <span class="b-step active"><span class="dot"></span>Filling</span>
+          <span class="b-step upcoming"><span class="dot"></span>Capping</span>
+          <span class="b-step upcoming"><span class="dot"></span>Decoration</span>
+          <span class="b-step upcoming"><span class="dot"></span>Unmoulding</span>
+          <span class="b-step upcoming"><span class="dot"></span>Packing</span>
+        </div>
+
+        <!-- HACCP strip -->
+        <div class="b-haccp-strip">
+          <span class="lbl">HACCP</span>
+          <span class="ok">All temps logged · last 09:14</span>
+          <span class="right"><button class="btn btn-secondary">Log next</button></span>
+        </div>
+
+        <!-- big current focus -->
+        <div class="b-current">
+          <div class="crumb">Right now · step 4 of 8</div>
+          <h3>Filling</h3>
+          <div class="sub">
+            <span><b>1</b> / 3 batches done</span>
+            <span><b>2</b> pending</span>
+            <span><b>9m</b> mould slots in use</span>
+          </div>
+          <div class="progress-bar"><span style="width:33%"></span></div>
+          <div class="actions">
+            <button class="btn btn-primary">Check all in this phase</button>
+            <button class="btn btn-secondary">Switch phase</button>
+          </div>
+        </div>
+
+        <!-- categories -->
+        <div class="b-categories">
+          <span class="b-cat on">All · 3</span>
+          <span class="b-cat">Bonbons · 2</span>
+          <span class="b-cat">Bars · 1</span>
+        </div>
+
+        <!-- rows for current phase only -->
+        <div class="b-rows">
+          <div class="b-row done">
+            <button class="check done">✓</button>
+            <div class="swatch haz"></div>
+            <div>
+              <div class="name">Hazelnut ganache</div>
+              <div class="meta">90g/pc · cooled overnight</div>
+            </div>
+            <span class="qty">36 pcs <span class="moulds">· 3m</span></span>
+            <span class="qty muted">11:00</span>
+          </div>
+          <div class="b-row">
+            <button class="check"></button>
+            <div class="swatch choc"></div>
+            <div>
+              <div class="name">Cocoa truffle</div>
+              <div class="meta">60% chocolate · cream filling</div>
+            </div>
+            <span class="qty">48 pcs <span class="moulds">· 4m</span></span>
+            <span class="qty muted">11:45</span>
+          </div>
+          <div class="b-row">
+            <button class="check"></button>
+            <div class="swatch"></div>
+            <div>
+              <div class="name">Almond praline</div>
+              <div class="meta">tempering · 32°C</div>
+            </div>
+            <span class="qty">18 pcs <span class="moulds">· 2m</span></span>
+            <span class="qty muted">13:00</span>
+          </div>
+        </div>
+
+        <div class="b-bottom">
+          <span class="info">Finish all 3 batches in <b>Filling</b> to unlock Capping.</span>
+          <button class="next-btn" disabled>Next phase: Capping →</button>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <!-- ────────────────────────────── notes ────────────────────────────── -->
+  <section class="notes">
+    <h3 class="serif">Decisions / tradeoffs</h3>
+    <ul>
+      <li><b>A · Single-column timeline.</b> Whole day visible end-to-end. Tick boxes per row. Done phases collapse-fade. Top stat strip replaces the heavy serif "Right now" card. Side rail dropped — HACCP becomes an inline strip near close-day. <i>Best when you bounce between phases or skip ahead.</i></li>
+      <li><b>B · Focused single phase.</b> Top progress dots show all phases at a glance. Body shows ONLY the current one, large rows w/ product swatches + mould count. Big "Next phase →" button when all in this phase done. Less scroll-distraction. <i>Best when you work strictly phase-by-phase on the workshop floor.</i></li>
+      <li><b>What both drop.</b> The 320px right rail (machines · mould pool · staff · live event feed). Replaced by inline stat strip (A) or progress dots (B). Live event feed → moved to a /production-brain/log page (or Settings).</li>
+      <li><b>What both keep.</b> HACCP entry, Close-day, per-batch ticks, Check-all-in-phase, category filter, mould count per row.</li>
+      <li><b>Click order (A):</b> scroll → tick rows → optionally Check-all per phase → Log temps when prompted → Close day at bottom.</li>
+      <li><b>Click order (B):</b> see active phase → tick rows in current phase → Next phase → repeat → Close day.</li>
+      <li><b>HACCP placement.</b> A → bottom near close. B → top strip permanent. Both keep entry one-click away.</li>
+      <li><b>Mobile.</b> A scales straight (one column already). B keeps current phase only — scrolls less.</li>
+    </ul>
+  </section>
+</body>
+</html>
