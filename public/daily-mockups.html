@@ -296,7 +296,7 @@
 </head>
 <body>
   <h1 class="page serif">Daily — two redesigns</h1>
-  <p class="lead">Same data, two layouts. Mockup A keeps the whole day visible; Mockup B focuses on the active phase, terminal-style. Both use Atelier Sage palette + drop the side rail (machines/mould/staff/feed). Pick one (or mix).</p>
+  <p class="lead">Same data, three layouts. A = whole day visible. B = focused single phase. C = mix (progress dots + big focus card on current phase + collapsed accordion for other phases). Atelier Sage palette throughout. Pick one.</p>
 
   <div class="ba-grid">
     <!-- ────────────────────────────── MOCKUP A ────────────────────────────── -->
@@ -532,10 +532,165 @@
     </section>
   </div>
 
+  <!-- ────────────────────────────── MOCKUP C (mix) ────────────────────────────── -->
+  <section class="frame" style="margin-top:14px">
+    <header class="frame-label">C · Mix — progress dots + focus card + collapsed phases</header>
+    <div class="frame-body" style="max-width:880px; margin:0 auto">
+      <div class="head">
+        <h2>Tuesday · 5 May</h2>
+        <span class="date">14:23 · step 8 of 14</span>
+        <div class="right">
+          <button class="btn btn-secondary">Close day</button>
+        </div>
+      </div>
+
+      <!-- progress dots from B -->
+      <div class="b-progress">
+        <span class="b-step done"><span class="dot"></span>Polishing</span>
+        <span class="b-step done"><span class="dot"></span>Painting</span>
+        <span class="b-step done"><span class="dot"></span>Shelling</span>
+        <span class="b-step active"><span class="dot"></span>Filling</span>
+        <span class="b-step upcoming"><span class="dot"></span>Capping</span>
+        <span class="b-step upcoming"><span class="dot"></span>Decoration</span>
+        <span class="b-step upcoming"><span class="dot"></span>Unmoulding</span>
+        <span class="b-step upcoming"><span class="dot"></span>Packing</span>
+      </div>
+
+      <!-- HACCP strip pinned -->
+      <div class="b-haccp-strip">
+        <span class="lbl">HACCP</span>
+        <span class="ok">All temps logged · last 09:14</span>
+        <span class="right"><button class="btn btn-secondary">Log next</button></span>
+      </div>
+
+      <!-- current phase focus card (B style) -->
+      <div class="b-current">
+        <div class="crumb">Right now · phase 4 of 8</div>
+        <h3>Filling</h3>
+        <div class="sub">
+          <span><b>1</b> / 3 done</span>
+          <span><b>2</b> pending</span>
+          <span><b>9m</b> mould slots used</span>
+        </div>
+        <div class="progress-bar"><span style="width:33%"></span></div>
+        <div class="actions">
+          <button class="btn btn-primary">Check all in this phase</button>
+        </div>
+      </div>
+
+      <!-- current phase rows (expanded, B style with swatches) -->
+      <div class="b-rows" style="margin-bottom:14px">
+        <div class="b-row done">
+          <button class="check done">✓</button>
+          <div class="swatch haz"></div>
+          <div><div class="name">Hazelnut ganache</div><div class="meta">90g/pc · cooled overnight</div></div>
+          <span class="qty">36 pcs <span class="moulds">· 3m</span></span>
+          <span class="qty muted">11:00</span>
+        </div>
+        <div class="b-row">
+          <button class="check"></button>
+          <div class="swatch choc"></div>
+          <div><div class="name">Cocoa truffle</div><div class="meta">60% chocolate · cream filling</div></div>
+          <span class="qty">48 pcs <span class="moulds">· 4m</span></span>
+          <span class="qty muted">11:45</span>
+        </div>
+        <div class="b-row">
+          <button class="check"></button>
+          <div class="swatch"></div>
+          <div><div class="name">Almond praline</div><div class="meta">tempering · 32°C</div></div>
+          <span class="qty">18 pcs <span class="moulds">· 2m</span></span>
+          <span class="qty muted">13:00</span>
+        </div>
+      </div>
+
+      <!-- other phases collapsed (A's structure but tight) -->
+      <div style="margin-bottom:6px; font-size:10px; text-transform:uppercase; letter-spacing:0.10em; color:#6b7570; font-weight:500; padding:0 4px">
+        Other phases · click to peek
+      </div>
+
+      <div class="a-phase done" style="margin-bottom:6px">
+        <div class="a-phase-head" style="cursor:pointer; border-radius:10px; border-bottom:1px solid rgba(29,36,33,0.08)">
+          <span style="font-size:13px; opacity:0.55">▸</span>
+          <span class="name">Polishing</span>
+          <div class="bar"><span style="width:100%"></span></div>
+          <span class="pct">2/2 done</span>
+        </div>
+      </div>
+
+      <div class="a-phase done" style="margin-bottom:6px">
+        <div class="a-phase-head" style="cursor:pointer; border-radius:10px; border-bottom:1px solid rgba(29,36,33,0.08)">
+          <span style="font-size:13px; opacity:0.55">▸</span>
+          <span class="name">Painting</span>
+          <div class="bar"><span style="width:100%"></span></div>
+          <span class="pct">3/3 done</span>
+        </div>
+      </div>
+
+      <div class="a-phase done" style="margin-bottom:6px">
+        <div class="a-phase-head" style="cursor:pointer; border-radius:10px; border-bottom:1px solid rgba(29,36,33,0.08)">
+          <span style="font-size:13px; opacity:0.55">▸</span>
+          <span class="name">Shelling</span>
+          <div class="bar"><span style="width:100%"></span></div>
+          <span class="pct">2/2 done</span>
+        </div>
+      </div>
+
+      <div class="a-phase" style="margin-bottom:6px">
+        <div class="a-phase-head" style="cursor:pointer; border-radius:10px; border-bottom:1px solid rgba(29,36,33,0.08)">
+          <span style="font-size:13px; opacity:0.55">▾</span>
+          <span class="name">Capping</span>
+          <div class="bar"><span style="width:0%"></span></div>
+          <span class="pct">0/2 pending</span>
+        </div>
+        <div class="a-phase-body" style="border-radius:0 0 10px 10px">
+          <div class="a-row">
+            <button class="check"></button>
+            <div><div class="name">Cocoa truffle</div><div class="meta">cap once filling sets · 4m</div></div>
+            <span class="who">M.</span>
+            <span class="qty">48 pcs</span>
+            <span class="moulds">4m</span>
+          </div>
+          <div class="a-row">
+            <button class="check"></button>
+            <div><div class="name">Almond praline</div><div class="meta">cap after temper rest · 2m</div></div>
+            <span class="who">M.</span>
+            <span class="qty">18 pcs</span>
+            <span class="moulds">2m</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="a-phase" style="margin-bottom:6px">
+        <div class="a-phase-head" style="cursor:pointer; border-radius:10px; border-bottom:1px solid rgba(29,36,33,0.08)">
+          <span style="font-size:13px; opacity:0.55">▸</span>
+          <span class="name">Decoration</span>
+          <div class="bar"><span style="width:0%"></span></div>
+          <span class="pct">0/1 pending</span>
+        </div>
+      </div>
+
+      <div class="a-phase" style="margin-bottom:6px">
+        <div class="a-phase-head" style="cursor:pointer; border-radius:10px; border-bottom:1px solid rgba(29,36,33,0.08)">
+          <span style="font-size:13px; opacity:0.55">▸</span>
+          <span class="name">Packing</span>
+          <div class="bar"><span style="width:0%"></span></div>
+          <span class="pct">0/2 pending</span>
+        </div>
+      </div>
+
+      <!-- close day -->
+      <div class="b-bottom" style="margin-top:14px">
+        <span class="info">6 of 14 steps still open. Close ends the day; remaining steps roll forward.</span>
+        <button class="next-btn" disabled>Close production day</button>
+      </div>
+    </div>
+  </section>
+
   <!-- ────────────────────────────── notes ────────────────────────────── -->
   <section class="notes">
     <h3 class="serif">Decisions / tradeoffs</h3>
     <ul>
+      <li><b>C · Mix (recommended).</b> Top progress dots = whole-day overview at a glance (8 phases, done/active/upcoming). HACCP strip pinned underneath. Big focus card on current phase + its rows expanded with swatches. Below: every other phase as a collapsed accordion row (click ▸ to peek). Done phases auto-fade. Close-day pinned at bottom. <i>Best balance — terminal flow when you want it, full visibility when you need it.</i></li>
       <li><b>A · Single-column timeline.</b> Whole day visible end-to-end. Tick boxes per row. Done phases collapse-fade. Top stat strip replaces the heavy serif "Right now" card. Side rail dropped — HACCP becomes an inline strip near close-day. <i>Best when you bounce between phases or skip ahead.</i></li>
       <li><b>B · Focused single phase.</b> Top progress dots show all phases at a glance. Body shows ONLY the current one, large rows w/ product swatches + mould count. Big "Next phase →" button when all in this phase done. Less scroll-distraction. <i>Best when you work strictly phase-by-phase on the workshop floor.</i></li>
       <li><b>What both drop.</b> The 320px right rail (machines · mould pool · staff · live event feed). Replaced by inline stat strip (A) or progress dots (B). Live event feed → moved to a /production-brain/log page (or Settings).</li>
