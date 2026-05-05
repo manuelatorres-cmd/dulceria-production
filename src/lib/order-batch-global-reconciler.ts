@@ -96,6 +96,14 @@ export interface ReconciledBatch {
    *  but no production. Signalled downstream via the plan name
    *  suffix "— packing". */
   kind?: "produce" | "packing";
+  /** When a cluster's mould count exceeds the mould.quantityOwned cap,
+   *  the cluster is split into sequential sub-batches. The pair
+   *  (splitIndex, splitTotal) is 1-based; downstream renames the plan
+   *  "<base name> · {splitIndex}/{splitTotal}" so the chocolatier sees
+   *  each round as its own tickable batch. Both null on uncapped
+   *  products or when one batch fits within the cap. */
+  splitIndex?: number;
+  splitTotal?: number;
 }
 
 export interface GlobalReconcileDecision {
@@ -291,16 +299,24 @@ export function reconcileGlobalProduceDemand(
         return da - db;
       });
 
-    for (let i = 0; i < Math.max(clusters.length, existingDrafts.length); i++) {
-      const cluster = clusters[i];
+    // Each cluster splits into 1+ sub-batches. When mould.quantityOwned
+    // is set and the cluster's demand exceeds (cavities × quantityOwned),
+    // the demand is sliced into successive sub-batches of at most
+    // `quantityOwned` moulds each (FIFO across the cluster's order items).
+    // Each sub-batch becomes its own plan, so the chocolatier ticks one
+    // round at a time instead of marking eight moulds done in one click
+    // when only four physical moulds exist.
+    const cap = mould.quantityOwned && mould.quantityOwned > 0 ? mould.quantityOwned : null;
+    const allSubBatches = clusters.flatMap((c) =>
+      splitClusterByCap(c, mould.numberOfCavities, cap),
+    );
+
+    for (let i = 0; i < Math.max(allSubBatches.length, existingDrafts.length); i++) {
+      const sb = allSubBatches[i];
       const draft = existingDrafts[i];
 
-      if (cluster && draft) {
-        // Update existing draft with this cluster's allocations.
-        const totalDemand = cluster.reduce((s, d) => s + d.remaining, 0);
-        const moulds = Math.ceil(totalDemand / mould.numberOfCavities);
-        const totalPieces = moulds * mould.numberOfCavities;
-        const allocations = cluster.map((d) => ({ orderItemId: d.itemId, allocatedQuantity: d.remaining }));
+      if (sb && draft) {
+        // Update existing draft with this sub-batch's allocations.
         for (const link of links) {
           if (link.planId === draft.id && link.id) decision.linksToDelete.push(link.id);
         }
@@ -311,27 +327,31 @@ export function reconcileGlobalProduceDemand(
           productId,
           productName: product.name,
           mouldId: mould.id!,
-          moulds, totalPieces, totalDemand,
-          surplus: totalPieces - totalDemand,
-          allocations,
+          moulds: sb.moulds,
+          totalPieces: sb.totalPieces,
+          totalDemand: sb.totalDemand,
+          surplus: sb.totalPieces - sb.totalDemand,
+          allocations: sb.allocations,
+          splitIndex: sb.splitIndex,
+          splitTotal: sb.splitTotal,
         });
-      } else if (cluster) {
-        // No matching draft → spawn a new batch for this cluster.
-        const totalDemand = cluster.reduce((s, d) => s + d.remaining, 0);
-        const moulds = Math.ceil(totalDemand / mould.numberOfCavities);
-        const totalPieces = moulds * mould.numberOfCavities;
-        const allocations = cluster.map((d) => ({ orderItemId: d.itemId, allocatedQuantity: d.remaining }));
+      } else if (sb) {
+        // No matching draft → spawn a new batch for this sub-batch.
         decision.newBatches.push({
           tempId: `__new_${tempCounter++}`,
           productId,
           productName: product.name,
           mouldId: mould.id!,
-          moulds, totalPieces, totalDemand,
-          surplus: totalPieces - totalDemand,
-          allocations,
+          moulds: sb.moulds,
+          totalPieces: sb.totalPieces,
+          totalDemand: sb.totalDemand,
+          surplus: sb.totalPieces - sb.totalDemand,
+          allocations: sb.allocations,
+          splitIndex: sb.splitIndex,
+          splitTotal: sb.splitTotal,
         });
       } else if (draft) {
-        // Surplus draft with no cluster → cancel.
+        // Surplus draft with no sub-batch → cancel.
         decision.plansToCancel.push(draft.id!);
         for (const link of links) {
           if (link.planId === draft.id && link.id) decision.linksToDelete.push(link.id);
@@ -377,6 +397,84 @@ export function reconcileGlobalProduceDemand(
   decision.plansToDelete = [...new Set(decision.plansToDelete)];
 
   return decision;
+}
+
+/** Slice a cluster into sequential sub-batches when the demand needs
+ *  more mould-fills than the chocolatier physically owns. Each sub-batch
+ *  consumes up to `cap` mould-fills (= cap × cavities pieces) of the
+ *  cluster's demand, drawn FIFO across the cluster's order items. When
+ *  `cap` is null, returns a single sub-batch carrying the whole cluster.
+ *  Sub-batches are tagged with (splitIndex, splitTotal) only when more
+ *  than one is produced — single-batch clusters keep both fields null
+ *  so plan names stay clean. */
+function splitClusterByCap(
+  cluster: Array<{ itemId: string; remaining: number }>,
+  cavities: number,
+  cap: number | null,
+): Array<{
+  moulds: number;
+  totalPieces: number;
+  totalDemand: number;
+  allocations: Array<{ orderItemId: string; allocatedQuantity: number }>;
+  splitIndex?: number;
+  splitTotal?: number;
+}> {
+  const totalDemand = cluster.reduce((s, d) => s + d.remaining, 0);
+  if (totalDemand <= 0) return [];
+  const totalMoulds = Math.ceil(totalDemand / cavities);
+  const effCap = cap && cap > 0 ? cap : totalMoulds;
+  const splitTotal = Math.ceil(totalMoulds / effCap);
+
+  const mouldChunks: number[] = [];
+  let mouldsLeft = totalMoulds;
+  while (mouldsLeft > 0) {
+    const take = Math.min(effCap, mouldsLeft);
+    mouldChunks.push(take);
+    mouldsLeft -= take;
+  }
+
+  // Track each item's still-unallocated demand as we walk through the
+  // chunks. FIFO across the cluster keeps the allocation deterministic
+  // and respects the deadline-sort that put the earliest item first.
+  const remaining = cluster.map((d) => ({ itemId: d.itemId, left: d.remaining }));
+  let cursor = 0;
+  const out: Array<{
+    moulds: number;
+    totalPieces: number;
+    totalDemand: number;
+    allocations: Array<{ orderItemId: string; allocatedQuantity: number }>;
+    splitIndex?: number;
+    splitTotal?: number;
+  }> = [];
+  let splitIdx = 1;
+  for (const m of mouldChunks) {
+    const piecesCap = m * cavities;
+    let remainingPieces = piecesCap;
+    const allocations: Array<{ orderItemId: string; allocatedQuantity: number }> = [];
+    while (remainingPieces > 0 && cursor < remaining.length) {
+      const r = remaining[cursor];
+      if (r.left <= 0) {
+        cursor++;
+        continue;
+      }
+      const take = Math.min(r.left, remainingPieces);
+      allocations.push({ orderItemId: r.itemId, allocatedQuantity: take });
+      r.left -= take;
+      remainingPieces -= take;
+      if (r.left === 0) cursor++;
+    }
+    const subDemand = allocations.reduce((s, a) => s + a.allocatedQuantity, 0);
+    out.push({
+      moulds: m,
+      totalPieces: piecesCap,
+      totalDemand: subDemand,
+      allocations,
+      splitIndex: splitTotal > 1 ? splitIdx : undefined,
+      splitTotal: splitTotal > 1 ? splitTotal : undefined,
+    });
+    splitIdx++;
+  }
+  return out;
 }
 
 /** Earliest deadline among all order items currently linked to a

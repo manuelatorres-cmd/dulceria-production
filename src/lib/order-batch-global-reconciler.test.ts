@@ -25,8 +25,8 @@ function mkProduct(id: string, name = id, mouldId: string | undefined = "m1"): P
   return { id, name, defaultMouldId: mouldId, defaultBatchQty: 1 } as unknown as Product;
 }
 
-function mkMould(id: string, cavities: number): Mould {
-  return { id, name: id, cavityWeightG: 10, numberOfCavities: cavities };
+function mkMould(id: string, cavities: number, quantityOwned?: number): Mould {
+  return { id, name: id, cavityWeightG: 10, numberOfCavities: cavities, quantityOwned };
 }
 
 function mkPlan(id: string, status: ProductionPlan["status"] = "draft"): ProductionPlan {
@@ -139,6 +139,57 @@ describe("reconcileGlobalProduceDemand — fresh consolidation", () => {
     }));
     expect(result.newBatches).toHaveLength(0);
     expect(result.warnings.some((w) => /mould/i.test(w))).toBe(true);
+  });
+});
+
+describe("reconcileGlobalProduceDemand — mould-cap split", () => {
+  it("splits a cluster into sequential sub-batches when demand exceeds quantityOwned moulds", () => {
+    // 16 pieces of p1, 2 cavities/mould → 8 mould-fills total. Owner has
+    // 4 physical moulds → split into two sub-batches of 4 moulds each.
+    const result = reconcileGlobalProduceDemand(baseInput({
+      openOrders: [mkOrder("oA")],
+      openOrderItems: [mkItem("iA1", "oA", "p1", 16)],
+      products: [mkProduct("p1", "XXL Heart", "m1")],
+      moulds: [mkMould("m1", 2, 4)],
+    }));
+    expect(result.newBatches).toHaveLength(2);
+    const [first, second] = result.newBatches;
+    expect(first.moulds).toBe(4);
+    expect(first.totalPieces).toBe(8);
+    expect(first.splitIndex).toBe(1);
+    expect(first.splitTotal).toBe(2);
+    expect(second.moulds).toBe(4);
+    expect(second.totalPieces).toBe(8);
+    expect(second.splitIndex).toBe(2);
+    expect(second.splitTotal).toBe(2);
+    // The cluster's single 16-piece line is sliced 8/8 across the rounds.
+    expect(first.allocations).toEqual([{ orderItemId: "iA1", allocatedQuantity: 8 }]);
+    expect(second.allocations).toEqual([{ orderItemId: "iA1", allocatedQuantity: 8 }]);
+  });
+
+  it("does not split when demand fits within quantityOwned moulds", () => {
+    // 8 pieces of p1, 2 cavities → 4 moulds. Owner has 4 → exactly one round.
+    const result = reconcileGlobalProduceDemand(baseInput({
+      openOrders: [mkOrder("oA")],
+      openOrderItems: [mkItem("iA1", "oA", "p1", 8)],
+      products: [mkProduct("p1", "XXL Heart", "m1")],
+      moulds: [mkMould("m1", 2, 4)],
+    }));
+    expect(result.newBatches).toHaveLength(1);
+    expect(result.newBatches[0].moulds).toBe(4);
+    expect(result.newBatches[0].splitIndex).toBeUndefined();
+    expect(result.newBatches[0].splitTotal).toBeUndefined();
+  });
+
+  it("treats quantityOwned 0/null as no cap (legacy behaviour)", () => {
+    const result = reconcileGlobalProduceDemand(baseInput({
+      openOrders: [mkOrder("oA")],
+      openOrderItems: [mkItem("iA1", "oA", "p1", 200)],
+      products: [mkProduct("p1", "Standard Truffle", "m1")],
+      moulds: [mkMould("m1", 40)], // quantityOwned undefined
+    }));
+    expect(result.newBatches).toHaveLength(1);
+    expect(result.newBatches[0].moulds).toBe(5);
   });
 });
 

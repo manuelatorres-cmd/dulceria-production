@@ -7943,6 +7943,18 @@ export async function regenerateAllProductionPlans(): Promise<RegeneratePlansRes
       .update({ quantity: upd.moulds })
       .eq("id", upd.planProductId);
     if (ppError) throw ppError;
+    // Refresh the plan name when the split shape changed: the cluster
+    // may have grown into multiple sub-batches (or shrunk back to one),
+    // and the existing draft's name needs to reflect its new role.
+    const baseName = `${upd.productName} — consolidated`;
+    const newName = upd.splitIndex && upd.splitTotal
+      ? `${baseName} · ${upd.splitIndex}/${upd.splitTotal}`
+      : baseName;
+    const { error: planNameErr } = await supabase
+      .from("productionPlans")
+      .update({ name: newName, updatedAt: now })
+      .eq("id", upd.planId);
+    if (planNameErr) throw planNameErr;
     const { error: delLinksErr } = await supabase
       .from("orderPlanLinks")
       .delete()
@@ -7976,9 +7988,13 @@ export async function regenerateAllProductionPlans(): Promise<RegeneratePlansRes
     // Packing-only batches get the "— packing" suffix so the scheduler
     // (and later the UI) can distinguish them from produce batches.
     const nameSuffix = b.kind === "packing" ? "— packing" : "— consolidated";
+    // Sub-batches from a mould-cap split get the "· i/t" tail so the
+    // chocolatier sees "round 1 of 2" / "round 2 of 2" as separate
+    // tickable rows.
+    const splitTail = b.splitIndex && b.splitTotal ? ` · ${b.splitIndex}/${b.splitTotal}` : "";
     const { error: planError } = await supabase.from("productionPlans").insert({
       id: planId,
-      name: `${b.productName} ${nameSuffix}`,
+      name: `${b.productName} ${nameSuffix}${splitTail}`,
       batchNumber,
       status: "draft",
       createdAt: now,
@@ -8107,7 +8123,11 @@ async function seedCampaignDrivenPlans(): Promise<{ warnings: string[]; deadline
         continue;
       }
       const namePattern = `Campaign: ${c.name} — ${product.name}`;
-      const existing = existingPlans.find((p) => p.name === namePattern);
+      // Match the base name OR any split sub-batch ("· 1/2") so a re-run
+      // doesn't double-create plans for the same campaign+product pair.
+      const existing = existingPlans.find(
+        (p) => p.name === namePattern || (p.name ?? "").startsWith(namePattern + " · "),
+      );
       // Anchor at local noon — using end-of-day shifts to next-day in
       // some timezones once the scheduler converts back to ISO date,
       // landing batches on the day AFTER the launch.
@@ -8128,48 +8148,61 @@ async function seedCampaignDrivenPlans(): Promise<{ warnings: string[]; deadline
       }
 
       const cavities = mould.numberOfCavities ?? 1;
-      const moulds_count = Math.max(1, Math.ceil(units / cavities));
+      const totalMoulds = Math.max(1, Math.ceil(units / cavities));
+      // Cap mould-fills per plan at the chocolatier's owned mould count,
+      // so a campaign needing more pieces than fit in one round splits
+      // into sequential sub-batches the daily checklist can tick off
+      // independently. quantityOwned 0/null = no cap (legacy behaviour).
+      const cap = mould.quantityOwned && mould.quantityOwned > 0 ? mould.quantityOwned : totalMoulds;
+      const splitTotal = Math.ceil(totalMoulds / cap);
+      const chunks: number[] = [];
+      let left = totalMoulds;
+      while (left > 0) {
+        const take = Math.min(cap, left);
+        chunks.push(take);
+        left -= take;
+      }
 
-      const planId = newId();
-      const batchNumber = await generateBatchNumber(now);
-      const { error: planErr } = await supabase.from("productionPlans").insert({
-        id: planId,
-        name: namePattern,
-        batchNumber,
-        status: "draft",
-        sourceOrderId: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-      if (planErr) {
-        warnings.push(`Could not create campaign plan for ${product.name}: ${planErr.message}`);
-        continue;
-      }
-      const { error: ppErr } = await supabase.from("planProducts").insert({
-        id: newId(),
-        planId,
-        productId,
-        mouldId: product.defaultMouldId,
-        quantity: moulds_count,
-        sortOrder: 0,
-      });
-      if (ppErr) {
-        warnings.push(`Could not link campaign plan products: ${ppErr.message}`);
-        continue;
-      }
-      // Push into the in-memory caches so successive iterations see
-      // the new plan and don't re-create.
-      existingPlans.push({
-        id: planId, name: namePattern, batchNumber, status: "draft",
-        createdAt: now, updatedAt: now,
-      } as ProductionPlan);
-      planById.set(planId, existingPlans[existingPlans.length - 1]);
-      existingPP.push({ id: newId(), planId, productId, mouldId: product.defaultMouldId, quantity: moulds_count, sortOrder: 0 } as PlanProduct);
-      // Record the deadline so the scheduler reverse-schedules this
-      // batch from the campaign's endDate (minus production buffer)
-      // instead of forward-filling from today.
-      if (campaignDeadlineMs != null) {
-        deadlineByPlanId.set(planId, campaignDeadlineMs);
+      for (let idx = 0; idx < chunks.length; idx++) {
+        const chunkMoulds = chunks[idx];
+        const splitTail = splitTotal > 1 ? ` · ${idx + 1}/${splitTotal}` : "";
+        const planName = namePattern + splitTail;
+        const planId = newId();
+        const batchNumber = await generateBatchNumber(now);
+        const { error: planErr } = await supabase.from("productionPlans").insert({
+          id: planId,
+          name: planName,
+          batchNumber,
+          status: "draft",
+          sourceOrderId: null,
+          createdAt: now,
+          updatedAt: now,
+        });
+        if (planErr) {
+          warnings.push(`Could not create campaign plan for ${product.name}: ${planErr.message}`);
+          continue;
+        }
+        const { error: ppErr } = await supabase.from("planProducts").insert({
+          id: newId(),
+          planId,
+          productId,
+          mouldId: product.defaultMouldId,
+          quantity: chunkMoulds,
+          sortOrder: 0,
+        });
+        if (ppErr) {
+          warnings.push(`Could not link campaign plan products: ${ppErr.message}`);
+          continue;
+        }
+        existingPlans.push({
+          id: planId, name: planName, batchNumber, status: "draft",
+          createdAt: now, updatedAt: now,
+        } as ProductionPlan);
+        planById.set(planId, existingPlans[existingPlans.length - 1]);
+        existingPP.push({ id: newId(), planId, productId, mouldId: product.defaultMouldId, quantity: chunkMoulds, sortOrder: 0 } as PlanProduct);
+        if (campaignDeadlineMs != null) {
+          deadlineByPlanId.set(planId, campaignDeadlineMs);
+        }
       }
     }
   }
@@ -8244,39 +8277,57 @@ async function seedProductionOrderDrivenPlans(): Promise<{ warnings: string[]; d
       const mould = mouldById.get(product.defaultMouldId);
       if (!mould) continue;
       const namePattern = `PO: ${po.name ?? po.dueDate} — ${product.name}`;
-      const existing = existingPlans.find((p) => p.name === namePattern);
+      const existing = existingPlans.find(
+        (p) => p.name === namePattern || (p.name ?? "").startsWith(namePattern + " · "),
+      );
       if (existing) {
         if (dueMs != null && existing.id) deadlineByPlanId.set(existing.id, dueMs);
         continue;
       }
       const cavities = mould.numberOfCavities ?? 1;
-      const moulds_count = Math.max(1, Math.ceil(it.targetUnits / cavities));
-      const planId = newId();
-      const batchNumber = await generateBatchNumber(now);
-      const { error: planErr } = await supabase.from("productionPlans").insert({
-        id: planId,
-        name: namePattern,
-        batchNumber,
-        status: "draft",
-        sourceOrderId: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-      if (planErr) { warnings.push(`Could not create plan for ${product.name}: ${planErr.message}`); continue; }
-      const { error: ppErr } = await supabase.from("planProducts").insert({
-        id: newId(),
-        planId,
-        productId: it.productId,
-        mouldId: product.defaultMouldId,
-        quantity: moulds_count,
-        sortOrder: 0,
-      });
-      if (ppErr) { warnings.push(`Could not link plan products: ${ppErr.message}`); continue; }
-      existingPlans.push({
-        id: planId, name: namePattern, batchNumber, status: "draft",
-        createdAt: now, updatedAt: now,
-      } as ProductionPlan);
-      if (dueMs != null) deadlineByPlanId.set(planId, dueMs);
+      const totalMoulds = Math.max(1, Math.ceil(it.targetUnits / cavities));
+      // Same mould-cap split as the campaign seeder — keeps each plan
+      // within one round of the chocolatier's physical mould count.
+      const cap = mould.quantityOwned && mould.quantityOwned > 0 ? mould.quantityOwned : totalMoulds;
+      const splitTotal = Math.ceil(totalMoulds / cap);
+      const chunks: number[] = [];
+      let left = totalMoulds;
+      while (left > 0) {
+        const take = Math.min(cap, left);
+        chunks.push(take);
+        left -= take;
+      }
+      for (let idx = 0; idx < chunks.length; idx++) {
+        const chunkMoulds = chunks[idx];
+        const splitTail = splitTotal > 1 ? ` · ${idx + 1}/${splitTotal}` : "";
+        const planName = namePattern + splitTail;
+        const planId = newId();
+        const batchNumber = await generateBatchNumber(now);
+        const { error: planErr } = await supabase.from("productionPlans").insert({
+          id: planId,
+          name: planName,
+          batchNumber,
+          status: "draft",
+          sourceOrderId: null,
+          createdAt: now,
+          updatedAt: now,
+        });
+        if (planErr) { warnings.push(`Could not create plan for ${product.name}: ${planErr.message}`); continue; }
+        const { error: ppErr } = await supabase.from("planProducts").insert({
+          id: newId(),
+          planId,
+          productId: it.productId,
+          mouldId: product.defaultMouldId,
+          quantity: chunkMoulds,
+          sortOrder: 0,
+        });
+        if (ppErr) { warnings.push(`Could not link plan products: ${ppErr.message}`); continue; }
+        existingPlans.push({
+          id: planId, name: planName, batchNumber, status: "draft",
+          createdAt: now, updatedAt: now,
+        } as ProductionPlan);
+        if (dueMs != null) deadlineByPlanId.set(planId, dueMs);
+      }
     }
   }
   return { warnings, deadlineByPlanId };
