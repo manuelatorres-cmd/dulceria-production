@@ -890,21 +890,24 @@ export default function PlanPage() {
                   }
                   const orderedBuckets = [...stepBuckets.values()].sort((a, b) => a.sortOrder - b.sortOrder);
 
-                  // Pastel by step phase. Each step gets its own colour.
+                  // v6 layout B — surfaces are white-glass; phase identity
+                  // lives only in `ink` (small text + a 3px left stripe on
+                  // chip cards). Old gradient-wash bg retired.
                   function tintFor(stepName: string): { bg: string; ink: string } {
                     const n = stepName.toLowerCase();
-                    if (n.includes("polish"))   return { bg: "linear-gradient(180deg,#fdf8e2,#fdf1e2)", ink: "#8a7030" };
+                    const surface = "rgba(255,255,255,0.65)";
+                    if (n.includes("polish"))   return { bg: surface, ink: "#8a7030" };
                     if (n.includes("paint") || n.includes("colour") || n.includes("color"))
-                                                return { bg: "linear-gradient(180deg,#fdeeea,#fdf1e2)", ink: "#9b4f48" };
+                                                return { bg: surface, ink: "#9b4f48" };
                     if (n.includes("shell") || n.includes("temper"))
-                                                return { bg: "linear-gradient(180deg,#fdf8e2,#fdf1e2)", ink: "#9a6640" };
-                    if (n.includes("prep"))     return { bg: "linear-gradient(180deg,#f3eef6,#fdeeea)", ink: "#6a4d89" };
-                    if (n.includes("fill"))     return { bg: "linear-gradient(180deg,#eff5fb,#f3eef6)", ink: "#4b6b8f" };
-                    if (n.includes("cap"))      return { bg: "linear-gradient(180deg,#eff3ec,#f1faf4)", ink: "#5c7050" };
+                                                return { bg: surface, ink: "#9a6640" };
+                    if (n.includes("prep"))     return { bg: surface, ink: "#6a4d89" };
+                    if (n.includes("fill"))     return { bg: surface, ink: "#4b6b8f" };
+                    if (n.includes("cap"))      return { bg: surface, ink: "#5c7050" };
                     if (n.includes("unmould") || n.includes("unmold"))
-                                                return { bg: "linear-gradient(180deg,#f1faf4,#fdf8e2)", ink: "#4a7a5e" };
-                    if (n.includes("pack"))     return { bg: "linear-gradient(180deg,#fdf1e2,#fdeeea)", ink: "#9a6640" };
-                    return { bg: "linear-gradient(180deg,rgba(255,255,255,0.7),rgba(245,243,239,0.7))", ink: "#1c1d1f" };
+                                                return { bg: surface, ink: "#4a7a5e" };
+                    if (n.includes("pack"))     return { bg: surface, ink: "#9a6640" };
+                    return { bg: surface, ink: "#1c1d1f" };
                   }
 
                   // Mega-grouping: when a step name (e.g. "Polishing")
@@ -1732,7 +1735,7 @@ function WeekView(props: {
                       const expanded = expandedSections.has(sectionKey);
                       const stepPlanIds = [...new Set(groupsArr.flatMap((g) => g.batches.map((bb) => bb.planId)))];
                       return (
-                        <div key={b.stepId} className="rounded-[8px] px-2 py-1" style={{ background: tint.bg, color: tint.ink }}>
+                        <div key={b.stepId} className="rounded-[8px] px-2 py-1" style={{ background: tint.bg, color: tint.ink, borderLeft: `3px solid ${tint.ink}` }}>
                           <div className="w-full flex items-baseline gap-1.5">
                             <DragHandle
                               id={`step:${ds.day.id}:${b.stepId}`}
@@ -1887,7 +1890,7 @@ function WeekView(props: {
                     );
                     const megaPlanIds = [...new Set(list.flatMap((b) => [...b.groups.values()].flatMap((g) => g.batches.map((x) => x.planId))))];
                     return (
-                      <div key={`mega:${name}`} className="rounded-[8px] px-2 py-1" style={{ background: tint.bg, color: tint.ink }}>
+                      <div key={`mega:${name}`} className="rounded-[8px] px-2 py-1" style={{ background: tint.bg, color: tint.ink, borderLeft: `3px solid ${tint.ink}` }}>
                         <div className="w-full flex items-baseline gap-1.5">
                           <DragHandle
                             id={`mega:${ds.day.id}:${name}`}
@@ -2721,7 +2724,7 @@ function DemandByUrgency({
             <span
               key={p.name}
               className="inline-flex items-baseline gap-1 text-[10.5px] rounded-full px-2 py-0.5 border border-white/60"
-              style={{ background: p.net > 0 ? "linear-gradient(180deg,#e3ebe6,#fdf1e2)" : "rgba(255,255,255,0.55)" }}
+              style={{ background: "rgba(255,255,255,0.65)", borderLeft: p.net > 0 ? "3px solid #4a6b5b" : undefined }}
               title={`${p.qty} ordered · ${p.stock} in stock · make ${p.net}`}
             >
               <span className="truncate max-w-[120px]" style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}>
@@ -2740,13 +2743,14 @@ function DemandByUrgency({
           total qty. Tight 3–4 col grid. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
         {orderRows.map((o) => {
+          const surface = "rgba(255,255,255,0.65)";
           const tint = o.bucket === "overdue"
-            ? { bg: "linear-gradient(180deg,#e3ebe6,#fdf1e2)", ink: "#2e4839" }
+            ? { bg: surface, ink: "#9b4f48" }
             : o.bucket === "today"
-              ? { bg: "linear-gradient(180deg,#fdf8e2,#fdf1e2)", ink: "#8a7030" }
+              ? { bg: surface, ink: "#8a7030" }
               : o.bucket === "tomorrow"
-                ? { bg: "linear-gradient(180deg,#eff5fb,#f3eef6)", ink: "#4b6b8f" }
-                : { bg: "linear-gradient(180deg,rgba(255,255,255,0.7),rgba(245,243,239,0.55))", ink: "#1c1d1f" };
+                ? { bg: surface, ink: "#4b6b8f" }
+                : { bg: surface, ink: "#1c1d1f" };
           const channelTint = CHANNEL_TINT[o.channel] ?? CHANNEL_TINT.other;
           const date = new Date(o.deadline);
           const dateStr = date.toLocaleDateString("de-AT", { weekday: "short", day: "2-digit", month: "2-digit" });
@@ -2756,7 +2760,7 @@ function DemandByUrgency({
             <div
               key={o.orderId}
               className="rounded-[12px] border border-white/60 p-2.5"
-              style={{ background: tint.bg, color: tint.ink }}
+              style={{ background: tint.bg, color: tint.ink, borderLeft: `3px solid ${tint.ink}` }}
             >
               {/* Header: customer + total */}
               <div className="flex items-baseline gap-1.5">
@@ -3060,7 +3064,7 @@ function BatchGroupRow({
         <Link
           href={`/production/${encodeURIComponent(b.planId)}?from=plan`}
           className="flex items-center gap-3 rounded-[10px] px-3 py-2 transition hover:opacity-90 border border-transparent hover:border-foreground/15"
-          style={{ background: tint.bg, color: tint.ink }}
+          style={{ background: tint.bg, color: tint.ink, borderLeft: `3px solid ${tint.ink}` }}
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5 truncate">
@@ -3091,7 +3095,7 @@ function BatchGroupRow({
   }
 
   return (
-    <li className="rounded-[10px] overflow-hidden border border-transparent" style={{ background: tint.bg, color: tint.ink }}>
+    <li className="rounded-[10px] overflow-hidden border border-transparent" style={{ background: tint.bg, color: tint.ink, borderLeft: `3px solid ${tint.ink}` }}>
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-3 px-3 py-2 text-left transition hover:opacity-90"
@@ -3347,14 +3351,14 @@ function PivotView(props: {
     fill: "Fill", cap: "Cap", unmould: "Unmould", packing: "Pack",
   };
   const PHASE_TINT: Record<string, { bg: string; ink: string }> = {
-    polishing: { bg: "linear-gradient(180deg,#fdf8e2,#fdf1e2)", ink: "#8a7030" },
-    colour:    { bg: "linear-gradient(180deg,#fdeeea,#fdf1e2)", ink: "#9b4f48" },
-    shell:     { bg: "linear-gradient(180deg,#fdf8e2,#fdf1e2)", ink: "#9a6640" },
-    filling:   { bg: "linear-gradient(180deg,#f3eef6,#fdeeea)", ink: "#735a78" },
-    fill:      { bg: "linear-gradient(180deg,#eff5fb,#f3eef6)", ink: "#4b6b8f" },
-    cap:       { bg: "linear-gradient(180deg,#eff3ec,#f1faf4)", ink: "#5c7050" },
-    unmould:   { bg: "linear-gradient(180deg,#f1faf4,#fdf8e2)", ink: "#4a7a5e" },
-    packing:   { bg: "linear-gradient(180deg,#fdf1e2,#fdeeea)", ink: "#9b4f48" },
+    polishing: { bg: "rgba(255,255,255,0.65)", ink: "#8a7030" },
+    colour:    { bg: "rgba(255,255,255,0.65)", ink: "#9b4f48" },
+    shell:     { bg: "rgba(255,255,255,0.65)", ink: "#9a6640" },
+    filling:   { bg: "rgba(255,255,255,0.65)", ink: "#735a78" },
+    fill:      { bg: "rgba(255,255,255,0.65)", ink: "#4b6b8f" },
+    cap:       { bg: "rgba(255,255,255,0.65)", ink: "#5c7050" },
+    unmould:   { bg: "rgba(255,255,255,0.65)", ink: "#4a7a5e" },
+    packing:   { bg: "rgba(255,255,255,0.65)", ink: "#9b4f48" },
   };
   const SRC_COLOR: Record<"order" | "campaign" | "po", string> = {
     order: "#2b6cb0", campaign: "#6a3a8c", po: "#2e4839",
@@ -4048,14 +4052,14 @@ function MonthView(props: {
     fill: "Fill", cap: "Cap", unmould: "Unmould", packing: "Pack",
   };
   const PHASE_TINT: Record<string, { bg: string; ink: string }> = {
-    polishing: { bg: "linear-gradient(180deg,#fdf8e2,#fdf1e2)", ink: "#8a7030" },
-    colour:    { bg: "linear-gradient(180deg,#fdeeea,#fdf1e2)", ink: "#9b4f48" },
-    shell:     { bg: "linear-gradient(180deg,#fdf8e2,#fdf1e2)", ink: "#9a6640" },
-    filling:   { bg: "linear-gradient(180deg,#f3eef6,#fdeeea)", ink: "#735a78" },
-    fill:      { bg: "linear-gradient(180deg,#eff5fb,#f3eef6)", ink: "#4b6b8f" },
-    cap:       { bg: "linear-gradient(180deg,#eff3ec,#f1faf4)", ink: "#5c7050" },
-    unmould:   { bg: "linear-gradient(180deg,#f1faf4,#fdf8e2)", ink: "#4a7a5e" },
-    packing:   { bg: "linear-gradient(180deg,#fdf1e2,#fdeeea)", ink: "#9b4f48" },
+    polishing: { bg: "rgba(255,255,255,0.65)", ink: "#8a7030" },
+    colour:    { bg: "rgba(255,255,255,0.65)", ink: "#9b4f48" },
+    shell:     { bg: "rgba(255,255,255,0.65)", ink: "#9a6640" },
+    filling:   { bg: "rgba(255,255,255,0.65)", ink: "#735a78" },
+    fill:      { bg: "rgba(255,255,255,0.65)", ink: "#4b6b8f" },
+    cap:       { bg: "rgba(255,255,255,0.65)", ink: "#5c7050" },
+    unmould:   { bg: "rgba(255,255,255,0.65)", ink: "#4a7a5e" },
+    packing:   { bg: "rgba(255,255,255,0.65)", ink: "#9b4f48" },
   };
   const SRC_COLOR: Record<"order" | "campaign" | "po", string> = {
     order: "#2b6cb0", campaign: "#6a3a8c", po: "#2e4839",
