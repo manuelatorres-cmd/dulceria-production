@@ -166,15 +166,22 @@ export default function PlanPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTokens, orders]);
 
+  function buildPlanUrl(focusValue: string | null): string {
+    const view = searchParams.get("view");
+    const parts: string[] = [];
+    if (focusValue) parts.push(`focus=${focusValue}`);
+    if (view) parts.push(`view=${encodeURIComponent(view)}`);
+    return parts.length ? `/plan?${parts.join("&")}` : "/plan";
+  }
   function clearFocus() {
-    router.push("/plan");
+    router.push(buildPlanUrl(null));
   }
   function toggleFocusToken(tok: string) {
     const next = focusTokens.includes(tok)
       ? focusTokens.filter((t) => t !== tok)
       : [...focusTokens, tok];
-    if (next.length === 0) router.push("/plan");
-    else router.push(`/plan?focus=${next.map((s) => encodeURIComponent(s)).join(",")}`);
+    if (next.length === 0) router.push(buildPlanUrl(null));
+    else router.push(buildPlanUrl(next.map((s) => encodeURIComponent(s)).join(",")));
   }
 
   // Apply focus to the lineItems feed used everywhere downstream so
@@ -465,8 +472,8 @@ export default function PlanPage() {
           value={focusParam ?? ""}
           onChange={(e) => {
             const v = e.target.value;
-            if (!v) router.push("/plan");
-            else router.push(`/plan?focus=${encodeURIComponent(v)}`);
+            if (!v) router.push(buildPlanUrl(null));
+            else router.push(buildPlanUrl(encodeURIComponent(v)));
           }}
           className="text-[11.5px] rounded-full border border-border bg-card px-2.5 py-1 hover:border-foreground"
         >
