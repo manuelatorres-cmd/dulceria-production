@@ -91,34 +91,48 @@ describe("decideBorrowStrategy", () => {
 });
 
 describe("computeReplenishmentQuantity", () => {
-  it("uses maximumUnits when set", () => {
-    // Borrowed 5 of 20 Store. Min 10, Max 30 → restock to 30 = 30 − (20−5) = 15.
-    // Floor at borrowed (5) → 15.
+  it("returns 0 when postBorrow ≥ min, even if max is higher", () => {
+    // Borrowed 5 of 20. Min 10, Max 30. postBorrow = 15 ≥ min → no replen.
+    // Skip-when-above-min wins over top-up-to-max.
     expect(computeReplenishmentQuantity({
       borrowedQuantity: 5, currentStore: 20, minimumUnits: 10, maximumUnits: 30,
-    })).toBe(15);
+    })).toBe(0);
   });
 
-  it("falls back to minimumUnits when max is null", () => {
-    // Borrowed 5 of 20. Min 10, no max → target 10. 10 − 15 = negative → 0.
-    // Floor at borrowed (5) → 5.
+  it("uses maximumUnits as target when postBorrow dips below min", () => {
+    // Borrowed 15 of 20. Min 10, Max 30. postBorrow = 5 (< min).
+    // topUp to max = 30 − 5 = 25. Floor at borrowed 15 → 25.
+    expect(computeReplenishmentQuantity({
+      borrowedQuantity: 15, currentStore: 20, minimumUnits: 10, maximumUnits: 30,
+    })).toBe(25);
+  });
+
+  it("returns 0 when postBorrow stock still meets the minimum", () => {
+    // Borrowed 5 of 20. Min 10, no max → post = 15 ≥ 10 → no replen.
     expect(computeReplenishmentQuantity({
       borrowedQuantity: 5, currentStore: 20, minimumUnits: 10,
-    })).toBe(5);
+    })).toBe(0);
   });
 
   it("tops up when currentStore is low and we borrow a bit", () => {
-    // Borrowed 3 of 5. Min 12, no max → target 12. post = 5−3 = 2.
+    // Borrowed 3 of 5. Min 12, no max → post = 5−3 = 2 (< min).
     // topUp = 12 − 2 = 10 (> borrowed 3).
     expect(computeReplenishmentQuantity({
       borrowedQuantity: 3, currentStore: 5, minimumUnits: 12,
     })).toBe(10);
   });
 
-  it("never goes below the borrowed quantity", () => {
-    // Already above min → topUp 0, but we still must make back what we took.
+  it("returns 0 when stock is well above min even after a small borrow", () => {
+    // Already above min by a wide margin → no replen line.
     expect(computeReplenishmentQuantity({
       borrowedQuantity: 7, currentStore: 100, minimumUnits: 10,
-    })).toBe(7);
+    })).toBe(0);
+  });
+
+  it("uses borrowed quantity as floor when post-borrow dips below min", () => {
+    // post = 50−15 = 35 (< min 40). topUp = 40−35 = 5. Floor at borrowed 15 → 15.
+    expect(computeReplenishmentQuantity({
+      borrowedQuantity: 15, currentStore: 50, minimumUnits: 40,
+    })).toBe(15);
   });
 });

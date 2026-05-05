@@ -89,18 +89,18 @@ export function decideBorrowStrategy(input: BorrowDecisionInput): BorrowDecision
 }
 
 /** Compute the replenishment quantity for a single borrowed product.
- *  Target = maximumUnits (if set) else minimumUnits. Replenishment =
- *  max(borrowedQuantity, target − currentStore + borrowedQuantity).
- *  The floor at `borrowedQuantity` guarantees we at least restore
- *  what we took. */
+ *  Returns 0 when post-borrow Store stock still meets the minimum —
+ *  no replenishment line needed. Otherwise tops up to target
+ *  (maximumUnits if set, else minimumUnits). */
 export function computeReplenishmentQuantity(input: {
   borrowedQuantity: number;
   currentStore: number;
   minimumUnits: number;
   maximumUnits?: number;
 }): number {
-  const target = input.maximumUnits ?? input.minimumUnits;
   const postBorrowStore = Math.max(0, input.currentStore - input.borrowedQuantity);
+  if (postBorrowStore >= input.minimumUnits) return 0;
+  const target = input.maximumUnits ?? input.minimumUnits;
   const topUp = Math.max(0, target - postBorrowStore);
   return Math.max(input.borrowedQuantity, topUp);
 }

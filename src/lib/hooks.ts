@@ -9249,15 +9249,19 @@ export async function syncReplenishmentOrder(parentOrderId: string): Promise<voi
   const { computeReplenishmentQuantity } = await import("@/lib/borrowDecision");
 
   let sortOrder = 0;
-  const inserts = borrowedItems.map((bi) => {
-    const mins = minsByProduct.get(bi.productId);
-    const qty = computeReplenishmentQuantity({
-      borrowedQuantity: bi.quantity,
-      currentStore: storeByProduct.get(bi.productId) ?? 0,
-      minimumUnits: mins?.minimumUnits ?? bi.quantity,
-      maximumUnits: mins?.maximumUnits,
-    });
-    return {
+  const inserts = borrowedItems
+    .map((bi) => {
+      const mins = minsByProduct.get(bi.productId);
+      const qty = computeReplenishmentQuantity({
+        borrowedQuantity: bi.quantity,
+        currentStore: storeByProduct.get(bi.productId) ?? 0,
+        minimumUnits: mins?.minimumUnits ?? bi.quantity,
+        maximumUnits: mins?.maximumUnits,
+      });
+      return { bi, qty };
+    })
+    .filter(({ qty }) => qty > 0)
+    .map(({ bi, qty }) => ({
       id: newId(),
       orderId: childId,
       productId: bi.productId,
@@ -9265,12 +9269,14 @@ export async function syncReplenishmentOrder(parentOrderId: string): Promise<voi
       sortOrder: sortOrder++,
       fulfilmentMode: "produce" as const,
       notes: `Replenish Store after borrowing ${bi.quantity} pc for order ${parentOrderId.slice(0, 8)}.`,
-    };
-  });
-  if (inserts.length > 0) {
-    const { error } = await supabase.from("orderItems").insert(inserts);
-    if (error) throw error;
+    }));
+  if (inserts.length === 0) {
+    // All borrowed lines still leave Store above min — no replenishment needed.
+    await deleteOrder(childId);
+    return;
   }
+  const { error } = await supabase.from("orderItems").insert(inserts);
+  if (error) throw error;
 
   queryClient.invalidateQueries({ queryKey: ["orders"] });
   queryClient.invalidateQueries({ queryKey: ["order-items"] });
