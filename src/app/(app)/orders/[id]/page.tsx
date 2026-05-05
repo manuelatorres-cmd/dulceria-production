@@ -2509,6 +2509,7 @@ function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
  *  a no-op because allocated will be empty. */
 function OrderReadyToPackSection({ orderId }: { orderId: string }) {
   const rows = useAllocatedForOrder(orderId);
+  const order = useOrder(orderId);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState<{ pieces: number; warnings: string[] } | null>(null);
@@ -2528,6 +2529,13 @@ function OrderReadyToPackSection({ orderId }: { orderId: string }) {
     setBusy(true); setErr("");
     try {
       const result = await markOrderAsPacked(orderId);
+      // Flip the order to status='done' so it falls out of pending /
+      // ready_to_pack lists. /picking does the same after markOrderAsPacked;
+      // /orders/[id] previously only drained stock, leaving the order in
+      // its prior status — looked like "nothing happened" to the operator.
+      if (order) {
+        await saveOrder({ ...order, status: "done" });
+      }
       setDone({ pieces: result.piecesMoved, warnings: result.warnings });
     } catch (e) {
       console.error("markOrderAsPacked failed:", e);
