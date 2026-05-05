@@ -903,6 +903,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
     deliveryType?: DeliveryType; deliveryAt?: string;
     deliveryAddress?: string; deliveryNotes?: string;
     isApproxDeadline?: boolean;
+    isolated?: boolean;
   };
   onSaved: () => void;
   onCancel: () => void;
@@ -921,6 +922,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   const [deliveryAt, setDeliveryAt] = useState(order.deliveryAt ? toLocalDatetime(order.deliveryAt) : "");
   const [deliveryAddress, setDeliveryAddress] = useState(order.deliveryAddress ?? "");
   const [deliveryNotes, setDeliveryNotes] = useState(order.deliveryNotes ?? "");
+  const [isolated, setIsolated] = useState<boolean>(order.isolated ?? false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -983,6 +985,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         deliveryAddress: deliveryAddress.trim() || undefined,
         deliveryNotes: deliveryNotes.trim() || undefined,
         isApproxDeadline,
+        isolated,
       });
       onSaved();
     } catch (err) {
@@ -1198,6 +1201,21 @@ function OrderEditForm({ order, onSaved, onCancel }: {
           </div>
         )}
       </div>
+
+      <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-[10px] border border-border bg-card px-3 py-2.5">
+        <input
+          type="checkbox"
+          checked={isolated}
+          onChange={(e) => setIsolated(e.target.checked)}
+          className="mt-0.5 accent-[#4a6b5b]"
+        />
+        <span className="text-[12.5px] leading-snug">
+          <span className="block font-medium">Keep production isolated</span>
+          <span className="block text-muted-foreground text-[11px]">
+            This order's batches stay separate — won't share moulds with replen/other orders, won't be folded into combined plans for the same product.
+          </span>
+        </span>
+      </label>
 
       <div className="flex gap-2">
         <button

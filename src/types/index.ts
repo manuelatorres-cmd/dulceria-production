@@ -1873,6 +1873,10 @@ export interface Order {
    *  to the customer for the original order. Lives on the ORIGINAL
    *  order so bookkeeping can tie the two records together. */
   creditReference?: string;
+  /** When true, this order's batches stay separate from other
+   *  production for the same products — batches don't share moulds
+   *  or get folded into replen plans. Mig 0086. */
+  isolated?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -2437,6 +2441,10 @@ export interface Campaign {
    *  variants). */
   colorTag?: string;
   notes?: string;
+  /** When true, this campaign's batches stay separate from other
+   *  production for the same products — batches don't share moulds
+   *  or get folded into replen plans. Mig 0086. */
+  isolated?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }

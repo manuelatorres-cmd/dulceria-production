@@ -604,6 +604,7 @@ function CampaignEditor({
   const [productIds, setProductIds] = useState<string[]>(campaign.productIds);
   const [productTargets, setProductTargets] = useState<Record<string, number>>(campaign.productTargets ?? {});
   const [notes, setNotes] = useState(campaign.notes ?? "");
+  const [isolated, setIsolated] = useState<boolean>(campaign.isolated ?? false);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -618,6 +619,7 @@ function CampaignEditor({
     setProductIds(campaign.productIds);
     setProductTargets(campaign.productTargets ?? {});
     setNotes(campaign.notes ?? "");
+    setIsolated(campaign.isolated ?? false);
   }, [campaign]);
 
   async function save() {
@@ -648,6 +650,7 @@ function CampaignEditor({
           Object.entries(productTargets).filter(([pid, n]) => productIds.includes(pid) && n > 0),
         ),
         notes: notes.trim() || undefined,
+        isolated,
       });
       onDone();
     } finally {
@@ -768,6 +771,21 @@ function CampaignEditor({
           <Field label="Notes">
             <textarea className={`${glassInput} resize-none`} value={notes} rows={3} onChange={(e) => setNotes(e.target.value)} />
           </Field>
+
+          <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-[10px] border border-white/60 bg-white/40 backdrop-blur-md px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={isolated}
+              onChange={(e) => setIsolated(e.target.checked)}
+              className="mt-0.5 accent-[#4a6b5b]"
+            />
+            <span className="text-[12.5px] leading-snug">
+              <span className="block font-medium">Keep production isolated</span>
+              <span className="block text-muted-foreground text-[11px]">
+                Batches for this campaign stay separate — won't share moulds with replen/other orders, won't be folded into combined plans for the same product.
+              </span>
+            </span>
+          </label>
 
           <div className="flex justify-between items-center pt-3 border-t border-white/40 flex-wrap gap-2">
             <div className="flex gap-2">
