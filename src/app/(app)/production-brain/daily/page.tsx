@@ -1080,7 +1080,7 @@ export default function DailyV2Page() {
     if (activePhase !== "colour") return [];
     const tasks: ColorTask[] = [];
     const taskMeta = new Map<string, {
-      planId: string; productName: string; batchLabel: string;
+      planId: string; ppId: string; productName: string; batchLabel: string;
       mouldName: string; qty: number; cavities: number;
       stepKey: string; notes?: string;
     }>();
@@ -1122,6 +1122,7 @@ export default function DailyV2Page() {
         });
         taskMeta.set(`${ppId}|0`, {
           planId: pp.planId,
+          ppId,
           productName: product.name,
           batchLabel: plan.batchNumber ?? plan.name ?? "Batch",
           mouldName,
@@ -1148,6 +1149,7 @@ export default function DailyV2Page() {
         });
         taskMeta.set(`${ppId}|${i}`, {
           planId: pp.planId,
+          ppId,
           productName: product.name,
           batchLabel: plan.batchNumber ?? plan.name ?? "Batch",
           mouldName,
@@ -1210,8 +1212,20 @@ export default function DailyV2Page() {
         out.push({ kind: "switch", toColorId: primary });
         activeColorId = primary;
       }
+      // Done state syncs both directions:
+      //   - Right-side per-task tick writes `color-${ppId}-${i}` →
+      //     only that task shows done (granular per-step).
+      //   - Left-side checklist tick writes the bare `colour-${ppId}`
+      //     → every paint task for that pp shows done immediately
+      //     (fan-out, no toggleRow rewrite needed).
+      //   - Legacy plan-wide `colour` / `color` keys also satisfy.
       const doneSet = doneByPlan.get(meta.planId) ?? new Set<string>();
-      const done = doneSet.has(meta.stepKey);
+      const done =
+        doneSet.has(meta.stepKey)
+        || doneSet.has(`colour-${meta.ppId}`)
+        || doneSet.has(`color-${meta.ppId}`)
+        || doneSet.has("colour")
+        || doneSet.has("color");
       currentRun.push({
         kind: "task",
         stepKey: meta.stepKey,
