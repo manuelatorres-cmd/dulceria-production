@@ -765,8 +765,11 @@ export default function DailyV2Page() {
     const plan = plansById.get(planId);
     if (!plan) return [];
     const name = plan.name ?? "";
-    if (!name.startsWith("PO: ")) return [];
-    const rest = name.slice("PO: ".length);
+    // Strip optional " · 1/2" / " · 2/2" sub-batch tail before matching
+    // the PO. Split sub-batches share the same parent PO name.
+    const baseName = name.replace(/\s+·\s+\d+\/\d+$/, "");
+    if (!baseName.startsWith("PO: ")) return [];
+    const rest = baseName.slice("PO: ".length);
     const dash = rest.indexOf(" — ");
     const poName = dash > 0 ? rest.slice(0, dash) : rest;
     const matchingPos = allProductionOrders.filter((po) => {
@@ -774,20 +777,34 @@ export default function DailyV2Page() {
       return (po.name ?? "") === poName;
     });
     if (matchingPos.length === 0) return [];
-    const planProductIds = new Set(
-      todayPlanProducts.filter((pp) => pp.planId === planId).map((pp) => pp.productId),
-    );
+    const planPps = todayPlanProducts.filter((pp) => pp.planId === planId);
+    const planProductIds = new Set(planPps.map((pp) => pp.productId));
+    // This sub-batch's own planned-piece capacity = sum(pp.quantity * cavities).
+    // When a PO target spans multiple split sub-batches, each sub-batch
+    // should only own its slice of the total demand — otherwise a single
+    // sub-batch claims the whole PO request and the surplus stays at 0
+    // even when this batch over-yielded.
+    const slicePiecesByProduct = new Map<string, number>();
+    for (const pp of planPps) {
+      const m = pp.mouldId ? mouldById.get(pp.mouldId) : undefined;
+      const cavities = m?.numberOfCavities ?? 0;
+      slicePiecesByProduct.set(
+        pp.productId,
+        (slicePiecesByProduct.get(pp.productId) ?? 0) + pp.quantity * cavities,
+      );
+    }
     const rows: AllocationSplitPoRow[] = [];
     for (const po of matchingPos) {
       const items = allProductionOrderItems.filter((it) => it.productionOrderId === po.id);
       for (const it of items) {
         if (!planProductIds.has(it.productId)) continue;
+        const slice = slicePiecesByProduct.get(it.productId) ?? it.targetUnits;
         rows.push({
           productionOrderItemId: it.id!,
           productionOrderId: po.id!,
           productId: it.productId,
           poLabel: po.name ?? "PO",
-          requested: it.targetUnits,
+          requested: Math.min(it.targetUnits, slice),
         });
       }
     }
