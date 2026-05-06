@@ -86,6 +86,12 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function addDaysIso(iso: string, n: number): string {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 const WEEKDAY_NAMES = [
   "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
 ] as const;
@@ -98,6 +104,12 @@ function isWorkingToday(workingDays: readonly string[] | undefined): boolean {
 
 export default function DailyV2Page() {
   const today = todayIso();
+  // viewDate = the date this page is showing. Defaults to real today;
+  // operator can step forward/back to preview tomorrow's run after
+  // closing today, or peek at yesterday's still-open work. Close-day +
+  // yield modals stay gated on actual today via `isViewingToday`.
+  const [viewDate, setViewDate] = useState<string>(today);
+  const isViewingToday = viewDate === today;
   const plans = useProductionPlans();
   const planProducts = useAllPlanProducts();
   const products = useProductsList(true);
@@ -137,7 +149,12 @@ export default function DailyV2Page() {
   // Resolve which plans run today via productionDayLineItems linked to
   // the current ProductionDay row. Falls back to plans whose status is
   // "active" if no day exists yet (new day not opened).
-  const todayDayId = todayDay?.id ?? productionDays.find((d) => d.date === today)?.id;
+  // Resolve the day-id for whichever date the operator is viewing.
+  // Real "today" still drives close-day + yield modals; everything
+  // else (line items, checklist, rollups) keys on the selected date.
+  const todayDayId = isViewingToday
+    ? (todayDay?.id ?? productionDays.find((d) => d.date === viewDate)?.id)
+    : productionDays.find((d) => d.date === viewDate)?.id;
   const todayLineItems = useMemo(
     () => allLineItems.filter((li) => todayDayId && li.productionDayId === todayDayId),
     [allLineItems, todayDayId],
@@ -1661,12 +1678,43 @@ export default function DailyV2Page() {
         >
           Daily
         </h1>
-        <span
-          className="text-muted-foreground text-[20px]"
-          style={{ fontFamily: "var(--font-serif)", letterSpacing: "-0.015em" }}
-        >
-          {now.toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" })} · {now.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setViewDate((d) => addDaysIso(d, -1))}
+            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted text-sm leading-none"
+            title="Previous day"
+          >
+            ‹
+          </button>
+          <span
+            className="text-muted-foreground text-[20px] min-w-[140px] text-center"
+            style={{ fontFamily: "var(--font-serif)", letterSpacing: "-0.015em" }}
+          >
+            {new Date(viewDate + "T00:00:00").toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" })}
+            {isViewingToday && (
+              <span className="text-[12px] ml-1.5 opacity-65">· {now.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })}</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={() => setViewDate((d) => addDaysIso(d, 1))}
+            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted text-sm leading-none"
+            title="Next day"
+          >
+            ›
+          </button>
+          {!isViewingToday && (
+            <button
+              type="button"
+              onClick={() => setViewDate(today)}
+              className="ml-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium border border-border bg-card hover:bg-muted"
+              title="Jump back to today"
+            >
+              today
+            </button>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {todaySources.total > 0 && (
             <div className="relative">
@@ -1749,7 +1797,8 @@ export default function DailyV2Page() {
           )}
           <button
             onClick={handleClose}
-            disabled={closing}
+            disabled={closing || !isViewingToday}
+            title={isViewingToday ? "Close today's production day" : "Switch to today to close the day"}
             className="rounded-full px-3 py-1.5 text-xs font-medium border border-border bg-card hover:bg-muted disabled:opacity-50 inline-flex items-center gap-1.5"
           >
             <X className="w-3.5 h-3.5" /> {closing ? "Closing…" : "Close production day"}
