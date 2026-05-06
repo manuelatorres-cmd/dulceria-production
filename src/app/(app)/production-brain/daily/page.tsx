@@ -190,20 +190,36 @@ export default function DailyV2Page() {
     return m;
   }, [plans, allOrderItems, allOrderPlanLinks]);
 
-  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<Set<string>>(() => new Set());
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const todayPlanProducts = useMemo(() => {
     let pps = planProducts.filter((pp) => todayPlanIds.has(pp.planId));
-    if (sourceFilter) {
-      pps = pps.filter((pp) => planSourcesByPlan.get(pp.planId)?.has(sourceFilter));
+    if (sourceFilter.size > 0) {
+      pps = pps.filter((pp) => {
+        const tokens = planSourcesByPlan.get(pp.planId);
+        if (!tokens) return false;
+        for (const t of sourceFilter) if (tokens.has(t)) return true;
+        return false;
+      });
     }
     return pps;
   }, [planProducts, todayPlanIds, sourceFilter, planSourcesByPlan]);
 
+  function toggleSourceFilter(token: string) {
+    setSourceFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(token)) next.delete(token);
+      else next.add(token);
+      return next;
+    });
+  }
+
   // Distinct source tokens that appear on at least one of today's
   // plans. Grouped by kind for the native <select> optgroup layout.
   const todaySources = useMemo(() => {
-    const seen = new Map<string, { token: string; kind: "campaign" | "po" | "order"; label: string }>();
+    type Src = { token: string; kind: "campaign" | "po" | "order"; label: string; fulfillmentType?: string };
+    const seen = new Map<string, Src>();
     for (const planId of todayPlanIds) {
       const tokens = planSourcesByPlan.get(planId);
       if (!tokens) continue;
@@ -217,10 +233,9 @@ export default function DailyV2Page() {
           const oid = tok.slice("order:".length);
           const o = allOrders.find((x) => x.id === oid);
           if (!o) continue;
-          // Skip closed/cancelled orders — they shouldn't pollute the dropdown.
           if (o.status !== "pending" && o.status !== "in_production") continue;
           const label = o.sourceRef ?? o.customerName ?? o.eventName ?? oid.slice(0, 6);
-          seen.set(tok, { token: tok, kind: "order", label });
+          seen.set(tok, { token: tok, kind: "order", label, fulfillmentType: o.fulfillmentType });
         }
       }
     }
@@ -1637,35 +1652,83 @@ export default function DailyV2Page() {
         </span>
         <div className="ml-auto flex items-center gap-2">
           {todaySources.total > 0 && (
-            <select
-              value={sourceFilter ?? ""}
-              onChange={(e) => setSourceFilter(e.target.value || null)}
-              className="rounded-full px-3 py-1.5 text-xs font-medium border border-border bg-card hover:bg-muted max-w-[260px]"
-              title="Scope today's checklist to a single source (campaign, PO, or order)"
-            >
-              <option value="">All sources ({todaySources.total})</option>
-              {todaySources.campaigns.length > 0 && (
-                <optgroup label="Campaigns">
-                  {todaySources.campaigns.map((s) => (
-                    <option key={s.token} value={s.token}>{s.label}</option>
-                  ))}
-                </optgroup>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setFilterOpen((v) => !v)}
+                className="rounded-full px-3 py-1.5 text-xs font-medium border border-border bg-card hover:bg-muted inline-flex items-center gap-1.5"
+                title="Scope today's checklist to selected sources"
+              >
+                {sourceFilter.size === 0
+                  ? `All sources (${todaySources.total})`
+                  : `${sourceFilter.size} selected`}
+                <span className="opacity-60">▾</span>
+              </button>
+              {filterOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setFilterOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-1 z-40 w-[280px] max-h-[60vh] overflow-y-auto rounded-[12px] border border-border bg-card shadow-lg p-2 text-xs">
+                    <div className="flex items-center justify-between px-1.5 py-1">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Filter sources
+                      </span>
+                      {sourceFilter.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSourceFilter(new Set())}
+                          className="text-[11px] text-primary hover:underline"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    {todaySources.campaigns.length > 0 && (
+                      <div className="mt-1">
+                        <p className="px-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">Campaigns</p>
+                        {todaySources.campaigns.map((s) => (
+                          <FilterOptionRow
+                            key={s.token}
+                            label={s.label}
+                            checked={sourceFilter.has(s.token)}
+                            onToggle={() => toggleSourceFilter(s.token)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {todaySources.pos.length > 0 && (
+                      <div className="mt-1">
+                        <p className="px-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">Production orders</p>
+                        {todaySources.pos.map((s) => (
+                          <FilterOptionRow
+                            key={s.token}
+                            label={s.label}
+                            checked={sourceFilter.has(s.token)}
+                            onToggle={() => toggleSourceFilter(s.token)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {todaySources.orders.length > 0 && (
+                      <div className="mt-1">
+                        <p className="px-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">Orders</p>
+                        {todaySources.orders.map((s) => (
+                          <FilterOptionRow
+                            key={s.token}
+                            label={s.label}
+                            tag={s.fulfillmentType}
+                            checked={sourceFilter.has(s.token)}
+                            onToggle={() => toggleSourceFilter(s.token)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
-              {todaySources.pos.length > 0 && (
-                <optgroup label="Production orders">
-                  {todaySources.pos.map((s) => (
-                    <option key={s.token} value={s.token}>{s.label}</option>
-                  ))}
-                </optgroup>
-              )}
-              {todaySources.orders.length > 0 && (
-                <optgroup label="Orders">
-                  {todaySources.orders.map((s) => (
-                    <option key={s.token} value={s.token}>{s.label}</option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
+            </div>
           )}
           <button
             onClick={handleClose}
@@ -2269,5 +2332,35 @@ export default function DailyV2Page() {
         />
       )}
     </div>
+  );
+}
+
+function FilterOptionRow({
+  label, tag, checked, onToggle,
+}: {
+  label: string;
+  tag?: string;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={
+        "w-full flex items-center gap-2 px-1.5 py-1 rounded-[6px] text-left transition " +
+        (checked ? "bg-primary/10 text-foreground" : "hover:bg-muted text-foreground")
+      }
+    >
+      <span className="w-3.5 h-3.5 shrink-0 rounded-sm border border-border flex items-center justify-center text-[10px]">
+        {checked ? "✓" : ""}
+      </span>
+      <span className="flex-1 truncate">{label}</span>
+      {tag && (
+        <span className="rounded-full border border-border bg-card/70 px-1.5 py-[1px] text-[9.5px] text-muted-foreground capitalize shrink-0">
+          {tag}
+        </span>
+      )}
+    </button>
   );
 }
