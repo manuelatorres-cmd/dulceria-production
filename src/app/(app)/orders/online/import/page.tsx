@@ -18,6 +18,8 @@ const DEFAULT_LEAD_DAYS = 3;
 /** Encoded picker value: "product:<id>" or "variant:<variantId>:<vpId|->" */
 type PickerValue = string;
 
+const SKIP_LINE: PickerValue = "skip";
+
 function encodeProduct(productId: string): PickerValue {
   return `product:${productId}`;
 }
@@ -27,8 +29,10 @@ function encodeVariant(variantId: string, vpId: string | null): PickerValue {
 function decodePicker(v: PickerValue):
   | { kind: "product"; productId: string }
   | { kind: "variant"; variantId: string; variantPackagingId: string | null }
+  | { kind: "skip" }
   | null {
   if (!v) return null;
+  if (v === SKIP_LINE) return { kind: "skip" };
   const [kind, a, b] = v.split(":");
   if (kind === "product" && a) return { kind: "product", productId: a };
   if (kind === "variant" && a) {
@@ -150,6 +154,7 @@ export default function ShopifyImportPage() {
         if (!v) return false;
         const dec = decodePicker(v);
         if (!dec) return false;
+        if (dec.kind === "skip") return true; // explicit skip counts as resolved
         if (dec.kind === "variant") {
           // Variant must have a size if any sizes exist for it.
           const sizes = variantSizesFor(dec.variantId);
@@ -157,6 +162,18 @@ export default function ShopifyImportPage() {
         }
         return true;
       });
+      const hasAnyImportableLine = o.lineItems.some((li, i) => {
+        const v = getPick(o.name, i, li);
+        if (!v) return false;
+        const dec = decodePicker(v);
+        return dec !== null && dec.kind !== "skip";
+      });
+      if (allResolved && !hasAnyImportableLine) {
+        // Every line was marked skip → drop the whole order from the
+        // import (no point creating an empty order).
+        excludedActive++;
+        continue;
+      }
       if (!allResolved) {
         unresolved++;
         continue;
@@ -182,6 +199,7 @@ export default function ShopifyImportPage() {
           if (!manualRaw) continue;
           const dec = decodePicker(manualRaw);
           if (!dec) continue;
+          if (dec.kind === "skip") continue;
           // Was the parser's auto-pick the same? If yes, no manual
           // correction → skip.
           if (autoPicker(li) === manualRaw) continue;
@@ -216,29 +234,32 @@ export default function ShopifyImportPage() {
           shippingAddress: o.shippingAddress,
           phone: o.phone,
           deadline: deadline.toISOString(),
-          items: o.lineItems.map((li, i) => {
-            const dec = decodePicker(getPick(o.name, i, li)!)!;
-            const fulfilmentMode = produceSet.has(lineKey(o.name, i)) ? "produce" as const : "borrow" as const;
-            if (dec.kind === "product") {
+          items: o.lineItems
+            .map((li, i) => {
+              const dec = decodePicker(getPick(o.name, i, li)!);
+              if (!dec || dec.kind === "skip") return null;
+              const fulfilmentMode = produceSet.has(lineKey(o.name, i)) ? "produce" as const : "borrow" as const;
+              if (dec.kind === "product") {
+                return {
+                  kind: "product" as const,
+                  productId: dec.productId,
+                  quantity: li.quantity,
+                  unitPrice: li.unitPrice,
+                  notes: li.sku ? `SKU ${li.sku}` : undefined,
+                  fulfilmentMode,
+                };
+              }
               return {
-                kind: "product" as const,
-                productId: dec.productId,
+                kind: "variant" as const,
+                variantId: dec.variantId,
+                variantPackagingId: dec.variantPackagingId,
                 quantity: li.quantity,
                 unitPrice: li.unitPrice,
                 notes: li.sku ? `SKU ${li.sku}` : undefined,
                 fulfilmentMode,
               };
-            }
-            return {
-              kind: "variant" as const,
-              variantId: dec.variantId,
-              variantPackagingId: dec.variantPackagingId,
-              quantity: li.quantity,
-              unitPrice: li.unitPrice,
-              notes: li.sku ? `SKU ${li.sku}` : undefined,
-              fulfilmentMode,
-            };
-          }),
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null),
         };
       });
       const imported = await importOnlineOrders(payload);
@@ -486,6 +507,7 @@ export default function ShopifyImportPage() {
                                 disabled={isDup}
                               >
                                 <option value="">— pick {narrowed ? "size" : "variant or product"} —</option>
+                                <option value={SKIP_LINE}>↪︎ Skip this line</option>
                                 {narrowed && matchedVariant ? (
                                   <optgroup label={`Sizes — ${matchedVariant.name}`}>
                                     {(() => {
@@ -555,12 +577,17 @@ export default function ShopifyImportPage() {
                                   : li.resolutionNote ?? "Pick a variant size or product."}
                               </p>
                             )}
+                            {dec?.kind === "skip" && (
+                              <p className="mt-1 text-[11px] text-muted-foreground italic">
+                                Line skipped — won&apos;t be imported.
+                              </p>
+                            )}
                             {/* Stock + Produce/Borrow toggle. Only meaningful for
                                 resolved single-product picks. Variant lines
                                 aggregate stock per composition product, so the
                                 toggle there applies the choice to all derived
                                 lines on import. */}
-                            {dec && (() => {
+                            {dec && dec.kind !== "skip" && (() => {
                               const isBorrow = !produceSet.has(lk);
                               let stockLabel: string;
                               let stockClass: string;
