@@ -1715,12 +1715,21 @@ export async function moveProductionStepsToDate(args: {
     stepIds: string[]; plannedMinutes: number; sortOrder: number;
   }>;
 
+  let appliedMoves = 0;
+  const skippedMoves: Array<{ planId: string; stepId: string; reason: string }> = [];
   for (const m of moves) {
     const src = allLineItems.find(
       (li) => li.planId === m.planId && (li.stepIds ?? []).includes(m.stepId),
     );
-    if (!src) continue;
-    if (src.productionDayId === targetDayId) continue;
+    if (!src) {
+      skippedMoves.push({ ...m, reason: "no source lineItem (step not scheduled)" });
+      continue;
+    }
+    if (src.productionDayId === targetDayId) {
+      skippedMoves.push({ ...m, reason: "already on target day" });
+      continue;
+    }
+    appliedMoves++;
 
     // Remove the step from its source row. If that empties the row,
     // delete it; otherwise update with the trimmed stepIds.
@@ -1795,6 +1804,13 @@ export async function moveProductionStepsToDate(args: {
 
   queryClient.invalidateQueries({ queryKey: ["production-day-line-items"] });
   queryClient.invalidateQueries({ queryKey: ["production-days"] });
+  if (appliedMoves === 0 && moves.length > 0) {
+    console.warn("[moveProductionStepsToDate] no moves applied", { moves, skippedMoves });
+    throw new Error(
+      `Step couldn't be moved — ${skippedMoves[0]?.reason ?? "unknown reason"}. ` +
+      `Try Regenerate plan to refresh the schedule, then drag again.`,
+    );
+  }
 }
 
 /** Clear a plan's pinnedDate so the next regenerate is free to
