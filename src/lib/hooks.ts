@@ -10811,21 +10811,28 @@ export async function importOnlineOrders(input: OnlineOrderImportInput[]): Promi
   if (fresh.length === 0) return 0;
 
   const now = new Date();
-  const orderRows = fresh.map((o) => ({
-    id: newId(),
-    channel: "online",
-    customerName: o.customerName ?? o.email ?? null,
-    customerId: null,
-    deadline: o.deadline,
-    priority: "normal",
-    status: "pending",
-    notes: o.email ? `Email: ${o.email}` : null,
-    sourceRef: o.sourceRef,
-    deliveryAddress: o.shippingAddress ?? null,
-    deliveryType: o.shippingAddress ? "ship" : "pickup",
-    createdAt: o.placedAt ?? now,
-    updatedAt: now,
-  }));
+  const orderRows = fresh.map((o) => {
+    const fulfillment = o.shippingAddress ? "ship" : "pickup";
+    return {
+      id: newId(),
+      channel: "online",
+      customerName: o.customerName ?? o.email ?? null,
+      customerId: null,
+      deadline: o.deadline,
+      priority: "normal",
+      status: "pending",
+      notes: o.email ? `Email: ${o.email}` : null,
+      sourceRef: o.sourceRef,
+      deliveryAddress: o.shippingAddress ?? null,
+      deliveryType: fulfillment,
+      // Mirror to the production-brain field so /orders + /plan can
+      // surface pickup/ship pills without re-deriving from the legacy
+      // `deliveryType`.
+      fulfillmentType: fulfillment,
+      createdAt: o.placedAt ?? now,
+      updatedAt: now,
+    };
+  });
 
   const { error: insOrdersErr } = await supabase.from("orders").insert(orderRows);
   if (insOrdersErr) throw insOrdersErr;
