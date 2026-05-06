@@ -163,54 +163,76 @@ export default function DailyV2Page() {
   const ingredientByIdLocal = useMemo(() => new Map(ingredients.map((i) => [i.id!, i])), [ingredients]);
   void campaigns;
 
-  // Order → set of planIds linked to that order (across all production
-  // days). Drives the per-order filter so the operator can scope the
-  // entire daily view to one urgent order's batches without losing the
-  // multi-batch grouping the page does downstream.
-  const planIdsByOrder = useMemo(() => {
+  // Plan → source tokens. A plan can have multiple tokens (e.g. an
+  // order-driven consolidated batch fulfilling N orders gets N
+  // "order:<id>" tokens). Token shapes match the /plan focus picker so
+  // future cross-page wiring stays consistent.
+  const planSourcesByPlan = useMemo(() => {
     const m = new Map<string, Set<string>>();
+    for (const plan of plans) {
+      if (!plan.id) continue;
+      const tokens = new Set<string>();
+      const name = plan.name ?? "";
+      const camp = name.match(/^Campaign:\s+(.+?)\s+—\s/);
+      const po = name.match(/^PO:\s+(.+?)\s+—\s/);
+      if (camp) tokens.add(`campaign:${camp[1]}`);
+      else if (po) tokens.add(`po:${po[1]}`);
+      m.set(plan.id, tokens);
+    }
     const itemById = new Map(allOrderItems.map((i) => [i.id!, i]));
     for (const link of allOrderPlanLinks) {
       const item = itemById.get(link.orderItemId);
       if (!item) continue;
-      const set = m.get(item.orderId) ?? new Set<string>();
-      set.add(link.planId);
-      m.set(item.orderId, set);
+      const set = m.get(link.planId) ?? new Set<string>();
+      set.add(`order:${item.orderId}`);
+      m.set(link.planId, set);
     }
     return m;
-  }, [allOrderItems, allOrderPlanLinks]);
+  }, [plans, allOrderItems, allOrderPlanLinks]);
 
-  const [orderFilter, setOrderFilter] = useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
 
   const todayPlanProducts = useMemo(() => {
     let pps = planProducts.filter((pp) => todayPlanIds.has(pp.planId));
-    if (orderFilter) {
-      const allowed = planIdsByOrder.get(orderFilter) ?? new Set<string>();
-      pps = pps.filter((pp) => allowed.has(pp.planId));
+    if (sourceFilter) {
+      pps = pps.filter((pp) => planSourcesByPlan.get(pp.planId)?.has(sourceFilter));
     }
     return pps;
-  }, [planProducts, todayPlanIds, orderFilter, planIdsByOrder]);
+  }, [planProducts, todayPlanIds, sourceFilter, planSourcesByPlan]);
 
-  // Only orders with at least one batch on today's plan list — keeps
-  // the dropdown short on busy days.
-  const ordersWithTodayBatches = useMemo(() => {
-    const out: Array<{ id: string; label: string }> = [];
-    for (const o of allOrders) {
-      if (!o.id) continue;
-      if (o.status !== "pending" && o.status !== "in_production") continue;
-      const planSet = planIdsByOrder.get(o.id);
-      if (!planSet) continue;
-      let intersects = false;
-      for (const pid of planSet) {
-        if (todayPlanIds.has(pid)) { intersects = true; break; }
+  // Distinct source tokens that appear on at least one of today's
+  // plans. Grouped by kind for the native <select> optgroup layout.
+  const todaySources = useMemo(() => {
+    const seen = new Map<string, { token: string; kind: "campaign" | "po" | "order"; label: string }>();
+    for (const planId of todayPlanIds) {
+      const tokens = planSourcesByPlan.get(planId);
+      if (!tokens) continue;
+      for (const tok of tokens) {
+        if (seen.has(tok)) continue;
+        if (tok.startsWith("campaign:")) {
+          seen.set(tok, { token: tok, kind: "campaign", label: tok.slice("campaign:".length) });
+        } else if (tok.startsWith("po:")) {
+          seen.set(tok, { token: tok, kind: "po", label: tok.slice("po:".length) });
+        } else {
+          const oid = tok.slice("order:".length);
+          const o = allOrders.find((x) => x.id === oid);
+          if (!o) continue;
+          // Skip closed/cancelled orders — they shouldn't pollute the dropdown.
+          if (o.status !== "pending" && o.status !== "in_production") continue;
+          const label = o.sourceRef ?? o.customerName ?? o.eventName ?? oid.slice(0, 6);
+          seen.set(tok, { token: tok, kind: "order", label });
+        }
       }
-      if (!intersects) continue;
-      const label = o.sourceRef ?? o.customerName ?? o.eventName ?? o.id.slice(0, 6);
-      out.push({ id: o.id, label });
     }
-    out.sort((a, b) => a.label.localeCompare(b.label));
-    return out;
-  }, [allOrders, planIdsByOrder, todayPlanIds]);
+    const arr = [...seen.values()];
+    arr.sort((a, b) => a.label.localeCompare(b.label));
+    return {
+      campaigns: arr.filter((s) => s.kind === "campaign"),
+      pos: arr.filter((s) => s.kind === "po"),
+      orders: arr.filter((s) => s.kind === "order"),
+      total: arr.length,
+    };
+  }, [todayPlanIds, planSourcesByPlan, allOrders]);
 
   // Pull product-fillings only for products running today so the
   // PhaseDetailsPanel can render filling lists without one query per
@@ -1614,17 +1636,35 @@ export default function DailyV2Page() {
           {now.toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "short" })} · {now.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          {ordersWithTodayBatches.length > 0 && (
+          {todaySources.total > 0 && (
             <select
-              value={orderFilter ?? ""}
-              onChange={(e) => setOrderFilter(e.target.value || null)}
-              className="rounded-full px-3 py-1.5 text-xs font-medium border border-border bg-card hover:bg-muted"
-              title="Scope today's checklist to a single order"
+              value={sourceFilter ?? ""}
+              onChange={(e) => setSourceFilter(e.target.value || null)}
+              className="rounded-full px-3 py-1.5 text-xs font-medium border border-border bg-card hover:bg-muted max-w-[260px]"
+              title="Scope today's checklist to a single source (campaign, PO, or order)"
             >
-              <option value="">All orders ({ordersWithTodayBatches.length})</option>
-              {ordersWithTodayBatches.map((o) => (
-                <option key={o.id} value={o.id}>{o.label}</option>
-              ))}
+              <option value="">All sources ({todaySources.total})</option>
+              {todaySources.campaigns.length > 0 && (
+                <optgroup label="Campaigns">
+                  {todaySources.campaigns.map((s) => (
+                    <option key={s.token} value={s.token}>{s.label}</option>
+                  ))}
+                </optgroup>
+              )}
+              {todaySources.pos.length > 0 && (
+                <optgroup label="Production orders">
+                  {todaySources.pos.map((s) => (
+                    <option key={s.token} value={s.token}>{s.label}</option>
+                  ))}
+                </optgroup>
+              )}
+              {todaySources.orders.length > 0 && (
+                <optgroup label="Orders">
+                  {todaySources.orders.map((s) => (
+                    <option key={s.token} value={s.token}>{s.label}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           )}
           <button
