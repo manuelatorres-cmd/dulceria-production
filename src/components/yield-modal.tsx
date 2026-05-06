@@ -62,8 +62,11 @@ export function YieldModal({ entries, mode = "batch", onConfirm, onCancel, cance
     );
   }
 
-  function clamp(planProductId: string, max: number, value: number) {
-    return Math.max(0, Math.min(value, max));
+  function clamp(_planProductId: string, _max: number, value: number) {
+    // Floor at 0; the planned `max` is informational only — operators
+    // sometimes yield more pieces than planned (extra mould fills, large
+    // pours, etc.) and need to log the actual count.
+    return Math.max(0, value);
   }
 
   const totalIntact = localEntries.reduce((sum, e) => sum + e.yield, 0);
@@ -327,16 +330,15 @@ function YieldField({
           ref={inputRef ?? undefined}
           type="number"
           min={0}
-          max={max}
           value={inputStrs[inputStrKey] ?? value}
           onChange={(e) => {
             setInputStrs((prev) => ({ ...prev, [inputStrKey]: e.target.value }));
           }}
           onBlur={(e) => {
             const val = parseInt(e.target.value, 10);
-            const clamped = isNaN(val)
-              ? value
-              : Math.max(0, Math.min(val, max));
+            // No upper cap — actual yield can exceed planned when an
+            // operator pours extra moulds or gets above-spec yield.
+            const clamped = isNaN(val) ? value : Math.max(0, val);
             onChange(clamped);
             setInputStrs((prev) => {
               const { [inputStrKey]: _removed, ...rest } = prev;
@@ -353,7 +355,7 @@ function YieldField({
         />
         <button
           type="button"
-          onClick={() => onChange(Math.min(max, value + 1))}
+          onClick={() => onChange(value + 1)}
           className="w-7 h-7 border border-border bg-card hover:border-foreground text-foreground"
           style={{ borderRadius: 2 }}
         >
