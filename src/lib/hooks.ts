@@ -9061,6 +9061,24 @@ export async function regenerateAllPlansAndSchedule(staticInputs: {
     async () => assertOk(await supabase.from("planStepStatus").select("*")) as PlanStepStatus[],
   );
 
+  // Pull every productionDay row that's already been closed and treat
+  // those dates as zero-capacity for the scheduler. Without this, regen
+  // happily back-fills work onto a "done" day, which surfaces as
+  // unfinished steps reappearing on today after Close.
+  const closedDays = assertOk(
+    await supabase
+      .from("productionDays")
+      .select("date")
+      .eq("status", "done"),
+  ) as Array<{ date: string }>;
+  const closedDayBlockers: EventCalendarEntry[] = closedDays.map((d) => ({
+    name: "Production day closed",
+    kind: "blocked" as const,
+    startDate: d.date,
+    endDate: d.date,
+  }));
+  const blockedWithClosed = [...staticInputs.blockedDays, ...closedDayBlockers];
+
   const { buildDailySchedule } = await import("@/lib/scheduler");
   const preview = await step("buildDailySchedule", async () =>
     buildDailySchedule({
@@ -9068,6 +9086,7 @@ export async function regenerateAllPlansAndSchedule(staticInputs: {
       products, moulds, planStepStatus,
       extraDeadlineByPlanId: campaignDeadlines,
       ...staticInputs,
+      blockedDays: blockedWithClosed,
     }),
   );
 
