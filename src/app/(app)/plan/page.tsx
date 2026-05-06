@@ -2362,6 +2362,9 @@ function ScheduledPanel({
                 <div className="flex flex-wrap gap-1">
                   {g.orders.map((s) => {
                     const checked = focusTokens.includes(s.token);
+                    const oid = s.token.slice("order:".length);
+                    const ord = orders.find((o) => o.id === oid);
+                    const ft = ord?.fulfillmentType;
                     return (
                       <button
                         key={s.token}
@@ -2373,10 +2376,13 @@ function ScheduledPanel({
                             ? "bg-foreground text-background border-foreground"
                             : "border-white/60 bg-white/55 hover:opacity-90 text-foreground")
                         }
-                        title={`Earliest day · ${s.earliestDate}`}
+                        title={`Earliest day · ${s.earliestDate}${ft ? ` · ${ft}` : ""}`}
                       >
                         <span>{checked ? "☑" : "☐"}</span>
                         <span className="truncate max-w-[150px]">{s.label}</span>
+                        {ft && (
+                          <span className="opacity-70 capitalize">{ft}</span>
+                        )}
                         <span className="opacity-60 tabular-nums">{s.batchCount}b</span>
                       </button>
                     );
