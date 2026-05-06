@@ -19,6 +19,8 @@ import {
   useStockMovements,
   useVariants,
   useAllVariantPackagings,
+  useVariantStockLocations,
+  usePackagingList,
 } from "@/lib/hooks";
 import { STOCK_LOCATION_SHORT_LABELS, STOCK_LOCATIONS, type StockLocation } from "@/types";
 import { TransferModal } from "@/components/transfer-modal";
@@ -108,7 +110,7 @@ function formatCountedAt(ts: number | undefined): string | null {
 }
 
 export default function StockPage() {
-  const [activeTab, setActiveTab] = useState<"products" | "fillings" | "movements">("products");
+  const [activeTab, setActiveTab] = useState<"products" | "boxes" | "fillings" | "movements">("products");
 
   return (
     <div>
@@ -117,7 +119,7 @@ export default function StockPage() {
       {/* Tab strip + adjust link */}
       <div className="px-4 pb-3 flex items-center gap-2">
         <div className="flex gap-1">
-          {(["products", "fillings", "movements"] as const).map((tab) => (
+          {(["products", "boxes", "fillings", "movements"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -127,7 +129,7 @@ export default function StockPage() {
                   : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab === "products" ? "Products" : tab === "fillings" ? "Fillings" : "Movements"}
+              {tab === "products" ? "Products" : tab === "boxes" ? "Boxes" : tab === "fillings" ? "Fillings" : "Movements"}
             </button>
           ))}
         </div>
@@ -142,11 +144,129 @@ export default function StockPage() {
 
       {activeTab === "products" ? (
         <ProductStockTab />
+      ) : activeTab === "boxes" ? (
+        <BoxStockTab />
       ) : activeTab === "fillings" ? (
         <FillingStockTab />
       ) : (
         <MovementsTab />
       )}
+    </div>
+  );
+}
+
+// ─── Box Stock Tab ─────────────────────────────────────────────────────────
+//
+// Boxes (variantPackagings) live in the `variantStockLocations` table —
+// /picking creates rows there as the operator boxes pieces up. The other
+// tabs key on planProductId, so this tab is its own panel keyed on
+// variantPackagingId. Allocated rows show their orderId so the operator
+// can see which buyer the box is reserved for.
+
+function BoxStockTab() {
+  const rows = useVariantStockLocations();
+  const variants = useVariants();
+  const vps = useAllVariantPackagings();
+  const orders = useOrders();
+  const packagings = usePackagingList();
+
+  const variantById = useMemo(() => new Map(variants.map((v) => [v.id!, v])), [variants]);
+  const vpById = useMemo(() => new Map(vps.map((v) => [v.id!, v])), [vps]);
+  const orderById = useMemo(() => new Map(orders.map((o) => [o.id!, o])), [orders]);
+  const packagingById = useMemo(() => new Map(packagings.map((p) => [p.id!, p])), [packagings]);
+
+  type GroupRow = {
+    key: string;
+    variantName: string;
+    sizeLabel: string;
+    location: StockLocation;
+    quantity: number;
+    orderRef?: string;
+  };
+  const grouped = useMemo<GroupRow[]>(() => {
+    const out: GroupRow[] = [];
+    for (const r of rows) {
+      if ((r.quantity ?? 0) <= 0) continue;
+      const vp = vpById.get(r.variantPackagingId);
+      if (!vp) continue;
+      const variant = variantById.get(vp.variantId);
+      if (!variant) continue;
+      const sizeLabel = vp.packagingId
+        ? packagingById.get(vp.packagingId)?.name ?? `vp ${vp.id?.slice(0, 4)}`
+        : "loose";
+      let orderRef: string | undefined;
+      if (r.location === "allocated" && r.orderId) {
+        const o = orderById.get(r.orderId);
+        if (o) orderRef = o.sourceRef ?? o.customerName ?? o.eventName ?? r.orderId.slice(0, 6);
+      }
+      out.push({
+        key: `${r.id}`,
+        variantName: variant.name,
+        sizeLabel,
+        location: r.location as StockLocation,
+        quantity: r.quantity,
+        orderRef,
+      });
+    }
+    out.sort((a, b) => {
+      const cmp = a.variantName.localeCompare(b.variantName);
+      if (cmp !== 0) return cmp;
+      if (a.location !== b.location) return a.location.localeCompare(b.location);
+      return (a.orderRef ?? "").localeCompare(b.orderRef ?? "");
+    });
+    return out;
+  }, [rows, vpById, variantById, orderById, packagingById]);
+
+  const totalBoxes = grouped.reduce((s, r) => s + r.quantity, 0);
+  const sellable = grouped
+    .filter((r) => r.location !== "allocated")
+    .reduce((s, r) => s + r.quantity, 0);
+  const allocated = grouped
+    .filter((r) => r.location === "allocated")
+    .reduce((s, r) => s + r.quantity, 0);
+
+  if (grouped.length === 0) {
+    return (
+      <div className="px-4">
+        <p className="text-sm text-muted-foreground py-6 text-center">
+          No boxes on hand. Build some via /picking.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 space-y-3">
+      <div className="flex flex-wrap gap-2 text-xs">
+        <span className="rounded-full border border-border bg-card px-2.5 py-1">
+          Total · <span className="tabular-nums font-medium">{totalBoxes}</span>
+        </span>
+        <span className="rounded-full border border-status-ok-edge bg-status-ok-bg/30 px-2.5 py-1 text-status-ok">
+          Sellable · <span className="tabular-nums font-medium">{sellable}</span>
+        </span>
+        <span className="rounded-full border border-status-warn-edge bg-status-warn-bg/30 px-2.5 py-1 text-status-warn">
+          Allocated · <span className="tabular-nums font-medium">{allocated}</span>
+        </span>
+      </div>
+      <ul className="rounded-sm border border-border bg-card divide-y divide-border">
+        {grouped.map((r) => (
+          <li key={r.key} className="px-3 py-2 flex items-center gap-2 text-sm">
+            <span className="font-medium truncate flex-1">{r.variantName}</span>
+            <span className="text-xs text-muted-foreground">{r.sizeLabel}</span>
+            <span className={`text-[10.5px] rounded-full border px-1.5 py-[1px] capitalize ${
+              r.location === "allocated"
+                ? "border-status-warn-edge bg-status-warn-bg/30 text-status-warn"
+                : "border-border bg-card/70 text-muted-foreground"
+            }`}>
+              {r.location}
+            </span>
+            {r.orderRef && (
+              <span className="text-[10.5px] text-muted-foreground">→ {r.orderRef}</span>
+            )}
+            <span className="tabular-nums font-medium w-8 text-right">{r.quantity}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
