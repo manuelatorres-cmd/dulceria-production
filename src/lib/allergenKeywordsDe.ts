@@ -87,6 +87,18 @@ const DE_ALLERGEN_KEYWORDS: Record<string, string[]> = {
 };
 
 /**
+ * Cocoa butter is a purified fat with no milk protein and is NOT an EU LMIV
+ * Annex II allergen. Its name collides with the milk keyword "butter", so we
+ * strip it before substring matching to avoid a false-positive milk flag.
+ */
+function normalizeForAllergenMatch(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/kakaobutter/g, "")
+    .replace(/cocoa butter/g, "");
+}
+
+/**
  * Returns true when the German `name` plausibly contains the allergen with
  * the given ID. Case-insensitive substring match against a curated keyword
  * list. Unknown IDs return false (fail closed).
@@ -94,7 +106,7 @@ const DE_ALLERGEN_KEYWORDS: Record<string, string[]> = {
 export function nameMatchesAllergenDe(name: string, allergenId: string): boolean {
   const keywords = DE_ALLERGEN_KEYWORDS[allergenId];
   if (!keywords || keywords.length === 0) return false;
-  const lower = name.toLowerCase();
+  const lower = normalizeForAllergenMatch(name);
   return keywords.some((kw) => lower.includes(kw));
 }
 
@@ -107,7 +119,7 @@ export function nameMatchesAllergenDe(name: string, allergenId: string): boolean
  * almonds, and "Mandeln" always bolds even if the parent flag is missing.
  */
 export function containsAllergen(label: string): boolean {
-  const lower = label.toLowerCase();
+  const lower = normalizeForAllergenMatch(label);
   for (const keywords of Object.values(DE_ALLERGEN_KEYWORDS)) {
     for (const kw of keywords) {
       if (lower.includes(kw)) return true;
