@@ -5,6 +5,9 @@ import Link from "next/link";
 import {
   DndContext,
   PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  MouseSensor,
   useSensor,
   useSensors,
   useDraggable,
@@ -12,6 +15,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   DragOverlay,
+  pointerWithin,
 } from "@dnd-kit/core";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -45,10 +49,14 @@ export default function ProductionBrainPlannerPage() {
   const [dragging, setDragging] = useState<ReplenishmentProposal | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // Mix of sensors so the planner works on desktop + touch + keyboard.
+  // PointerSensor alone misses some touch devices; MouseSensor +
+  // TouchSensor pair covers both reliably.
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 4 },
-    }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
+    useSensor(KeyboardSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
   const productsById = useMemo(() => {
@@ -96,7 +104,14 @@ export default function ProductionBrainPlannerPage() {
     const proposalId = String(e.active.id);
     const overId = e.over?.id as string | undefined;
     setDragging(null);
-    if (!overId || !overId.startsWith("day-")) return;
+    if (!overId) {
+      setErr("Drop missed — release the proposal directly over a day cell.");
+      return;
+    }
+    if (!overId.startsWith("day-")) {
+      setErr(`Drop target "${overId}" isn't a day cell.`);
+      return;
+    }
     const targetDate = overId.slice(4);
     try {
       await scheduleProposalOnDay(proposalId, targetDate);
@@ -108,6 +123,7 @@ export default function ProductionBrainPlannerPage() {
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
