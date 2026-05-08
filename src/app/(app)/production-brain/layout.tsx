@@ -8,6 +8,7 @@ const TABS: { href: string; label: string }[] = [
   { href: "/production-brain/dashboard", label: "Dashboard" },
   { href: "/production-brain/daily", label: "Daily" },
   { href: "/production-brain/planner", label: "Planner" },
+  { href: "/production-brain/needed", label: "Needed" },
   { href: "/production-brain/equipment", label: "Equipment" },
   { href: "/production-brain/haccp", label: "HACCP" },
 ];
