@@ -19,6 +19,8 @@ import { queryClient } from "@/lib/query-client";
 import { RefreshCw, AlertTriangle, CheckCircle, Flame, Lock } from "lucide-react";
 import { BackButton } from "@/components/back-button";
 import { PlanTabs } from "@/components/plan-tabs";
+import { PlanHeader } from "@/components/production-plan/plan-header";
+import { FilterStrip } from "@/components/production-plan/filter-strip";
 import {
   DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors,
   closestCenter, pointerWithin,
@@ -413,6 +415,84 @@ export default function PlanPage() {
   const totalBatches = daySummary.reduce((s, d) => s + d.batchCount, 0);
   const tightDays = daySummary.filter((d) => d.level === "warn" || d.level === "critical" || d.level === "over").length;
 
+  // ── PlanHeader stats (Phase 1) ──────────────────────────────────
+  const planHeaderStats = useMemo(() => {
+    const totalPlannedMinutes = daySummary.reduce((s, d) => s + d.usedMinutes, 0);
+    const totalCapacityMinutes = daySummary.reduce((s, d) => s + d.availableMinutes, 0);
+    const sortedDates = daySummary.map((d) => d.day.date).sort();
+    const windowStart = sortedDates[0] ?? null;
+    const windowEnd = sortedDates[sortedDates.length - 1] ?? null;
+    const peak = daySummary.slice().sort((a, b) => b.batchCount - a.batchCount)[0];
+    return {
+      totalBatches,
+      daysCovered: daySummary.length,
+      windowStart,
+      windowEnd,
+      totalPlannedMinutes,
+      totalCapacityMinutes,
+      tightDays,
+      peakDay: peak
+        ? { date: peak.day.date, batches: peak.batchCount, capacityPct: peak.utilisationPercent }
+        : null,
+    };
+  }, [daySummary, totalBatches, tightDays]);
+
+  // ── FilterStrip source counts (Phase 1) ─────────────────────────
+  const filterStripCounts = useMemo(() => {
+    // Same window the ScheduledPanel uses (yesterday … +13 days).
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const ws = new Date(today);
+    ws.setDate(today.getDate() - 1);
+    const we = new Date(today);
+    we.setDate(today.getDate() + 13);
+    const fmt = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const wsIso = fmt(ws);
+    const weIso = fmt(we);
+    const dayInWindow = new Set<string>();
+    for (const d of productionDays) {
+      if (d.id && d.date >= wsIso && d.date <= weIso) dayInWindow.add(d.id);
+    }
+    const scheduledPlanIds = new Set<string>();
+    for (const li of lineItems) {
+      if (dayInWindow.has(li.productionDayId)) scheduledPlanIds.add(li.planId);
+    }
+    const campaignNames = new Set<string>();
+    const poNames = new Set<string>();
+    const orderIds = new Set<string>();
+    const itemById = new Map(orderItems.map((i) => [i.id!, i]));
+    for (const pid of scheduledPlanIds) {
+      const plan = plans.find((p) => p.id === pid);
+      if (!plan) continue;
+      const name = plan.name ?? "";
+      if (name.startsWith("Campaign: ")) {
+        const rest = name.slice("Campaign: ".length);
+        const dash = rest.indexOf(" — ");
+        campaignNames.add(dash > 0 ? rest.slice(0, dash) : rest);
+      } else if (name.startsWith("PO: ")) {
+        const rest = name.slice("PO: ".length);
+        const dash = rest.indexOf(" — ");
+        poNames.add(dash > 0 ? rest.slice(0, dash) : rest);
+      } else {
+        for (const link of orderPlanLinks) {
+          if (link.planId !== pid) continue;
+          const item = itemById.get(link.orderItemId);
+          if (item) orderIds.add(item.orderId);
+        }
+      }
+    }
+    const total = campaignNames.size + poNames.size + orderIds.size;
+    const visible = focusTokens.length > 0 ? focusTokens.length : total;
+    return {
+      visibleSourceCount: visible,
+      totalSourceCount: total,
+      orderCount: orderIds.size,
+      campaignCount: campaignNames.size,
+      poCount: poNames.size,
+    };
+  }, [plans, lineItems, productionDays, orderPlanLinks, orderItems, focusTokens]);
+
   const orderedSteps = useMemo(
     () => [...productionSteps].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
     [productionSteps],
@@ -444,118 +524,92 @@ export default function PlanPage() {
         <BackButton />
       </div>
       <PlanTabs focusParam={focusParam} />
-      {/* ─── Header row: title + summary pills + controls ─────────── */}
-      <div className="mb-4 flex flex-wrap items-baseline gap-3">
-        <h1
-          className="text-[26px] tracking-[-0.025em]"
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 400 }}
-        >
-          Production plan
-        </h1>
-        <span className="text-[12px] text-muted-foreground">
-          {totalBatches} batch{totalBatches === 1 ? "" : "es"} · {daySummary.length} day{daySummary.length === 1 ? "" : "s"}
-        </span>
-        {focusLabel && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#e3ebe6] text-[#2e4839] text-[11px] font-medium border border-[#c8d4cc]">
-            Focus: {focusLabel}
-            <button
-              type="button"
-              onClick={clearFocus}
-              className="opacity-60 hover:opacity-100 leading-none text-[14px]"
-              title="Clear focus filter"
+
+      <PlanHeader
+        stats={planHeaderStats}
+        view={viewMode}
+        onViewChange={setViewMode}
+        onRegenerate={handleRegenerate}
+        regenerating={regenerating}
+        configIncomplete={!configStatus.isComplete}
+        focusActiveChip={
+          focusLabel ? (
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-medium"
+              style={{
+                background: "var(--wp-draft-tint)",
+                color: "var(--wp-text-primary)",
+                border: "0.5px solid var(--wp-caramel)",
+                borderRadius: 14,
+              }}
             >
-              ×
-            </button>
-          </span>
-        )}
-        {/* Focus picker — scope the calendar to one source. */}
-        <select
-          value={focusParam ?? ""}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (!v) router.push(buildPlanUrl(null));
-            else router.push(buildPlanUrl(encodeURIComponent(v)));
-          }}
-          className="text-[11.5px] rounded-full border border-border bg-card px-2.5 py-1 hover:border-foreground"
-        >
-          <option value="">Focus on…</option>
-          {campaigns.length > 0 && (
-            <optgroup label="Campaigns">
-              {campaigns
-                .filter((c) => c.status !== "done" && c.status !== "cancelled")
-                .map((c) => (
-                  <option key={c.id} value={`campaign:${c.name}`}>
-                    {c.name}
-                  </option>
-                ))}
-            </optgroup>
-          )}
-          {productionOrders.length > 0 && (
-            <optgroup label="Production orders">
-              {productionOrders
-                .filter((po) => po.status !== "done" && po.status !== "cancelled")
-                .map((po) => (
-                  <option key={po.id} value={`po:${po.name ?? po.dueDate}`}>
-                    {po.name ?? po.dueDate}
-                  </option>
-                ))}
-            </optgroup>
-          )}
-          {orders.length > 0 && (
-            <optgroup label="Orders">
-              {orders
-                .filter((o) => o.status === "pending" || o.status === "in_production")
-                .slice(0, 50)
-                .map((o) => (
-                  <option key={o.id} value={`order:${o.id}`}>
-                    {o.sourceRef ? `${o.sourceRef} · ` : ""}{o.customerName || o.eventName || "(unnamed)"}
-                  </option>
-                ))}
-            </optgroup>
-          )}
-        </select>
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
-          {tightDays > 0 && (
-            <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${LEVEL_PILL.warn}`}>
-              {tightDays} tight day{tightDays === 1 ? "" : "s"}
-            </span>
-          )}
-          {/* View toggle */}
-          <div className="inline-flex items-center rounded-full border border-border bg-card overflow-hidden text-[11px]">
-            {(["day", "week", "pivot", "month"] as const).map((m) => (
+              Focus: {focusLabel}
               <button
-                key={m}
-                onClick={() => setViewMode(m)}
-                className={
-                  "px-3 py-1 transition-colors " +
-                  (viewMode === m
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:text-foreground")
-                }
+                type="button"
+                onClick={clearFocus}
+                className="opacity-60 hover:opacity-100 leading-none text-[14px]"
+                title="Clear focus filter"
               >
-                {m === "day" ? "Day" : m === "week" ? "Week" : m === "pivot" ? "Pivot" : "Month"}
+                ×
               </button>
-            ))}
-          </div>
-          <Link
-            href="/plan/fillings"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[11px] text-foreground hover:border-foreground/30 transition-colors"
+            </span>
+          ) : null
+        }
+        focusSlot={
+          <select
+            value={focusParam ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) router.push(buildPlanUrl(null));
+              else router.push(buildPlanUrl(encodeURIComponent(v)));
+            }}
+            className="text-[11.5px] px-2.5 py-1"
+            style={{
+              border: "0.5px solid var(--wp-border-warm)",
+              background: "var(--wp-card-bg)",
+              color: "var(--wp-text-primary)",
+              borderRadius: 14,
+            }}
           >
-            <Flame className="w-3 h-3" /> Filling cooking list
-          </Link>
-          <div className="flex flex-col items-end">
-            <button
-              onClick={handleRegenerate}
-              disabled={regenerating || !configStatus.isComplete}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1 text-[11px] font-medium disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3 h-3 ${regenerating ? "animate-spin" : ""}`} />
-              {regenerating ? "Regenerating…" : "Regenerate plan"}
-            </button>
-            <LastRegenLine />
-          </div>
-        </div>
-      </div>
+            <option value="">Focus on…</option>
+            {campaigns.length > 0 && (
+              <optgroup label="Campaigns">
+                {campaigns
+                  .filter((c) => c.status !== "done" && c.status !== "cancelled")
+                  .map((c) => (
+                    <option key={c.id} value={`campaign:${c.name}`}>
+                      {c.name}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+            {productionOrders.length > 0 && (
+              <optgroup label="Production orders">
+                {productionOrders
+                  .filter((po) => po.status !== "done" && po.status !== "cancelled")
+                  .map((po) => (
+                    <option key={po.id} value={`po:${po.name ?? po.dueDate}`}>
+                      {po.name ?? po.dueDate}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+            {orders.length > 0 && (
+              <optgroup label="Orders">
+                {orders
+                  .filter((o) => o.status === "pending" || o.status === "in_production")
+                  .slice(0, 50)
+                  .map((o) => (
+                    <option key={o.id} value={`order:${o.id}`}>
+                      {o.sourceRef ? `${o.sourceRef} · ` : ""}{o.customerName || o.eventName || "(unnamed)"}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+          </select>
+        }
+        lastRegenSlot={<LastRegenLine />}
+      />
 
       {/* ─── Stale open production day(s) ─────────────────────────── */}
       {staleOpenDays.length > 0 && (
@@ -630,17 +684,23 @@ export default function PlanPage() {
         orderPlanLinks={orderPlanLinks}
       />
 
-      {/* ─── Scheduled · 14 days — multi-select source filter. ────── */}
-      <ScheduledPanel
-        plans={plans}
-        lineItems={lineItems}
-        productionDays={productionDays}
-        orders={orders}
-        orderItems={orderItems}
-        orderPlanLinks={orderPlanLinks}
-        focusTokens={focusTokens}
-        toggleFocusToken={toggleFocusToken}
-      />
+      {/* ─── Scheduled · 14 days — collapsible filter strip (Phase 1). */}
+      <FilterStrip
+        counts={filterStripCounts}
+        hasActiveFilter={focusTokens.length > 0}
+        onResetFilter={clearFocus}
+      >
+        <ScheduledPanel
+          plans={plans}
+          lineItems={lineItems}
+          productionDays={productionDays}
+          orders={orders}
+          orderItems={orderItems}
+          orderPlanLinks={orderPlanLinks}
+          focusTokens={focusTokens}
+          toggleFocusToken={toggleFocusToken}
+        />
+      </FilterStrip>
 
       {/* ─── Calendar — one card per scheduled day ───────────────── */}
       {daySummary.length === 0 ? (

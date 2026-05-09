@@ -161,6 +161,28 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* Weekly production plan v2 — scoped warm-cream theme per
+   docs/WEEKLY_PLAN_REDESIGN_SPEC.md. Same palette + naming convention
+   as .manual-planner-v2 below; kept under its own class so the rest of
+   /plan can adopt it incrementally without bleed. */
+.weekly-plan-v2 {
+  --wp-page-bg: #fbf6f1;
+  --wp-card-bg: #ffffff;
+  --wp-border-warm: #e8e3d6;
+  --wp-text-primary: #2c2515;
+  --wp-text-muted: #8a7e64;
+  --wp-caramel: #dab73f;
+  --wp-teal: #264443;
+  --wp-blush: #fbccb9;
+  --wp-rose: #993556;
+  --wp-mint: #5dcaa5;
+  --wp-hover-bg: #f5f0e3;
+  --wp-today-tint: #fdf6e8;
+  --wp-closed-bg: #f3eee2;
+  --wp-draft-tint: #fff7e9;
+  --wp-conflict-tint: #fbe6e3;
+}
+
 /* Manual planner v2 — scoped warm-cream theme per docs/MANUAL_PLANNER_V2_SPEC.md.
    Tokens live under .manual-planner-v2 so they never bleed into other pages. */
 .manual-planner-v2 {
