@@ -50,6 +50,11 @@ import { saveDraftToPlan } from "@/lib/manual-planner/save-draft-to-plan";
 
 import { DemandPicker } from "@/components/manual-planner/demand-picker/demand-picker";
 import { DraftBar } from "@/components/manual-planner/draft-bar/draft-bar";
+import {
+  FillMouldModal,
+  type FillMouldChoice,
+  type PoFillOption,
+} from "@/components/manual-planner/draft-bar/fill-mould-modal";
 import { WeekGrid } from "@/components/manual-planner/week-grid/week-grid";
 import type { DayLineItemView } from "@/components/manual-planner/week-grid/day-column";
 import { BackButton } from "@/components/back-button";
@@ -172,6 +177,10 @@ export default function ManualPlannerPage() {
 
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendingFillMould, setPendingFillMould] = useState<{
+    availablePos: PoFillOption[];
+    currentStock: number;
+  } | null>(null);
 
   function setDraft(updater: DraftBatch | null | ((cur: DraftBatch | null) => DraftBatch | null)) {
     if (typeof updater === "function") {
@@ -383,17 +392,15 @@ export default function ManualPlannerPage() {
     setDraft((cur) => (cur ? { ...cur, name } : cur));
   }
 
-  async function handleSaveDraft() {
-    if (!draft) return;
+  async function commitDraftToDb(toSave: DraftBatch) {
     setSaving(true);
     setSaveErr(null);
     try {
-      const result = await saveDraftToPlan(draft);
+      const result = await saveDraftToPlan(toSave);
       if (result.warnings.length > 0) {
         setSaveErr(`Saved with warnings: ${result.warnings.join("; ")}`);
       }
       setDraft(null);
-      // Force refetch of demand-related queries so the picker updates.
       queryClient.invalidateQueries({ queryKey: ["production-plans"] });
       queryClient.invalidateQueries({ queryKey: ["plan-products"] });
       queryClient.invalidateQueries({ queryKey: ["orderPlanLinks"] });
@@ -402,6 +409,73 @@ export default function ManualPlannerPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleSaveDraft() {
+    if (!draft) return;
+    // Modal trigger: surplus pieces with no destination chosen + at least one
+    // allocation. Skip the modal when surplus is 0 (perfect fit) or when the
+    // user has already chosen a destination via a smart suggestion.
+    const allocatedPo = new Map<string, number>();
+    for (const a of draft.allocations) {
+      if (a.source === "po") allocatedPo.set(a.parentId, a.qty);
+    }
+    if (draft.surplus > 0 && draft.surplusDestination == null && draft.allocations.length > 0) {
+      const productDemand = productDemands.find((p) => p.productId === draft.productId);
+      const availablePos: PoFillOption[] = [];
+      for (const po of productDemand?.poItems ?? []) {
+        const alreadyTaken = allocatedPo.get(po.poItemId) ?? 0;
+        const remaining = Math.max(0, po.remaining - alreadyTaken);
+        if (remaining <= 0) continue;
+        availablePos.push({
+          poItemId: po.poItemId,
+          poName: po.poName,
+          remaining,
+          originalQty: po.originalQty,
+        });
+      }
+      setPendingFillMould({
+        availablePos,
+        currentStock: stockByProduct.get(draft.productId) ?? 0,
+      });
+      return;
+    }
+    void commitDraftToDb(draft);
+  }
+
+  function handleFillMouldChoice(choice: FillMouldChoice) {
+    if (!draft) {
+      setPendingFillMould(null);
+      return;
+    }
+    let next: DraftBatch = { ...draft, surplusDestination: choice.surplusDestination };
+    if (choice.surplusDestination === "po-fill" && choice.poFillPick) {
+      const allocations = [...next.allocations];
+      const idx = allocations.findIndex(
+        (a) => a.source === "po" && a.parentId === choice.poFillPick!.poItemId,
+      );
+      const alloc: DraftAllocation = {
+        source: "po",
+        parentId: choice.poFillPick.poItemId,
+        qty:
+          (idx >= 0 ? allocations[idx].qty : 0) + choice.poFillPick.qty,
+        label: choice.poFillPick.poName,
+        dueDate: idx >= 0 ? allocations[idx].dueDate : null,
+      };
+      if (idx >= 0) allocations[idx] = alloc;
+      else allocations.push(alloc);
+      next = recomputeBatchTotals({ ...next, allocations });
+      // After absorbing surplus into a PO line, the surplus number shifts.
+      // Keep destination so saveDraftToPlan stores the intent on the plan.
+      next.surplusDestination = "po-fill";
+    }
+    setDraft(next);
+    setPendingFillMould(null);
+    void commitDraftToDb(next);
+  }
+
+  function handleFillMouldCancel() {
+    setPendingFillMould(null);
   }
 
   // ─── Picker highlight sets ────────────────────────────────────────
@@ -721,6 +795,16 @@ export default function ManualPlannerPage() {
             />
           </div>
         </div>
+
+        {pendingFillMould && draft && (
+          <FillMouldModal
+            draft={draft}
+            availablePos={pendingFillMould.availablePos}
+            currentStock={pendingFillMould.currentStock}
+            onCancel={handleFillMouldCancel}
+            onConfirm={handleFillMouldChoice}
+          />
+        )}
       </div>
     </DndContext>
   );
