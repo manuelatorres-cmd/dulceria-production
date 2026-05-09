@@ -606,20 +606,81 @@ export default function ManualPlannerPage() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div>
+      <div className="manual-planner-v2 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4">
         <div className="mb-2">
           <BackButton />
         </div>
-        <div className="flex items-baseline gap-3 mb-4 flex-wrap">
-          <h1
-            className="text-3xl"
-            style={{ fontFamily: "var(--font-serif)", fontWeight: 400, letterSpacing: "-0.02em" }}
-          >
-            Manual planner
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Compose batches by hand from open demand. Saved batches pin to a day; the auto-planner will respect them.
-          </p>
+
+        {/* Header — title + subtitle + week nav */}
+        <div className="flex items-start justify-between gap-3 mb-5 flex-wrap">
+          <div>
+            <h1
+              className="text-3xl"
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontWeight: 600,
+                letterSpacing: "-0.02em",
+                color: "var(--mp-text-primary)",
+              }}
+            >
+              Manual planner
+            </h1>
+            <p
+              className="text-[13px] italic mt-0.5"
+              style={{ color: "var(--mp-text-muted)" }}
+            >
+              Select demand · build a draft batch · drop on a day · save as production order.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const next = new Date(weekAnchor);
+                next.setDate(next.getDate() - 7);
+                setWeekAnchor(next);
+              }}
+              className="px-3 py-1.5 text-[13px] hover:bg-[color:var(--mp-hover-bg)]"
+              style={{
+                border: "0.5px solid var(--mp-border-warm)",
+                background: "var(--mp-card-bg)",
+                color: "var(--mp-text-primary)",
+                borderRadius: 4,
+              }}
+            >
+              ← prev week
+            </button>
+            <button
+              type="button"
+              onClick={() => setWeekAnchor(new Date())}
+              className="px-3 py-1.5 text-[13px] hover:bg-[color:var(--mp-hover-bg)]"
+              style={{
+                border: "0.5px solid var(--mp-border-warm)",
+                background: "var(--mp-card-bg)",
+                color: "var(--mp-text-primary)",
+                borderRadius: 4,
+              }}
+            >
+              today
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const next = new Date(weekAnchor);
+                next.setDate(next.getDate() + 7);
+                setWeekAnchor(next);
+              }}
+              className="px-3 py-1.5 text-[13px] hover:bg-[color:var(--mp-hover-bg)]"
+              style={{
+                border: "0.5px solid var(--mp-border-warm)",
+                background: "var(--mp-card-bg)",
+                color: "var(--mp-text-primary)",
+                borderRadius: 4,
+              }}
+            >
+              next week →
+            </button>
+          </div>
         </div>
 
         {saveErr ? (
@@ -639,9 +700,10 @@ export default function ManualPlannerPage() {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr,360px] gap-4">
-          {/* ─── Left: Demand panel + Week grid ───────────────────── */}
-          <div className="space-y-4">
+        {/* 3-zone grid: 380px demand picker · 1fr right column (draft bar + week grid) */}
+        <div className="grid grid-cols-1 lg:grid-cols-[380px,1fr] gap-6">
+          {/* LEFT — demand picker (Phase 2 will swap inner UI; Phase 1 keeps existing) */}
+          <div>
             <DemandPanel
               aggByProduct={aggByProduct}
               productById={productById}
@@ -650,6 +712,24 @@ export default function ManualPlannerPage() {
               hasComposer={!!composer}
               onStartBatch={startNewBatch}
             />
+          </div>
+
+          {/* RIGHT — draft bar (top) + week grid (main) */}
+          <div className="space-y-4 min-w-0">
+            <ComposerCard
+              composer={composer}
+              productById={productById}
+              mouldById={mouldById}
+              onName={setComposerName}
+              onDate={setComposerDate}
+              onCount={setItemMouldCount}
+              onRemoveItem={removeItem}
+              onSave={saveComposer}
+              onSaveDraft={persistComposerAsDraft}
+              onDiscard={() => setComposer(null)}
+              saving={saving}
+            />
+            <DraftsList drafts={drafts} productById={productById} onLoad={loadDraftIntoComposer} onDelete={deleteDraft} />
 
             <WeekGrid
               weeks={weeks}
@@ -666,25 +746,6 @@ export default function ManualPlannerPage() {
               hasComposer={!!composer}
             />
           </div>
-
-          {/* ─── Right: Batch composer + drafts ──────────────────── */}
-          <aside className="space-y-3">
-            <ComposerCard
-              composer={composer}
-              productById={productById}
-              mouldById={mouldById}
-              onName={setComposerName}
-              onDate={setComposerDate}
-              onCount={setItemMouldCount}
-              onRemoveItem={removeItem}
-              onSave={saveComposer}
-              onSaveDraft={persistComposerAsDraft}
-              onDiscard={() => setComposer(null)}
-              saving={saving}
-            />
-
-            <DraftsList drafts={drafts} productById={productById} onLoad={loadDraftIntoComposer} onDelete={deleteDraft} />
-          </aside>
         </div>
       </div>
 

@@ -161,6 +161,28 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* Manual planner v2 — scoped warm-cream theme per docs/MANUAL_PLANNER_V2_SPEC.md.
+   Tokens live under .manual-planner-v2 so they never bleed into other pages. */
+.manual-planner-v2 {
+  --mp-page-bg: #fbf6f1;
+  --mp-card-bg: #ffffff;
+  --mp-border-warm: #e8e3d6;
+  --mp-text-primary: #2c2515;
+  --mp-text-muted: #8a7e64;
+  --mp-caramel: #dab73f;
+  --mp-teal: #264443;
+  --mp-blush: #fbccb9;
+  --mp-rose: #993556;
+  --mp-mint: #5dcaa5;
+  --mp-hover-bg: #f5f0e3;
+  --mp-today-tint: #fdf6e8;
+  --mp-closed-tint: #ebe8df;
+  --mp-draft-tint: #fff7e9;
+  --mp-draft-border: #dab73f;
+  background: var(--mp-page-bg);
+  color: var(--mp-text-primary);
+}
+
 @layer utilities {
   /* Standardised form input — use on <input>, <select>, <textarea>. */
   .input {
