@@ -1,8 +1,14 @@
 "use client";
 
+import { useMemo } from "react";
 import type { ProductDemand } from "@/lib/manual-planner/aggregate-demand";
+import {
+  generateSuggestions,
+  type SmartSuggestion,
+} from "@/lib/manual-planner/smart-suggestions";
 import { OrderLine } from "./order-line";
 import { PoLine } from "./po-line";
+import { SmartSuggestionRow } from "./smart-suggestion";
 
 export function OrdersExpanded({
   product,
@@ -10,13 +16,16 @@ export function OrdersExpanded({
   draftPoItemIds,
   onPickOrderLine,
   onPickPoLine,
+  onAcceptSuggestion,
 }: {
   product: ProductDemand;
   draftOrderItemIds: Set<string>;
   draftPoItemIds: Set<string>;
   onPickOrderLine: (args: { orderItemId: string; productId: string; qty: number; customerName: string }) => void;
   onPickPoLine: (args: { poItemId: string; productId: string; qty: number; poName: string }) => void;
+  onAcceptSuggestion: (productId: string, suggestion: SmartSuggestion) => void;
 }) {
+  const suggestions = useMemo(() => generateSuggestions(product), [product]);
   return (
     <div
       style={{
@@ -32,6 +41,14 @@ export function OrdersExpanded({
           No open orders or POs for this product.
         </p>
       )}
+
+      {suggestions.map((s) => (
+        <SmartSuggestionRow
+          key={`${s.type}:${s.totalPieces}`}
+          suggestion={s}
+          onAccept={(sug) => onAcceptSuggestion(product.productId, sug)}
+        />
+      ))}
 
       {product.orderItems.length > 0 && (
         <SectionHeader

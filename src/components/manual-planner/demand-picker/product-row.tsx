@@ -1,6 +1,7 @@
 "use client";
 
 import type { ProductDemand } from "@/lib/manual-planner/aggregate-demand";
+import type { SmartSuggestion } from "@/lib/manual-planner/smart-suggestions";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { OrdersExpanded } from "./orders-expanded";
 
@@ -13,6 +14,7 @@ export function ProductRow({
   draftPoItemIds,
   onPickOrderLine,
   onPickPoLine,
+  onAcceptSuggestion,
 }: {
   product: ProductDemand;
   expanded: boolean;
@@ -22,6 +24,7 @@ export function ProductRow({
   draftPoItemIds: Set<string>;
   onPickOrderLine: (args: { orderItemId: string; productId: string; qty: number; customerName: string }) => void;
   onPickPoLine: (args: { poItemId: string; productId: string; qty: number; poName: string }) => void;
+  onAcceptSuggestion: (productId: string, suggestion: SmartSuggestion) => void;
 }) {
   // Determine left border color based on visual state.
   let leftBorder = "transparent";
@@ -154,6 +157,7 @@ export function ProductRow({
           draftPoItemIds={draftPoItemIds}
           onPickOrderLine={onPickOrderLine}
           onPickPoLine={onPickPoLine}
+          onAcceptSuggestion={onAcceptSuggestion}
         />
       )}
     </div>

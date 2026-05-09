@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ProductDemand } from "@/lib/manual-planner/aggregate-demand";
+import type { SmartSuggestion } from "@/lib/manual-planner/smart-suggestions";
 import { CategoryGroup } from "./category-group";
 import { FilterRow, type DemandFilter } from "./filter-row";
 import { ProductRow } from "./product-row";
@@ -21,6 +22,7 @@ export function DemandPicker({
   draftPoItemIds,
   onPickOrderLine,
   onPickPoLine,
+  onAcceptSuggestion,
 }: {
   products: ProductDemand[];
   draftProductId: string | null;
@@ -28,6 +30,7 @@ export function DemandPicker({
   draftPoItemIds: Set<string>;
   onPickOrderLine: (args: { orderItemId: string; productId: string; qty: number; customerName: string }) => void;
   onPickPoLine: (args: { poItemId: string; productId: string; qty: number; poName: string }) => void;
+  onAcceptSuggestion: (productId: string, suggestion: SmartSuggestion) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -158,6 +161,7 @@ export function DemandPicker({
                   draftPoItemIds={draftPoItemIds}
                   onPickOrderLine={onPickOrderLine}
                   onPickPoLine={onPickPoLine}
+                  onAcceptSuggestion={onAcceptSuggestion}
                 />
               ))}
             </CategoryGroup>

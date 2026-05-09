@@ -35,6 +35,7 @@ import {
 } from "@/lib/hooks";
 import { queryClient } from "@/lib/query-client";
 import { aggregateDemandByProduct } from "@/lib/manual-planner/aggregate-demand";
+import type { SmartSuggestion } from "@/lib/manual-planner/smart-suggestions";
 import { computeBatchActiveMinutes } from "@/lib/manual-planner/compute-batch-time";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import {
@@ -298,6 +299,63 @@ export default function ManualPlannerPage() {
       } else {
         next.allocations.push(allocation);
       }
+      return recomputeBatchTotals(next);
+    });
+  }
+
+  function handleAcceptSuggestion(productId: string, suggestion: SmartSuggestion) {
+    const product = productById.get(productId);
+    const mouldId = product?.defaultMouldId;
+    const mould = mouldId ? mouldById.get(mouldId) : undefined;
+    if (!mouldId || !mould || !mould.numberOfCavities) {
+      setSaveErr(`No default mould set for ${product?.name ?? productId.slice(0, 8)}.`);
+      return;
+    }
+
+    setSaveErr(null);
+    setDraft((cur) => {
+      // Different product in draft → block. User cancels first.
+      if (cur && cur.productId !== productId) {
+        setSaveErr(
+          `Draft already has ${cur.productName}. Save or cancel it before accepting a suggestion for ${product?.name ?? "this product"}.`,
+        );
+        return cur;
+      }
+
+      const base =
+        cur ??
+        newDraft({
+          productId,
+          productName: product?.name ?? productId.slice(0, 8),
+          mouldId,
+          mouldName: mould.name,
+          numberOfCavities: mould.numberOfCavities,
+        });
+
+      // Merge picks into existing allocations (upsert by parentId+source).
+      const merged = [...base.allocations];
+      for (const p of suggestion.picks) {
+        const idx = merged.findIndex(
+          (a) => a.source === p.source && a.parentId === p.parentId,
+        );
+        const allocation: DraftAllocation = {
+          source: p.source,
+          parentId: p.parentId,
+          qty: p.qty,
+          label: p.label,
+          dueDate: p.dueDate,
+        };
+        if (idx >= 0) merged[idx] = allocation;
+        else merged.push(allocation);
+      }
+
+      const next: DraftBatch = {
+        ...base,
+        allocations: merged,
+        // Suggestion-driven surplus destination only if user hasn't already
+        // chosen one — never silently overwrite a manual choice.
+        surplusDestination: base.surplusDestination ?? suggestion.surplusDestination,
+      };
       return recomputeBatchTotals(next);
     });
   }
@@ -628,6 +686,7 @@ export default function ManualPlannerPage() {
               draftPoItemIds={draftPoItemIds}
               onPickOrderLine={handlePickOrderLine}
               onPickPoLine={handlePickPoLine}
+              onAcceptSuggestion={handleAcceptSuggestion}
             />
           </div>
 
