@@ -32,10 +32,14 @@ import {
   useMoulds,
   useAllPlanProducts,
   useProductionPlans,
+  useAllOrderPlanLinks,
+  useProductLocationTotals,
   saveProductionPlan,
   savePlanProduct,
   saveOrderPlanLink,
 } from "@/lib/hooks";
+import { aggregateDemandByProduct } from "@/lib/manual-planner/aggregate-demand";
+import { DemandPicker } from "@/components/manual-planner/demand-picker/demand-picker";
 import { newId } from "@/lib/supabase";
 import { ORDER_CHANNEL_LABELS } from "@/types";
 import type { Mould, Product } from "@/types";
@@ -175,6 +179,8 @@ export default function ManualPlannerPage() {
   const moulds = useMoulds(true);
   const planProducts = useAllPlanProducts();
   const productionPlans = useProductionPlans();
+  const orderPlanLinks = useAllOrderPlanLinks();
+  const productLocations = useProductLocationTotals();
 
   // Lookup maps
   const productById = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
@@ -197,144 +203,42 @@ export default function ManualPlannerPage() {
     return m;
   }, [variantComposition]);
 
-  // ─── Build all demand lines (A + B + D) ────────────────────────────
-  const demandLines: DemandLine[] = useMemo(() => {
-    const out: DemandLine[] = [];
-
-    // A — Customer orders (open)
-    const openOrderIds = new Set(
-      orders
-        .filter((o) => o.status === "pending" || o.status === "in_production" || o.status === "ready_to_pack")
-        .map((o) => o.id!),
-    );
-    // direct orderItems
-    for (const it of orderItems) {
-      if (!openOrderIds.has(it.orderId)) continue;
-      if (it.variantId) continue; // variant-derived → handled via orderVariantLines
-      const ord = orderById.get(it.orderId);
-      const label = ord
-        ? `Order ${ord.sourceRef ?? ""} ${ord.customerName ?? ord.eventName ?? ""}`.trim()
-        : `Order ${it.orderId.slice(0, 8)}`;
-      out.push({
-        sourceLineId: `oi:${it.id ?? it.orderId + ":" + it.productId}`,
-        source: "order",
-        productId: it.productId,
-        qty: it.quantity,
-        sourceLabel: label,
-        parentId: it.id ?? "",
-        dueDate: ord?.deadline ? ord.deadline.slice(0, 10) : null,
-      });
-    }
-    // variant lines → expand via composition into per-product lines
-    for (const vl of orderVariantLines) {
-      if (!openOrderIds.has(vl.orderId)) continue;
-      if (!vl.variantPackagingId) continue;
-      const ord = orderById.get(vl.orderId);
-      const variant = vpById.get(vl.variantPackagingId);
-      const variantName = variant ? variantById.get(variant.variantId)?.name : undefined;
-      const composition = compByVp.get(vl.variantPackagingId) ?? [];
-      for (const c of composition) {
-        out.push({
-          sourceLineId: `ovl:${vl.id ?? vl.orderId + ":" + vl.variantPackagingId}:${c.productId}`,
-          source: "order",
-          productId: c.productId,
-          qty: c.qty * vl.quantity,
-          sourceLabel: ord
-            ? `Order ${ord.sourceRef ?? ""} ${ord.customerName ?? ord.eventName ?? ""} · ${variantName ?? ""}×${vl.quantity}`.trim()
-            : `Order ${vl.orderId.slice(0, 8)} · ${variantName ?? ""}×${vl.quantity}`,
-          // Allocations against expanded variant lines aren't supported by OrderPlanLink (it keys
-          // on orderItemId, not variant lines). Mark parentId empty so we skip writing a link for these.
-          parentId: "",
-          dueDate: ord?.deadline ? ord.deadline.slice(0, 10) : null,
-        });
-      }
-    }
-
-    // B — Production Orders (POs)
-    const openPoIds = new Set(
-      productionOrders.filter((p) => p.status === "pending" || p.status === "in_production").map((p) => p.id!),
-    );
-    for (const it of productionOrderItems) {
-      if (!openPoIds.has(it.productionOrderId)) continue;
-      const po = poById.get(it.productionOrderId);
-      out.push({
-        sourceLineId: `poi:${it.id ?? it.productionOrderId + ":" + it.productId}`,
-        source: "po",
-        productId: it.productId,
-        qty: it.targetUnits,
-        sourceLabel: po ? `PO · ${po.name ?? po.channel}` : `PO ${it.productionOrderId.slice(0, 8)}`,
-        parentId: "", // no PO-plan link table — informational only
-        dueDate: po?.dueDate ? po.dueDate.slice(0, 10) : null,
-      });
-    }
-
-    // D — Subscription runs (planned + in-production)
-    for (const run of subscriptionRuns) {
-      if (run.status !== "planned" && run.status !== "in-production") continue;
-      const tpl = subTemplateById.get(run.templateId);
-      const totalPieces = (tpl?.pieceCount ?? 0) * (run.subscriberCount ?? 0);
-      const productIds = run.selectedProductIds ?? [];
-      if (totalPieces <= 0 || productIds.length === 0) continue;
-      const perProduct = Math.ceil(totalPieces / productIds.length);
-      for (const pid of productIds) {
-        out.push({
-          sourceLineId: `sub:${run.id}:${pid}`,
-          source: "subscription",
-          productId: pid,
-          qty: perProduct,
-          sourceLabel: tpl
-            ? `Sub · ${tpl.name} · ${run.scheduledShipDate}`
-            : `Sub · ${run.scheduledShipDate}`,
-          parentId: "",
-          dueDate: run.scheduledShipDate ? run.scheduledShipDate.slice(0, 10) : null,
-        });
-      }
-    }
-
-    return out;
-  }, [
-    orders,
-    orderItems,
-    orderVariantLines,
-    productionOrders,
-    productionOrderItems,
-    subscriptionRuns,
-    subTemplateById,
-    orderById,
-    poById,
-    vpById,
-    variantById,
-    compByVp,
-  ]);
-
-  // Aggregated per-product
-  const aggByProduct = useMemo(() => {
-    const m = new Map<
-      string,
-      { total: number; bySource: Record<DemandSource, number>; lines: DemandLine[] }
-    >();
-    for (const d of demandLines) {
-      const cur = m.get(d.productId) ?? {
-        total: 0,
-        bySource: { order: 0, po: 0, subscription: 0 } as Record<DemandSource, number>,
-        lines: [] as DemandLine[],
-      };
-      cur.total += d.qty;
-      cur.bySource[d.source] += d.qty;
-      cur.lines.push(d);
-      m.set(d.productId, cur);
-    }
-    // sort lines within each product by dueDate ascending (nulls last)
-    for (const v of m.values()) {
-      v.lines.sort((a, b) => {
-        if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
-        if (a.dueDate) return -1;
-        if (b.dueDate) return 1;
-        return 0;
-      });
+  // ─── v2 demand aggregation (DemandPicker) ───────────────────────────
+  const stockByProduct = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const [pid, locs] of productLocations.entries()) {
+      m.set(pid, (locs.store ?? 0) + (locs.production ?? 0) + (locs.freezer ?? 0));
     }
     return m;
-  }, [demandLines]);
+  }, [productLocations]);
+
+  const productDemands = useMemo(
+    () =>
+      aggregateDemandByProduct({
+        orders,
+        orderItems,
+        productionOrders,
+        productionOrderItems,
+        products,
+        moulds,
+        plans: productionPlans,
+        planProducts,
+        links: orderPlanLinks,
+        stockByProduct,
+      }),
+    [
+      orders,
+      orderItems,
+      productionOrders,
+      productionOrderItems,
+      products,
+      moulds,
+      productionPlans,
+      planProducts,
+      orderPlanLinks,
+      stockByProduct,
+    ],
+  );
 
   // Drafts (localStorage) + pinned plans (DB)
   const [drafts, setDrafts] = useState<DraftBatch[]>([]);
@@ -380,6 +284,94 @@ export default function ManualPlannerPage() {
   function deleteDraft(id: string) {
     setDrafts((d) => d.filter((x) => x.id !== id));
   }
+
+  // ─── v2 pick handlers (Phase 2 transitional wiring) ─────────────────
+  // Translates DemandPicker line clicks into the existing addItemFromLine
+  // call. Phase 3 will replace this with a direct draft-bar accumulation
+  // model that doesn't go through DemandLine.
+  function handlePickOrderLine({
+    orderItemId,
+    productId,
+    qty,
+    customerName,
+  }: {
+    orderItemId: string;
+    productId: string;
+    qty: number;
+    customerName: string;
+  }) {
+    const product = productById.get(productId);
+    const mouldId = product?.defaultMouldId;
+    const mould = mouldId ? mouldById.get(mouldId) : undefined;
+    if (!mouldId || !mould || !mould.numberOfCavities) {
+      setSaveErr(`No default mould set for ${product?.name ?? productId.slice(0, 8)}.`);
+      return;
+    }
+    const mouldCount = Math.max(1, Math.ceil(qty / mould.numberOfCavities));
+    const line: DemandLine = {
+      sourceLineId: `oi:${orderItemId}`,
+      source: "order",
+      productId,
+      qty,
+      sourceLabel: customerName,
+      parentId: orderItemId,
+      dueDate: null,
+    };
+    addItemFromLine(line, mouldId, mouldCount);
+  }
+
+  function handlePickPoLine({
+    poItemId,
+    productId,
+    qty,
+    poName,
+  }: {
+    poItemId: string;
+    productId: string;
+    qty: number;
+    poName: string;
+  }) {
+    const product = productById.get(productId);
+    const mouldId = product?.defaultMouldId;
+    const mould = mouldId ? mouldById.get(mouldId) : undefined;
+    if (!mouldId || !mould || !mould.numberOfCavities) {
+      setSaveErr(`No default mould set for ${product?.name ?? productId.slice(0, 8)}.`);
+      return;
+    }
+    const mouldCount = Math.max(1, Math.ceil(qty / mould.numberOfCavities));
+    // PO source — no OrderPlanLink-able parent, so parentId stays empty.
+    const line: DemandLine = {
+      sourceLineId: `poi:${poItemId}`,
+      source: "po",
+      productId,
+      qty,
+      sourceLabel: `PO · ${poName}`,
+      parentId: "",
+      dueDate: null,
+    };
+    addItemFromLine(line, mouldId, mouldCount);
+  }
+
+  // Sets used by DemandPicker to highlight rows already in draft.
+  const draftProductId = composer?.items[0]?.productId ?? null;
+  const draftOrderItemIds = useMemo(() => {
+    const s = new Set<string>();
+    if (!composer) return s;
+    for (const item of composer.items) {
+      for (const a of item.allocations) {
+        if (a.source === "order" && a.parentId) s.add(a.parentId);
+      }
+    }
+    return s;
+  }, [composer]);
+  const draftPoItemIds = useMemo(() => {
+    const s = new Set<string>();
+    // Phase 2 doesn't store PO allocations on composer items (PO has no
+    // link table), so this will populate in Phase 3 when the draft model
+    // tracks PO picks. For now the picker won't highlight PO lines as
+    // "in draft" — that's an honest gap.
+    return s;
+  }, []);
 
   // Adding item from a demand line
   function addItemFromLine(line: DemandLine, mouldId: string, mouldCount: number) {
@@ -702,15 +694,15 @@ export default function ManualPlannerPage() {
 
         {/* 3-zone grid: 380px demand picker · 1fr right column (draft bar + week grid) */}
         <div className="grid grid-cols-1 lg:grid-cols-[380px,1fr] gap-6">
-          {/* LEFT — demand picker (Phase 2 will swap inner UI; Phase 1 keeps existing) */}
+          {/* LEFT — DemandPicker v2 (Phase 2) */}
           <div>
-            <DemandPanel
-              aggByProduct={aggByProduct}
-              productById={productById}
-              moulds={moulds}
-              onAddToBatch={(line, mouldId, mouldCount) => addItemFromLine(line, mouldId, mouldCount)}
-              hasComposer={!!composer}
-              onStartBatch={startNewBatch}
+            <DemandPicker
+              products={productDemands}
+              draftProductId={draftProductId}
+              draftOrderItemIds={draftOrderItemIds}
+              draftPoItemIds={draftPoItemIds}
+              onPickOrderLine={handlePickOrderLine}
+              onPickPoLine={handlePickPoLine}
             />
           </div>
 
@@ -762,236 +754,6 @@ export default function ManualPlannerPage() {
         ) : null}
       </DragOverlay>
     </DndContext>
-  );
-}
-
-// ─── Demand panel ──────────────────────────────────────────────────
-
-function DemandPanel({
-  aggByProduct,
-  productById,
-  moulds,
-  onAddToBatch,
-  hasComposer,
-  onStartBatch,
-}: {
-  aggByProduct: Map<string, { total: number; bySource: Record<DemandSource, number>; lines: DemandLine[] }>;
-  productById: Map<string, Product>;
-  moulds: Mould[];
-  onAddToBatch: (line: DemandLine, mouldId: string, mouldCount: number) => void;
-  hasComposer: boolean;
-  onStartBatch: () => void;
-}) {
-  const sortedRows = useMemo(() => {
-    const rows = Array.from(aggByProduct.entries()).map(([productId, agg]) => ({
-      productId,
-      ...agg,
-      label: productById.get(productId)?.name ?? productId.slice(0, 8),
-    }));
-    rows.sort((a, b) => b.total - a.total);
-    return rows;
-  }, [aggByProduct, productById]);
-
-  return (
-    <section className="border border-border bg-card p-4" style={{ borderRadius: 4 }}>
-      <div className="flex items-baseline justify-between mb-3">
-        <h2
-          className="text-[10px] uppercase text-muted-foreground font-medium"
-          style={{ letterSpacing: "0.12em" }}
-        >
-          Total demand
-        </h2>
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] text-muted-foreground tabular-nums">
-            {sortedRows.length} products
-          </span>
-          {!hasComposer && (
-            <button
-              type="button"
-              onClick={onStartBatch}
-              className="text-[11px] inline-flex items-center gap-1 px-2 py-1 border border-border hover:border-foreground"
-              style={{ borderRadius: 3 }}
-            >
-              <Plus className="w-3 h-3" /> New batch
-            </button>
-          )}
-        </div>
-      </div>
-      {sortedRows.length === 0 ? (
-        <p
-          className="text-muted-foreground text-[12.5px] italic"
-          style={{ fontFamily: "var(--font-serif)" }}
-        >
-          No open demand from orders, POs, or subscriptions.
-        </p>
-      ) : (
-        <ul className="space-y-1">
-          {sortedRows.map((row) => (
-            <DemandRow
-              key={row.productId}
-              productId={row.productId}
-              label={row.label}
-              total={row.total}
-              bySource={row.bySource}
-              lines={row.lines}
-              moulds={moulds}
-              onAddToBatch={onAddToBatch}
-            />
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function DemandRow({
-  productId,
-  label,
-  total,
-  bySource,
-  lines,
-  moulds,
-  onAddToBatch,
-}: {
-  productId: string;
-  label: string;
-  total: number;
-  bySource: Record<DemandSource, number>;
-  lines: DemandLine[];
-  moulds: Mould[];
-  onAddToBatch: (line: DemandLine, mouldId: string, mouldCount: number) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <li className="border border-border" style={{ borderRadius: 3 }}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full text-left px-2 py-1.5 flex items-center gap-2 hover:bg-muted/40"
-      >
-        {open ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
-        <span className="flex-1 text-[13px] truncate">{label}</span>
-        <span className="text-[11px] tabular-nums font-semibold">{total} pcs</span>
-        <SourceBadges bySource={bySource} />
-      </button>
-      {open && (
-        <ul className="border-t border-border bg-muted/20">
-          {lines.map((line) => (
-            <DemandLineRow
-              key={line.sourceLineId}
-              productId={productId}
-              line={line}
-              moulds={moulds}
-              onAddToBatch={onAddToBatch}
-            />
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-function SourceBadges({ bySource }: { bySource: Record<DemandSource, number> }) {
-  const items: Array<[DemandSource, string]> = [
-    ["order", "Ord"],
-    ["po", "PO"],
-    ["subscription", "Sub"],
-  ];
-  return (
-    <div className="flex gap-1 shrink-0">
-      {items.map(([key, short]) => {
-        const v = bySource[key] ?? 0;
-        if (v <= 0) return null;
-        return (
-          <span
-            key={key}
-            className={
-              "text-[9px] uppercase px-1.5 py-0.5 tabular-nums " +
-              (key === "order"
-                ? "bg-accent-terracotta-bg text-accent-terracotta-ink"
-                : key === "po"
-                ? "bg-accent-mustard-bg text-accent-mustard-ink"
-                : "bg-accent-mauve-bg text-accent-mauve-ink")
-            }
-            style={{ borderRadius: 2, letterSpacing: "0.08em" }}
-            title={`${short} demand: ${v} pcs`}
-          >
-            {short} {v}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
-function DemandLineRow({
-  productId,
-  line,
-  moulds,
-  onAddToBatch,
-}: {
-  productId: string;
-  line: DemandLine;
-  moulds: Mould[];
-  onAddToBatch: (line: DemandLine, mouldId: string, mouldCount: number) => void;
-}) {
-  // Pick first mould as a friendly default; user can change in the picker.
-  const defaultMouldId = moulds[0]?.id ?? "";
-  const [mouldId, setMouldId] = useState<string>(defaultMouldId);
-  const [mouldCount, setMouldCount] = useState<number>(1);
-  const mould = moulds.find((m) => m.id === mouldId);
-  const cavities = mould?.numberOfCavities ?? 0;
-  const pieces = mouldCount * cavities;
-
-  return (
-    <li className="px-2 py-1.5 border-b border-border last:border-b-0">
-      <div className="flex items-baseline gap-2 mb-1">
-        <span className="text-[11px] flex-1 truncate text-muted-foreground">
-          {line.sourceLabel}
-          {line.dueDate && (
-            <span className="ml-1 text-[10px] opacity-70">
-              · due {new Date(line.dueDate).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
-            </span>
-          )}
-        </span>
-        <span className="text-[11px] tabular-nums font-medium">{line.qty} pcs</span>
-      </div>
-      <div className="flex items-center gap-1.5 text-[11px]">
-        <select
-          value={mouldId}
-          onChange={(e) => setMouldId(e.target.value)}
-          className="text-[11px] border border-border bg-card px-1 py-0.5 flex-1 min-w-0"
-          style={{ borderRadius: 2 }}
-        >
-          {moulds.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name} ({m.numberOfCavities} cav)
-            </option>
-          ))}
-        </select>
-        <input
-          type="number"
-          min={1}
-          value={mouldCount}
-          onChange={(e) => setMouldCount(Math.max(1, Number(e.target.value) || 1))}
-          className="w-14 text-[11px] border border-border bg-card px-1 py-0.5 tabular-nums"
-          style={{ borderRadius: 2 }}
-          aria-label="moulds"
-        />
-        <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
-          = {pieces} pcs
-        </span>
-        <button
-          type="button"
-          onClick={() => mouldId && onAddToBatch(line, mouldId, mouldCount)}
-          disabled={!mouldId || mouldCount <= 0}
-          className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase border border-foreground bg-foreground text-background hover:opacity-90 disabled:opacity-40"
-          style={{ borderRadius: 2, letterSpacing: "0.08em" }}
-        >
-          <Plus className="w-3 h-3" /> Add
-        </button>
-      </div>
-    </li>
   );
 }
 
