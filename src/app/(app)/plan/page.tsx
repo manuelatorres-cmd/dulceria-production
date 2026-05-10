@@ -21,7 +21,7 @@ import { BackButton } from "@/components/back-button";
 import { PlanTabs } from "@/components/plan-tabs";
 import { PlanHeader } from "@/components/production-plan/plan-header";
 import { FilterStrip } from "@/components/production-plan/filter-strip";
-import { WeekGrid as WeekGridV2 } from "@/components/production-plan/week-grid";
+import { PlanWeekV2 } from "@/components/production-plan/plan-week-v2";
 import {
   DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors,
   closestCenter, pointerWithin,
@@ -714,25 +714,22 @@ export default function PlanPage() {
           </p>
         </div>
       ) : viewMode === "week" ? (
-        <div className="weekly-plan-v2">
-          <WeekNav anchor={weekAnchor} onAnchorChange={setWeekAnchor} />
-          <WeekGridV2
-            anchor={weekAnchor}
-            productionDays={productionDays}
-            lineItems={visibleLineItems}
-            plans={plans}
-            planProducts={planProducts}
-            productionSteps={productionSteps}
-            products={products}
-            moulds={moulds}
-            capacityConfig={config}
-            people={people}
-            unavailability={unavailability}
-            blockedDays={blockedDays}
-            warnPercent={config?.warnThresholdPercent ?? 75}
-            criticalPercent={config?.criticalThresholdPercent ?? 90}
-          />
-        </div>
+        <PlanWeekV2
+          weekAnchor={weekAnchor}
+          setWeekAnchor={setWeekAnchor}
+          productionDays={productionDays}
+          lineItems={visibleLineItems}
+          plans={plans}
+          planProducts={planProducts}
+          productionSteps={productionSteps}
+          products={products}
+          moulds={moulds}
+          capacityConfig={config}
+          people={people}
+          unavailability={unavailability}
+          blockedDays={blockedDays}
+          weekNav={<WeekNav anchor={weekAnchor} onAnchorChange={setWeekAnchor} />}
+        />
       ) : viewMode === "pivot" ? (
         <PivotView
           plans={plans}

@@ -9,6 +9,10 @@ export type StepBlockDensity = "two-line" | "compact";
 export interface StepBlockEntry {
   /** Composite key — lineItemId + stepId. */
   key: string;
+  /** Plan id — used by phase 4 drag handlers. */
+  planId: string;
+  /** ISO yyyy-mm-dd of the day this entry currently lives on. */
+  sourceDate: string;
   /** May be null when stepId is missing from productionSteps. */
   step: ProductionStep | null;
   productName: string;

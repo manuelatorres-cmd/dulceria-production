@@ -168,9 +168,6 @@ export function WeekGrid(props: WeekGridInputs) {
         const step = stepById.get(stepId) ?? null;
         const passive =
           !!step && step.activeMinutes <= 0 && (step.waitingMinutes ?? 0) > 0;
-        // Passive steps annotate the gap to neighbouring lineItems of
-        // the same plan. Phase 4 replaces this with the absolute-overlay
-        // span bar (Approach 2).
         const spanInfo = passive
           ? {
               fromIso: dateIdx > 0 ? planDates[dateIdx - 1] : "",
@@ -180,6 +177,8 @@ export function WeekGrid(props: WeekGridInputs) {
         const arr = m.get(date) ?? [];
         arr.push({
           key: `${li.id ?? `${li.productionDayId}:${li.planId}`}:${stepId}`,
+          planId: li.planId,
+          sourceDate: date,
           step,
           productName: product?.name ?? "—",
           planName: plan.name ?? "Batch",
