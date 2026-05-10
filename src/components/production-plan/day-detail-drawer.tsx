@@ -161,6 +161,7 @@ export function DayDetailDrawer(props: DayDetailDrawerProps) {
     setWorking(true);
     try {
       await onMarkAsWorked(iso);
+      onClose();
     } finally {
       setWorking(false);
     }

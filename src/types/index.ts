@@ -1996,6 +1996,10 @@ export interface ProductionDayLineItem {
   stepIds: string[];
   plannedMinutes: number;
   sortOrder: number;
+  /** Set when the day's work has actually been performed; flipped by
+   *  the day-detail drawer's "Mark as worked" action so the auto-planner
+   *  treats it as historical. Migration 0087. */
+  actuallyWorked?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }

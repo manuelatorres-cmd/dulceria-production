@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircle } from "lucide-react";
 import { CapacityBar } from "./capacity-bar";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -8,6 +9,7 @@ export function DayHeader({
   iso,
   isToday,
   isClosed,
+  isWorked,
   usedMinutes,
   capacityMinutes,
   warnPercent,
@@ -16,6 +18,8 @@ export function DayHeader({
   iso: string;
   isToday: boolean;
   isClosed: boolean;
+  /** True when every line item on this day has actuallyWorked=true. */
+  isWorked?: boolean;
   usedMinutes: number;
   capacityMinutes: number;
   warnPercent: number;
@@ -38,21 +42,30 @@ export function DayHeader({
       }}
     >
       <div
-        className="text-[11px] uppercase"
+        className="text-[11px] uppercase flex items-center justify-between gap-1"
         style={{
           color: "var(--wp-text-muted)",
           letterSpacing: "0.06em",
           fontWeight: 600,
         }}
       >
-        {dayLabel}
-        {isToday && (
-          <span
-            className="ml-1 normal-case"
-            style={{ color: "var(--wp-rose)", fontWeight: 500, letterSpacing: 0 }}
-          >
-            · today
-          </span>
+        <span>
+          {dayLabel}
+          {isToday && (
+            <span
+              className="ml-1 normal-case"
+              style={{ color: "var(--wp-rose)", fontWeight: 500, letterSpacing: 0 }}
+            >
+              · today
+            </span>
+          )}
+        </span>
+        {isWorked && (
+          <CheckCircle
+            className="w-3.5 h-3.5"
+            style={{ color: "var(--wp-mint)" }}
+            aria-label="day worked"
+          />
         )}
       </div>
       <div

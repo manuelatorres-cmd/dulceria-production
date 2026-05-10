@@ -130,6 +130,25 @@ export function WeekGrid(props: WeekGridInputs) {
     return m;
   }, [weekDays, capacityConfig, people, unavailability, blockedDays, lineItems, dayDateById]);
 
+  // Per-day "all line items actually worked" — drives the green ✓ badge.
+  const workedByDate = useMemo(() => {
+    const totalByDate = new Map<string, number>();
+    const workedByDateAcc = new Map<string, number>();
+    for (const li of lineItems) {
+      const date = dayDateById.get(li.productionDayId);
+      if (!date) continue;
+      totalByDate.set(date, (totalByDate.get(date) ?? 0) + 1);
+      if (li.actuallyWorked) {
+        workedByDateAcc.set(date, (workedByDateAcc.get(date) ?? 0) + 1);
+      }
+    }
+    const m = new Map<string, boolean>();
+    for (const [date, total] of totalByDate) {
+      m.set(date, total > 0 && (workedByDateAcc.get(date) ?? 0) === total);
+    }
+    return m;
+  }, [lineItems, dayDateById]);
+
   // Sorted lineItem dates per plan — used to populate spanInfo on
   // passive steps so the StepBlock can render "→ Wed" / "from Mon"
   // annotations without recomputing per-render.
@@ -240,6 +259,7 @@ export function WeekGrid(props: WeekGridInputs) {
               iso={iso}
               isToday={iso === todayIso}
               isClosed={isClosed}
+              isWorked={workedByDate.get(iso) ?? false}
               usedMinutes={cap.used}
               capacityMinutes={cap.capacity}
               warnPercent={warnPercent}

@@ -22,6 +22,7 @@ export function DayColumn({
   iso,
   isToday,
   isClosed,
+  isWorked,
   usedMinutes,
   capacityMinutes,
   warnPercent,
@@ -35,6 +36,7 @@ export function DayColumn({
   iso: string;
   isToday: boolean;
   isClosed: boolean;
+  isWorked?: boolean;
   usedMinutes: number;
   capacityMinutes: number;
   warnPercent: number;
@@ -77,6 +79,7 @@ export function DayColumn({
           iso={iso}
           isToday={isToday}
           isClosed={isClosed}
+          isWorked={isWorked}
           usedMinutes={usedMinutes}
           capacityMinutes={capacityMinutes}
           warnPercent={warnPercent}

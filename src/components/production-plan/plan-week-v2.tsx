@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 import {
   DndContext,
   PointerSensor,
+  MouseSensor,
+  TouchSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
   useDraggable,
@@ -68,7 +71,14 @@ export function PlanWeekV2({
   onStepClick?: (entry: DayStepEntry) => void;
   weekNav?: React.ReactNode;
 }) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // PointerSensor alone misses some touch devices; mirror the planner's
+  // sensor stack so touch + mouse + keyboard all work on iPad.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
+    useSensor(KeyboardSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
   const [moveError, setMoveError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const warnPercent = capacityConfig?.warnThresholdPercent ?? 75;
