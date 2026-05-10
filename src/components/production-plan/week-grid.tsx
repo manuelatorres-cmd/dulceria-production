@@ -11,7 +11,7 @@ import type {
   ProductionStep,
 } from "@/types";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
-import { DayColumn, type DayStepEntry } from "./day-column";
+import { DayColumn, type DayStepEntry, type DayConflict } from "./day-column";
 
 function isoForOffset(start: Date, offset: number): string {
   const d = new Date(start);
@@ -43,6 +43,14 @@ export interface WeekGridInputs {
   blockedDays: Parameters<typeof effectiveDailyCapacityMinutes>[4];
   warnPercent: number;
   criticalPercent: number;
+  /** Phase 5 hooks the day header click into the day-detail drawer. */
+  onDayHeaderClick?: (iso: string) => void;
+  /** Phase 4/5 hooks step clicks into an edit drawer. */
+  onStepClick?: (entry: DayStepEntry) => void;
+  /** Phase 4 wraps each block with useDraggable. */
+  renderDraggable?: (entry: DayStepEntry, body: React.ReactNode) => React.ReactNode;
+  /** Phase 4 conflict detection result, keyed by ISO date. */
+  conflictsByDate?: Map<string, DayConflict[]>;
 }
 
 /**
@@ -69,6 +77,10 @@ export function WeekGrid(props: WeekGridInputs) {
     blockedDays,
     warnPercent,
     criticalPercent,
+    onDayHeaderClick,
+    onStepClick,
+    renderDraggable,
+    conflictsByDate,
   } = props;
 
   const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -118,6 +130,22 @@ export function WeekGrid(props: WeekGridInputs) {
     return m;
   }, [weekDays, capacityConfig, people, unavailability, blockedDays, lineItems, dayDateById]);
 
+  // Sorted lineItem dates per plan — used to populate spanInfo on
+  // passive steps so the StepBlock can render "→ Wed" / "from Mon"
+  // annotations without recomputing per-render.
+  const datesByPlan = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const li of lineItems) {
+      const date = dayDateById.get(li.productionDayId);
+      if (!date) continue;
+      const arr = m.get(li.planId) ?? [];
+      if (!arr.includes(date)) arr.push(date);
+      m.set(li.planId, arr);
+    }
+    for (const arr of m.values()) arr.sort();
+    return m;
+  }, [lineItems, dayDateById]);
+
   const stepsByDate = useMemo(() => {
     const m = new Map<string, DayStepEntry[]>();
     for (const li of lineItems) {
@@ -133,9 +161,22 @@ export function WeekGrid(props: WeekGridInputs) {
       const pieces = pp ? (pp.actualYield ?? pp.quantity * cavities) : 0;
       const isLocked = !!plan.pinnedDate;
 
-      // One DayStepEntry per stepId on this lineItem.
+      const planDates = datesByPlan.get(li.planId) ?? [date];
+      const dateIdx = planDates.indexOf(date);
+
       for (const stepId of li.stepIds) {
         const step = stepById.get(stepId) ?? null;
+        const passive =
+          !!step && step.activeMinutes <= 0 && (step.waitingMinutes ?? 0) > 0;
+        // Passive steps annotate the gap to neighbouring lineItems of
+        // the same plan. Phase 4 replaces this with the absolute-overlay
+        // span bar (Approach 2).
+        const spanInfo = passive
+          ? {
+              fromIso: dateIdx > 0 ? planDates[dateIdx - 1] : "",
+              toIso: dateIdx < planDates.length - 1 ? planDates[dateIdx + 1] : "",
+            }
+          : null;
         const arr = m.get(date) ?? [];
         arr.push({
           key: `${li.id ?? `${li.productionDayId}:${li.planId}`}:${stepId}`,
@@ -144,12 +185,17 @@ export function WeekGrid(props: WeekGridInputs) {
           planName: plan.name ?? "Batch",
           pieces,
           isLocked,
+          spanInfo:
+            spanInfo && (spanInfo.fromIso || spanInfo.toIso)
+              ? {
+                  fromIso: spanInfo.fromIso || date,
+                  toIso: spanInfo.toIso || date,
+                }
+              : null,
         });
         m.set(date, arr);
       }
     }
-    // Sort within each day by step.sortOrder ascending (with passive last
-    // when sortOrder ties — keeps the visual flow intuitive).
     for (const arr of m.values()) {
       arr.sort((a, b) => {
         const ao = a.step?.sortOrder ?? 9999;
@@ -167,6 +213,7 @@ export function WeekGrid(props: WeekGridInputs) {
     productById,
     mouldById,
     stepById,
+    datesByPlan,
   ]);
 
   return (
@@ -199,6 +246,10 @@ export function WeekGrid(props: WeekGridInputs) {
               warnPercent={warnPercent}
               criticalPercent={criticalPercent}
               steps={steps}
+              conflicts={conflictsByDate?.get(iso)}
+              onHeaderClick={onDayHeaderClick ? () => onDayHeaderClick(iso) : undefined}
+              onStepClick={onStepClick}
+              renderDraggable={renderDraggable}
             />
           );
         })}
