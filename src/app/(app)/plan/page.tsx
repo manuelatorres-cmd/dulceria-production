@@ -21,6 +21,7 @@ import { BackButton } from "@/components/back-button";
 import { PlanTabs } from "@/components/plan-tabs";
 import { PlanHeader } from "@/components/production-plan/plan-header";
 import { FilterStrip } from "@/components/production-plan/filter-strip";
+import { WeekGrid as WeekGridV2 } from "@/components/production-plan/week-grid";
 import {
   DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors,
   closestCenter, pointerWithin,
@@ -298,6 +299,9 @@ export default function PlanPage() {
       })
       .sort((a, b) => a.day.date.localeCompare(b.day.date));
   }, [lineItems, productionDays, dayById, config, people, unavailability, blockedDays]);
+
+  // ── Week grid anchor (Phase 2) ──────────────────────────────────
+  const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
 
   const [regenerating, setRegenerating] = useState(false);
   const [lastResult, setLastResult] = useState<{ warnings: string[]; unscheduledPlanIds: string[]; count: number } | null>(null);
@@ -710,29 +714,25 @@ export default function PlanPage() {
           </p>
         </div>
       ) : viewMode === "week" ? (
-        <WeekView
-          daySummary={daySummary}
-          lineItems={visibleLineItems}
-          dayById={dayById}
-          orderedSteps={orderedSteps}
-          planMap={planMap}
-          planProductsByPlan={planProductsByPlan}
-          productMap={productMap}
-          batchOrderRef={batchOrderRef}
-          stepDoneFor={stepDoneFor}
-          expandedSections={expandedSections}
-          toggleSection={toggleSection}
-          expandedProducts={expandedProducts}
-          toggleProduct={toggleProduct}
-          expandedCategories={expandedCategories}
-          toggleCategory={toggleCategory}
-          categoryNameById={categoryNameById}
-          orderPlanLinks={orderPlanLinks}
-          orderItems={orderItems}
-          orders={orders}
-          focusTokens={focusTokens}
-          doneKeysByPlan={doneKeysByPlan}
-        />
+        <div className="weekly-plan-v2">
+          <WeekNav anchor={weekAnchor} onAnchorChange={setWeekAnchor} />
+          <WeekGridV2
+            anchor={weekAnchor}
+            productionDays={productionDays}
+            lineItems={visibleLineItems}
+            plans={plans}
+            planProducts={planProducts}
+            productionSteps={productionSteps}
+            products={products}
+            moulds={moulds}
+            capacityConfig={config}
+            people={people}
+            unavailability={unavailability}
+            blockedDays={blockedDays}
+            warnPercent={config?.warnThresholdPercent ?? 75}
+            criticalPercent={config?.criticalThresholdPercent ?? 90}
+          />
+        </div>
       ) : viewMode === "pivot" ? (
         <PivotView
           plans={plans}
@@ -4957,3 +4957,81 @@ function MonthView(props: {
   );
 }
 
+
+// ── Plan v2 — week navigation strip (Phase 2) ─────────────────────
+function WeekNav({
+  anchor,
+  onAnchorChange,
+}: {
+  anchor: Date;
+  onAnchorChange: (d: Date) => void;
+}) {
+  const start = new Date(anchor);
+  const dow = start.getDay();
+  const offset = (dow + 6) % 7;
+  start.setDate(start.getDate() - offset);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("de-AT", { day: "numeric", month: "short" });
+  const label = `${fmt(start)} – ${fmt(end)}`;
+  return (
+    <div className="flex items-center justify-between mb-2">
+      <span
+        className="text-[12px] tabular-nums"
+        style={{ color: "var(--wp-text-muted)" }}
+      >
+        {label}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            const next = new Date(anchor);
+            next.setDate(next.getDate() - 7);
+            onAnchorChange(next);
+          }}
+          className="px-2.5 py-1 text-[11px]"
+          style={{
+            border: "0.5px solid var(--wp-border-warm)",
+            background: "var(--wp-card-bg)",
+            color: "var(--wp-text-primary)",
+            borderRadius: 14,
+          }}
+        >
+          ← prev week
+        </button>
+        <button
+          type="button"
+          onClick={() => onAnchorChange(new Date())}
+          className="px-2.5 py-1 text-[11px]"
+          style={{
+            border: "0.5px solid var(--wp-border-warm)",
+            background: "var(--wp-card-bg)",
+            color: "var(--wp-text-primary)",
+            borderRadius: 14,
+          }}
+        >
+          today
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const next = new Date(anchor);
+            next.setDate(next.getDate() + 7);
+            onAnchorChange(next);
+          }}
+          className="px-2.5 py-1 text-[11px]"
+          style={{
+            border: "0.5px solid var(--wp-border-warm)",
+            background: "var(--wp-card-bg)",
+            color: "var(--wp-text-primary)",
+            borderRadius: 14,
+          }}
+        >
+          next week →
+        </button>
+      </div>
+    </div>
+  );
+}
