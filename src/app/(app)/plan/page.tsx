@@ -22,6 +22,10 @@ import { PlanTabs } from "@/components/plan-tabs";
 import { PlanHeader } from "@/components/production-plan/plan-header";
 import { FilterStrip } from "@/components/production-plan/filter-strip";
 import { PlanWeekV2 } from "@/components/production-plan/plan-week-v2";
+import { DayDetailDrawer } from "@/components/production-plan/day-detail-drawer";
+import { BottomSummary } from "@/components/production-plan/bottom-summary";
+import { markDayAsWorked } from "@/lib/production-plan/mark-day-as-worked";
+import { rescheduleDay } from "@/lib/production-plan/reschedule-day";
 import {
   DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors,
   closestCenter, pointerWithin,
@@ -302,6 +306,8 @@ export default function PlanPage() {
 
   // ── Week grid anchor (Phase 2) ──────────────────────────────────
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
+  // ── Day-detail drawer (Phase 5) ─────────────────────────────────
+  const [drawerIso, setDrawerIso] = useState<string | null>(null);
 
   const [regenerating, setRegenerating] = useState(false);
   const [lastResult, setLastResult] = useState<{ warnings: string[]; unscheduledPlanIds: string[]; count: number } | null>(null);
@@ -714,22 +720,74 @@ export default function PlanPage() {
           </p>
         </div>
       ) : viewMode === "week" ? (
-        <PlanWeekV2
-          weekAnchor={weekAnchor}
-          setWeekAnchor={setWeekAnchor}
-          productionDays={productionDays}
-          lineItems={visibleLineItems}
-          plans={plans}
-          planProducts={planProducts}
-          productionSteps={productionSteps}
-          products={products}
-          moulds={moulds}
-          capacityConfig={config}
-          people={people}
-          unavailability={unavailability}
-          blockedDays={blockedDays}
-          weekNav={<WeekNav anchor={weekAnchor} onAnchorChange={setWeekAnchor} />}
-        />
+        <>
+          <PlanWeekV2
+            weekAnchor={weekAnchor}
+            setWeekAnchor={setWeekAnchor}
+            productionDays={productionDays}
+            lineItems={visibleLineItems}
+            plans={plans}
+            planProducts={planProducts}
+            productionSteps={productionSteps}
+            products={products}
+            moulds={moulds}
+            capacityConfig={config}
+            people={people}
+            unavailability={unavailability}
+            blockedDays={blockedDays}
+            weekNav={<WeekNav anchor={weekAnchor} onAnchorChange={setWeekAnchor} />}
+            onDayHeaderClick={(iso) => setDrawerIso(iso)}
+          />
+          <PlanBottomSummary
+            anchor={weekAnchor}
+            productionDays={productionDays}
+            lineItems={visibleLineItems}
+            plans={plans}
+            capacityConfig={config}
+            people={people}
+            unavailability={unavailability}
+            blockedDays={blockedDays}
+            onJumpToNextWeek={() => {
+              const next = new Date(weekAnchor);
+              next.setDate(next.getDate() + 7);
+              setWeekAnchor(next);
+            }}
+          />
+          {drawerIso && (
+            <DayDetailDrawer
+              iso={drawerIso}
+              onClose={() => setDrawerIso(null)}
+              productionDays={productionDays}
+              lineItems={visibleLineItems}
+              plans={plans}
+              planProducts={planProducts}
+              productionSteps={productionSteps}
+              products={products}
+              moulds={moulds}
+              capacityConfig={config}
+              people={people}
+              unavailability={unavailability}
+              blockedDays={blockedDays}
+              conflicts={[]}
+              onMarkAsWorked={async (iso) => {
+                await markDayAsWorked({
+                  iso,
+                  productionDays,
+                  lineItems: visibleLineItems,
+                });
+              }}
+              onReschedule={async (sourceDate, targetDate, pin) => {
+                await rescheduleDay({
+                  sourceDate,
+                  targetDate,
+                  pin,
+                  productionDays,
+                  lineItems: visibleLineItems,
+                });
+              }}
+            />
+          )}
+        </>
       ) : viewMode === "pivot" ? (
         <PivotView
           plans={plans}
@@ -5030,5 +5088,117 @@ function WeekNav({
         </button>
       </div>
     </div>
+  );
+}
+
+function PlanBottomSummary({
+  anchor,
+  productionDays,
+  lineItems,
+  plans,
+  capacityConfig,
+  people,
+  unavailability,
+  blockedDays,
+  onJumpToNextWeek,
+}: {
+  anchor: Date;
+  productionDays: import("@/types").ProductionDay[];
+  lineItems: import("@/types").ProductionDayLineItem[];
+  plans: import("@/types").ProductionPlan[];
+  capacityConfig: ReturnType<typeof useCapacityConfig>;
+  people: ReturnType<typeof usePeople>;
+  unavailability: ReturnType<typeof usePersonUnavailability>;
+  blockedDays: ReturnType<typeof useBlockedDays>;
+  onJumpToNextWeek: () => void;
+}) {
+  const monday = (() => {
+    const d = new Date(anchor);
+    const dow = d.getDay();
+    const offset = (dow + 6) % 7;
+    d.setDate(d.getDate() - offset);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const weekIsoSet = new Set<string>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    weekIsoSet.add(fmt(d));
+  }
+  const nextStart = new Date(monday);
+  nextStart.setDate(monday.getDate() + 7);
+  const nextWeekIsoSet = new Set<string>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(nextStart);
+    d.setDate(nextStart.getDate() + i);
+    nextWeekIsoSet.add(fmt(d));
+  }
+  const dayDateById = new Map<string, string>();
+  for (const d of productionDays) {
+    if (d.id && d.date) dayDateById.set(d.id, d.date.slice(0, 10));
+  }
+  const activePlanIds = new Set(
+    plans
+      .filter((p) => p.status !== "done" && p.status !== "cancelled")
+      .map((p) => p.id!),
+  );
+  const usedByDate = new Map<string, number>();
+  const batchesByDate = new Map<string, Set<string>>();
+  let nextBatches = new Set<string>();
+  for (const li of lineItems) {
+    const date = dayDateById.get(li.productionDayId);
+    if (!date) continue;
+    if (!activePlanIds.has(li.planId)) continue;
+    if (weekIsoSet.has(date)) {
+      usedByDate.set(date, (usedByDate.get(date) ?? 0) + (li.plannedMinutes ?? 0));
+      const set = batchesByDate.get(date) ?? new Set<string>();
+      set.add(li.planId);
+      batchesByDate.set(date, set);
+    } else if (nextWeekIsoSet.has(date)) {
+      nextBatches.add(li.planId);
+    }
+  }
+  let plannedMinutes = 0;
+  let batches = new Set<string>();
+  let peakIso: string | null = null;
+  let peakBatches = 0;
+  let peakPct = 0;
+  let daysActive = 0;
+  for (const iso of weekIsoSet) {
+    const used = usedByDate.get(iso) ?? 0;
+    if (used > 0) daysActive++;
+    plannedMinutes += used;
+    const dayBatches = batchesByDate.get(iso);
+    if (dayBatches) {
+      for (const id of dayBatches) batches.add(id);
+      const cap = effectiveDailyCapacityMinutes(
+        new Date(iso + "T12:00:00"),
+        capacityConfig,
+        people,
+        unavailability,
+        blockedDays,
+      );
+      const pct = cap > 0 ? Math.round((used / cap) * 100) : 0;
+      if (dayBatches.size > peakBatches) {
+        peakIso = iso;
+        peakBatches = dayBatches.size;
+        peakPct = pct;
+      }
+    }
+  }
+  return (
+    <BottomSummary
+      thisWeek={{
+        daysActive,
+        batches: batches.size,
+        plannedMinutes,
+        peak: peakIso ? { iso: peakIso, batches: peakBatches, pct: peakPct } : null,
+      }}
+      nextWeek={{ batches: nextBatches.size }}
+      onJumpToNextWeek={onJumpToNextWeek}
+    />
   );
 }
