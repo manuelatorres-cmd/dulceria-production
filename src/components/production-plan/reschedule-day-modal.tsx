@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { IconX as X } from "@tabler/icons-react";
+import { DsButton } from "@/components/dulceria";
 
 export function RescheduleDayModal({
   sourceDate,
@@ -94,34 +95,17 @@ export function RescheduleDayModal({
           className="px-5 py-3 flex items-center justify-end gap-2"
           style={{ borderTop: "0.5px solid var(--wp-border-warm)" }}
         >
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-3 py-1.5 text-[12px]"
-            style={{
-              border: "0.5px solid var(--wp-border-warm)",
-              background: "var(--wp-card-bg)",
-              color: "var(--wp-text-primary)",
-              borderRadius: 4,
-            }}
-          >
+          <DsButton size="md" onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            type="button"
+          </DsButton>
+          <DsButton
+            variant="primary"
+            size="md"
             onClick={() => onConfirm(target, pin)}
             disabled={!target || target === sourceDate}
-            className="px-3 py-1.5 text-[12px]"
-            style={{
-              border: "0.5px solid var(--wp-teal)",
-              background: "var(--wp-teal)",
-              color: "#ffffff",
-              borderRadius: 4,
-              opacity: !target || target === sourceDate ? 0.5 : 1,
-            }}
           >
             Move all batches
-          </button>
+          </DsButton>
         </div>
       </div>
     </div>

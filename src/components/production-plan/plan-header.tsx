@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { IconRefresh as RefreshCw, IconFlame as Flame } from "@tabler/icons-react";
 import Link from "next/link";
+import { DsButton } from "@/components/dulceria";
 
 export type PlanViewMode = "day" | "week" | "pivot" | "month";
 
@@ -103,21 +104,22 @@ export function PlanHeader({
               {stats.tightDays} tight day{stats.tightDays === 1 ? "" : "s"}
             </span>
           )}
-          <button
-            type="button"
+          <DsButton
+            variant="primary"
+            size="sm"
             onClick={onRegenerate}
             disabled={regenerating || configIncomplete}
-            className="px-3 py-1 text-[11px] font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
             style={{
-              background: "var(--wp-teal)",
-              color: "#ffffff",
-              border: "0.5px solid var(--wp-teal)",
               borderRadius: 14,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontWeight: 500,
             }}
           >
             <RefreshCw className={`w-3 h-3 ${regenerating ? "animate-spin" : ""}`} />
             {regenerating ? "Regenerating…" : "Regenerate"}
-          </button>
+          </DsButton>
         </div>
       </div>
 
