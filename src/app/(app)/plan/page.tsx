@@ -621,29 +621,52 @@ export default function PlanPage() {
         lastRegenSlot={<LastRegenLine />}
       />
 
-      {/* ─── Stale open production day(s) ─────────────────────────── */}
+      {/* ─── Stale open production day(s) — consolidated into one. ── */}
       {staleOpenDays.length > 0 && (
-        <div className="mb-3 space-y-2">
-          {staleOpenDays.map((d) => (
-            <Banner
-              key={d.id}
-              tone="butter"
-              icon={<AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />}
-            >
-              <div className="text-xs flex flex-wrap items-center gap-2 leading-snug">
+        <div className="mb-3">
+          <Banner tone="butter" icon={<AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />}>
+            <div className="text-xs flex flex-wrap items-center gap-2 leading-snug">
+              {staleOpenDays.length === 1 ? (
                 <span>
-                  Production day for <strong>{d.date}</strong> is still open. Close it to carry unfinished steps forward.
+                  Production day for <strong>{staleOpenDays[0].date}</strong> is still open. Close it to carry unfinished steps forward.
                 </span>
+              ) : (
+                <span>
+                  <strong>{staleOpenDays.length}</strong> production days still open:{" "}
+                  {staleOpenDays.map((d, i) => (
+                    <Fragment key={d.id}>
+                      {i > 0 ? ", " : ""}
+                      <strong>{d.date}</strong>
+                    </Fragment>
+                  ))}
+                  . Close them to carry unfinished steps forward.
+                </span>
+              )}
+              {staleOpenDays.length === 1 ? (
                 <button
-                  onClick={() => handleCloseStale(d.date)}
-                  disabled={closingDate === d.date}
+                  onClick={() => handleCloseStale(staleOpenDays[0].date)}
+                  disabled={closingDate === staleOpenDays[0].date}
                   className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-3 py-1 text-[11px] font-medium disabled:opacity-50"
                 >
-                  {closingDate === d.date ? "Closing…" : "Close day"}
+                  {closingDate === staleOpenDays[0].date ? "Closing…" : "Close day"}
                 </button>
-              </div>
-            </Banner>
-          ))}
+              ) : (
+                <span className="ml-auto inline-flex flex-wrap gap-1.5">
+                  {staleOpenDays.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => handleCloseStale(d.date)}
+                      disabled={closingDate === d.date}
+                      className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-2.5 py-0.5 text-[10px] font-medium disabled:opacity-50"
+                      title={`Close production day ${d.date}`}
+                    >
+                      {closingDate === d.date ? "Closing…" : `Close ${d.date.slice(5)}`}
+                    </button>
+                  ))}
+                </span>
+              )}
+            </div>
+          </Banner>
         </div>
       )}
 
@@ -685,14 +708,34 @@ export default function PlanPage() {
         )}
       </div>
 
-      {/* ─── Demand by urgency — minimum-must-do view per order. ─── */}
-      <DemandByUrgency
-        orders={orders}
-        orderItems={orderItems}
-        products={products}
-        productLocationTotals={productLocationTotals}
-        orderPlanLinks={orderPlanLinks}
-      />
+      {/* ─── Demand by urgency — collapsed by default (Phase 3 polish). */}
+      <details
+        className="mb-3"
+        style={{
+          background: "var(--wp-card-bg, var(--color-card))",
+          border: "0.5px solid var(--wp-border-warm, var(--color-border))",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        <summary
+          className="px-4 py-2 cursor-pointer text-[12px] inline-flex items-center gap-2 select-none w-full"
+          style={{ color: "var(--wp-text-muted, var(--color-muted-foreground))" }}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          <span>Must do — by urgency</span>
+          <span className="text-[11px] italic">show details</span>
+        </summary>
+        <div className="px-1 pb-1">
+          <DemandByUrgency
+            orders={orders}
+            orderItems={orderItems}
+            products={products}
+            productLocationTotals={productLocationTotals}
+            orderPlanLinks={orderPlanLinks}
+          />
+        </div>
+      </details>
 
       {/* ─── Scheduled · 14 days — collapsible filter strip (Phase 1). */}
       <FilterStrip

@@ -21,7 +21,7 @@ export interface StepBlockEntry {
   isLocked: boolean;
   /** Set when this step has waitingMinutes spilling into another day. */
   spanInfo?: { fromIso: string; toIso: string } | null;
-  /** Inline conflict marker — phase 4 will populate from detect-conflicts. */
+  /** Inline conflict marker. */
   hasConflict?: boolean;
 }
 
@@ -48,7 +48,7 @@ export function StepBlock({
   const waitingMins = entry.step?.waitingMinutes ?? 0;
   const conflict = !!entry.hasConflict;
 
-  // Visual variant decision (per spec matrix).
+  // Visual variant per spec matrix.
   let leftBorder: string;
   let leftStyle: "solid" | "dashed";
   let bg: string;
@@ -79,10 +79,12 @@ export function StepBlock({
 
   const cursor = passive ? "default" : draggable ? "grab" : "pointer";
 
+  // Mockup-aligned sizes: padding 7px 9px, font 12px for two-line; tighter
+  // 4px/8px + 11px for compact so 6+ steps stay readable in one column.
   const root: React.CSSProperties = {
-    padding: density === "compact" ? "3px 7px" : "5px 7px",
+    padding: density === "compact" ? "4px 8px" : "7px 9px",
     borderRadius: 3,
-    fontSize: density === "compact" ? 10.5 : 11,
+    fontSize: density === "compact" ? 11 : 12,
     lineHeight: 1.35,
     background: bg,
     border: passive
@@ -159,25 +161,73 @@ function TwoLineRow({
   timeLabel: string;
   spanInfo?: { fromIso: string; toIso: string } | null;
 }) {
+  // Explicit flex-col so the two rows always stack — protects against any
+  // parent CSS that might collapse the fragment.
   return (
-    <>
-      <div className="flex items-baseline gap-1">
-        <span className="flex-1 truncate inline-flex items-center gap-1" style={{ fontWeight: 500 }}>
-          {conflict && <AlertTriangle className="w-3 h-3" style={{ color: "var(--wp-rose)" }} />}
-          {isLocked && !passive && !conflict && <Lock className="w-3 h-3" style={{ color: "var(--wp-teal)" }} />}
-          {passive && <Hourglass className="w-3 h-3" style={{ color: "var(--wp-text-muted)" }} />}
-          {stepName}
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <span
+          style={{
+            flex: 1,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontWeight: 500,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            minWidth: 0,
+          }}
+        >
+          {conflict && <AlertTriangle className="w-3 h-3 shrink-0" style={{ color: "var(--wp-rose)" }} />}
+          {isLocked && !passive && !conflict && (
+            <Lock className="w-3 h-3 shrink-0" style={{ color: "var(--wp-teal)" }} />
+          )}
+          {passive && (
+            <Hourglass className="w-3 h-3 shrink-0" style={{ color: "var(--wp-text-muted)" }} />
+          )}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {stepName}
+          </span>
         </span>
-        <span className="tabular-nums shrink-0" style={{ color: "var(--wp-text-muted)" }}>
+        <span
+          className="tabular-nums shrink-0"
+          style={{ color: "var(--wp-text-muted)", fontSize: 11 }}
+        >
           {timeLabel}
         </span>
       </div>
-      <div className="text-[10px] tabular-nums truncate" style={{ color: "var(--wp-text-muted)" }}>
-        {productName}
-        {pieces > 0 && ` · ${pieces} pcs`}
-        {spanInfo?.fromIso && ` · from ${shortDow(spanInfo.fromIso)}`}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 11,
+          color: "var(--wp-text-muted)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          minWidth: 0,
+        }}
+      >
+        <span
+          style={{
+            flex: 1,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {productName}
+        </span>
+        {pieces > 0 && (
+          <span className="tabular-nums shrink-0">{pieces} pcs</span>
+        )}
+        {spanInfo?.fromIso && (
+          <span className="shrink-0">· from {shortDow(spanInfo.fromIso)}</span>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -197,15 +247,44 @@ function CompactRow({
   timeLabel: string;
 }) {
   return (
-    <div className="flex items-baseline gap-1">
-      <span className="flex-1 truncate inline-flex items-center gap-1">
-        {conflict && <AlertTriangle className="w-3 h-3" style={{ color: "var(--wp-rose)" }} />}
-        {isLocked && !passive && !conflict && <Lock className="w-3 h-3" style={{ color: "var(--wp-teal)" }} />}
-        {passive && <Hourglass className="w-3 h-3" style={{ color: "var(--wp-text-muted)" }} />}
-        <span style={{ fontWeight: 500 }}>{stepName}</span>
-        <span style={{ color: "var(--wp-text-muted)" }}>· {productName}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <span
+        style={{
+          flex: 1,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          minWidth: 0,
+        }}
+      >
+        {conflict && <AlertTriangle className="w-3 h-3 shrink-0" style={{ color: "var(--wp-rose)" }} />}
+        {isLocked && !passive && !conflict && (
+          <Lock className="w-3 h-3 shrink-0" style={{ color: "var(--wp-teal)" }} />
+        )}
+        {passive && (
+          <Hourglass className="w-3 h-3 shrink-0" style={{ color: "var(--wp-text-muted)" }} />
+        )}
+        <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {stepName}
+        </span>
+        <span
+          style={{
+            color: "var(--wp-text-muted)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          · {productName}
+        </span>
       </span>
-      <span className="tabular-nums shrink-0" style={{ color: "var(--wp-text-muted)" }}>
+      <span
+        className="tabular-nums shrink-0"
+        style={{ color: "var(--wp-text-muted)", fontSize: 10.5 }}
+      >
         {timeLabel}
       </span>
     </div>
