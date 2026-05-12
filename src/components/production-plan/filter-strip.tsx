@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ChevronDown, ChevronUp, Filter, Grid3x3 } from "lucide-react";
+import {
+  IconChevronDown as ChevronDown,
+  IconChevronUp as ChevronUp,
+  IconFilter as Filter,
+  IconGrid3x3 as Grid3x3,
+} from "@tabler/icons-react";
 
 export interface FilterStripCounts {
   /** Number of source pills currently rendered after applying the active focus. */

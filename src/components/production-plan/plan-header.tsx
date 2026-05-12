@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { RefreshCw, Flame } from "lucide-react";
+import { IconRefresh as RefreshCw, IconFlame as Flame } from "@tabler/icons-react";
 import Link from "next/link";
 
 export type PlanViewMode = "day" | "week" | "pivot" | "month";

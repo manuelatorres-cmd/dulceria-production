@@ -27,7 +27,15 @@ import {
   type OrderChannel, type OrderPriority, type OrderStatus,
   type StockLocation,
 } from "@/types";
-import { Plus, Search, AlertTriangle, ShoppingBag, X, Warehouse, Flame } from "lucide-react";
+import {
+  IconPlus as Plus,
+  IconSearch as Search,
+  IconAlertTriangle as AlertTriangle,
+  IconShoppingBag as ShoppingBag,
+  IconX as X,
+  IconBuildingWarehouse as Warehouse,
+  IconFlame as Flame,
+} from "@tabler/icons-react";
 import { ListRow, StatusTag, type ListRowTier, type StatusTagKind } from "@/components/dulceria";
 
 /* iOS-glass design tokens — match /dashboard, /plan, /production-brain. */

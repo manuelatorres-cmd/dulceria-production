@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle } from "lucide-react";
+import { IconCircleCheck as CheckCircle } from "@tabler/icons-react";
 import { CapacityBar } from "./capacity-bar";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

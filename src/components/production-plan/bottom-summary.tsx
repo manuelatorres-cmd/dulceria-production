@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { IconArrowRight as ArrowRight } from "@tabler/icons-react";
 import { formatMinutes } from "./format-minutes";
 
 export interface BottomSummaryProps {

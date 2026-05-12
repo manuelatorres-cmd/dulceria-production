@@ -1,7 +1,7 @@
 "use client";
 
 import type { PoDemandLine } from "@/lib/manual-planner/aggregate-demand";
-import { Plus } from "lucide-react";
+import { IconPlus as Plus } from "@tabler/icons-react";
 
 export function PoLine({
   line,

@@ -58,7 +58,7 @@ import {
 import { WeekGrid } from "@/components/manual-planner/week-grid/week-grid";
 import type { DayLineItemView } from "@/components/manual-planner/week-grid/day-column";
 import { BackButton } from "@/components/back-button";
-import { AlertTriangle } from "lucide-react";
+import { IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 

@@ -1,6 +1,10 @@
 "use client";
 
-import { Lock, Hourglass, AlertTriangle } from "lucide-react";
+import {
+  IconLock as Lock,
+  IconHourglass as Hourglass,
+  IconAlertTriangle as AlertTriangle,
+} from "@tabler/icons-react";
 import type { ProductionStep } from "@/types";
 import { formatMinutes } from "./format-minutes";
 

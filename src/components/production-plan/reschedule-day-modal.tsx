@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { IconX as X } from "@tabler/icons-react";
 
 export function RescheduleDayModal({
   sourceDate,

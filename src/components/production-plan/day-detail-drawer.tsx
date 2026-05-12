@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X, AlertTriangle, Lock, Hourglass, CheckCircle, Calendar } from "lucide-react";
+import {
+  IconX as X,
+  IconAlertTriangle as AlertTriangle,
+  IconLock as Lock,
+  IconHourglass as Hourglass,
+  IconCircleCheck as CheckCircle,
+  IconCalendar as Calendar,
+} from "@tabler/icons-react";
 import type {
   Mould,
   PlanProduct,

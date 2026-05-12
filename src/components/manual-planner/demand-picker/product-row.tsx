@@ -2,7 +2,7 @@
 
 import type { ProductDemand } from "@/lib/manual-planner/aggregate-demand";
 import type { SmartSuggestion } from "@/lib/manual-planner/smart-suggestions";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { IconChevronDown as ChevronDown, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import { OrdersExpanded } from "./orders-expanded";
 
 export function ProductRow({

@@ -11,14 +11,14 @@ import {
   useAllPlanProducts,
 } from "@/lib/hooks";
 import {
-  ClipboardList,
-  CalendarDays,
-  Zap,
-  Megaphone,
-  ArrowRight,
-  Plus,
-  Package,
-} from "lucide-react";
+  IconClipboardList as ClipboardList,
+  IconCalendarMonth as CalendarDays,
+  IconBolt as Zap,
+  IconSpeakerphone as Megaphone,
+  IconArrowRight as ArrowRight,
+  IconPlus as Plus,
+  IconPackage as Package,
+} from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import {
   StatCard,

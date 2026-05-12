@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Hourglass } from "lucide-react";
+import { IconLock as Lock, IconHourglass as Hourglass } from "@tabler/icons-react";
 import { formatMinutes } from "@/lib/manual-planner/compute-batch-time";
 import type { ProductionStep } from "@/types";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { IconArrowRight as ArrowRight } from "@tabler/icons-react";
 import type { SmartSuggestion } from "@/lib/manual-planner/smart-suggestions";
 
 export function SmartSuggestionRow({

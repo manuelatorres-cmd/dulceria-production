@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowRight, X } from "lucide-react";
+import { IconArrowRight as ArrowRight, IconX as X } from "@tabler/icons-react";
 import type { DraftBatch, SurplusDestination } from "@/lib/manual-planner/draft-state";
 
 export interface PoFillOption {

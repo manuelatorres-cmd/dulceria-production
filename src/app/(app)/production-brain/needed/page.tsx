@@ -18,7 +18,13 @@ import {
 } from "@/lib/hooks";
 import { ORDER_CHANNEL_LABELS } from "@/types";
 import { BackButton } from "@/components/back-button";
-import { CheckSquare, Square, Info, AlertTriangle, Check } from "lucide-react";
+import {
+  IconSquareCheck as CheckSquare,
+  IconSquare as Square,
+  IconInfoCircle as Info,
+  IconAlertTriangle as AlertTriangle,
+  IconCheck as Check,
+} from "@tabler/icons-react";
 
 /**
  * Needed — pick open orders + see aggregated demand against current stock

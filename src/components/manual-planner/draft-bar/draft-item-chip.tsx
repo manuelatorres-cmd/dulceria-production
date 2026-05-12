@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { IconX as X } from "@tabler/icons-react";
 import type { DraftAllocation } from "@/lib/manual-planner/draft-state";
 
 export function DraftItemChip({

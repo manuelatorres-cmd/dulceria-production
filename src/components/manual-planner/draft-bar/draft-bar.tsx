@@ -1,7 +1,12 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/core";
-import { GripVertical, Save, X, Trash2 } from "lucide-react";
+import {
+  IconGripVertical as GripVertical,
+  IconDeviceFloppy as Save,
+  IconX as X,
+  IconTrash as Trash2,
+} from "@tabler/icons-react";
 import type { DraftBatch } from "@/lib/manual-planner/draft-state";
 import { DraftItemChip } from "./draft-item-chip";
 import { formatMinutes } from "@/lib/manual-planner/compute-batch-time";

@@ -1,6 +1,12 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Lock, Hourglass, AlertTriangle } from "lucide-react";
+import {
+  IconChevronDown as ChevronDown,
+  IconChevronRight as ChevronRight,
+  IconLock as Lock,
+  IconHourglass as Hourglass,
+  IconAlertTriangle as AlertTriangle,
+} from "@tabler/icons-react";
 import type { StepBlockEntry } from "./step-block";
 import { formatMinutes } from "./format-minutes";
 
