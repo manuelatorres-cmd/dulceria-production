@@ -20,6 +20,14 @@ import {
   Package,
 } from "lucide-react";
 import { BackButton } from "@/components/back-button";
+import {
+  StatCard,
+  type StatCardVariant,
+  ListRow,
+  type ListRowTier,
+  AttentionItem,
+  type AttentionVariant,
+} from "@/components/dulceria";
 
 export default function WorkshopPage() {
   const plans = useProductionPlans();
@@ -50,9 +58,7 @@ export default function WorkshopPage() {
 
   const openOrders = useMemo(
     () =>
-      orders.filter(
-        (o) => o.status !== "done" && o.status !== "cancelled",
-      ),
+      orders.filter((o) => o.status !== "done" && o.status !== "cancelled"),
     [orders],
   );
 
@@ -86,34 +92,33 @@ export default function WorkshopPage() {
 
       <div className="px-4 pb-10 space-y-5">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Kpi
+          <DsKpi
             label="Active batches"
             value={activeBatches.length}
             sub={`${draftBatches.length} waiting`}
-            icon={<ClipboardList className="w-4 h-4" />}
             href="/production-brain/daily"
+            variant="active"
           />
-          <Kpi
+          <DsKpi
             label="Due in 7 days"
             value={next7.length}
             sub={`${openOrders.length} open total`}
-            icon={<CalendarDays className="w-4 h-4" />}
             href="/orders"
+            variant="default"
           />
-          <Kpi
+          <DsKpi
             label="Rush"
             value={rushOrders.length}
             sub={rushOrders.length === 0 ? "clear" : "time-sensitive"}
-            icon={<Zap className="w-4 h-4" />}
-            accent={rushOrders.length > 0 ? "warn" : "ok"}
             href="/orders?rush=1"
+            variant={rushOrders.length > 0 ? "urgent" : "ok"}
           />
-          <Kpi
+          <DsKpi
             label="Campaigns"
             value={campaigns.length}
             sub="planned + running"
-            icon={<Megaphone className="w-4 h-4" />}
             href="/campaigns"
+            variant="ok"
           />
         </div>
 
@@ -122,11 +127,9 @@ export default function WorkshopPage() {
             {activeBatches.length === 0 && draftBatches.length === 0 ? (
               <EmptyLine text="No active or draft batches. Start one from the planner." />
             ) : (
-              <ul className="divide-y divide-border">
+              <div>
                 {[...activeBatches, ...draftBatches].slice(0, 6).map((p) => {
-                  const lines = planProducts.filter(
-                    (pp) => pp.planId === p.id,
-                  );
+                  const lines = planProducts.filter((pp) => pp.planId === p.id);
                   const summary = lines
                     .slice(0, 2)
                     .map(
@@ -134,34 +137,45 @@ export default function WorkshopPage() {
                         `${productsById.get(pp.productId) ?? "?"} ×${pp.quantity}`,
                     )
                     .join(", ");
+                  const isActive = p.status === "active";
+                  const tier: ListRowTier = isActive ? "positive" : "parked";
                   return (
-                    <li key={p.id}>
-                      <Link
-                        href={`/production/${p.id}?from=workshop`}
-                        className="flex items-center gap-3 px-1 py-2 hover:bg-muted/30 rounded-sm"
-                      >
-                        <StatusDot status={p.status} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium truncate">
-                            {p.name ?? `Batch ${p.batchNumber ?? ""}`}
-                          </p>
-                          {summary && (
-                            <p className="text-[11px] text-muted-foreground truncate">
-                              {summary}
-                              {lines.length > 2
-                                ? ` +${lines.length - 2} more`
-                                : ""}
-                            </p>
-                          )}
-                        </div>
-                        <span className="text-[10.5px] uppercase text-muted-foreground tracking-wider">
-                          {p.status ?? "draft"}
-                        </span>
-                      </Link>
-                    </li>
+                    <Link
+                      key={p.id}
+                      href={`/production/${p.id}?from=workshop`}
+                      style={{ color: "inherit", textDecoration: "none" }}
+                    >
+                      <ListRow
+                        tier={tier}
+                        title={
+                          <>
+                            <span>
+                              {p.name ?? `Batch ${p.batchNumber ?? ""}`}
+                            </span>
+                          </>
+                        }
+                        meta={
+                          summary
+                            ? `${summary}${lines.length > 2 ? ` +${lines.length - 2} more` : ""}`
+                            : undefined
+                        }
+                        side={
+                          <span
+                            style={{
+                              fontSize: 11,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.08em",
+                              color: "var(--ds-text-muted)",
+                            }}
+                          >
+                            {p.status ?? "draft"}
+                          </span>
+                        }
+                      />
+                    </Link>
                   );
                 })}
-              </ul>
+              </div>
             )}
           </DashCard>
 
@@ -169,64 +183,59 @@ export default function WorkshopPage() {
             {next7.length === 0 ? (
               <EmptyLine text="No deadlines in the next week." />
             ) : (
-              <ul className="divide-y divide-border">
+              <div>
                 {next7.map((o) => {
                   const d = new Date(o.deadline);
                   const daysOff = Math.round(
                     (d.getTime() - today.getTime()) / (24 * 60 * 60 * 1000),
                   );
+                  const variant: AttentionVariant =
+                    daysOff <= 1 ? "critical" : daysOff <= 3 ? "warn" : "info";
+                  const dayLabel =
+                    daysOff === 0
+                      ? "today"
+                      : daysOff === 1
+                      ? "tomorrow"
+                      : `${daysOff}d`;
+                  const dateLabel = d.toLocaleDateString(undefined, {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                  });
                   return (
-                    <li key={o.id}>
-                      <Link
-                        href={`/orders/${o.id}?from=workshop`}
-                        className="flex items-center gap-3 px-1 py-2 hover:bg-muted/30 rounded-sm"
-                      >
-                        <div className="w-10 shrink-0 text-center">
-                          <div
-                            className="text-[10px] uppercase text-muted-foreground"
-                            style={{ letterSpacing: "0.08em" }}
-                          >
-                            {d.toLocaleDateString(undefined, {
-                              month: "short",
-                            })}
-                          </div>
-                          <div
-                            className="text-[16px] font-semibold leading-tight"
-                            style={{ fontFamily: "var(--font-serif)" }}
-                          >
-                            {d.getDate()}
-                          </div>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium truncate">
+                    <Link
+                      key={o.id}
+                      href={`/orders/${o.id}?from=workshop`}
+                      style={{ color: "inherit", textDecoration: "none" }}
+                    >
+                      <AttentionItem
+                        variant={variant}
+                        title={
+                          <span>
                             {o.customerName ?? o.eventName ?? "Order"}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground truncate capitalize">
+                            <span
+                              style={{
+                                marginLeft: 8,
+                                fontWeight: 400,
+                                color: "var(--ds-text-muted)",
+                                fontSize: 11,
+                              }}
+                            >
+                              {dateLabel} · {dayLabel}
+                            </span>
+                          </span>
+                        }
+                        detail={
+                          <span style={{ textTransform: "capitalize" }}>
                             {o.channel} · {o.priority}
                             {o.timeSensitive ? " · rush" : ""}
-                          </p>
-                        </div>
-                        <span
-                          className={
-                            "text-[10.5px] tabular-nums " +
-                            (daysOff <= 1
-                              ? "text-status-alert"
-                              : daysOff <= 3
-                                ? "text-status-warn"
-                                : "text-muted-foreground")
-                          }
-                        >
-                          {daysOff === 0
-                            ? "today"
-                            : daysOff === 1
-                              ? "tomorrow"
-                              : `${daysOff}d`}
-                        </span>
-                      </Link>
-                    </li>
+                          </span>
+                        }
+                      />
+                    </Link>
                   );
                 })}
-              </ul>
+              </div>
             )}
           </DashCard>
         </div>
@@ -237,59 +246,23 @@ export default function WorkshopPage() {
   );
 }
 
-function Kpi({
+function DsKpi({
   label,
   value,
   sub,
-  icon,
   href,
-  accent,
+  variant,
 }: {
   label: string;
   value: number;
   sub: string;
-  icon: React.ReactNode;
   href: string;
-  accent?: "warn" | "ok";
+  variant: StatCardVariant;
 }) {
+  // Wrapping StatCard in Link preserves right-click open-in-new-tab.
   return (
-    <Link
-      href={href}
-      className="block border border-border bg-card hover:border-foreground transition-colors px-3 py-3"
-      style={{ borderRadius: 4 }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <span
-          className="text-[10px] uppercase text-muted-foreground"
-          style={{ letterSpacing: "0.12em" }}
-        >
-          {label}
-        </span>
-        <span
-          className={
-            accent === "warn"
-              ? "text-status-warn"
-              : accent === "ok"
-                ? "text-status-ok"
-                : "text-muted-foreground"
-          }
-        >
-          {icon}
-        </span>
-      </div>
-      <div className="flex items-baseline gap-2">
-        <span
-          className="text-[28px] leading-none tabular-nums"
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontWeight: 500,
-            letterSpacing: "-0.02em",
-          }}
-        >
-          {value}
-        </span>
-        <span className="text-[11px] text-muted-foreground">{sub}</span>
-      </div>
+    <Link href={href} style={{ color: "inherit", textDecoration: "none" }}>
+      <StatCard label={label} value={value} meta={sub} variant={variant} />
     </Link>
   );
 }
@@ -305,16 +278,29 @@ function DashCard({
 }) {
   return (
     <section
-      className="border border-border bg-card"
-      style={{ borderRadius: 4 }}
+      style={{
+        background: "var(--ds-card-bg)",
+        border: "0.5px solid var(--ds-border-warm)",
+        borderRadius: 8,
+        overflow: "hidden",
+      }}
     >
-      <header className="px-4 pt-3 pb-2 flex items-center justify-between">
+      <header
+        style={{
+          padding: "14px 20px 10px",
+          borderBottom: "0.5px solid var(--ds-border-warm)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: 12,
+        }}
+      >
         <h3
-          className="text-[13px]"
           style={{
             fontFamily: "var(--font-serif)",
-            fontWeight: 500,
-            letterSpacing: "-0.01em",
+            fontSize: 16,
+            fontWeight: 600,
+            color: "var(--ds-text-primary)",
           }}
         >
           {title}
@@ -322,14 +308,20 @@ function DashCard({
         {href && (
           <Link
             href={href}
-            className="text-[10.5px] uppercase text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-            style={{ letterSpacing: "0.1em" }}
+            style={{
+              fontSize: 12,
+              color: "var(--ds-text-muted)",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
           >
             Open <ArrowRight className="w-3 h-3" />
           </Link>
         )}
       </header>
-      <div className="px-4 pb-3">{children}</div>
+      <div>{children}</div>
     </section>
   );
 }
@@ -337,22 +329,16 @@ function DashCard({
 function EmptyLine({ text }: { text: string }) {
   return (
     <p
-      className="text-[12px] text-muted-foreground italic py-4"
-      style={{ fontFamily: "var(--font-serif)" }}
+      style={{
+        padding: "16px 20px",
+        fontSize: 12,
+        color: "var(--ds-text-muted)",
+        fontStyle: "italic",
+      }}
     >
       {text}
     </p>
   );
-}
-
-function StatusDot({ status }: { status?: string }) {
-  const cls =
-    status === "active"
-      ? "bg-status-ok"
-      : status === "draft"
-        ? "bg-muted-foreground/40"
-        : "bg-muted-foreground/20";
-  return <span className={`inline-block w-2 h-2 rounded-full ${cls}`} />;
 }
 
 function QuickActions() {
@@ -372,18 +358,33 @@ function QuickActions() {
         <Link
           key={a.href}
           href={a.href}
-          className="border border-border bg-muted hover:bg-card hover:border-foreground px-3 py-3 flex items-center gap-2 text-[12.5px]"
           style={{
-            borderRadius: 3,
+            border: "0.5px solid var(--ds-border-warm)",
+            background: "var(--ds-card-bg)",
+            color: "var(--ds-text-primary)",
+            padding: "10px 14px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
             fontFamily: "var(--font-serif)",
             fontWeight: 500,
+            borderRadius: 4,
+            textDecoration: "none",
             letterSpacing: "-0.01em",
           }}
+          className="hover:bg-[color:var(--ds-card-bg-hover)]"
         >
-          <a.icon className="w-4 h-4 text-muted-foreground" />
+          <a.icon className="w-4 h-4" style={{ color: "var(--ds-text-muted)" }} />
           {a.label}
         </Link>
       ))}
     </div>
   );
 }
+
+// Legacy helpers retained as harmless leftovers — `ClipboardList`,
+// `Zap`, `Megaphone`, etc. icon imports are intentionally kept in case
+// downstream PRs reuse them on this page.
+void ClipboardList;
+void Zap;
