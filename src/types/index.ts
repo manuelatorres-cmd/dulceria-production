@@ -2449,6 +2449,14 @@ export interface Campaign {
    *  production for the same products — batches don't share moulds
    *  or get folded into replen plans. Mig 0086. */
   isolated?: boolean;
+  /** Manual revenue goal for the campaign (currency units, not cents).
+   *  Compared against projected revenue (Σ target_units × list price)
+   *  on the /campaigns/[id] Volume planning widget. Mig 0088. */
+  revenueTarget?: number;
+  /** Free-text reference to a linked Business Hub campaign. When set,
+   *  a follow-up sync hook can push projected revenue back to the hub.
+   *  Mig 0088. */
+  businessHubCampaignId?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

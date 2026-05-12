@@ -4,6 +4,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { VolumePlanning } from "@/components/campaign-detail/volume-planning";
 import { BackButton } from "@/components/back-button";
 import { PageHeader } from "@/components/page-header";
 import { phaseKeyFromStepName } from "@/lib/production";
@@ -311,6 +312,9 @@ function CampaignView({
         />
       </div>
 
+      {/* Volume planning (target units × list price → projected revenue) */}
+      <VolumePlanning campaign={campaign} products={products} />
+
       {/* Overall progress bar */}
       <div className={`${CARD} mb-4`}>
         <div className="flex items-center justify-between mb-2">
@@ -605,6 +609,9 @@ function CampaignEditor({
   const [productTargets, setProductTargets] = useState<Record<string, number>>(campaign.productTargets ?? {});
   const [notes, setNotes] = useState(campaign.notes ?? "");
   const [isolated, setIsolated] = useState<boolean>(campaign.isolated ?? false);
+  const [businessHubCampaignId, setBusinessHubCampaignId] = useState<string>(
+    campaign.businessHubCampaignId ?? "",
+  );
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -620,6 +627,7 @@ function CampaignEditor({
     setProductTargets(campaign.productTargets ?? {});
     setNotes(campaign.notes ?? "");
     setIsolated(campaign.isolated ?? false);
+    setBusinessHubCampaignId(campaign.businessHubCampaignId ?? "");
   }, [campaign]);
 
   async function save() {
@@ -651,6 +659,7 @@ function CampaignEditor({
         ),
         notes: notes.trim() || undefined,
         isolated,
+        businessHubCampaignId: businessHubCampaignId.trim() || undefined,
       });
       onDone();
     } finally {
@@ -770,6 +779,16 @@ function CampaignEditor({
 
           <Field label="Notes">
             <textarea className={`${glassInput} resize-none`} value={notes} rows={3} onChange={(e) => setNotes(e.target.value)} />
+          </Field>
+
+          <Field label="Business Hub campaign id (optional)">
+            <input
+              type="text"
+              className={glassInput}
+              value={businessHubCampaignId}
+              onChange={(e) => setBusinessHubCampaignId(e.target.value)}
+              placeholder="Paste BH campaign id"
+            />
           </Field>
 
           <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-[10px] border border-white/60 bg-white/40 backdrop-blur-md px-3 py-2.5">
