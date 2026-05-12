@@ -28,6 +28,7 @@ import {
   type StockLocation,
 } from "@/types";
 import { Plus, Search, AlertTriangle, ShoppingBag, X, Warehouse, Flame } from "lucide-react";
+import { ListRow, StatusTag, type ListRowTier, type StatusTagKind } from "@/components/dulceria";
 
 /* iOS-glass design tokens — match /dashboard, /plan, /production-brain. */
 const CARD = "bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
@@ -320,81 +321,130 @@ export default function OrdersPage() {
                 order.status === "pending" && nextAction
                   ? nextAction.label === "Awaiting plan regeneration" ? "awaiting" : "scheduled"
                   : null;
+              // Tier + status tag mapping per design-system spec.
+              // Rule: max 2 tags per row. Channel info moves to the meta
+              // line as plain text. Priority moves to meta.
+              const tier: ListRowTier =
+                order.status === "cancelled"
+                  ? "parked"
+                  : order.status === "done"
+                  ? "done"
+                  : overdue
+                  ? "urgent"
+                  : "default";
+              const statusKind: StatusTagKind = overdue
+                ? "overdue"
+                : order.status === "ready_to_pack"
+                ? "ready"
+                : order.status === "in_production"
+                ? "scheduled"
+                : order.status === "done"
+                ? "done"
+                : order.status === "cancelled"
+                ? "done"
+                : "pending";
+              const channelLabel = ORDER_CHANNEL_LABELS[order.channel];
+              const fulfilmentText = order.fulfillmentType
+                ? ` · ${order.fulfillmentType}`
+                : "";
+              const priorityText =
+                order.priority !== "normal"
+                  ? ` · ${ORDER_PRIORITY_LABELS[order.priority]}`
+                  : "";
+              const itemsPreview =
+                items.length > 0
+                  ? ` · ${items.slice(0, 3).map((i) => productMap.get(i.productId)?.name ?? "?").join(", ")}${items.length > 3 ? ` +${items.length - 3}` : ""}`
+                  : "";
+              const title = (
+                <>
+                  <span style={{ flex: "0 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {order.customerName || order.eventName || "(unnamed)"}
+                  </span>
+                  {order.sourceRef && (
+                    <span
+                      className="text-ds-meta tabular-nums"
+                      style={{ fontStyle: "normal", fontSize: 11 }}
+                      title="Source order reference"
+                    >
+                      {order.sourceRef}
+                    </span>
+                  )}
+                  <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
+                    <StatusTag kind={statusKind}>
+                      {overdue ? "Overdue" : ORDER_STATUS_LABELS[order.status]}
+                    </StatusTag>
+                    {pendingSubState && !overdue && (
+                      <StatusTag kind={pendingSubState === "scheduled" ? "scheduled" : "pending"}>
+                        {pendingSubState === "scheduled" ? "Scheduled" : "Awaiting plan"}
+                      </StatusTag>
+                    )}
+                  </span>
+                </>
+              );
+              const meta = (
+                <>
+                  {channelLabel}
+                  {fulfilmentText}
+                  {priorityText}
+                  {" · "}
+                  {lineCount} line{lineCount !== 1 ? "s" : ""} · {totalQty} piece{totalQty !== 1 ? "s" : ""}
+                  {itemsPreview}
+                </>
+              );
+              const secondary =
+                nextAction && pendingSubState !== "awaiting" ? (
+                  <>
+                    <span style={{ color: "var(--ds-text-muted)" }}>Next: </span>
+                    <span style={{ fontWeight: 500, color: "var(--ds-text-primary)", fontStyle: "normal" }}>
+                      {nextAction.label}
+                    </span>
+                    {nextAction.when && (
+                      <span style={{ color: "var(--ds-text-muted)" }}> · {nextAction.when}</span>
+                    )}
+                  </>
+                ) : undefined;
+              const side = (
+                <>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: overdue ? "var(--ds-tier-urgent)" : "var(--ds-text-primary)",
+                    }}
+                  >
+                    {formatDeadline(order.deadline)}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: overdue ? "var(--ds-tier-urgent)" : "var(--ds-text-muted)",
+                      fontStyle: overdue ? "normal" : "italic",
+                    }}
+                  >
+                    {overdue
+                      ? "overdue"
+                      : daysToDeadline === 0
+                      ? "today"
+                      : daysToDeadline === 1
+                      ? "tomorrow"
+                      : `in ${daysToDeadline}d`}
+                  </span>
+                </>
+              );
               return (
-                <li key={order.id}>
+                <li key={order.id} style={{ background: "var(--ds-card-bg)" }}>
                   <Link
                     href={`/orders/${encodeURIComponent(order.id!)}`}
-                    className="block rounded-[14px] bg-white/60 border border-white/60 p-3 hover:bg-white/85 transition"
+                    className="block"
+                    style={{ color: "inherit", textDecoration: "none" }}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium truncate">
-                            {order.customerName || order.eventName || "(unnamed)"}
-                          </span>
-                          {order.sourceRef && (
-                            <span className="text-[11px] font-mono tabular-nums text-muted-foreground rounded-sm bg-muted px-1.5 py-[1px]" title="Source order reference (Shopify, etc.)">
-                              {order.sourceRef}
-                            </span>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            {ORDER_CHANNEL_LABELS[order.channel]}
-                          </span>
-                          {order.fulfillmentType && (
-                            <span
-                              className="text-[10.5px] rounded-full border border-border bg-card/70 px-1.5 py-[1px] text-muted-foreground capitalize"
-                              title="Fulfilment type"
-                            >
-                              {order.fulfillmentType}
-                            </span>
-                          )}
-                          <span className={`text-xs rounded-full px-2 py-0.5 ${STATUS_STYLE[order.status]}`}>
-                            {ORDER_STATUS_LABELS[order.status]}
-                          </span>
-                          {pendingSubState && (
-                            <span className={`text-xs rounded-full px-2 py-0.5 border ${
-                              pendingSubState === "scheduled"
-                                ? "border-status-ok/40 bg-status-ok/10 text-status-ok"
-                                : "border-status-warn/40 bg-status-warn/10 text-status-warn"
-                            }`}>
-                              {pendingSubState === "scheduled" ? "Scheduled" : "Awaiting plan"}
-                            </span>
-                          )}
-                          <span className={`text-xs ${PRIORITY_STYLE[order.priority]}`}>
-                            {ORDER_PRIORITY_LABELS[order.priority]}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {lineCount} line{lineCount !== 1 ? "s" : ""} · {totalQty} piece{totalQty !== 1 ? "s" : ""}
-                          {items.length > 0 && (
-                            <span className="ml-1">· {items.slice(0, 3).map((i) => productMap.get(i.productId)?.name ?? "?").join(", ")}{items.length > 3 && ` +${items.length - 3}`}</span>
-                          )}
-                        </p>
-                        {nextAction && pendingSubState !== "awaiting" && (
-                          <p className="text-xs mt-1">
-                            <span className="text-muted-foreground">Next: </span>
-                            <span className="font-medium text-foreground">{nextAction.label}</span>
-                            {nextAction.when && (
-                              <span className="text-muted-foreground"> · {nextAction.when}</span>
-                            )}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className={`text-sm font-medium ${overdue ? "text-destructive" : ""}`}>
-                          {formatDeadline(order.deadline)}
-                        </p>
-                        {overdue ? (
-                          <p className="text-xs text-destructive flex items-center gap-1 justify-end">
-                            <AlertTriangle className="w-3 h-3" /> overdue
-                          </p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            {daysToDeadline === 0 ? "today" : daysToDeadline === 1 ? "tomorrow" : `in ${daysToDeadline}d`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                    <ListRow
+                      tier={tier}
+                      title={title}
+                      meta={meta}
+                      secondary={secondary}
+                      side={side}
+                    />
                   </Link>
                 </li>
               );
