@@ -13,6 +13,7 @@ import {
 import { runEngine, type EngineRunSummary } from "@/lib/engineRunner";
 import type { ReplenishmentProposal } from "@/types";
 import { BackButton } from "@/components/back-button";
+import { StatCard } from "@/components/dulceria";
 
 /**
  * Production Brain · Dashboard (phase 1 scaffold)
@@ -122,23 +123,31 @@ export default function ProductionBrainDashboardPage() {
         ) : null}
       </section>
 
-      {/* KPI strip */}
+      {/* KPI strip — design-system StatCards (Phase 3). */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <KPI label="Active batches" value={activeBatches.toString()} hint={`${plans.length} total plans`} />
-        <KPI
+        <StatCard
+          label="Active batches"
+          value={activeBatches}
+          meta={`${plans.length} total plans`}
+          variant="active"
+        />
+        <StatCard
           label="Open orders"
-          value={openOrderCount.toString()}
-          hint={`${rushCount} rush · ${orders.length} total`}
+          value={openOrderCount}
+          meta={`${rushCount} rush · ${orders.length} total`}
+          variant={rushCount > 0 ? "urgent" : "default"}
         />
-        <KPI
+        <StatCard
           label="Replenishment proposals"
-          value={proposals.length.toString()}
-          hint={proposals.length === 0 ? "engine quiet" : "drag to schedule"}
+          value={proposals.length}
+          meta={proposals.length === 0 ? "engine quiet" : "drag to schedule"}
+          variant={proposals.length === 0 ? "parked" : "warn"}
         />
-        <KPI
+        <StatCard
           label="Active campaigns"
-          value={campaigns.filter((c) => c.status === "active").length.toString()}
-          hint={`${campaigns.length} scheduled`}
+          value={campaigns.filter((c) => c.status === "active").length}
+          meta={`${campaigns.length} scheduled`}
+          variant="ok"
         />
       </section>
 
