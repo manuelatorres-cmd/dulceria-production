@@ -135,33 +135,22 @@ export default function ProductionOrderDetailPage({
   }
 
   return (
-    <div className="px-6 sm:px-10 pt-6 pb-12 max-w-[1500px] mx-auto">
-      <div className="space-y-2 mb-3">
-        <BackButton fallbackHref="/production-orders" fallbackLabel="All production orders" onBack={() => router.back()} />
-        <DetailNav
-          items={[...allOrders].sort((a, b) => a.dueDate.localeCompare(b.dueDate))}
-          currentId={id}
-          hrefFor={(o) => `/production-orders/${encodeURIComponent(o.id!)}`}
-          labelFor={(o) => o.name || o.dueDate}
-        />
-      </div>
-
-      <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
-        <h1
-          className="text-[26px] tracking-[-0.025em]"
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 400 }}
-        >
-          {name || "Untitled"}
-        </h1>
-        {order.name && (
-          <Link
-            href={`/plan?focus=po:${encodeURIComponent(order.name)}`}
-            className="text-[11.5px] px-3 py-1 rounded-full bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] font-medium hover:bg-[#d4e0d8]"
-          >
-            Plan this in /plan →
-          </Link>
-        )}
-      </div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title={name || "Untitled"}
+        meta={`${status} · due ${order.dueDate}`}
+        actions={
+          order.name ? (
+            <Link
+              href={`/plan?focus=po:${encodeURIComponent(order.name)}`}
+              className="text-[11.5px] px-3 py-1 rounded-full bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] font-medium hover:opacity-90"
+            >
+              Plan this in /plan →
+            </Link>
+          ) : undefined
+        }
+      />
+      <div className="px-6 sm:px-10 pt-4 pb-12 max-w-[1500px] mx-auto">
 
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4">
         {/* Main fields */}
@@ -424,6 +413,7 @@ export default function ProductionOrderDetailPage({
         stepStatuses={allStepStatuses}
         poId={id}
       />
+      </div>
     </div>
   );
 }
