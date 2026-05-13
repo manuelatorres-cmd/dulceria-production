@@ -16,7 +16,7 @@ import {
   setIngredientLowStock,
 } from "@/lib/hooks";
 import { FILL_FACTOR } from "@/lib/production";
-import { IconCircleCheck as CheckCircle } from "@tabler/icons-react";
+import { IconChevronLeft as ChevronLeft, IconCircleCheck as CheckCircle } from "@tabler/icons-react";
 import { PageHeader } from "@/components/dulceria";
 import { LowStockFlagButton } from "@/components/pantry";
 
