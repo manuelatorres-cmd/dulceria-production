@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useProductsList, useMouldsList, useProductFillingsForProducts, useFillingIngredientsForFillings, useIngredients, saveProductionPlan, savePlanProduct, toggleStep, useFillings, usePlanProducts, generateBatchNumber, useProductStockAlerts, useVariants, useAllVariantProducts, useFillingStockItems, useShelfStableCategoryNames } from "@/lib/hooks";
-import { IconAlertTriangle as AlertTriangle, IconArrowLeft as ArrowLeft, IconCheck as Check, IconChevronDown as ChevronDown, IconHistory as History, IconPackageOff as PackageX, IconShoppingCart as ShoppingCart } from "@tabler/icons-react";
+import { IconAlertTriangle as AlertTriangle, IconCheck as Check, IconChevronDown as ChevronDown, IconHistory as History, IconPackageOff as PackageX, IconShoppingCart as ShoppingCart } from "@tabler/icons-react";
+import { PageHeader } from "@/components/dulceria";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Product, Mould, PlanProduct, FillingPreviousBatch } from "@/types";
@@ -355,29 +356,22 @@ function NewPlanContent() {
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-6 pb-2">
-        <Link href="/production" className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-3">
-          <ArrowLeft className="w-4 h-4" /> Production
-        </Link>
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-bold">{fromPlanId ? "Duplicate batch" : isPastBatch ? "Log past batch" : "New batch plan"}</h1>
-          {!fromPlanId && (
+      <PageHeader
+        title={fromPlanId ? "Duplicate batch" : isPastBatch ? "Log past batch" : "New batch plan"}
+        meta={isPastBatch ? "Marked completed immediately — no step tracking" : undefined}
+        actions={
+          !fromPlanId ? (
             <button
               onClick={() => setIsPastBatch((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-[6px] border px-2.5 py-1 text-xs transition-colors ${isPastBatch ? "border-primary bg-[color:var(--ds-tint-info)] text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
+              className={`inline-flex items-center gap-1.5 rounded-[6px] border px-2.5 py-1 text-xs transition-colors ${isPastBatch ? "border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)] text-[color:var(--ds-tier-quarter-focus)] font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
               title="Log a batch that already happened"
             >
               <History className="w-3.5 h-3.5" aria-hidden="true" />
               {isPastBatch ? "Past batch" : "Log past batch"}
             </button>
-          )}
-        </div>
-        {isPastBatch && (
-          <p className="text-xs text-muted-foreground mt-1">
-            This batch will be marked as completed immediately — no step tracking needed.
-          </p>
-        )}
-      </div>
+          ) : undefined
+        }
+      />
 
       {phase === "select" && (
         <div className="px-4 space-y-3 pb-6">
