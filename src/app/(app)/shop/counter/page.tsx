@@ -116,7 +116,10 @@ export default function ShopCounterPage() {
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <PageHeader title="Shop · Counter" meta={"Custom box" + " · " + "Pick size, choose bonbons, print label, close. Aim for under 60 seconds per sale."} />
+      <PageHeader
+        title="Counter"
+        meta="Custom box · pick size, choose bonbons, print label, close · aim for under 60 seconds per sale"
+      />
 
       <div className="flex items-center justify-between gap-3 mb-6">
         <ol
