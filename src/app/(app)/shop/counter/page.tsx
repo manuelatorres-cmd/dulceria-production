@@ -121,6 +121,7 @@ export default function ShopCounterPage() {
         meta="Custom box · pick size, choose bonbons, print label, close · aim for under 60 seconds per sale"
       />
 
+      <div style={{ padding: "16px 32px 40px" }}>
       <div className="flex items-center justify-between gap-3 mb-6">
         <ol
           className="flex items-center gap-3 text-[10.5px] uppercase text-muted-foreground"
@@ -389,6 +390,7 @@ export default function ShopCounterPage() {
           </footer>
         </section>
       ) : null}
+      </div>
     </div>
   );
 }
