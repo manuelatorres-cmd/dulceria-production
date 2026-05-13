@@ -42,11 +42,11 @@ export default function WallDisplayPage() {
   }, [shifts]);
 
   const lastReadingByUnit = useMemo(() => {
-    const m = new Map<string, number>();
+    const m = new Map<string, { at: number; tempC: number }>();
     for (const r of readings) {
-      const prev = m.get(r.coldStorageUnitId) ?? 0;
       const t = new Date(r.loggedAt).getTime();
-      if (t > prev) m.set(r.coldStorageUnitId, t);
+      const prev = m.get(r.coldStorageUnitId);
+      if (!prev || t > prev.at) m.set(r.coldStorageUnitId, { at: t, tempC: Number(r.readingC) });
     }
     return m;
   }, [readings]);
@@ -221,16 +221,21 @@ export default function WallDisplayPage() {
             </h2>
             <ul className="space-y-1">
               {storage.map((unit) => {
-                const lastMs = lastReadingByUnit.get(unit.id ?? "") ?? 0;
-                const hoursAgo =
-                  lastMs === 0
-                    ? null
-                    : Math.round((Date.now() - lastMs) / (60 * 60 * 1000));
+                const last = lastReadingByUnit.get(unit.id ?? "");
+                const hoursAgo = last ? Math.round((Date.now() - last.at) / (60 * 60 * 1000)) : null;
+                const inRange =
+                  last &&
+                  unit.targetTempMinC != null &&
+                  unit.targetTempMaxC != null &&
+                  last.tempC >= unit.targetTempMinC &&
+                  last.tempC <= unit.targetTempMaxC;
+                const tempTone =
+                  !last ? "text-status-alert"
+                  : !inRange ? "text-status-alert"
+                  : hoursAgo != null && hoursAgo > 12 ? "text-status-warn"
+                  : "text-status-ok";
                 return (
-                  <li
-                    key={unit.id}
-                    className="flex items-center justify-between text-[13px]"
-                  >
+                  <li key={unit.id} className="flex items-center justify-between gap-3 text-[13px]">
                     <span
                       style={{
                         fontFamily: "var(--font-serif)",
@@ -240,16 +245,11 @@ export default function WallDisplayPage() {
                     >
                       {unit.name}
                     </span>
-                    <span
-                      className={
-                        hoursAgo === null
-                          ? "text-status-alert"
-                          : hoursAgo > 12
-                            ? "text-status-warn"
-                            : "text-status-ok"
-                      }
-                    >
-                      {hoursAgo === null ? "no reading" : `${hoursAgo}h ago`}
+                    <span className={`tabular-nums ${tempTone}`}>
+                      {last ? `${last.tempC.toFixed(1)}°C` : "no reading"}
+                      {last && hoursAgo != null && (
+                        <span className="text-muted-foreground ml-2 text-[11px]">{hoursAgo}h ago</span>
+                      )}
                     </span>
                   </li>
                 );
