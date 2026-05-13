@@ -1,36 +1,42 @@
 "use client";
 
-/**
- * Fillings page — two tabs: Fillings, Categories
- * ────────────────────────────────────────────────
- * Fillings: existing reusable filling list (grouped by category).
- * Categories: configurable filling categories with a per-category
- *             `shelfStable` flag that drives production-wizard scaling.
- */
-
-import { useState, useMemo, useEffect, Suspense } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
-import { ListToolbar, FilterPanel, FilterChipGroup, ArchiveFilterChip, QuickAddForm, EmptyState, ListItemCard } from "@/components/pantry";
-import { CategoryPicker } from "@/components/category-picker";
 import {
-  useFillings, saveFilling, useAllFillingStatuses,
-  useFillingCategories, useFillingCategoryUsageCounts, saveFillingCategory,
+  useFillings,
+  saveFilling,
+  useAllFillingStatuses,
+  useFillingCategories,
+  useFillingCategoryUsageCounts,
+  saveFillingCategory,
+  useProductsList,
+  useProductFillingsForProducts,
 } from "@/lib/hooks";
-import { DEFAULT_FILLING_STATUSES, allergenLabel } from "@/types";
-import type { Filling } from "@/types";
-import { ChevronRight, ChevronDown } from "lucide-react";
-import Link from "next/link";
-import { useNShortcut } from "@/lib/use-n-shortcut";
+import { DEFAULT_FILLING_STATUSES, isRealAllergen } from "@/types";
+import {
+  PageHeader,
+  CategorySection,
+  FillingCard,
+  AddCard,
+  DsButton,
+  Section,
+  normalizeFillingStatus,
+  type FillingStatus,
+} from "@/components/dulceria";
+import {
+  ListToolbar,
+  FilterPanel,
+  ArchiveFilterChip,
+  QuickAddForm,
+  EmptyState,
+  ListItemCard,
+} from "@/components/pantry";
+import { CategoryPicker } from "@/components/category-picker";
+import { IconPlus, IconCategory, IconSearch } from "@tabler/icons-react";
 import { usePersistedFilters } from "@/lib/use-persisted-filters";
-import { shelfLifeBucket, SHELF_LIFE_BUCKET_LABELS, SHELF_LIFE_BUCKET_ORDER, type ShelfLifeBucket } from "@/lib/shelfLifeBuckets";
+import { useNShortcut } from "@/lib/use-n-shortcut";
 
-type FillingsTab = "fillings" | "categories";
-
-const TABS: { id: FillingsTab; label: string }[] = [
-  { id: "fillings", label: "Fillings" },
-  { id: "categories", label: "Categories" },
-];
+type Tab = "fillings" | "categories";
 
 export default function FillingsPage() {
   return (
@@ -41,196 +47,121 @@ export default function FillingsPage() {
 }
 
 function FillingsPageInner() {
-  const [tab, setTab] = usePersistedFilters("fillings-tab", { activeTab: "fillings" as FillingsTab });
+  const [tab, setTab] = usePersistedFilters("fillings-tab", { activeTab: "fillings" as Tab });
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
 
-  // URL param wins over sessionStorage — lets detail pages return to a specific tab via
-  // `/fillings?tab=categories` (used by the Back link on filling-category detail pages).
   useEffect(() => {
     if (tabParam === "fillings" || tabParam === "categories") {
       if (tab.activeTab !== tabParam) setTab("activeTab", tabParam);
     }
   }, [tabParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const activeTab = tab.activeTab;
-
   return (
-    <div>
-      <PageHeader title="Fillings" description="Reusable filling products and their categories" />
-
-      <div className="px-4 mb-3">
-        <div className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          {TABS.map(({ id, label }) => (
-            <button
-              key={id}
-              onClick={() => setTab("activeTab", id)}
-              className={`px-3.5 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                activeTab === id
-                  ? "bg-accent text-accent-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {activeTab === "fillings" && <FillingsTab />}
-      {activeTab === "categories" && <CategoriesTab />}
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      {tab.activeTab === "fillings" ? (
+        <FillingsTab onSwitchToCategories={() => setTab("activeTab", "categories")} />
+      ) : (
+        <CategoriesTab onSwitchToFillings={() => setTab("activeTab", "fillings")} />
+      )}
     </div>
   );
 }
 
-// ─── Fillings Tab ────────────────────────────────────────────────────────────
+type StatusFilter = "all" | FillingStatus;
 
-function FillingsTab() {
+const STATUS_FILTERS: Array<{ id: StatusFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "confirmed", label: "Confirmed" },
+  { id: "testing", label: "Testing" },
+  { id: "to-try", label: "To try" },
+];
+
+function FillingsTab({ onSwitchToCategories }: { onSwitchToCategories: () => void }) {
   const router = useRouter();
-  const [f, setF] = usePersistedFilters("fillings", {
+  const [f, setF] = usePersistedFilters("fillings-v2", {
     search: "",
-    showFilters: false,
-    filterStatus: "",
-    filterCategories: [] as string[],
-    filterAllergens: [] as string[],
-    filterExcludeAllergens: [] as string[],
-    filterShelfLife: [] as ShelfLifeBucket[],
+    filterStatus: "all" as StatusFilter,
+    filterCategory: "",
     showArchived: false,
   });
+
   const fillings = useFillings(f.showArchived);
   const allCategories = useFillingCategories();
-  const existingStatuses = useAllFillingStatuses();
-  const statusOptions = useMemo(() => {
-    const all = [...new Set([...DEFAULT_FILLING_STATUSES, ...existingStatuses])].sort();
-    return all.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }));
-  }, [existingStatuses]);
-  const categoryOptions = useMemo(() =>
-    allCategories.map((c) => ({ value: c.name, label: c.name.split(" (")[0] })),
-    [allCategories],
-  );
-  const [showAdd, setShowAdd] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newCategory, setNewCategory] = useState("");
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const products = useProductsList();
+  const allProductIds = useMemo(() => products.map((p) => p.id!).filter(Boolean), [products]);
+  const productFillingsMap = useProductFillingsForProducts(allProductIds);
 
-  const filterCategoriesSet = useMemo(() => new Set(f.filterCategories), [f.filterCategories]);
-  const filterAllergensSet = useMemo(() => new Set(f.filterAllergens), [f.filterAllergens]);
-  const filterExcludeAllergensSet = useMemo(() => new Set(f.filterExcludeAllergens), [f.filterExcludeAllergens]);
-  const filterShelfLifeSet = useMemo(() => new Set(f.filterShelfLife), [f.filterShelfLife]);
-  const toggleShelfLifeBucket = (bucket: ShelfLifeBucket) => {
-    const next = new Set(filterShelfLifeSet);
-    if (next.has(bucket)) next.delete(bucket); else next.add(bucket);
-    setF("filterShelfLife", Array.from(next));
-  };
+  const productNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of products) if (p.id) m.set(p.id, p.name);
+    return m;
+  }, [products]);
 
-  const presentAllergenIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const l of fillings) for (const a of (l.allergens ?? [])) set.add(a);
-    return Array.from(set).sort();
-  }, [fillings]);
+  /** fillingId → product names */
+  const usedInByFilling = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const [pid, rows] of productFillingsMap) {
+      const name = productNameById.get(pid);
+      if (!name) continue;
+      for (const { fillingId } of rows) {
+        const arr = m.get(fillingId) ?? [];
+        if (!arr.includes(name)) arr.push(name);
+        m.set(fillingId, arr);
+      }
+    }
+    for (const arr of m.values()) arr.sort();
+    return m;
+  }, [productFillingsMap, productNameById]);
 
-  useNShortcut(() => setShowAdd(true), showAdd);
-
-  const activeFilterCount =
-    (f.filterStatus ? 1 : 0) +
-    (filterCategoriesSet.size > 0 ? 1 : 0) +
-    (filterAllergensSet.size > 0 ? 1 : 0) +
-    (filterExcludeAllergensSet.size > 0 ? 1 : 0) +
-    (filterShelfLifeSet.size > 0 ? 1 : 0) +
-    (f.showArchived ? 1 : 0);
-
-  function clearFilters() {
-    setF("filterStatus", "");
-    setF("filterCategories", []);
-    setF("filterAllergens", []);
-    setF("filterExcludeAllergens", []);
-    setF("filterShelfLife", []);
-    setF("showArchived", false);
-  }
-
-  function toggleFilterCategory(cat: string) {
-    const next = new Set(filterCategoriesSet);
-    if (next.has(cat)) next.delete(cat); else next.add(cat);
-    setF("filterCategories", Array.from(next));
-  }
-
-  function toggleFilterAllergen(allergen: string) {
-    const next = new Set(filterAllergensSet);
-    if (next.has(allergen)) next.delete(allergen); else next.add(allergen);
-    setF("filterAllergens", Array.from(next));
-  }
-
-  function toggleExcludeAllergen(allergen: string) {
-    const next = new Set(filterExcludeAllergensSet);
-    if (next.has(allergen)) next.delete(allergen); else next.add(allergen);
-    setF("filterExcludeAllergens", Array.from(next));
-  }
-
-  const searchLower = f.search.toLowerCase();
   const filtered = useMemo(() => {
+    const q = f.search.trim().toLowerCase();
     return fillings.filter((l) => {
-      if (f.search && !l.name.toLowerCase().includes(searchLower) && !(l.category ?? "").toLowerCase().includes(searchLower)) return false;
-      if (f.filterStatus && l.status !== f.filterStatus) return false;
-      if (filterCategoriesSet.size > 0 && !filterCategoriesSet.has(l.category)) return false;
-      if (filterAllergensSet.size > 0 && !(l.allergens ?? []).some((a) => filterAllergensSet.has(a))) return false;
-      if (filterExcludeAllergensSet.size > 0 && (l.allergens ?? []).some((a) => filterExcludeAllergensSet.has(a))) return false;
-      if (filterShelfLifeSet.size > 0 && !filterShelfLifeSet.has(shelfLifeBucket(l.shelfLifeWeeks))) return false;
-      if (!f.showArchived && l.archived) return false;
+      if (q && !l.name.toLowerCase().includes(q) && !(l.category ?? "").toLowerCase().includes(q)) return false;
+      if (f.filterStatus !== "all") {
+        const norm = normalizeFillingStatus(l.status);
+        if (norm !== f.filterStatus) return false;
+      }
+      if (f.filterCategory && l.category !== f.filterCategory) return false;
       return true;
     });
-  }, [fillings, f.search, searchLower, f.filterStatus, filterCategoriesSet, filterAllergensSet, filterExcludeAllergensSet, filterShelfLifeSet, f.showArchived]);
+  }, [fillings, f.search, f.filterStatus, f.filterCategory]);
 
-  // Group fillings by category, ordered by the live categories list (then any unknown labels by name)
   const grouped = useMemo(() => {
-    // Single pass: bucket by category name
-    const byCategory = new Map<string, Filling[]>();
-    const uncategorized: Filling[] = [];
+    const byCategory = new Map<string, typeof filtered>();
+    const uncategorized: typeof filtered = [];
     for (const l of filtered) {
       if (!l.category) {
         uncategorized.push(l);
       } else {
-        const arr = byCategory.get(l.category);
-        if (arr) arr.push(l);
-        else byCategory.set(l.category, [l]);
+        const arr = byCategory.get(l.category) ?? [];
+        arr.push(l);
+        byCategory.set(l.category, arr);
       }
     }
-
-    const groups: { category: string; label: string; fillings: Filling[] }[] = [];
+    const groups: Array<{ id: string; label: string; list: typeof filtered }> = [];
     const seen = new Set<string>();
     for (const cat of allCategories) {
-      if (seen.has(cat.name)) continue;
-      const catFillings = byCategory.get(cat.name);
-      if (catFillings && catFillings.length > 0) {
-        groups.push({ category: cat.name, label: cat.name, fillings: catFillings });
+      const arr = byCategory.get(cat.name);
+      if (arr && arr.length > 0) {
+        groups.push({ id: cat.name, label: cat.name, list: arr });
         seen.add(cat.name);
       }
     }
-    // Any filling whose category isn't in the categories table (e.g. a stale/legacy label)
-    const orphanNames = [...byCategory.keys()].filter((name) => !seen.has(name)).sort();
-    for (const name of orphanNames) {
-      groups.push({ category: name, label: name, fillings: byCategory.get(name)! });
+    const orphans = [...byCategory.keys()].filter((k) => !seen.has(k)).sort();
+    for (const k of orphans) {
+      groups.push({ id: k, label: k, list: byCategory.get(k)! });
     }
     if (uncategorized.length > 0) {
-      groups.push({ category: "", label: "Uncategorized", fillings: uncategorized });
+      groups.push({ id: "", label: "Uncategorized", list: uncategorized });
     }
-
     return groups;
   }, [filtered, allCategories]);
 
-  function toggleCategory(cat: string) {
-    setCollapsedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat); else next.add(cat);
-      return next;
-    });
-  }
-
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newName.trim()) return;
+  async function handleAdd() {
     const id = await saveFilling({
-      name: newName.trim(),
-      category: newCategory,
+      name: "New filling",
+      category: "",
       source: "",
       description: "",
       allergens: [],
@@ -239,267 +170,187 @@ function FillingsTab() {
     router.push(`/fillings/${encodeURIComponent(String(id))}?new=1`);
   }
 
+  const total = fillings.length;
+  const byStatus = useMemo(() => {
+    const m: Record<FillingStatus, number> = { confirmed: 0, testing: 0, "to-try": 0, unknown: 0 };
+    for (const l of fillings) m[normalizeFillingStatus(l.status)]++;
+    return m;
+  }, [fillings]);
+
   return (
-    <div className="px-4 space-y-3 pb-6">
-      <ListToolbar
-        search={f.search}
-        onSearchChange={(v) => setF("search", v)}
-        searchPlaceholder="Search name, category…"
-        searchAriaLabel="Search fillings"
-        onAdd={() => setShowAdd(true)}
-        addAriaLabel="Add filling"
-        addTitle="Add filling (n)"
-        showFilters
-        filterPanelOpen={f.showFilters}
-        onToggleFilters={() => setF("showFilters", !f.showFilters)}
-        activeFilterCount={activeFilterCount}
+    <>
+      <PageHeader
+        title="Fillings"
+        meta={`${total} fillings across ${allCategories.length} categor${allCategories.length === 1 ? "y" : "ies"} · ${byStatus.confirmed} confirmed, ${byStatus.testing} testing, ${byStatus["to-try"]} to try`}
+        actions={
+          <>
+            <DsButton variant="default" size="md" onClick={onSwitchToCategories}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <IconCategory size={14} stroke={1.5} /> Categories
+              </span>
+            </DsButton>
+            <DsButton variant="primary" size="md" onClick={handleAdd}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <IconPlus size={14} stroke={1.5} /> New filling
+              </span>
+            </DsButton>
+          </>
+        }
       />
 
-      {/* Quick filters under search — most-used dimensions always
-          visible. Full set stays in the panel below. See
-          feedback_filter_ux_pattern.md. */}
-      {(categoryOptions.length > 0 || statusOptions.length > 0) && (
-        <div className="flex flex-col gap-1.5">
-          {statusOptions.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Status</span>
-              {statusOptions.map(({ value, label }) => {
-                const active = f.filterStatus === value;
-                return (
-                  <button
-                    key={value || "any"}
-                    onClick={() => setF("filterStatus", active ? "" : value)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                      active
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {categoryOptions.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Category</span>
-              {categoryOptions.map(({ value, label }) => {
-                const active = filterCategoriesSet.has(value);
-                return (
-                  <button
-                    key={value}
-                    onClick={() => toggleFilterCategory(value)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
-                      active
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {presentAllergenIds.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Avoid</span>
-              {presentAllergenIds.map((id) => {
-                const active = filterAllergensSet.has(id);
-                return (
-                  <button
-                    key={id}
-                    onClick={() => toggleFilterAllergen(id)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                      active
-                        ? "bg-[var(--accent-blush-bg)] text-[var(--accent-blush-ink)]"
-                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
-                    }`}
-                  >
-                    {allergenLabel(id)}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              borderRadius: 14,
+              maxWidth: 360,
+            }}
+          >
+            <IconSearch size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
+            <input
+              type="text"
+              value={f.search}
+              onChange={(e) => setF("search", e.target.value)}
+              placeholder="Search fillings…"
+              style={{
+                fontSize: 12,
+                border: "none",
+                background: "transparent",
+                outline: "none",
+                flex: 1,
+                color: "var(--ds-text-primary)",
+              }}
+            />
+          </div>
 
-      {f.showFilters && (
-        <FilterPanel activeFilterCount={activeFilterCount} onClearAll={clearFilters}>
-          <FilterChipGroup
+          <PillRow
             label="Status"
-            options={statusOptions}
-            value={f.filterStatus}
-            defaultValue=""
-            onChange={(v) => setF("filterStatus", v)}
+            options={STATUS_FILTERS.map((s) => ({ id: s.id, label: s.label }))}
+            isActive={(id) => f.filterStatus === id}
+            onSelect={(id) => setF("filterStatus", id as StatusFilter)}
           />
-          <FilterChipGroup
-            label="Category"
-            options={categoryOptions}
-            multi
-            selected={filterCategoriesSet}
-            onToggle={toggleFilterCategory}
-          />
-          {presentAllergenIds.length > 0 && (
-            <FilterChipGroup
-              label="Contains allergen"
-              options={presentAllergenIds.map((id) => ({ value: id, label: allergenLabel(id) }))}
-              multi
-              selected={filterAllergensSet}
-              onToggle={toggleFilterAllergen}
+          {allCategories.length > 0 && (
+            <PillRow
+              label="Category"
+              options={[
+                { id: "", label: "All" },
+                ...allCategories.map((c) => ({ id: c.name, label: c.name.split(" (")[0] })),
+              ]}
+              isActive={(id) => f.filterCategory === id}
+              onSelect={(id) => setF("filterCategory", id)}
             />
           )}
-          {presentAllergenIds.length > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Exclude allergens</p>
-              <div className="flex flex-wrap gap-1">
-                {presentAllergenIds.map((id) => (
-                  <button
-                    key={id}
-                    onClick={() => toggleExcludeAllergen(id)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${filterExcludeAllergensSet.has(id) ? "bg-destructive text-destructive-foreground" : "border border-border"}`}
-                  >
-                    {allergenLabel(id)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <FilterChipGroup
-            label="Shelf life"
-            options={SHELF_LIFE_BUCKET_ORDER.map((b) => ({ value: b, label: SHELF_LIFE_BUCKET_LABELS[b] }))}
-            multi
-            selected={filterShelfLifeSet}
-            onToggle={(v) => toggleShelfLifeBucket(v as ShelfLifeBucket)}
-          />
-          <ArchiveFilterChip
-            value={f.showArchived}
-            onChange={(v) => setF("showArchived", v)}
-          />
-        </FilterPanel>
-      )}
-
-      {showAdd && (
-        <form onSubmit={handleAdd} className="rounded-sm border border-border bg-card p-3 space-y-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Filling name (e.g. Dark ganache, Praline crunch)…"
-            aria-label="Filling name"
-            required
-            autoFocus
-            className="input"
-          />
-          <CategoryPicker
-            category={newCategory}
-            onCategoryChange={setNewCategory}
-          />
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={!newName.trim()}
-              className="btn-primary flex-1 py-2"
-            >
-              Create Filling
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowAdd(false); setNewName(""); setNewCategory(""); }}
-              className="btn-secondary px-4 py-2"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      {filtered.length === 0 ? (
-        <p className="text-muted-foreground text-sm py-8 text-center">
-          {fillings.length === 0 && activeFilterCount === 0
-            ? "No fillings yet. Tap + to create your first filling product."
-            : "No fillings match your filters."}
-        </p>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setCollapsedCategories(new Set(grouped.map((g) => g.category)))} className="text-xs text-muted-foreground">Collapse all</button>
-            <button onClick={() => setCollapsedCategories(new Set())} className="text-xs text-muted-foreground">Expand all</button>
-          </div>
-          {grouped.map((group) => {
-            const isCollapsed = collapsedCategories.has(group.category);
-            return (
-              <div key={group.category}>
-                <button
-                  onClick={() => toggleCategory(group.category)}
-                  aria-expanded={!isCollapsed}
-                  className="flex items-center gap-2 w-full text-left mb-2"
-                >
-                  <ChevronDown aria-hidden="true" className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-150 ${isCollapsed ? "-rotate-90" : ""}`} />
-                  <h2 className="text-sm font-semibold text-primary">{group.label}</h2>
-                  <span className="text-xs text-muted-foreground">({group.fillings.length})</span>
-                </button>
-                {!isCollapsed && (
-                  <ul className="space-y-2 ml-6">
-                    {group.fillings.map((filling) => (
-                      <li
-                        key={filling.id}
-                        className={`rounded-sm border bg-card ${filling.archived ? "border-muted opacity-60" : "border-border"}`}
-                        style={{ contentVisibility: "auto", containIntrinsicSize: "0 72px" }}
-                      >
-                        <Link
-                          href={`/fillings/${encodeURIComponent(filling.id ?? '')}`}
-                          className="flex items-center gap-3 p-3 min-w-0"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <h3 className="font-medium text-sm truncate">
-                              {filling.name}
-                              {filling.archived && <span className="ml-1.5 text-[10px] text-muted-foreground font-normal">(archived)</span>}
-                            </h3>
-                            {filling.description && (
-                              <p className="text-xs text-muted-foreground truncate mt-0.5">{filling.description}</p>
-                            )}
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {filling.status && (
-                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                  filling.status === "confirmed" ? "bg-success-muted text-success" :
-                                  filling.status === "testing"   ? "bg-warning-muted text-warning" :
-                                  filling.status === "to try"    ? "bg-muted text-muted-foreground" :
-                                                                   "bg-sky-50 text-sky-700 border border-sky-200"
-                                }`}>
-                                  {filling.status.charAt(0).toUpperCase() + filling.status.slice(1)}
-                                </span>
-                              )}
-                              {filling.allergens.map((a) => (
-                                <span
-                                  key={a}
-                                  className="rounded-sm border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-[10px]"
-                                >
-                                  {allergenLabel(a)}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          <ChevronRight aria-hidden="true" className="w-4 h-4 text-muted-foreground shrink-0" />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
         </div>
-      )}
+
+        {grouped.length === 0 ? (
+          <p
+            style={{
+              textAlign: "center",
+              padding: "40px 0",
+              fontFamily: "var(--font-serif)",
+              fontSize: 14,
+              color: "var(--ds-text-muted)",
+            }}
+          >
+            {fillings.length === 0 ? "No fillings yet." : "No fillings match the filters."}
+          </p>
+        ) : (
+          grouped.map((g) => (
+            <CategorySection
+              key={g.id || "uncategorised"}
+              title={g.label}
+              count={`${g.list.length} filling${g.list.length === 1 ? "" : "s"}`}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                {g.list.map((l) => {
+                  const status = normalizeFillingStatus(l.status);
+                  const usedIn = l.id ? usedInByFilling.get(l.id) ?? [] : [];
+                  const aller = (l.allergens ?? []).filter(isRealAllergen);
+                  return (
+                    <FillingCard
+                      key={l.id}
+                      href={`/fillings/${encodeURIComponent(l.id ?? "")}`}
+                      name={l.name}
+                      status={status}
+                      usedInProducts={usedIn}
+                      allergens={aller}
+                      archived={l.archived}
+                    />
+                  );
+                })}
+                <AddCard label={`new ${g.label.toLowerCase()}`} onClick={handleAdd} />
+              </div>
+            </CategorySection>
+          ))
+        )}
+      </div>
+    </>
+  );
+}
+
+function PillRow({
+  label,
+  options,
+  isActive,
+  onSelect,
+}: {
+  label: string;
+  options: Array<{ id: string; label: string }>;
+  isActive: (id: string) => boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <span
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--ds-text-muted)",
+          fontWeight: 600,
+          marginRight: 4,
+        }}
+      >
+        {label}
+      </span>
+      {options.map((o) => {
+        const active = isActive(o.id);
+        return (
+          <button
+            key={o.id || "all"}
+            type="button"
+            onClick={() => onSelect(o.id)}
+            style={{
+              padding: "3px 10px",
+              fontSize: 11,
+              border: `0.5px solid ${active ? "var(--ds-tier-quarter-focus)" : "var(--ds-border-warm)"}`,
+              background: active ? "var(--ds-tier-quarter-focus)" : "var(--ds-card-bg)",
+              color: active ? "#ffffff" : "var(--ds-text-muted)",
+              borderRadius: 12,
+              cursor: "pointer",
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-// ─── Categories Tab ──────────────────────────────────────────────────────────
-
-function CategoriesTab() {
+function CategoriesTab({ onSwitchToFillings }: { onSwitchToFillings: () => void }) {
   const router = useRouter();
   const [f, setF] = usePersistedFilters("filling-categories", {
     search: "",
@@ -509,33 +360,20 @@ function CategoriesTab() {
 
   const categories = useFillingCategories(f.showArchived);
   const usageCounts = useFillingCategoryUsageCounts();
-
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [newShelfStable, setNewShelfStable] = useState(false);
-
   useNShortcut(() => setShowAdd(true), showAdd);
 
-  const activeFilterCount = (f.showArchived ? 1 : 0);
-
   const filtered = useMemo(() => {
-    return categories.filter((c) => {
-      if (f.search && !c.name.toLowerCase().includes(f.search.toLowerCase())) return false;
-      return true;
-    });
+    const q = f.search.trim().toLowerCase();
+    return categories.filter((c) => !q || c.name.toLowerCase().includes(q));
   }, [categories, f.search]);
-
-  function clearFilters() {
-    setF("showArchived", false);
-  }
 
   async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!newName.trim()) return;
-    const id = await saveFillingCategory({
-      name: newName.trim(),
-      shelfStable: newShelfStable,
-    });
+    const id = await saveFillingCategory({ name: newName.trim(), shelfStable: newShelfStable });
     setNewName("");
     setNewShelfStable(false);
     setShowAdd(false);
@@ -543,104 +381,140 @@ function CategoriesTab() {
   }
 
   return (
-    <div className="px-4 space-y-3 pb-6">
-      <ListToolbar
-        search={f.search}
-        onSearchChange={(v) => setF("search", v)}
-        searchPlaceholder="Search categories…"
-        searchAriaLabel="Search filling categories"
-        onAdd={() => setShowAdd(true)}
-        addAriaLabel="Add filling category"
-        addTitle="Add category (n)"
-        showFilters
-        filterPanelOpen={f.showFilters}
-        onToggleFilters={() => setF("showFilters", !f.showFilters)}
-        activeFilterCount={activeFilterCount}
+    <>
+      <PageHeader
+        title="Filling categories"
+        meta={`${categories.filter((c) => !c.archived).length} categories`}
+        actions={
+          <DsButton variant="default" size="md" onClick={onSwitchToFillings}>
+            ← Back to fillings
+          </DsButton>
+        }
       />
-
-      {f.showFilters && (
-        <FilterPanel activeFilterCount={activeFilterCount} onClearAll={clearFilters}>
-          <ArchiveFilterChip
-            value={f.showArchived}
-            onChange={(v) => setF("showArchived", v)}
-          />
-        </FilterPanel>
-      )}
-
-      {showAdd && (
-        <QuickAddForm
-          onSubmit={handleAdd}
-          onCancel={() => { setShowAdd(false); setNewName(""); setNewShelfStable(false); }}
-          submitLabel="Create Category"
-          canSubmit={!!newName.trim()}
+      <div style={{ padding: "16px 32px 40px" }}>
+        <Section
+          title="Categories"
+          action={
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              style={{ fontSize: 12, color: "var(--ds-tier-quarter-focus)", fontWeight: 500 }}
+            >
+              + new category
+            </button>
+          }
         >
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Escape") { setShowAdd(false); setNewName(""); setNewShelfStable(false); } }}
-            placeholder="Category name (e.g. Marmalades)…"
-            aria-label="Category name"
-            className="input w-full"
-            autoFocus
-            required
-          />
-          <label className="flex items-start gap-2 text-sm cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={newShelfStable}
-              onChange={(e) => setNewShelfStable(e.target.checked)}
-              className="mt-0.5"
+          <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+            <ListToolbar
+              search={f.search}
+              onSearchChange={(v) => setF("search", v)}
+              searchPlaceholder="Search categories…"
+              searchAriaLabel="Search filling categories"
+              onAdd={() => setShowAdd(true)}
+              addAriaLabel="Add filling category"
+              addTitle="Add category (n)"
+              showFilters
+              filterPanelOpen={f.showFilters}
+              onToggleFilters={() => setF("showFilters", !f.showFilters)}
+              activeFilterCount={f.showArchived ? 1 : 0}
             />
-            <span>
-              <span className="font-medium">Shelf-stable</span>
-              <span className="block text-xs text-muted-foreground">
-                The production wizard will ask for a batch multiplier instead of scaling the recipe to the moulds.
-              </span>
-            </span>
-          </label>
-        </QuickAddForm>
-      )}
-
-      {filtered.length === 0 && (
-        <EmptyState
-          hasData={categories.length > 0}
-          emptyMessage="No filling categories yet. Tap + to add your first."
-          filteredMessage="No categories match your search."
-        />
-      )}
-
-      {filtered.length > 0 && (
-        <ul className="space-y-2">
-          {filtered.map((c) => {
-            const usage = usageCounts.get(c.name) ?? 0;
-            return (
-              <ListItemCard
-                key={c.id}
-                href={`/fillings/categories/${encodeURIComponent(c.id!)}`}
-                archived={c.archived}
+            {f.showFilters && (
+              <FilterPanel
+                activeFilterCount={f.showArchived ? 1 : 0}
+                onClearAll={() => setF("showArchived", false)}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm truncate">{c.name}</span>
-                    {c.shelfStable && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                        Shelf-stable
-                      </span>
-                    )}
-                    {c.archived && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Archived</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {usage === 0 ? "No fillings" : `${usage} filling${usage === 1 ? "" : "s"}`}
-                  </div>
-                </div>
-              </ListItemCard>
-            );
-          })}
-        </ul>
-      )}
-    </div>
+                <ArchiveFilterChip
+                  value={f.showArchived}
+                  onChange={(v) => setF("showArchived", v)}
+                />
+              </FilterPanel>
+            )}
+            {showAdd && (
+              <QuickAddForm
+                onSubmit={handleAdd}
+                onCancel={() => {
+                  setShowAdd(false);
+                  setNewName("");
+                  setNewShelfStable(false);
+                }}
+                submitLabel="Create category"
+                canSubmit={!!newName.trim()}
+              >
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setShowAdd(false);
+                      setNewName("");
+                      setNewShelfStable(false);
+                    }
+                  }}
+                  placeholder="Category name…"
+                  aria-label="Category name"
+                  className="input w-full"
+                  autoFocus
+                  required
+                />
+                <label className="flex items-start gap-2 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newShelfStable}
+                    onChange={(e) => setNewShelfStable(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="font-medium">Shelf-stable</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Production wizard asks for a batch multiplier instead of scaling to moulds.
+                    </span>
+                  </span>
+                </label>
+              </QuickAddForm>
+            )}
+            {filtered.length === 0 ? (
+              <EmptyState
+                hasData={categories.length > 0}
+                emptyMessage="No filling categories yet."
+                filteredMessage="No categories match."
+              />
+            ) : (
+              <ul style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {filtered.map((c) => {
+                  const usage = usageCounts.get(c.name) ?? 0;
+                  return (
+                    <ListItemCard
+                      key={c.id}
+                      href={`/fillings/categories/${encodeURIComponent(c.id!)}`}
+                      archived={c.archived}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm truncate">{c.name}</span>
+                          {c.shelfStable && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                              Shelf-stable
+                            </span>
+                          )}
+                          {c.archived && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                              Archived
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {usage === 0 ? "No fillings" : `${usage} filling${usage === 1 ? "" : "s"}`}
+                        </div>
+                      </div>
+                    </ListItemCard>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </Section>
+      </div>
+    </>
   );
 }
