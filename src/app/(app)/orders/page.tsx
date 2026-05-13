@@ -39,7 +39,7 @@ import {
 import { ListRow, StatusTag, type ListRowTier, type StatusTagKind } from "@/components/dulceria";
 
 /* iOS-glass design tokens — match /dashboard, /plan, /production-brain. */
-const CARD = "bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+const CARD = "bg-[color:var(--ds-card-bg)] border-[0.5px] border-[color:var(--ds-border-warm)] rounded-[8px] p-4";
 const SECTION_TITLE = "text-[10px] tracking-[0.08em] uppercase text-muted-foreground font-semibold mb-3 flex items-center gap-2";
 
 const STATUS_STYLE: Record<OrderStatus, string> = {

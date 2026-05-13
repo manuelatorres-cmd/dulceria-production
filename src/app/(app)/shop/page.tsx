@@ -18,7 +18,7 @@ import { IconPlus as Plus, IconX as X, IconPrinter as Printer, IconClock as Cloc
 const WEEKDAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 /* Same glass card pattern as /plan + /dashboard. */
-const CARD = "bg-white/70 backdrop-blur-2xl border border-white/60 rounded-[18px] p-5 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+const CARD = "bg-[color:var(--ds-card-bg)] border-[0.5px] border-[color:var(--ds-border-warm)] rounded-[8px] p-5";
 const PINK = "bg-[#e3ebe6] text-[#2e4839] hover:bg-[#d4e0d8]";
 const PINK_INK = "text-[#2e4839]";
 

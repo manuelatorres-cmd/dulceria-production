@@ -35,7 +35,7 @@ import {
 /* Style constants — kept consistent with the dashboard redesign so
    /plan and /dashboard read as one family. See feedback_design_direction
    (dashboard exception, 2026-04-24). */
-const CARD = "bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+const CARD = "bg-[color:var(--ds-card-bg)] border-[0.5px] border-[color:var(--ds-border-warm)] rounded-[8px] p-4";
 const INNER = "rounded-[12px] border border-border";
 
 /** Render Error / Supabase / unknown into a single human-readable line.
