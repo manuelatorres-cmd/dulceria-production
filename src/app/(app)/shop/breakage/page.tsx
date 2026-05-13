@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/page-header";
 import {
   useProductsList,
   saveStockTransfer,
@@ -10,6 +9,14 @@ import {
   useProductCategories,
 } from "@/lib/hooks";
 import { STOCK_TRANSFER_REASON_LABELS, type StockTransferReason } from "@/types";
+import {
+  PageHeader,
+  Section,
+  DsButton,
+  DsTabNav,
+  useToast,
+} from "@/components/dulceria";
+import { IconSearch } from "@tabler/icons-react";
 
 const STOCK_OUT_REASONS: StockTransferReason[] = [
   "sold",
@@ -20,24 +27,17 @@ const STOCK_OUT_REASONS: StockTransferReason[] = [
   "waste",
 ];
 
-/**
- * Stock-out log — bulk entry screen for everything that leaves shop
- * stock outside the normal order/box flows: walk-in singles (sold),
- * tastings, gifts/giveaways, event samples (booth), staff
- * consumption, and counter waste/breakage. Saves as stockTransfer
- * rows so the weekly sales report picks them up.
- */
 export default function ShopBreakagePage() {
   const products = useProductsList();
   const transfers = useStockTransfers("product");
   const campaigns = useCampaigns();
   const categories = useProductCategories(true);
+  const toast = useToast();
 
   const [reason, setReason] = useState<StockTransferReason>("sold");
   const [entries, setEntries] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
 
@@ -46,14 +46,12 @@ export default function ShopBreakagePage() {
     [categories],
   );
 
-  // Active market_event campaign — auto-tag event_sample / sold
-  // notes with the booth name when one is in window.
   const activeMarketEvent = useMemo(() => {
     const todayIso = new Date().toISOString().slice(0, 10);
     return campaigns.find(
-      (c) => c.type === "market_event"
-        && c.status !== "done" && c.status !== "cancelled"
-        && c.startDate <= todayIso && c.endDate >= todayIso,
+      (c) => c.type === "market_event" &&
+        c.status !== "done" && c.status !== "cancelled" &&
+        c.startDate <= todayIso && c.endDate >= todayIso,
     );
   }, [campaigns]);
 
@@ -61,6 +59,7 @@ export default function ShopBreakagePage() {
     () => products.filter((p) => !p.archived).sort((a, b) => a.name.localeCompare(b.name)),
     [products],
   );
+
   const visibleEligible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return eligible.filter((p) => {
@@ -71,6 +70,7 @@ export default function ShopBreakagePage() {
       return true;
     });
   }, [eligible, activeCategories, search]);
+
   const usedCategories = useMemo(() => {
     const ids = new Set<string>();
     for (const p of eligible) if (p.productCategoryId) ids.add(p.productCategoryId);
@@ -80,18 +80,16 @@ export default function ShopBreakagePage() {
   }, [eligible, categoryNameById]);
 
   const totalEntered = Object.values(entries).reduce((s, n) => s + n, 0);
+  const productCount = Object.keys(entries).length;
 
   async function save() {
     setSaving(true);
-    setSavedMsg(null);
     try {
-      const rows = Object.entries(entries).filter(([_, qty]) => qty > 0);
+      const rows = Object.entries(entries).filter(([, qty]) => qty > 0);
       const tag = activeMarketEvent && (reason === "event_sample" || reason === "sold")
         ? `[${activeMarketEvent.name}] `
         : "";
       const noteOut = (tag + (notes || "")).trim() || undefined;
-      // Map reason → toLocation. Waste/breakage tracked separately;
-      // everything else marked as 'consumed' (left the system).
       const toLoc = reason === "waste" ? "waste" : "consumed";
       for (const [productId, qty] of rows) {
         await saveStockTransfer({
@@ -105,238 +103,295 @@ export default function ShopBreakagePage() {
           notes: noteOut,
         });
       }
-      setSavedMsg(`Logged ${rows.length} entries, ${totalEntered} pieces.`);
+      toast.success(`Logged ${rows.length} entries`, {
+        description: `${totalEntered} pieces`,
+      });
       setEntries({});
       setNotes("");
+    } catch (err) {
+      toast.error("Save failed", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader
         title="Stock out"
-        accent="Shop"
-        description="Anything leaving shop stock outside normal orders: walk-in sales, tastings, gifts, event samples, staff, breakage. Feeds the weekly sales report."
+        meta="Walk-in sales, tastings, gifts, event samples, staff, breakage · feeds weekly sales report"
       />
 
-      <section
-        className="border border-border bg-card p-4 mb-4"
-        style={{ borderRadius: 4 }}
-      >
-        <div className="flex flex-wrap gap-1.5 items-center">
-          <label className="text-[10px] uppercase text-muted-foreground font-medium mr-2" style={{ letterSpacing: "0.12em" }}>
-            Reason
-          </label>
-          {STOCK_OUT_REASONS.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setReason(r)}
-              className={
-                "text-[11.5px] px-2.5 py-1 border " +
-                (reason === r
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-card border-border text-foreground hover:border-foreground")
-              }
-              style={{ borderRadius: 3 }}
-            >
-              {STOCK_TRANSFER_REASON_LABELS[r]}
-            </button>
-          ))}
-        </div>
-        {activeMarketEvent && (reason === "event_sample" || reason === "sold") && (
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Auto-tagging note with active market event: <b>{activeMarketEvent.name}</b>.
-          </p>
-        )}
-      </section>
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <Section title="Reason">
+          <div style={{ padding: 16 }}>
+            <DsTabNav
+              variant="pills"
+              tabs={STOCK_OUT_REASONS.map((r) => ({
+                id: r,
+                label: STOCK_TRANSFER_REASON_LABELS[r],
+              }))}
+              activeTab={reason}
+              onChange={(id) => setReason(id as StockTransferReason)}
+            />
+            {activeMarketEvent && (reason === "event_sample" || reason === "sold") && (
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "var(--ds-text-muted)",
+                  marginTop: 10,
+                  fontStyle: "italic",
+                }}
+              >
+                Auto-tagging note with active market event: <b>{activeMarketEvent.name}</b>.
+              </p>
+            )}
+          </div>
+        </Section>
 
-      <section
-        className="border border-border bg-card p-4 mb-4"
-        style={{ borderRadius: 4 }}
-      >
-        <h3
-          className="text-[13px] mb-3"
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontWeight: 500,
-            letterSpacing: "-0.012em",
-          }}
-        >
-          How many of each? <span className="text-muted-foreground text-[10.5px] font-normal">(skip products with zero)</span>
-        </h3>
-
-        {/* Category chip row + search — narrows the product list. */}
-        {usedCategories.length > 0 && (
-          <div className="space-y-2 mb-3">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {usedCategories.map((c) => {
-                const active = activeCategories.has(c.id);
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => {
+        <Section title="How many of each?" action="Skip products with zero">
+          <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+            {usedCategories.length > 0 && (
+              <>
+                <DsTabNav
+                  variant="pills"
+                  tabs={[
+                    { id: "", label: "All" },
+                    ...usedCategories.map((c) => ({ id: c.id, label: c.name })),
+                  ]}
+                  activeTab={activeCategories.size === 0 ? "" : [...activeCategories][0] ?? ""}
+                  onChange={(id) => {
+                    if (id === "") setActiveCategories(new Set());
+                    else {
                       setActiveCategories((prev) => {
                         const next = new Set(prev);
-                        if (next.has(c.id)) next.delete(c.id);
-                        else next.add(c.id);
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        return next;
+                      });
+                    }
+                  }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "4px 10px",
+                    border: "0.5px solid var(--ds-border-warm)",
+                    background: "var(--ds-card-bg)",
+                    borderRadius: 14,
+                    maxWidth: 360,
+                  }}
+                >
+                  <IconSearch size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search products…"
+                    style={{
+                      fontSize: 12,
+                      border: "none",
+                      background: "transparent",
+                      outline: "none",
+                      flex: 1,
+                      color: "var(--ds-text-primary)",
+                    }}
+                  />
+                </div>
+              </>
+            )}
+
+            <ul
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                gap: 8,
+                listStyle: "none",
+                padding: 0,
+                margin: 0,
+              }}
+            >
+              {visibleEligible.map((p) => (
+                <li
+                  key={p.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    border: "0.5px solid var(--ds-border-warm)",
+                    background: "var(--ds-card-bg)",
+                    padding: "6px 10px",
+                    borderRadius: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontFamily: "var(--font-serif)",
+                      fontWeight: 500,
+                      letterSpacing: "-0.01em",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      flex: 1,
+                      minWidth: 0,
+                    }}
+                  >
+                    {p.name}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={entries[p.id ?? ""] ?? ""}
+                    onChange={(e) => {
+                      const v = Math.max(0, Number(e.target.value) || 0);
+                      setEntries((prev) => {
+                        const next = { ...prev };
+                        if (v === 0) delete next[p.id ?? ""];
+                        else next[p.id ?? ""] = v;
                         return next;
                       });
                     }}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors capitalize ${
-                      active
-                        ? "bg-foreground text-background"
-                        : "bg-card text-muted-foreground border border-border hover:border-foreground"
-                    }`}
-                  >
-                    {c.name}
-                  </button>
-                );
-              })}
-              {activeCategories.size > 0 && (
-                <button
-                  onClick={() => setActiveCategories(new Set())}
-                  className="text-[11px] text-muted-foreground hover:text-foreground underline"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search products…"
-              className="input"
-            />
-          </div>
-        )}
-        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {visibleEligible.map((p) => (
-            <li
-              key={p.id}
-              className="flex items-center justify-between gap-2 border border-border bg-muted px-3 py-1.5"
-              style={{ borderRadius: 3 }}
-            >
-              <span
-                className="text-[12.5px] flex-1 min-w-0 truncate"
-                style={{
-                  fontFamily: "var(--font-serif)",
-                  fontWeight: 500,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {p.name}
-              </span>
-              <input
-                type="number"
-                min={0}
-                value={entries[p.id ?? ""] ?? ""}
-                onChange={(e) => {
-                  const v = Math.max(0, Number(e.target.value) || 0);
-                  setEntries((prev) => {
-                    const next = { ...prev };
-                    if (v === 0) {
-                      delete next[p.id ?? ""];
-                    } else {
-                      next[p.id ?? ""] = v;
-                    }
-                    return next;
-                  });
-                }}
-                className="input text-right"
-                style={{ maxWidth: 72, padding: "4px 8px" }}
-                placeholder="0"
-              />
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section
-        className="border border-border bg-card p-4 mb-4"
-        style={{ borderRadius: 4 }}
-      >
-        <label className="label">Notes (optional)</label>
-        <textarea
-          className="input"
-          rows={2}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="e.g. customer dropped box, influencer visit"
-        />
-      </section>
-
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">
-          {totalEntered} pieces across {Object.keys(entries).length} products
-        </span>
-        <div className="flex items-center gap-3">
-          {savedMsg ? (
-            <span className="text-[11px] text-status-ok">{savedMsg}</span>
-          ) : null}
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving || totalEntered === 0}
-            className="btn-primary"
-          >
-            {saving ? "Saving…" : "Log entries"}
-          </button>
-        </div>
-      </div>
-
-      <section
-        className="mt-8 border border-border bg-card p-4"
-        style={{ borderRadius: 4 }}
-      >
-        <h3
-          className="text-[13px] mb-3"
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontWeight: 500,
-            letterSpacing: "-0.012em",
-          }}
-        >
-          Recent log
-        </h3>
-        {transfers.length === 0 ? (
-          <p
-            className="text-muted-foreground italic text-[12.5px]"
-            style={{ fontFamily: "var(--font-serif)" }}
-          >
-            Nothing logged yet.
-          </p>
-        ) : (
-          <ul className="space-y-1">
-            {transfers
-              .filter((t) => STOCK_OUT_REASONS.includes(t.reason as StockTransferReason))
-              .slice(0, 30)
-              .map((t) => (
-                <li
-                  key={t.id}
-                  className="flex items-center gap-3 text-[12px] px-3 py-1.5 bg-muted border border-border"
-                  style={{ borderRadius: 3 }}
-                >
-                  <span className="tabular-nums font-medium">{Number(t.quantity)}</span>
-                  <span className="text-muted-foreground">
-                    {STOCK_TRANSFER_REASON_LABELS[t.reason as StockTransferReason] ?? t.reason}
-                  </span>
-                  {t.notes && (
-                    <span className="text-muted-foreground text-[10.5px] truncate max-w-[200px]" title={t.notes}>
-                      {t.notes}
-                    </span>
-                  )}
-                  <span className="text-muted-foreground text-[10.5px] ml-auto tabular-nums">
-                    {new Date(t.transferredAt).toLocaleString()}
-                  </span>
+                    placeholder="0"
+                    style={{
+                      width: 56,
+                      padding: "3px 6px",
+                      fontSize: 12,
+                      border: "0.5px solid var(--ds-border-warm)",
+                      borderRadius: 3,
+                      background: "var(--ds-card-bg)",
+                      color: "var(--ds-text-primary)",
+                      textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  />
                 </li>
               ))}
-          </ul>
-        )}
-      </section>
+            </ul>
+          </div>
+        </Section>
+
+        <Section title="Notes" action="optional">
+          <div style={{ padding: 16 }}>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. customer dropped box, influencer visit"
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                fontSize: 12,
+                border: "0.5px solid var(--ds-border-warm)",
+                borderRadius: 4,
+                background: "var(--ds-card-bg)",
+                color: "var(--ds-text-primary)",
+                outline: "none",
+                resize: "vertical",
+                fontFamily: "inherit",
+              }}
+            />
+          </div>
+        </Section>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 12, color: "var(--ds-text-muted)" }}>
+            {totalEntered} piece{totalEntered === 1 ? "" : "s"} across {productCount} product{productCount === 1 ? "" : "s"}
+          </span>
+          <DsButton variant="primary" size="md" onClick={save} disabled={saving || totalEntered === 0}>
+            {saving ? "Saving…" : "Log entries"}
+          </DsButton>
+        </div>
+
+        <Section title="Recent log" action={`${transfers.filter((t) => STOCK_OUT_REASONS.includes(t.reason as StockTransferReason)).length} entries`}>
+          {transfers.length === 0 ? (
+            <p
+              style={{
+                padding: "20px 16px",
+                color: "var(--ds-text-muted)",
+                fontStyle: "italic",
+                fontFamily: "var(--font-serif)",
+                fontSize: 13,
+              }}
+            >
+              Nothing logged yet.
+            </p>
+          ) : (
+            <ul
+              style={{
+                padding: "0 0 14px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                listStyle: "none",
+                margin: 0,
+              }}
+            >
+              {transfers
+                .filter((t) => STOCK_OUT_REASONS.includes(t.reason as StockTransferReason))
+                .slice(0, 30)
+                .map((t) => (
+                  <li
+                    key={t.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      fontSize: 12,
+                      padding: "6px 16px",
+                      borderTop: "0.5px solid var(--ds-border-warm)",
+                    }}
+                  >
+                    <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 500, minWidth: 32 }}>
+                      {Number(t.quantity)}
+                    </span>
+                    <span style={{ color: "var(--ds-text-muted)" }}>
+                      {STOCK_TRANSFER_REASON_LABELS[t.reason as StockTransferReason] ?? t.reason}
+                    </span>
+                    {t.notes && (
+                      <span
+                        title={t.notes}
+                        style={{
+                          fontSize: 11,
+                          color: "var(--ds-text-muted)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          maxWidth: 240,
+                          fontStyle: "italic",
+                        }}
+                      >
+                        {t.notes}
+                      </span>
+                    )}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "var(--ds-text-muted)",
+                        marginLeft: "auto",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {new Date(t.transferredAt).toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </Section>
+      </div>
     </div>
   );
 }
