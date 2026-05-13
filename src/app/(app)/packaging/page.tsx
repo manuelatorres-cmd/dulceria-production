@@ -1,97 +1,88 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
-import { usePackagingList, useAllPackagingOrders, savePackaging, setPackagingLowStock, useCurrencySymbol } from "@/lib/hooks";
-import { Package } from "lucide-react";
-import { ListToolbar, FilterPanel, FilterChipGroup, ArchiveFilterChip, ListItemCard, LowStockFlagButton, StockBadge } from "@/components/pantry";
-import type { PackagingOrder } from "@/types";
-import { useNShortcut } from "@/lib/use-n-shortcut";
+import Link from "next/link";
+import {
+  usePackagingList,
+  useAllPackagingOrders,
+  savePackaging,
+  useCurrencySymbol,
+} from "@/lib/hooks";
+import { PageHeader, DsButton, AddCard } from "@/components/dulceria";
+import { IconPlus, IconSearch, IconPackage } from "@tabler/icons-react";
 import { usePersistedFilters } from "@/lib/use-persisted-filters";
+import type { PackagingOrder } from "@/types";
 
-type StockFilter = "all" | "in-stock" | "low-stock" | "out-of-stock" | "ordered";
+type StockFilter = "all" | "in" | "low" | "out" | "ordered";
 
-const STOCK_OPTIONS: { value: StockFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "in-stock", label: "In stock" },
-  { value: "low-stock", label: "Low stock" },
-  { value: "out-of-stock", label: "Out of stock" },
-  { value: "ordered", label: "Ordered" },
+const STOCK_FILTERS: Array<{ id: StockFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "in", label: "In stock" },
+  { id: "low", label: "Low" },
+  { id: "out", label: "Out" },
+  { id: "ordered", label: "Ordered" },
 ];
 
-const CAPACITY_OPTIONS = [
-  { value: "1-4", label: "1–4" },
-  { value: "5-9", label: "5–9" },
-  { value: "10+", label: "10+" },
-];
+const STOCK_TINT: Record<"in" | "low" | "out" | "ordered", { bg: string; color: string; text: string }> = {
+  in: { bg: "var(--ds-tint-ok)", color: "var(--ds-tier-positive)", text: "in stock" },
+  low: { bg: "var(--ds-tint-warn)", color: "var(--ds-semantic-warn)", text: "low" },
+  out: { bg: "var(--ds-tint-critical)", color: "var(--ds-tier-urgent)", text: "out" },
+  ordered: { bg: "var(--ds-tint-info)", color: "var(--ds-tier-quarter-focus)", text: "ordered" },
+};
 
-function matchesCapacity(capacity: number, filter: string): boolean {
-  if (filter === "1-4") return capacity >= 1 && capacity <= 4;
-  if (filter === "5-9") return capacity >= 5 && capacity <= 9;
-  if (filter === "10+") return capacity >= 10;
-  return true;
+function getStock(p: { lowStock?: boolean; outOfStock?: boolean; lowStockOrdered?: boolean }): "in" | "low" | "out" | "ordered" {
+  if (p.outOfStock) return "out";
+  if (p.lowStock && p.lowStockOrdered) return "ordered";
+  if (p.lowStock) return "low";
+  return "in";
 }
 
 export default function PackagingPage() {
   const router = useRouter();
-  const [f, setF] = usePersistedFilters("packaging", {
+  const [f, setF] = usePersistedFilters("packaging-v2", {
     search: "",
-    showFilters: false,
-    showArchived: false,
     filterStock: "all" as StockFilter,
-    filterCapacity: "" as string,
+    showArchived: false,
   });
   const packaging = usePackagingList(f.showArchived);
-  const allOrders = useAllPackagingOrders();
+  const orders = useAllPackagingOrders();
   const sym = useCurrencySymbol();
-  const [showAdd, setShowAdd] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newCapacity, setNewCapacity] = useState("");
-
-  useNShortcut(() => setShowAdd(true), showAdd);
-
-  const activeFilterCount =
-    (f.filterStock !== "all" ? 1 : 0) +
-    (f.filterCapacity ? 1 : 0) +
-    (f.showArchived ? 1 : 0);
-
-  function clearFilters() {
-    setF("filterStock", "all");
-    setF("filterCapacity", "");
-    setF("showArchived", false);
-  }
 
   const latestOrderMap = useMemo(() => {
-    const map = new Map<string, PackagingOrder>();
-    for (const order of allOrders) {
-      const existing = map.get(order.packagingId);
-      if (!existing || new Date(order.orderedAt) > new Date(existing.orderedAt)) {
-        map.set(order.packagingId, order);
-      }
+    const m = new Map<string, PackagingOrder>();
+    for (const o of orders) {
+      const ex = m.get(o.packagingId);
+      if (!ex || new Date(o.orderedAt) > new Date(ex.orderedAt)) m.set(o.packagingId, o);
     }
-    return map;
-  }, [allOrders]);
+    return m;
+  }, [orders]);
 
   const filtered = useMemo(() => {
+    const q = f.search.trim().toLowerCase();
     return packaging.filter((p) => {
-      if (f.search && !p.name.toLowerCase().includes(f.search.toLowerCase()) && !(p.manufacturer ?? "").toLowerCase().includes(f.search.toLowerCase())) return false;
-      if (f.filterStock === "out-of-stock" && !p.outOfStock) return false;
-      if (f.filterStock === "low-stock" && (!p.lowStock || p.outOfStock)) return false;
-      if (f.filterStock === "ordered" && !p.lowStockOrdered) return false;
-      if (f.filterStock === "in-stock" && (p.lowStock || p.outOfStock)) return false;
-      if (f.filterCapacity && !matchesCapacity(p.capacity, f.filterCapacity)) return false;
+      if (q && !p.name.toLowerCase().includes(q) && !(p.manufacturer ?? "").toLowerCase().includes(q)) return false;
+      if (f.filterStock !== "all" && getStock(p) !== f.filterStock) return false;
       return true;
     });
-  }, [packaging, f.search, f.filterStock, f.filterCapacity]);
+  }, [packaging, f.search, f.filterStock]);
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newName.trim()) return;
-    const cap = parseInt(newCapacity) || 1;
+  const total = packaging.length;
+  const lowCount = packaging.filter((p) => p.lowStock || p.outOfStock).length;
+  const costs = useMemo(() => {
+    const all: number[] = [];
+    for (const p of packaging) {
+      const latest = latestOrderMap.get(p.id ?? "");
+      if (latest?.pricePerUnit) all.push(latest.pricePerUnit);
+    }
+    if (all.length === 0) return null;
+    return { min: Math.min(...all), max: Math.max(...all) };
+  }, [packaging, latestOrderMap]);
+
+  async function handleAdd() {
     const id = await savePackaging({
-      name: newName.trim(),
-      capacity: cap,
+      name: "New packaging",
+      capacity: 1,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -99,173 +90,273 @@ export default function PackagingPage() {
   }
 
   return (
-    <div>
-      <PageHeader title="Packaging" description="Boxes, inserts, and other packaging materials" />
-      <div className="px-4 space-y-3 pb-6">
-        <ListToolbar
-          search={f.search}
-          onSearchChange={(v) => setF("search", v)}
-          searchPlaceholder="Search name or manufacturer…"
-          searchAriaLabel="Search packaging"
-          onAdd={() => setShowAdd(true)}
-          addAriaLabel="Add packaging"
-          addTitle="Add packaging (n)"
-          showFilters
-          filterPanelOpen={f.showFilters}
-          onToggleFilters={() => setF("showFilters", !f.showFilters)}
-          activeFilterCount={activeFilterCount}
-        />
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Packaging"
+        meta={`${total} SKUs${costs ? ` · ${sym}${costs.min.toFixed(2)}–${sym}${costs.max.toFixed(2)} unit cost` : ""}${lowCount > 0 ? ` · ${lowCount} low stock` : ""}`}
+        actions={
+          <DsButton variant="primary" size="md" onClick={handleAdd}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <IconPlus size={14} stroke={1.5} /> New packaging
+            </span>
+          </DsButton>
+        }
+      />
 
-        {/* Quick filters under search — baseline pattern. */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Stock</span>
-          {STOCK_OPTIONS.filter((o) => o.value !== "all").map(({ value, label }) => {
-            const active = f.filterStock === value;
-            return (
-              <button
-                key={value}
-                onClick={() => setF("filterStock", active ? "all" : value as StockFilter)}
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                  active
-                    ? "bg-accent text-accent-foreground"
-                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        {f.showFilters && (
-          <FilterPanel activeFilterCount={activeFilterCount} onClearAll={clearFilters}>
-            <FilterChipGroup
-              label="Stock status"
-              options={STOCK_OPTIONS}
-              value={f.filterStock}
-              defaultValue="all"
-              onChange={(v) => setF("filterStock", v as StockFilter)}
-            />
-            <FilterChipGroup
-              label="Capacity"
-              options={CAPACITY_OPTIONS}
-              value={f.filterCapacity}
-              defaultValue=""
-              onChange={(v) => setF("filterCapacity", v)}
-            />
-            <ArchiveFilterChip
-              value={f.showArchived}
-              onChange={(v) => setF("showArchived", v)}
-            />
-          </FilterPanel>
-        )}
-
-        {showAdd && (
-          <form onSubmit={handleAdd} className="rounded-sm border border-border bg-card p-3 space-y-2">
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              borderRadius: 14,
+              maxWidth: 360,
+            }}
+          >
+            <IconSearch size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
             <input
               type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Packaging name *"
-              required
-              autoFocus
-              className="input"
+              value={f.search}
+              onChange={(e) => setF("search", e.target.value)}
+              placeholder="Search packaging…"
+              style={{
+                fontSize: 12,
+                border: "none",
+                background: "transparent",
+                outline: "none",
+                flex: 1,
+                color: "var(--ds-text-primary)",
+              }}
             />
-            <div>
-              <label className="label">Product capacity</label>
-              <input
-                type="number"
-                value={newCapacity}
-                onChange={(e) => setNewCapacity(e.target.value)}
-                placeholder="e.g. 9"
-                min="1"
-                step="1"
-                className="input"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={!newName.trim()}
-                className="btn-primary flex-1 py-2"
-              >
-                Create Packaging
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowAdd(false); setNewName(""); setNewCapacity(""); }}
-                className="btn-secondary px-4 py-2"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
+          </div>
+
+          <PillRow
+            label="Stock"
+            options={STOCK_FILTERS.map((s) => ({ id: s.id, label: s.label }))}
+            isActive={(id) => f.filterStock === id}
+            onSelect={(id) => setF("filterStock", id as StockFilter)}
+          />
+        </div>
 
         {filtered.length === 0 ? (
-          <p className="text-muted-foreground text-sm py-8 text-center">
-            {packaging.length === 0
-              ? "No packaging yet. Tap + to add your first."
-              : "No packaging matches your search."}
+          <p
+            style={{
+              textAlign: "center",
+              padding: "40px 0",
+              fontFamily: "var(--font-serif)",
+              fontSize: 14,
+              color: "var(--ds-text-muted)",
+            }}
+          >
+            {packaging.length === 0 ? "No packaging yet." : "No SKUs match the filters."}
           </p>
         ) : (
-          <ul className="space-y-2">
-            {filtered.map((pkg) => {
-              const latestOrder = pkg.id ? latestOrderMap.get(pkg.id) : undefined;
-              return (
-                <ListItemCard
-                  key={pkg.id}
-                  href={`/packaging/${encodeURIComponent(pkg.id ?? "")}`}
-                  lowStock={pkg.lowStock}
-                  outOfStock={pkg.outOfStock}
-                  archived={pkg.archived}
-                  action={
-                    <LowStockFlagButton
-                      flagged={pkg.lowStock}
-                      itemName={pkg.name}
-                      onFlag={() => setPackagingLowStock(pkg.id!, true)}
-                      onUnflag={() => setPackagingLowStock(pkg.id!, false)}
-                    />
-                  }
-                >
-                  <div className="w-10 h-10 rounded-md bg-muted shrink-0 flex items-center justify-center text-muted-foreground">
-                    <Package className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h3 className="font-medium text-sm truncate">{pkg.name}</h3>
-                      {pkg.archived && (
-                        <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                          archived
+          <div
+            style={{
+              background: "var(--ds-card-bg)",
+              border: "0.5px solid var(--ds-border-warm)",
+              borderRadius: 6,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "60px minmax(0, 1fr) 100px 90px 110px 130px",
+                gap: 0,
+                padding: "8px 12px",
+                background: "var(--ds-card-bg-hover)",
+                borderBottom: "0.5px solid var(--ds-border-warm)",
+                fontSize: 9,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                color: "var(--ds-text-muted)",
+                fontWeight: 600,
+              }}
+            >
+              <span />
+              <span>Name · supplier</span>
+              <span>Fits</span>
+              <span>Cost/unit</span>
+              <span>Stock</span>
+              <span>Last order</span>
+            </div>
+            <ul style={{ display: "flex", flexDirection: "column" }}>
+              {filtered.map((p) => {
+                const stock = getStock(p);
+                const tint = STOCK_TINT[stock];
+                const accent =
+                  stock === "out"
+                    ? "var(--ds-tier-urgent)"
+                    : stock === "low"
+                    ? "var(--ds-semantic-warn)"
+                    : "transparent";
+                const latest = latestOrderMap.get(p.id ?? "");
+                return (
+                  <li
+                    key={p.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "60px minmax(0, 1fr) 100px 90px 110px 130px",
+                      gap: 0,
+                      alignItems: "center",
+                      padding: "10px 12px",
+                      borderBottom: "0.5px solid var(--ds-border-warm)",
+                      borderLeft: `2px solid ${accent}`,
+                      opacity: p.archived ? 0.5 : 1,
+                    }}
+                  >
+                    <Link href={`/packaging/${encodeURIComponent(p.id ?? "")}`} style={{ display: "block" }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 40,
+                          height: 40,
+                          background: "var(--ds-card-bg-hover)",
+                          borderRadius: 6,
+                          color: "var(--ds-text-muted)",
+                        }}
+                      >
+                        <IconPackage size={18} stroke={1.5} />
+                      </span>
+                    </Link>
+                    <Link
+                      href={`/packaging/${encodeURIComponent(p.id ?? "")}`}
+                      style={{ minWidth: 0, color: "var(--ds-text-primary)", textDecoration: "none" }}
+                    >
+                      <strong style={{ fontSize: 13, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.name}
+                      </strong>
+                      {p.manufacturer && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--ds-text-muted)",
+                            fontStyle: "italic",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            display: "block",
+                          }}
+                        >
+                          {p.manufacturer}
                         </span>
                       )}
-                      {!pkg.archived && pkg.outOfStock && <StockBadge status="out-of-stock" />}
-                      {!pkg.archived && !pkg.outOfStock && pkg.lowStock && (
-                        <StockBadge status={pkg.lowStockOrdered ? "ordered" : "low-stock"} />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                      <span className="text-xs text-muted-foreground">fits {pkg.capacity}</span>
-                      {pkg.manufacturer && (
-                        <>
-                          <span className="text-muted-foreground/40 text-xs">·</span>
-                          <span className="text-xs text-muted-foreground truncate">{pkg.manufacturer}</span>
-                        </>
-                      )}
-                      {latestOrder && (
-                        <>
-                          <span className="text-muted-foreground/40 text-xs">·</span>
-                          <span className="text-xs text-muted-foreground">{sym}{latestOrder.pricePerUnit.toFixed(2)}/unit</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </ListItemCard>
-              );
-            })}
-          </ul>
+                    </Link>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontVariantNumeric: "tabular-nums",
+                        color: "var(--ds-text-primary)",
+                      }}
+                    >
+                      <strong style={{ fontWeight: 500 }}>{p.capacity}</strong>{" "}
+                      <span style={{ fontSize: 10, color: "var(--ds-text-muted)" }}>
+                        unit{p.capacity === 1 ? "" : "s"}
+                      </span>
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontVariantNumeric: "tabular-nums",
+                        color: "var(--ds-text-primary)",
+                      }}
+                    >
+                      {latest ? `${sym}${latest.pricePerUnit.toFixed(2)}` : "—"}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        padding: "3px 8px",
+                        borderRadius: 3,
+                        background: tint.bg,
+                        color: tint.color,
+                        width: "fit-content",
+                      }}
+                    >
+                      {tint.text}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "var(--ds-text-muted)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {latest
+                        ? `${new Date(latest.orderedAt).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                          })} · ${latest.quantity} units`
+                        : "—"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
+
+        <AddCard label="new packaging" onClick={handleAdd} aspect="row" />
       </div>
+    </div>
+  );
+}
+
+function PillRow({
+  label,
+  options,
+  isActive,
+  onSelect,
+}: {
+  label: string;
+  options: Array<{ id: string; label: string }>;
+  isActive: (id: string) => boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <span
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--ds-text-muted)",
+          fontWeight: 600,
+          marginRight: 4,
+        }}
+      >
+        {label}
+      </span>
+      {options.map((o) => {
+        const active = isActive(o.id);
+        return (
+          <button
+            key={o.id || "all"}
+            type="button"
+            onClick={() => onSelect(o.id)}
+            style={{
+              padding: "3px 10px",
+              fontSize: 11,
+              border: `0.5px solid ${active ? "var(--ds-tier-quarter-focus)" : "var(--ds-border-warm)"}`,
+              background: active ? "var(--ds-tier-quarter-focus)" : "var(--ds-card-bg)",
+              color: active ? "#ffffff" : "var(--ds-text-muted)",
+              borderRadius: 12,
+              cursor: "pointer",
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
