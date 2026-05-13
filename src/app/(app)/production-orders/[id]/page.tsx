@@ -630,7 +630,7 @@ function ProductPicker({
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
                   active
                     ? "bg-accent text-accent-foreground"
-                    : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
+                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {c.name}
@@ -654,7 +654,7 @@ function ProductPicker({
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                   active
                     ? "bg-[var(--accent-lilac-bg)] text-[var(--accent-lilac-ink)]"
-                    : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
+                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {t}

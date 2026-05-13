@@ -268,7 +268,7 @@ export default function ProductionBrainPlannerPage() {
       <DragOverlay>
         {dragging ? (
           <div
-            className="border border-foreground bg-card px-2.5 py-1.5 text-xs shadow-lg"
+            className="border border-foreground bg-[color:var(--ds-card-bg)] px-2.5 py-1.5 text-xs shadow-lg"
             style={{ borderRadius: 3, opacity: 0.95 }}
           >
             <strong
@@ -374,7 +374,7 @@ function DayCell({
           ? isOver
             ? "bg-accent-terracotta-bg border-[color:var(--accent-terracotta-ink)]"
             : "bg-muted border-[color:var(--ds-border-warm)]"
-          : "bg-card border-[color:var(--ds-border-warm)] opacity-40")
+          : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] opacity-40")
       }
       style={{ borderRadius: 3 }}
     >
@@ -388,7 +388,7 @@ function DayCell({
         {plans.slice(0, 3).map((plan) => (
           <li
             key={plan.id}
-            className="px-1.5 py-0.5 text-[10px] truncate bg-card border border-[color:var(--ds-border-warm)]"
+            className="px-1.5 py-0.5 text-[10px] truncate bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)]"
             title={plan.name ?? ""}
             style={{ borderRadius: 2 }}
           >

@@ -90,7 +90,7 @@ export function YieldModal({ entries, mode = "batch", onConfirm, onCancel, cance
         <div className="bg-[color:var(--accent-peach-bg)] px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)]">
           <div className="flex items-center gap-3 mb-1">
             <div
-              className="w-9 h-9 bg-card flex items-center justify-center border border-[color:var(--ds-border-warm)]"
+              className="w-9 h-9 bg-[color:var(--ds-card-bg)] flex items-center justify-center border border-[color:var(--ds-border-warm)]"
               style={{ borderRadius: 3 }}
             >
               <Package className="w-5 h-5 text-foreground" />

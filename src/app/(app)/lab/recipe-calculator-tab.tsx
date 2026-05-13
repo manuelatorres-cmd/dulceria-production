@@ -154,7 +154,7 @@ export function RecipeCalculatorTab() {
                   onAdd={() => addLineForSlot(slotIdx)}
                 >
                   {slotLines.length > 0 && (
-                    <div className="rounded-sm border border-[color:var(--ds-border-warm)]/60 bg-card overflow-hidden">
+                    <div className="rounded-sm border border-[color:var(--ds-border-warm)]/60 bg-[color:var(--ds-card-bg)] overflow-hidden">
                       {slotLines.map(({ line, lineIdx }) => {
                         const ing = byId[line.ingredientId];
                         const missing = ing ? missingComposition(ing) : false;
@@ -284,7 +284,7 @@ function SlotCard({
       : "text-muted-foreground";
 
   return (
-    <div className={`rounded-sm border ${tone} bg-card`}>
+    <div className={`rounded-sm border ${tone} bg-[color:var(--ds-card-bg)]`}>
       <div className="px-4 py-3 flex items-start gap-3">
         <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${iconTone}`} />
         <div className="min-w-0 flex-1">

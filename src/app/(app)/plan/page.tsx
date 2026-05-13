@@ -2882,7 +2882,7 @@ function DemandByUrgency({
                 "text-[11px] px-2.5 py-0.5 rounded-full border transition " +
                 (active
                   ? "bg-foreground text-background border-foreground"
-                  : "bg-card border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
+                  : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
               }
               style={!active && tint ? { background: tint.bg, color: tint.ink, borderColor: tint.bg } : undefined}
             >
@@ -3116,7 +3116,7 @@ function GroupedWarnings({ warnings }: { warnings: string[] }) {
               {g.names.slice(0, 12).map((n) => (
                 <span
                   key={n}
-                  className="rounded-full bg-card border border-[color:var(--ds-border-warm)] px-2 py-0.5 text-[10.5px] text-foreground"
+                  className="rounded-full bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] px-2 py-0.5 text-[10.5px] text-foreground"
                 >
                   {n}
                 </span>

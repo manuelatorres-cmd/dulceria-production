@@ -439,8 +439,8 @@ function NewPlanContent() {
                           : stockAlert === "low"
                           ? "border-status-warn-edge bg-status-warn-bg/50"
                           : hasOutOfStock
-                          ? "border-status-alert-edge bg-card"
-                          : "border-[color:var(--ds-border-warm)] bg-card"
+                          ? "border-status-alert-edge bg-[color:var(--ds-card-bg)]"
+                          : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"
                       }`}
                     >
                       {/* Main product row */}
@@ -977,7 +977,7 @@ function BatchSizesPhase({
                   <div className="flex shrink-0 rounded-md border border-[color:var(--ds-border-warm)] overflow-hidden text-xs">
                     <button
                       onClick={() => onUpdatePreviousBatch(fillingId, null)}
-                      className={`px-2.5 py-1 transition-colors ${!usingPrevious ? "bg-accent text-accent-foreground font-medium" : "bg-card text-muted-foreground hover:bg-muted"}`}
+                      className={`px-2.5 py-1 transition-colors ${!usingPrevious ? "bg-accent text-accent-foreground font-medium" : "bg-[color:var(--ds-card-bg)] text-muted-foreground hover:bg-muted"}`}
                     >
                       Make fresh
                     </button>
@@ -995,7 +995,7 @@ function BatchSizesPhase({
                           });
                         }
                       }}
-                      className={`px-2.5 py-1 border-l border-[color:var(--ds-border-warm)] transition-colors ${usingPrevious ? "bg-accent text-accent-foreground font-medium" : "bg-card text-muted-foreground hover:bg-muted"}`}
+                      className={`px-2.5 py-1 border-l border-[color:var(--ds-border-warm)] transition-colors ${usingPrevious ? "bg-accent text-accent-foreground font-medium" : "bg-[color:var(--ds-card-bg)] text-muted-foreground hover:bg-muted"}`}
                     >
                       Use stock
                     </button>

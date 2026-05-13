@@ -139,7 +139,7 @@ export default function ShopCounterPage() {
                       ? "bg-foreground text-background border-foreground"
                       : done
                         ? "bg-[color:var(--accent-terracotta-bg)] border-[color:var(--accent-terracotta-ink)] text-[color:var(--accent-terracotta-ink)]"
-                        : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)]")
+                        : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)]")
                   }
                   style={{ borderRadius: 999 }}
                 >
@@ -194,7 +194,7 @@ export default function ShopCounterPage() {
                   "text-center border transition-colors " +
                   (boxSize === size
                     ? "bg-foreground text-background border-foreground"
-                    : "bg-card text-foreground border-[color:var(--ds-border-warm)] hover:border-foreground")
+                    : "bg-[color:var(--ds-card-bg)] text-foreground border-[color:var(--ds-border-warm)] hover:border-foreground")
                 }
                 style={{
                   borderRadius: 4,
@@ -415,10 +415,10 @@ function BonbonCard({
       className={
         "border p-3 transition-colors " +
         (picked > 0
-          ? "border-foreground bg-card"
+          ? "border-foreground bg-[color:var(--ds-card-bg)]"
           : outOfStock
-            ? "border-[color:var(--ds-border-warm)] bg-card opacity-50"
-            : "border-[color:var(--ds-border-warm)] bg-card hover:border-foreground")
+            ? "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] opacity-50"
+            : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-foreground")
       }
       style={{ borderRadius: 4 }}
     >

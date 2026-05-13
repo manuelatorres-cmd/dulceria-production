@@ -382,7 +382,7 @@ export default function DailyCountPage() {
                     "rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors capitalize " +
                     (active
                       ? "bg-foreground text-background"
-                      : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:border-foreground")
+                      : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:border-foreground")
                   }
                 >
                   {c.name}
@@ -409,7 +409,7 @@ export default function DailyCountPage() {
             "rounded-full px-3 py-1 text-[12px] font-medium border " +
             (tab === "variants"
               ? "bg-foreground text-background border-foreground"
-              : "bg-card border-[color:var(--ds-border-warm)] hover:border-foreground")
+              : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] hover:border-foreground")
           }
         >
           1 · Variants & singles · {variantPiecesSold} pcs · €{variantRevenue.toFixed(2)}
@@ -420,7 +420,7 @@ export default function DailyCountPage() {
             "rounded-full px-3 py-1 text-[12px] font-medium border " +
             (tab === "count"
               ? "bg-foreground text-background border-foreground"
-              : "bg-card border-[color:var(--ds-border-warm)] hover:border-foreground")
+              : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] hover:border-foreground")
           }
         >
           2 · Bonbon count
@@ -454,7 +454,7 @@ export default function DailyCountPage() {
                   : "No variants set up. Create one at /variants first."}
               </p>
             ) : (
-              <ul className="rounded-[6px] border border-[color:var(--ds-border-warm)] divide-y divide-border bg-card">
+              <ul className="rounded-[6px] border border-[color:var(--ds-border-warm)] divide-y divide-border bg-[color:var(--ds-card-bg)]">
                 {visibleSizeRows.map((row) => {
                   const qty = variantQty[row.id] ?? 0;
                   const overrideStr = variantPriceOverride[row.id] ?? "";
@@ -519,7 +519,7 @@ export default function DailyCountPage() {
             {singleProductSales.length === 0 ? (
               <p className="text-[12px] text-muted-foreground italic">No singles. Click "+ Add line" if any bars sold individually.</p>
             ) : (
-              <ul className="rounded-[6px] border border-[color:var(--ds-border-warm)] divide-y divide-border bg-card">
+              <ul className="rounded-[6px] border border-[color:var(--ds-border-warm)] divide-y divide-border bg-[color:var(--ds-card-bg)]">
                 {singleProductSales.map((sp, i) => (
                   <li key={i} className="px-3 py-2 flex items-center gap-2 flex-wrap">
                     <select

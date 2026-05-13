@@ -48,7 +48,7 @@ export function ListItemCard({
 
   return (
     <li
-      className={`border bg-card transition-colors hover:border-foreground/30 ${borderClass}`}
+      className={`border bg-[color:var(--ds-card-bg)] transition-colors hover:border-foreground/30 ${borderClass}`}
       style={{
         contentVisibility: "auto",
         containIntrinsicSize: "0 56px",

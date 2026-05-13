@@ -137,7 +137,7 @@ export default function SkillsPage() {
               <thead>
                 <tr>
                   <th
-                    className="sticky left-0 bg-card text-left py-2 pr-4 text-[10px] uppercase text-muted-foreground font-medium"
+                    className="sticky left-0 bg-[color:var(--ds-card-bg)] text-left py-2 pr-4 text-[10px] uppercase text-muted-foreground font-medium"
                     style={{ letterSpacing: "0.1em" }}
                   >
                     Person
@@ -165,7 +165,7 @@ export default function SkillsPage() {
                   .map((p) => (
                     <tr key={p.id} className="border-t border-[color:var(--ds-border-warm)]/60">
                       <td
-                        className="sticky left-0 bg-card py-2 pr-4"
+                        className="sticky left-0 bg-[color:var(--ds-card-bg)] py-2 pr-4"
                         style={{
                           fontFamily: "var(--font-serif)",
                           fontWeight: 500,

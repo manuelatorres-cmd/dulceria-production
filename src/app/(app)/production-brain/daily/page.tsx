@@ -1807,7 +1807,7 @@ export default function DailyV2Page() {
           active/upcoming colour-coded. Replaces the heavy tinted strip
           (layout C migration). Phases with no batches today are still
           shown as upcoming so total day shape stays consistent. */}
-      <div className="mb-3 flex gap-1.5 items-center bg-card/60 border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 overflow-x-auto">
+      <div className="mb-3 flex gap-1.5 items-center bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 overflow-x-auto">
         {PHASES.map((ph) => {
           const r = rollups[ph.id];
           const total = r.totalBatches;

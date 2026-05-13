@@ -261,7 +261,7 @@ export default function SalesReportPage() {
       <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
       {/* Range picker */}
       <div>
-        <div className="rounded-[6px] bg-card border border-[color:var(--ds-border-warm)] p-3 flex items-center flex-wrap gap-3">
+        <div className="rounded-[6px] bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] p-3 flex items-center flex-wrap gap-3">
           <div className="flex gap-1">
             <button
               onClick={() => setRange("this-week")}
@@ -449,7 +449,7 @@ function Tile({
         "rounded-[6px] border p-3 " +
         (tone === "alert"
           ? "border-status-alert-edge bg-status-alert-bg/40 text-status-alert"
-          : "border-[color:var(--ds-border-warm)] bg-card")
+          : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]")
       }
     >
       <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-1">

@@ -331,7 +331,7 @@ function RatingRow({ label, value, onChange }: { label: string; value: number; o
             className={`w-9 h-9 rounded text-sm font-medium border transition-colors ${
               n <= value
                 ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card border-[color:var(--ds-border-warm)] hover:border-primary/50"
+                : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] hover:border-primary/50"
             }`}
           >
             {n}

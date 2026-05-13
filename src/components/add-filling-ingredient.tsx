@@ -199,7 +199,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
             className={`rounded-full px-3 py-0.5 text-xs font-medium transition-colors ${
               kind === k
                 ? "bg-accent text-accent-foreground"
-                : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
+                : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
             }`}
           >
             {k === "ingredient" ? "Ingredient" : "Another filling"}

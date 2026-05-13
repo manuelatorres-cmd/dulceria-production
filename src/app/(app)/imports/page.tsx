@@ -216,7 +216,7 @@ export default function ImportsPage() {
               <ul className="space-y-1.5">
                 {unmapped.map((sku) => (
                   <li key={sku} className="flex items-center gap-2 text-[12px]">
-                    <code className="px-1.5 py-0.5 bg-card border border-[color:var(--ds-border-warm)]">
+                    <code className="px-1.5 py-0.5 bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)]">
                       {sku}
                     </code>
                     <span className="text-muted-foreground">→</span>

@@ -1277,7 +1277,7 @@ function FillingVersionHistoryTab({ versions, currentId }: { versions: import("@
         return (
           <li
             key={v.id}
-            className={`rounded-sm border bg-card p-3 ${isCurrent ? "border-primary/40" : "border-[color:var(--ds-border-warm)]"}`}
+            className={`rounded-sm border bg-[color:var(--ds-card-bg)] p-3 ${isCurrent ? "border-primary/40" : "border-[color:var(--ds-border-warm)]"}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">

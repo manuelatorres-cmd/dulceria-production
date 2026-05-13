@@ -1529,7 +1529,7 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
     <button
       onClick={() => onToggle(step.key)}
       className={`w-full flex items-center gap-3 p-3 rounded-sm border text-left transition-colors ${
-        done ? "border-status-ok-edge bg-status-ok-bg" : "border-[color:var(--ds-border-warm)] bg-card"
+        done ? "border-status-ok-edge bg-status-ok-bg" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"
       }`}
     >
       <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${

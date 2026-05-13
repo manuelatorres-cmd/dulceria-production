@@ -996,7 +996,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     className={`rounded-sm border px-2.5 py-1 text-xs font-medium transition-colors ${
                       localPriorityTier === t
                         ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
+                        : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                     }`}
                     title={t === 1 ? "Top seller — never displaced" : t === 2 ? "Normal" : "Nice-to-have — displaced first when tight"}
                   >

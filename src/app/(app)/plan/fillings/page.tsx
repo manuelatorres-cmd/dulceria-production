@@ -286,7 +286,7 @@ export default function FillingConsolidationPage() {
 
         {/* Cooking list */}
         {result.needs.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-card p-8 text-center">
+          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
             <p className="text-sm text-muted-foreground">
               No fillings needed in the next {windowDays} days.
             </p>
@@ -323,7 +323,7 @@ export default function FillingConsolidationPage() {
                 return (
                   <li
                     key={need.fillingId}
-                    className={`rounded-sm border bg-card overflow-hidden ${
+                    className={`rounded-sm border bg-[color:var(--ds-card-bg)] overflow-hidden ${
                       nothingToCook
                         ? "border-status-ok-edge"
                         : cookable === "short"
@@ -512,7 +512,7 @@ export default function FillingConsolidationPage() {
           onClick={() => !cookedSaving && setCookedModal(null)}
         >
           <div
-            className="bg-card rounded-sm border border-[color:var(--ds-border-warm)] p-5 max-w-[420px] w-[92vw] shadow-xl"
+            className="bg-[color:var(--ds-card-bg)] rounded-sm border border-[color:var(--ds-border-warm)] p-5 max-w-[420px] w-[92vw] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold mb-1">

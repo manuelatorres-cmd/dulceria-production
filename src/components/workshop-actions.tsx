@@ -62,7 +62,7 @@ function ActionBtn({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="border border-[color:var(--ds-border-warm)] bg-muted hover:bg-card hover:border-foreground px-2 py-2 text-[11.5px] text-left"
+      className="border border-[color:var(--ds-border-warm)] bg-muted hover:bg-[color:var(--ds-card-bg)] hover:border-foreground px-2 py-2 text-[11.5px] text-left"
       style={{
         borderRadius: 3,
         fontFamily: "var(--font-serif)",
@@ -372,7 +372,7 @@ function ContaminateModal({ onClose }: { onClose: () => void }) {
               "flex-1 border px-3 py-1.5 text-[12px] capitalize " +
               (decision === d
                 ? "bg-foreground text-background border-foreground"
-                : "bg-card border-[color:var(--ds-border-warm)] hover:border-foreground")
+                : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] hover:border-foreground")
             }
             style={{ borderRadius: 3 }}
           >

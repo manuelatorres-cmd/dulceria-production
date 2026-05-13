@@ -68,7 +68,7 @@ export function MultiSelectDropdown({
         <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-20 bg-card border border-[color:var(--ds-border-warm)] rounded-sm shadow-lg min-w-[200px] max-h-56 overflow-y-auto py-1">
+        <div className="absolute top-full left-0 mt-1 z-20 bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-sm shadow-lg min-w-[200px] max-h-56 overflow-y-auto py-1">
           {options.map((opt) => (
             <label
               key={opt}

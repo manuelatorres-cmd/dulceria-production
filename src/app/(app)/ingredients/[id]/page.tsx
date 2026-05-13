@@ -759,7 +759,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
           comma-thousands separator doesn't get misread as a decimal
           (Austrian convention reads "25,000" as 25.000 = 25). Below
           1kg we keep grams. */}
-      <div className={`rounded-sm border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-[color:var(--ds-border-warm)] bg-card"}`}>
+      <div className={`rounded-sm border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">On hand</p>
         <p className={`text-3xl font-bold tabular-nums ${belowThreshold ? "text-status-warn" : "text-foreground"}`}>
           {currentG >= 1000

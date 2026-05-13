@@ -117,7 +117,7 @@ function CopyRow({ label, previewHtml, previewText, copyHtml, copyText }: CopyRo
           </button>
         </div>
       </div>
-      <div className="rounded-sm bg-card border border-[color:var(--ds-border-warm)] px-2 py-1.5 text-xs leading-relaxed font-mono break-words">
+      <div className="rounded-sm bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] px-2 py-1.5 text-xs leading-relaxed font-mono break-words">
         {previewHtml ? (
           <span dangerouslySetInnerHTML={{ __html: previewHtml }} />
         ) : (

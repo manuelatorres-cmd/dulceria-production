@@ -158,7 +158,7 @@ function PackTab() {
                 ? "border-status-ok-bg bg-status-ok-bg/30"
                 : err
                 ? "border-status-blush-bg bg-status-blush-bg/30"
-                : "border-[color:var(--ds-border-warm)] bg-card")
+                : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]")
             }
           >
             <div className="flex-1 min-w-0">
@@ -475,7 +475,7 @@ function BoxTab() {
                 ? "border-status-blush-bg bg-status-blush-bg/30"
                 : succ > 0
                 ? "border-status-ok-bg bg-status-ok-bg/30"
-                : "border-[color:var(--ds-border-warm)] bg-card")
+                : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]")
             }
           >
             <div className="flex items-baseline gap-2 flex-wrap mb-1">

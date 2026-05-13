@@ -111,7 +111,7 @@ export function NotificationBell() {
 
       {open ? (
         <div
-          className="absolute right-0 top-12 w-[360px] max-h-[520px] overflow-hidden bg-card border border-[color:var(--ds-border-warm)] shadow-lg z-50 flex flex-col"
+          className="absolute right-0 top-12 w-[360px] max-h-[520px] overflow-hidden bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] shadow-lg z-50 flex flex-col"
           style={{ borderRadius: 4 }}
         >
           <header className="flex items-baseline justify-between px-4 pt-4 pb-2 border-b border-[color:var(--ds-border-warm)]">

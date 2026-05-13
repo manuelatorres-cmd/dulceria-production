@@ -286,7 +286,7 @@ export default function ShopifyImportPage() {
         </Link>
 
         {!parsed && !result && (
-          <section className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-card p-8 text-center space-y-3">
+          <section className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center space-y-3">
             <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
             <div>
               <p className="text-sm">Drop your Shopify orders CSV here or</p>
@@ -420,7 +420,7 @@ export default function ShopifyImportPage() {
                 return (
                   <li
                     key={o.name}
-                    className={`rounded-sm border bg-card p-3 space-y-2 ${isDup ? "border-[color:var(--ds-border-warm)]/60 opacity-60" : excluded.has(o.name) ? "border-[color:var(--ds-border-warm)]/60 opacity-50" : "border-[color:var(--ds-border-warm)]"}`}
+                    className={`rounded-sm border bg-[color:var(--ds-card-bg)] p-3 space-y-2 ${isDup ? "border-[color:var(--ds-border-warm)]/60 opacity-60" : excluded.has(o.name) ? "border-[color:var(--ds-border-warm)]/60 opacity-50" : "border-[color:var(--ds-border-warm)]"}`}
                   >
                     <div className="flex items-start gap-2">
                       <input

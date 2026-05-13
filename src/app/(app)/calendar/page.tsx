@@ -289,7 +289,7 @@ function QuickAdd({ href, label, sub }: { href: string; label: string; sub: stri
   return (
     <Link
       href={href}
-      className={`${INNER} flex items-center gap-3 px-3 py-2 bg-card hover:bg-muted/40 transition-colors`}
+      className={`${INNER} flex items-center gap-3 px-3 py-2 bg-[color:var(--ds-card-bg)] hover:bg-muted/40 transition-colors`}
     >
       <Plus className="w-3.5 h-3.5 shrink-0" />
       <div className="flex-1 min-w-0">
@@ -338,9 +338,9 @@ function MonthGrid({
               onClick={() => onSelect(cell.iso!)}
               className={`${cellSize} rounded-[8px] border text-left flex flex-col items-stretch px-1.5 py-1 transition-colors ${
                 isSelected
-                  ? "border-foreground bg-card"
+                  ? "border-foreground bg-[color:var(--ds-card-bg)]"
                   : isToday
-                  ? "border-[var(--accent-terracotta-ink)]/60 bg-card"
+                  ? "border-[var(--accent-terracotta-ink)]/60 bg-[color:var(--ds-card-bg)]"
                   : "border-[color:var(--ds-border-warm)] bg-muted/30 hover:bg-muted/50"
               }`}
               title={list.map((m) => `${MARKER_LABEL[m.kind]}: ${m.label}`).join(" · ") || undefined}

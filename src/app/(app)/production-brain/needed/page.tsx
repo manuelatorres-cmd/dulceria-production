@@ -416,7 +416,7 @@ function RowCard(p: RowCardProps) {
     <div
       className={
         "rounded-lg border p-3 " +
-        (ok ? "border-status-ok-bg bg-status-ok-bg/20" : "border-[color:var(--ds-border-warm)] bg-card")
+        (ok ? "border-status-ok-bg bg-status-ok-bg/20" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]")
       }
     >
       <div className="flex items-baseline justify-between gap-3 mb-1.5">

@@ -256,7 +256,7 @@ function BoxStockTab() {
             <span className={`text-[10.5px] rounded-full border px-1.5 py-[1px] capitalize ${
               r.location === "allocated"
                 ? "border-status-warn-edge bg-status-warn-bg/30 text-status-warn"
-                : "border-[color:var(--ds-border-warm)] bg-card/70 text-muted-foreground"
+                : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-muted-foreground"
             }`}>
               {r.location}
             </span>
@@ -558,7 +558,7 @@ function ProductStockTab() {
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
               filterLowOnly
                 ? "bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)]"
-                : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
+                : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
             }`}
           >
             Low only
@@ -573,7 +573,7 @@ function ProductStockTab() {
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                   active
                     ? "bg-accent text-accent-foreground"
-                    : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
+                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {label}
@@ -593,7 +593,7 @@ function ProductStockTab() {
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                   active
                     ? "bg-[var(--accent-blush-bg)] text-[var(--accent-blush-ink)]"
-                    : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
+                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {label}
@@ -684,7 +684,7 @@ function ProductStockTab() {
         groups.map((group) => (
           <div
             key={group.productId}
-            className={`rounded-sm border bg-card overflow-hidden ${
+            className={`rounded-sm border bg-[color:var(--ds-card-bg)] overflow-hidden ${
               group.isLow ? "border-status-warn-edge border-l-4" : "border-[color:var(--ds-border-warm)]"
             }`}
           >

@@ -176,7 +176,7 @@ export default function ProductionBrainDashboardPage() {
             {datelessAging.map(({ order, ageDays }) => (
               <li
                 key={order.id}
-                className="bg-card border border-[color:var(--ds-border-warm)] px-3 py-2 text-[12px]"
+                className="bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] px-3 py-2 text-[12px]"
                 style={{ borderRadius: 3 }}
               >
                 <div className="flex items-baseline justify-between">

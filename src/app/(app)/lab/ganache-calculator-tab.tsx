@@ -437,7 +437,7 @@ function IssueRow({ issue }: { issue: ReturnType<typeof validateGanache>[number]
       ? "border-status-alert-edge bg-status-alert-bg/30"
       : issue.severity === "warn"
       ? "border-status-warn-edge bg-status-warn-bg/30"
-      : "border-[color:var(--ds-border-warm)] bg-card";
+      : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]";
   const Icon = issue.severity === "bad" ? AlertCircle : issue.severity === "warn" ? AlertTriangle : CheckCircle2;
   const iconTone = issue.severity === "bad" ? "text-status-alert" : issue.severity === "warn" ? "text-status-warn" : "text-status-ok";
 

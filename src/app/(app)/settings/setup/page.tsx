@@ -254,8 +254,8 @@ function Section({ section }: { section: SetupSection }) {
       className={
         "border p-4 " +
         (done
-          ? "bg-card border-[color:var(--ds-border-warm)] opacity-70"
-          : "bg-card border-[color:var(--ds-border-warm)]")
+          ? "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] opacity-70"
+          : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)]")
       }
       style={{ borderRadius: 4 }}
     >

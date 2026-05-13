@@ -161,7 +161,7 @@ export default function ProductionPage() {
 
       <div className="px-4 pb-8 space-y-4">
         {visibleDays.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-card p-6 text-center">
+          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6 text-center">
             <Calendar className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">
               Nothing scheduled yet. Head to <Link href="/plan" className="text-primary hover:underline">/plan</Link> and click <span className="font-medium">Regenerate plan</span> once you have open orders.
@@ -186,7 +186,7 @@ export default function ProductionPage() {
                 <section
                   key={day.id ?? day.date}
                   className={`rounded-sm border overflow-hidden ${
-                    isToday ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-card"
+                    isToday ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"
                   }`}
                 >
                   <header className="px-4 py-3 border-b border-[color:var(--ds-border-warm)] flex items-center justify-between gap-3 flex-wrap">
@@ -286,7 +286,7 @@ export default function ProductionPage() {
                                         className={`rounded-sm border px-1.5 py-0.5 flex items-center gap-1 ${
                                           done
                                             ? "border-status-ok/40 bg-status-ok/10 text-status-ok"
-                                            : "border-[color:var(--ds-border-warm)] bg-card text-muted-foreground"
+                                            : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-muted-foreground"
                                         }`}
                                       >
                                         {done && <CheckCircle className="w-2.5 h-2.5" />}

@@ -135,7 +135,7 @@ export default function OnlineOrdersPage() {
                     "text-[11.5px] px-2.5 py-0.5 rounded-full border transition " +
                     (deliveryFilter === k
                       ? "bg-foreground text-background border-foreground"
-                      : "bg-card border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
+                      : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
                   }
                 >
                   {k === "all" ? `All (${allOnline.length})`
@@ -146,7 +146,7 @@ export default function OnlineOrdersPage() {
             </div>
           </div>
           {onlineOrders.length === 0 ? (
-            <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-card p-8 text-center">
+            <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
               <p className="text-sm text-muted-foreground">
                 No open online orders. Import a Shopify CSV to get started.
               </p>

@@ -106,7 +106,7 @@ export default function CampaignProductionPage({ params }: { params: Promise<{ i
       </p>
 
       {linkedPlans.length === 0 ? (
-        <div className="rounded-[6px] border border-dashed border-[color:var(--ds-border-warm)] bg-card/60 p-8 text-center">
+        <div className="rounded-[6px] border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
           <p className="text-sm text-muted-foreground">
             No batches scheduled. Run <Link href="/plan" className="text-primary hover:underline">Regenerate plan</Link> on /plan.
           </p>

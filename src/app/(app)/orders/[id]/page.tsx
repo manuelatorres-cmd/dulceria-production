@@ -578,7 +578,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                 order.status === s
                   ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
+                  : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
               }`}
             >
               {ORDER_STATUS_LABELS[s]}
@@ -1599,7 +1599,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
     : short ? "bg-status-alert" : "bg-status-ok";
 
   return (
-    <li className={`rounded-sm border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-card"}`}>
+    <li className={`rounded-sm border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
       <div className="flex items-center gap-3">
         <span
           className={`w-2 h-2 rounded-full shrink-0 ${feasibilityColor}`}

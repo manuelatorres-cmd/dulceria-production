@@ -57,8 +57,8 @@ export default function ProductionBrainLayout({
               className={
                 "px-4 py-1.5 text-sm rounded-full transition-colors " +
                 (active
-                  ? "bg-card text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:bg-card/60")
+                  ? "bg-[color:var(--ds-card-bg)] text-foreground font-medium shadow-sm"
+                  : "text-muted-foreground hover:bg-[color:var(--ds-card-bg)]")
               }
             >
               {tab.label}

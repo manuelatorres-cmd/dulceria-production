@@ -39,7 +39,7 @@ export function BottomNav() {
   const activeSection = getActiveSection(pathname);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-[color:var(--ds-border-warm)]">
+    <nav className="fixed bottom-0 left-0 right-0 bg-[color:var(--ds-card-bg)] border-t border-[color:var(--ds-border-warm)]">
       <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
         {navItems.map((item) => {
           const isActive = activeSection === item.href;

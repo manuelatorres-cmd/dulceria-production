@@ -226,7 +226,7 @@ function Tile({ label, value, tone }: { label: string; value: number; tone: "ok"
       ? "border-status-warn-edge bg-status-warn-bg/30 text-status-warn"
       : tone === "bad"
       ? "border-status-alert-edge bg-status-alert-bg/30 text-status-alert"
-      : "border-[color:var(--ds-border-warm)] bg-card text-muted-foreground";
+      : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-muted-foreground";
   return (
     <div className={`rounded-sm border ${cls} px-4 py-3`}>
       <div className="text-2xl font-medium tabular-nums">{value}</div>

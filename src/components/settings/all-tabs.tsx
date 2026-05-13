@@ -490,7 +490,7 @@ function ClearAllDataSection() {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-destructive">Delete All Data</h2>
-      <div className="rounded-sm border border-destructive/30 bg-card p-4 space-y-3">
+      <div className="rounded-sm border border-destructive/30 bg-[color:var(--ds-card-bg)] p-4 space-y-3">
         <div className="flex items-start gap-3">
           <Trash2 className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
@@ -926,7 +926,7 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
   const missing = missingPersonFields(person);
 
   return (
-    <li className={`rounded-sm border bg-card overflow-hidden ${person.archived ? "border-[color:var(--ds-border-warm)] opacity-70" : "border-[color:var(--ds-border-warm)]"}`}>
+    <li className={`rounded-sm border bg-[color:var(--ds-card-bg)] overflow-hidden ${person.archived ? "border-[color:var(--ds-border-warm)] opacity-70" : "border-[color:var(--ds-border-warm)]"}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button
           onClick={onToggle}
@@ -1321,7 +1321,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
+                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {WEEKDAY_LABELS[day]}
@@ -1361,7 +1361,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
+                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {skill}
@@ -1387,7 +1387,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
+                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {PRIMARY_ROLE_LABELS[pr]}
@@ -1431,7 +1431,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
+                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {CONTRACT_TYPE_LABELS[c]}
@@ -1599,7 +1599,7 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
                     className={`rounded-sm border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                       active
                         ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
+                        : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                     }`}
                   >
                     {ABSENCE_TYPE_LABELS[t]}
@@ -1804,7 +1804,7 @@ function EquipmentCard({ equipment: eq, expanded, onToggle }: {
     "text-muted-foreground bg-muted border-[color:var(--ds-border-warm)]";
 
   return (
-    <li className={`rounded-sm border bg-card overflow-hidden ${eq.archived ? "opacity-70 border-[color:var(--ds-border-warm)]" : "border-[color:var(--ds-border-warm)]"}`}>
+    <li className={`rounded-sm border bg-[color:var(--ds-card-bg)] overflow-hidden ${eq.archived ? "opacity-70 border-[color:var(--ds-border-warm)]" : "border-[color:var(--ds-border-warm)]"}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button
           onClick={onToggle}
