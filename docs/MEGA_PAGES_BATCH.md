@@ -457,13 +457,13 @@ Phase E.2   Extract 8 settings sections
 Phase E.3   Wire subroutes
 Phase E.4   Delete all-tabs.tsx
 
-Phase A.1   /products/[id] Product tab
-Phase A.2   /products/[id] Shell tab
-Phase A.3   /products/[id] Filling history tab
-Phase A.4   /products/[id] Batches tab
-Phase A.5   /products/[id] Cost tab
-Phase A.6   /products/[id] Nutrition tab
-Phase A.7   /products/[id] modals/drawers cleanup
+Phase A.1   /products/[id] Product tab                       ✓ shipped
+Phase A.2   /products/[id] Shell tab                         ✓ shipped
+Phase A.3   /products/[id] Filling history tab               ✓ shipped
+Phase A.4   /products/[id] Batches tab                       ✓ shipped
+Phase A.5   /products/[id] Cost tab                          ✓ shipped
+Phase A.6   /products/[id] Nutrition tab                     ✓ shipped
+Phase A.7   /products/[id] modals/drawers cleanup            ✓ shipped
 
 Phase D.1   /production-brain/daily Right now card
 Phase D.2   /production-brain/daily Phase cards
@@ -507,3 +507,42 @@ Phase F.1   /lab/audit-tab refit (if time)
 **End of spec.**
 
 Reference all existing components in `src/components/dulceria/`. Read mockups in `/docs/` for reference if tab body design feels ambiguous. When in doubt: match the visual language of `/customers` (already refit, exemplary).
+
+---
+
+## Phase A.5 — Cost tab · evidence
+
+- ✓ 2-col body via `grid-template-columns: repeat(auto-fit, minmax(320px, 1fr))` — `src/app/(app)/products/[id]/page.tsx:1899`
+- ✓ Left col: 2×2 StatCard grid (Cost/unit · Margin% · Sell price · Last computed) — `src/app/(app)/products/[id]/page.tsx:1917-1948`
+- ✓ Margin colour-coded: `ok` ≥30, `warn` 15-30, `urgent` <15 via `marginVariant` — `src/app/(app)/products/[id]/page.tsx:1843-1850`
+- ✓ Section "Cost breakdown" with ListRow per bucket (Shell / Filling / Packaging / Labor / Other) — `src/app/(app)/products/[id]/page.tsx:1788-1804, 1954-1979`
+- ✗ Packaging / Labor / Other rows render as `parked` tier "not tracked yet · deferred · ✗" — engine emits shell+filling_ingredient only today
+- ✓ "Recompute now" DsButton secondary — `src/app/(app)/products/[id]/page.tsx:1986-1993`
+- ✓ Right col: sparkline + snapshot history + Export CSV — `src/app/(app)/products/[id]/page.tsx:1998-2065`
+- ✓ Sparkline via inline SVG `CostSparkline` (recharts not available — kept zero-dep) — `src/app/(app)/products/[id]/page.tsx:2105-2147`
+- ✓ Snapshot history ListRow with ▲rose / ▼mint delta chip — `src/app/(app)/products/[id]/page.tsx:2033-2058`
+- ✓ Export CSV downloads via Blob URL — `src/app/(app)/products/[id]/page.tsx:1830-1846`
+- ✓ Sell price source: cheapest single-unit `VariantPackaging` for this product — `src/app/(app)/products/[id]/page.tsx:1819-1840`
+
+## Phase A.6 — Nutrition tab · evidence
+
+- ✓ Single column body — `src/app/(app)/products/[id]/page.tsx:2227-2389`
+- ✓ Section "Per 100g" — 2-col key/value tabular via `NutrientKeyValueGrid` — `src/app/(app)/products/[id]/page.tsx:2272-2284, 2391-2438`
+- ✓ Section "Per piece" — piece weight + same fields; market-driven nutrient list — `src/app/(app)/products/[id]/page.tsx:2287-2316`
+- ✗ Piece weight is read-only computed (shell+cap+fill grams). Inline-edit override deferred — schema has no `pieceWeightOverride` column. Hint surfaced in italic.
+- ✓ Section "Allergens" — 3 chip rows (contains red border, may contain caramel, dietary default) via `AllergenChipRow` — `src/app/(app)/products/[id]/page.tsx:2319-2336, 2440-2486`
+- ✓ Section "Source breakdown" collapsed by default; expands to ListRow per shell + filling with grams + % + ingredients — `src/app/(app)/products/[id]/page.tsx:2338-2378`
+- ✓ Section "Ingredient list" kept (Shopify export workflow) — `src/app/(app)/products/[id]/page.tsx:2381-2402`
+- ✓ Footer italic muted "Computed from shell + fillings — edit those to change values" — `src/app/(app)/products/[id]/page.tsx:2405-2407`
+
+## Phase A.7 — Modal / drawer cleanup · evidence
+
+- ✓ New `DsDialog` shared component — `src/components/dulceria/dialog.tsx`
+- ✓ New `DsDrawer` shared component — `src/components/dulceria/drawer.tsx`
+- ✓ Both exported via `src/components/dulceria/index.ts:55-56`
+- ✓ Duplicate panel → `DsDrawer` (was inline expanding card) — `src/app/(app)/products/[id]/page.tsx:1210-1260`
+- ✓ Photo removal confirm → `DsDialog` destructive (was floating mini-buttons) — `src/app/(app)/products/[id]/page.tsx:1175-1188`
+- ✓ Filling assignment form → `DsDrawer` (was inline panel inside Section) — `src/app/(app)/products/[id]/page.tsx:1262-1316`
+- ✓ Delete / Archive confirm → `DsDialog` (one prompt, tone flips between destructive Delete vs. default Archive based on `productProduced`) — `src/app/(app)/products/[id]/page.tsx:1190-1208`
+- ✓ Trigger buttons remain in the page body; the dialogs/drawers are mounted once outside the activeTab conditional so they survive tab switches.
+
