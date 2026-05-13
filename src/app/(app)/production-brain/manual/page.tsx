@@ -656,7 +656,7 @@ export default function ManualPlannerPage() {
   // ─── Render ───────────────────────────────────────────────────────
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={handleDragEnd}>
-      <div className="manual-planner-v2 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4">
+      <div className="ds manual-planner-v2 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
         <div className="mb-2">
           <BackButton />
         </div>

@@ -95,12 +95,12 @@ export default function OrderProductionPage({ params }: { params: Promise<{ id: 
 
   if (!order) {
     return (
-      <div className="px-4 py-6 text-muted-foreground">Loading…</div>
+      <div className="ds px-4 py-6 text-muted-foreground" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>Loading…</div>
     );
   }
 
   return (
-    <div className="px-4 py-6 max-w-2xl mx-auto">
+    <div className="ds px-4 py-6 max-w-2xl mx-auto" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="mb-4">
         <Link
           href={`/orders/${encodeURIComponent(orderId)}`}

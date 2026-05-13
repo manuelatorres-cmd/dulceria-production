@@ -440,7 +440,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div className="px-4 pt-6 pb-12">
+    <div className="ds px-4 pt-6 pb-12" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       {/* Header row: back + primary actions */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <button
