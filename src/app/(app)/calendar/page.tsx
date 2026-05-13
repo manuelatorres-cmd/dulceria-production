@@ -187,7 +187,6 @@ export default function CalendarPage() {
         }
       />
       <div className="px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto">
-      </div>
 
       {/* Main: focused month + side panel */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-3 mb-3">
