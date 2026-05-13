@@ -13,8 +13,8 @@ import {
 } from "@/lib/hooks";
 import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";
-import { IconArrowLeft as ArrowLeft, IconTrash as Trash2, IconArchive as Archive, IconArchiveOff as ArchiveRestore } from "@tabler/icons-react";
-import Link from "next/link";
+import { PageHeader, Section, DsButton, StatusTag } from "@/components/dulceria";
+import { IconTrash as Trash2, IconArchive as Archive, IconArchiveOff as ArchiveRestore } from "@tabler/icons-react";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 
 export default function FillingCategoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -80,43 +80,30 @@ export default function FillingCategoryDetailPage({ params }: { params: Promise<
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-6 pb-2">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
-        </button>
-      </div>
+      <PageHeader
+        title={
+          <InlineNameEditor
+            name={category.name}
+            onSave={async (n) => {
+              await saveFillingCategory({
+                id: category.id,
+                name: n,
+                shelfStable: category.shelfStable,
+                archived: category.archived,
+              });
+            }}
+          />
+        }
+        meta={`${inUseCount} filling${inUseCount === 1 ? "" : "s"} in this category`}
+        badges={
+          <>
+            {category.shelfStable && <StatusTag kind="ready">Shelf-stable</StatusTag>}
+            {category.archived && <StatusTag kind="done">Archived</StatusTag>}
+          </>
+        }
+      />
 
-      <div className="px-4 pb-6 space-y-6 max-w-lg">
-        {/* Name row */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1 flex items-center gap-2">
-            <InlineNameEditor
-              name={category.name}
-              onSave={async (n) => {
-                await saveFillingCategory({
-                  id: category.id,
-                  name: n,
-                  shelfStable: category.shelfStable,
-                  archived: category.archived,
-                });
-              }}
-              className="text-xl font-bold"
-            />
-            {category.shelfStable && (
-              <span className="rounded-full bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 text-[10px] font-medium shrink-0">
-                Shelf-stable
-              </span>
-            )}
-            {category.archived && (
-              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
-                <Archive className="w-3 h-3" /> Archived
-              </span>
-            )}
-          </div>
-        </div>
+      <div style={{ padding: "16px 32px 40px" }} className="space-y-6 max-w-lg">
 
         {/* Shelf-stable toggle */}
         <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
