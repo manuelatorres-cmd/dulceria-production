@@ -83,11 +83,8 @@ export default function ProductionBrainDashboardPage() {
   }, [dateless]);
 
   return (
-    <div>
-      <div className="px-4 pt-4">
-        <BackButton />
-      </div>
-      <PageHeader title="Production Brain — Dashboard" meta="Strategic overview: pipeline, alerts, replenishment proposals, capacity outlook." />
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader title="Production brain · Dashboard" meta="Strategic overview · pipeline, alerts, replenishment proposals, capacity outlook" />
 
       {/* Engine controls */}
       <section className="flex flex-wrap items-center gap-3 mb-5">
