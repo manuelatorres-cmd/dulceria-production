@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useCsvImports,
   saveCsvImport,
@@ -103,12 +103,13 @@ export default function ImportsPage() {
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader
         title="Imports"
-        accent="CSV"
-        description="Drop Shopify or HelloCash exports here. Preview before committing — unmapped SKUs resolve inline and cache for next time."
+        meta="CSV · Drop Shopify or HelloCash exports here · preview before committing · unmapped SKUs resolve inline + cache for next time"
       />
+
+      <div style={{ padding: "16px 32px 40px" }}>
 
       <section
         className="border border-border bg-card p-4 mb-6"
@@ -333,6 +334,7 @@ export default function ImportsPage() {
           </ul>
         )}
       </section>
+      </div>
     </div>
   );
 }
