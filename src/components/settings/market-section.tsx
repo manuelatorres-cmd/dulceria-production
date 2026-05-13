@@ -1,2 +1,2 @@
 "use client";
-export { MarketSection } from "./all-tabs";
+export { MarketSection } from "./_section-impls";

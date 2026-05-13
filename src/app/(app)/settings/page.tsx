@@ -9,7 +9,7 @@ import {
 /**
  * Settings hub landing. Was a 3274-line monolith with all 8 tabs in
  * one file; now a wayfinding hub with one HubCard per subroute. The
- * tab bodies live in src/components/settings/all-tabs.tsx and are
+ * tab bodies live in per-section files (backup-section.tsx, etc.) and are
  * rendered by each /settings/<tab>/page.tsx subroute.
  */
 export default function SettingsHubPage() {

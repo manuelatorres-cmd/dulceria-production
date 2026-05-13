@@ -1,2 +1,2 @@
 "use client";
-export { EquipmentSection } from "./all-tabs";
+export { EquipmentSection } from "./_section-impls";

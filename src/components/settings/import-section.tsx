@@ -1,2 +1,2 @@
 "use client";
-export { ImportSection } from "./all-tabs";
+export { ImportSection } from "./_section-impls";

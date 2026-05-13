@@ -1,2 +1,2 @@
 "use client";
-export { CapacitySection } from "./all-tabs";
+export { CapacitySection } from "./_section-impls";

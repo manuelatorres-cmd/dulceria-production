@@ -1,2 +1,2 @@
 "use client";
-export { StepsSection } from "./all-tabs";
+export { StepsSection } from "./_section-impls";
