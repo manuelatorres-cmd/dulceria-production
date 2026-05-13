@@ -15,13 +15,19 @@ import {
   deductShellForPlanProduct, prepareFillingForBatch, consumeFillingStockForPlanProduct,
   consumeProductStockForPacking, commitAllocationSplit,
   useProductionOrders, useAllProductionOrderItems,
+  usePeople, useAllIngredientStock, useMouldPool, useEquipmentInstances,
+  useMachineLoads, useEquipment,
 } from "@/lib/hooks";
 import { PackingModal } from "@/components/packing-modal";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
-import type { Filling, Mould, PlanProduct, Product, DecorationMaterial } from "@/types";
+import { calculateShellWeightG } from "@/lib/costCalculation";
+import type { Filling, Mould, PlanProduct, Product, DecorationMaterial, Ingredient } from "@/types";
 import { normalizeApplyAt } from "@/types";
-import { IconRotate as RotateCcw, IconPencil as Pencil, IconCheck as Check, IconX as X, IconBookmark as BookOpen, IconNote as StickyNote, IconPlus as Plus, IconClipboardList as ClipboardList, IconPrinter as Printer, IconPlayerPlay as Play } from "@tabler/icons-react";
-import { BackButton } from "@/components/back-button";
+import { IconRotate as RotateCcw, IconPencil as Pencil, IconCheck as Check, IconX as X, IconBookmark as BookOpen, IconNote as StickyNote, IconPlus as Plus, IconClipboardList as ClipboardList, IconPrinter as Printer, IconPlayerPlay as Play, IconGripVertical } from "@tabler/icons-react";
+import {
+  DsDetailPage, Section, ListRow, StatCard, DsButton, DsDrawer, DsDialog, StatusTag, type StatusTagKind,
+  DsInlineSelect, DsInlineField, DsInlineTextarea,
+} from "@/components/dulceria";
 import { YieldModal } from "@/components/yield-modal";
 import type { YieldEntry } from "@/components/yield-modal";
 import {
@@ -58,6 +64,18 @@ const PHASES = [
 ] as const;
 
 type PhaseId = typeof PHASES[number]["id"];
+
+/** Phase C wizard steps. Replaces the legacy single-screen 8-phase
+ *  view with a linear 5-step flow. URL state via ?step=. The 8 phase
+ *  tabs live under step=production. */
+const WIZARD_STEPS = [
+  { id: "plan",       label: "1 Plan"       },
+  { id: "prep",       label: "2 Prep"       },
+  { id: "production", label: "3 Production" },
+  { id: "packing",    label: "4 Packing"    },
+  { id: "wrapup",     label: "5 Wrap up"    },
+] as const;
+type WizardStepId = typeof WIZARD_STEPS[number]["id"];
 
 /** Map a user-facing step name to one of our 8 canonical phases.
  *  Exact match first (handles "Filling Prep" vs "Filling" correctly);
@@ -183,13 +201,29 @@ function PlanContent({
 }) {
   const [backHref, setBackHref] = useState("/production");
   const [backLabel, setBackLabel] = useState("Production");
+  const [activeStep, setActiveStep] = useState<WizardStepId>("production");
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const from = params.get("from");
     if (from) { setBackHref(from); setBackLabel("Back to product"); }
     const tab = params.get("tab") as PhaseId | null;
     if (tab && PHASES.some((p) => p.id === tab)) setActivePhase(tab);
+    const step = params.get("step") as WizardStepId | null;
+    if (step && WIZARD_STEPS.some((s) => s.id === step)) setActiveStep(step);
   }, []);
+
+  // Persist wizard step to URL so reloads / shared links land back on
+  // the same step. ?tab= continues to drive nested phase selection for
+  // step=production.
+  function changeStep(next: WizardStepId) {
+    setActiveStep(next);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    params.set("step", next);
+    const qs = params.toString();
+    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", url);
+  }
   const allFillings = useFillings();
   const shelfStableCategoryNames = useShelfStableCategoryNames();
   const allMoulds = useMouldsList(true);
@@ -422,6 +456,295 @@ function PlanContent({
     for (const arr of out.values()) arr.sort();
     return out;
   }, [allLineItemsForBatch, allProductionDays, productionStepsAll, planId]);
+
+  // ── Phase C wizard derivations ─────────────────────────────────
+  // Drive the header utilization bar, the Plan / Prep step bodies,
+  // and the step-pill completion states. All lazy memoised.
+
+  const people = usePeople(false);
+  const allIngredientStock = useAllIngredientStock();
+  const ingredientById = useMemo(
+    () => new Map(allIngredients.map((i) => [i.id!, i])),
+    [allIngredients],
+  );
+  const ingredientStockByIngredientId = useMemo(
+    () => new Map(allIngredientStock.map((r) => [r.ingredientId, r.quantityG])),
+    [allIngredientStock],
+  );
+  const mouldPool = useMouldPool();
+  const equipmentList = useEquipment(false);
+  const equipmentInstances = useEquipmentInstances();
+  const machineLoads = useMachineLoads();
+
+  // Aggregated minutes + dates for this plan from the daily-production line
+  // items. plannedMinutes already sums perBatch + per-mould scaling at the
+  // time of planning so we don't recompute it here.
+  const batchMinutesPlanned = useMemo(() => {
+    let total = 0;
+    for (const li of allLineItemsForBatch) {
+      if (li.planId !== planId) continue;
+      total += li.plannedMinutes ?? 0;
+    }
+    return total;
+  }, [allLineItemsForBatch, planId]);
+
+  const batchDates = useMemo(() => {
+    const dayDateById = new Map(allProductionDays.map((d) => [d.id!, d.date]));
+    const set = new Set<string>();
+    for (const li of allLineItemsForBatch) {
+      if (li.planId !== planId) continue;
+      const date = dayDateById.get(li.productionDayId);
+      if (date) set.add(date);
+    }
+    return [...set].sort();
+  }, [allLineItemsForBatch, allProductionDays, planId]);
+
+  // Day-capacity proxy: sum of every non-archived person's defaultHoursPerDay
+  // × 60 × number of distinct days this plan touches. Falls back to a single
+  // day when the plan hasn't been scheduled yet (so utilisation still renders
+  // a useful comparison instead of dividing by zero).
+  const dayCapacityMinutes = useMemo(() => {
+    const perDay = people
+      .filter((p) => !p.archived)
+      .reduce((s, p) => s + ((p.defaultHoursPerDay ?? 0) * 60), 0);
+    const days = Math.max(1, batchDates.length);
+    return perDay * days;
+  }, [people, batchDates]);
+
+  const utilizationPct = dayCapacityMinutes > 0
+    ? Math.round((batchMinutesPlanned / dayCapacityMinutes) * 100)
+    : 0;
+  const utilizationVariant: "ok" | "warn" | "urgent" = utilizationPct >= 100
+    ? "urgent"
+    : utilizationPct >= 80
+      ? "warn"
+      : "ok";
+  const utilizationColor =
+    utilizationVariant === "urgent" ? "var(--ds-tier-urgent)"
+    : utilizationVariant === "warn" ? "var(--ds-semantic-warn)"
+    : "var(--ds-tier-positive)";
+
+  // Estimated minutes per planProduct ("batch" in wizard vocab) for the
+  // Plan-step ListRow. activeMinutes × moulds for normal steps,
+  // activeMinutes × 1 for perBatch steps. Filtered to the product's
+  // category — falls back to summing every step when no match found.
+  const minutesByPlanProduct = useMemo(() => {
+    const productionStepsByType = new Map<string, typeof productionStepsAll>();
+    for (const s of productionStepsAll) {
+      const arr = productionStepsByType.get(s.productType) ?? [];
+      arr.push(s);
+      productionStepsByType.set(s.productType, arr);
+    }
+    const out = new Map<string, number>();
+    for (const pp of planProducts) {
+      const product = productsMap.get(pp.productId);
+      const moulds = pp.quantity;
+      const productType = product?.productCategoryId ?? "";
+      const stepsForType = productionStepsByType.get(productType) ?? [];
+      let mins = 0;
+      for (const s of stepsForType) {
+        mins += (s.activeMinutes ?? 0) * (s.perBatch ? 1 : moulds);
+      }
+      out.set(pp.id!, mins);
+    }
+    return out;
+  }, [planProducts, productsMap, productionStepsAll]);
+
+  // Mise en place: aggregate scaled filling-recipe ingredients across every
+  // consolidated filling, plus the shell-chocolate ingredient demand per
+  // planProduct. Returns { ingredientId, neededG, onHandG } sorted alpha by
+  // ingredient name.
+  const miseEnPlace = useMemo(() => {
+    const need = new Map<string, number>();
+    for (const cl of consolidatedFillings) {
+      for (const si of cl.scaledIngredients) {
+        need.set(si.ingredientId, (need.get(si.ingredientId) ?? 0) + si.amount);
+      }
+    }
+    for (const pp of planProducts) {
+      const product = productsMap.get(pp.productId);
+      const mould = mouldsMap.get(pp.mouldId);
+      if (!product?.shellIngredientId || !mould) continue;
+      const shellG = calculateShellWeightG(mould, product.shellPercentage)
+        * mould.numberOfCavities * pp.quantity;
+      if (shellG <= 0) continue;
+      need.set(
+        product.shellIngredientId,
+        (need.get(product.shellIngredientId) ?? 0) + shellG,
+      );
+    }
+    const rows: Array<{
+      ingredientId: string;
+      ingredientName: string;
+      neededG: number;
+      onHandG: number;
+      shortG: number;
+    }> = [];
+    for (const [ingredientId, neededG] of need) {
+      const ing = ingredientById.get(ingredientId);
+      const onHandG = ingredientStockByIngredientId.get(ingredientId) ?? 0;
+      rows.push({
+        ingredientId,
+        ingredientName: ing?.name ?? "Unknown ingredient",
+        neededG: Math.round(neededG),
+        onHandG: Math.round(onHandG),
+        shortG: Math.max(0, Math.round(neededG - onHandG)),
+      });
+    }
+    rows.sort((a, b) => a.ingredientName.localeCompare(b.ingredientName));
+    return rows;
+  }, [consolidatedFillings, planProducts, productsMap, mouldsMap, ingredientById, ingredientStockByIngredientId]);
+
+  // Local UI state for the Prep step's "prepped" + "clean" toggles.
+  // Pure UI today — no DB column persists these flags. Flag ✗ deferred
+  // until per-plan prep checklist schema exists.
+  const [preppedIngredientIds, setPreppedIngredientIds] = useState<Set<string>>(new Set());
+  const [cleanMouldIds, setCleanMouldIds] = useState<Set<string>>(new Set());
+
+  // Moulds needed: group planProducts by mouldId, sum quantities, and
+  // surface per-mould pool counts (in-use / free / sealed) so the
+  // operator knows what's already cleaned and ready to go.
+  const mouldsNeeded = useMemo(() => {
+    const byMould = new Map<string, { mouldId: string; needed: number; planProductIds: string[] }>();
+    for (const pp of planProducts) {
+      const existing = byMould.get(pp.mouldId);
+      if (existing) {
+        existing.needed += pp.quantity;
+        existing.planProductIds.push(pp.id!);
+      } else {
+        byMould.set(pp.mouldId, {
+          mouldId: pp.mouldId,
+          needed: pp.quantity,
+          planProductIds: [pp.id!],
+        });
+      }
+    }
+    const out: Array<{
+      mouldId: string;
+      mouldName: string;
+      needed: number;
+      inUse: number;
+      free: number;
+      sealed: number;
+    }> = [];
+    for (const row of byMould.values()) {
+      const pool = mouldPool.filter((mp) => mp.mouldId === row.mouldId && !mp.retired);
+      const inUse = pool.filter((mp) => mp.currentState === "loaded" || mp.currentState === "filled").length;
+      const free = pool.filter((mp) => mp.currentState === "available").length;
+      const sealed = pool.filter((mp) => mp.currentState === "sealed").length;
+      out.push({
+        mouldId: row.mouldId,
+        mouldName: mouldsMap.get(row.mouldId)?.name ?? "Unknown mould",
+        needed: row.needed,
+        inUse,
+        free,
+        sealed,
+      });
+    }
+    out.sort((a, b) => a.mouldName.localeCompare(b.mouldName));
+    return out;
+  }, [planProducts, mouldPool, mouldsMap]);
+
+  // Machines panel: every non-archived tempering / melting equipment
+  // instance with its current MachineLoad (if any) so operators can see
+  // empty machines + which chocolate is loaded where before the run.
+  const machinesView = useMemo(() => {
+    const temperingEquipmentIds = new Set(
+      equipmentList
+        .filter((e) => e.kind === "tempering" || e.kind === "melting_pot")
+        .map((e) => e.id!),
+    );
+    const insts = equipmentInstances.filter((ei) =>
+      temperingEquipmentIds.has(ei.equipmentId) && ei.status !== "retired",
+    );
+    return insts.map((inst) => {
+      const activeLoad = machineLoads.find(
+        (ml) => ml.equipmentInstanceId === inst.id && ml.status === "in_use",
+      );
+      const loadedIngredient = activeLoad
+        ? ingredientById.get(activeLoad.ingredientId)
+        : null;
+      return {
+        instance: inst,
+        load: activeLoad ?? null,
+        loadedIngredientName: loadedIngredient?.name ?? null,
+      };
+    });
+  }, [equipmentList, equipmentInstances, machineLoads, ingredientById]);
+
+  const totalPrepIngredients = miseEnPlace.length;
+  const allPrepped = totalPrepIngredients > 0
+    && miseEnPlace.every((row) => preppedIngredientIds.has(row.ingredientId));
+
+  // Wizard step state for the pill chrome.
+  const productionStepDone = phaseDoneCount === PHASES.length;
+  const packingPhaseSteps = useMemo(() => steps.filter((s) => s.group === "packing"), [steps]);
+  const packingStepDone = packingPhaseSteps.length > 0
+    && packingPhaseSteps.every((s) => statusMap.get(s.key));
+  const planStepComplete = planProducts.length > 0;
+  const wrapupStepComplete = plan.status === "done";
+
+  function stepPillState(id: WizardStepId): "completed" | "active" | "future" {
+    if (id === activeStep) return "active";
+    const done =
+      id === "plan" ? planStepComplete
+      : id === "prep" ? allPrepped
+      : id === "production" ? productionStepDone
+      : id === "packing" ? packingStepDone
+      : wrapupStepComplete;
+    if (done) return "completed";
+    const order = WIZARD_STEPS.findIndex((s) => s.id === id);
+    const currentOrder = WIZARD_STEPS.findIndex((s) => s.id === activeStep);
+    return order > currentOrder ? "future" : "completed";
+  }
+
+  // Status badge mapping for the header.
+  const planStatusKind: StatusTagKind = plan.status === "done" ? "done"
+    : plan.status === "active" ? "scheduled"
+    : plan.status === "cancelled" || plan.status === "orphaned" ? "neutral"
+    : "pending";
+  const planStatusLabel = plan.status === "done" ? "Done"
+    : plan.status === "active" ? "In production"
+    : plan.status === "cancelled" ? "Cancelled"
+    : plan.status === "orphaned" ? "Orphaned"
+    : "Draft";
+
+  // Drawers + dialogs (Plan-step edit drawer, Add-batch drawer, Mark-done dialog)
+  const [editingPlanProductId, setEditingPlanProductId] = useState<string | null>(null);
+  const [addBatchDrawerOpen, setAddBatchDrawerOpen] = useState(false);
+  const [addBatchProductId, setAddBatchProductId] = useState<string>("");
+  const [addBatchMouldId, setAddBatchMouldId] = useState<string>("");
+  const [addBatchQuantity, setAddBatchQuantity] = useState<number>(1);
+  const [markDoneDialogOpen, setMarkDoneDialogOpen] = useState(false);
+
+  async function handleAddBatch() {
+    if (!addBatchProductId || !addBatchMouldId || addBatchQuantity < 1) return;
+    await savePlanProduct({
+      planId,
+      productId: addBatchProductId,
+      mouldId: addBatchMouldId,
+      quantity: addBatchQuantity,
+      sortOrder: planProducts.length,
+    });
+    setAddBatchDrawerOpen(false);
+    setAddBatchProductId("");
+    setAddBatchMouldId("");
+    setAddBatchQuantity(1);
+  }
+
+  async function reorderPlanProduct(planProductId: string, direction: -1 | 1) {
+    const sorted = [...planProducts].sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = sorted.findIndex((pp) => pp.id === planProductId);
+    if (idx < 0) return;
+    const swapWith = idx + direction;
+    if (swapWith < 0 || swapWith >= sorted.length) return;
+    const a = sorted[idx];
+    const b = sorted[swapWith];
+    await Promise.all([
+      savePlanProduct({ ...a, sortOrder: b.sortOrder }),
+      savePlanProduct({ ...b, sortOrder: a.sortOrder }),
+    ]);
+  }
 
   /** Deduct filling stock for all fillings marked as "use stock" (fillingPreviousBatches) */
   async function deductPreviousBatchStock() {
@@ -875,184 +1198,561 @@ function PlanContent({
     : daysSinceCreated === 1 ? "Started yesterday"
     : `Day ${daysSinceCreated + 1} of this batch`;
 
+  const headerMeta = [
+    plan.batchNumber ?? null,
+    ageLabel,
+    `${phaseDoneCount} / ${PHASES.length} phases`,
+    batchDates.length > 0
+      ? batchDates.length === 1
+        ? new Date(batchDates[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })
+        : `${new Date(batchDates[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })} – ${new Date(batchDates[batchDates.length - 1] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })}`
+      : null,
+    `${planProducts.length} batch${planProducts.length === 1 ? "" : "es"}`,
+  ].filter(Boolean).join(" · ");
+
   return (
-    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-6 pb-2">
-        <div className="mb-3">
-          <BackButton fallbackHref={backHref} fallbackLabel={backLabel} />
-        </div>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            {editingName ? (
-              <div className="flex items-center gap-1.5">
-                <input
-                  autoFocus
-                  type="text"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleRenamePlan(); if (e.key === "Escape") setEditingName(false); }}
-                  className="flex-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <button onClick={handleRenamePlan} className="p-1 rounded-full hover:bg-muted"><Check className="w-4 h-4 text-primary" /></button>
-                <button onClick={() => setEditingName(false)} className="p-1 rounded-full hover:bg-muted"><X className="w-4 h-4 text-muted-foreground" /></button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 group">
-                <h1 className="text-xl font-bold truncate">{plan.name}</h1>
-                <button
-                  onClick={() => { setNameInput(plan.name); setEditingName(true); }}
-                  className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-muted transition-opacity"
-                  aria-label="Rename batch"
-                >
-                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                </button>
-              </div>
+    <>
+      <DsDetailPage
+        title={plan.name}
+        titleEditor={editingName ? (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <input
+              autoFocus
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleRenamePlan(); if (e.key === "Escape") setEditingName(false); }}
+              style={{
+                fontSize: 20, fontWeight: 600, padding: "2px 8px", minWidth: 260,
+                border: "0.5px solid var(--ds-border-warm)", borderRadius: 6,
+                background: "var(--ds-card-bg)", outline: "none",
+                color: "var(--ds-text-primary)",
+              }}
+            />
+            <button onClick={handleRenamePlan} style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "var(--ds-tier-quarter-focus)" }} aria-label="Save"><Check size={14} /></button>
+            <button onClick={() => setEditingName(false)} style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "var(--ds-text-muted)" }} aria-label="Cancel"><X size={14} /></button>
+          </div>
+        ) : (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <h1 className="text-ds-page-title">{plan.name}</h1>
+            <button
+              onClick={() => { setNameInput(plan.name); setEditingName(true); }}
+              style={{ padding: 4, border: "none", background: "transparent", cursor: "pointer", color: "var(--ds-text-muted)" }}
+              aria-label="Rename batch"
+            >
+              <Pencil size={13} />
+            </button>
+          </span>
+        )}
+        meta={headerMeta}
+        statusBadge={<StatusTag kind={planStatusKind}>{planStatusLabel}</StatusTag>}
+        breadcrumb={{ label: backLabel, href: backHref }}
+        actions={
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            {plan.batchSummary && (
+              <Link
+                href={`/production/${encodeURIComponent(planId)}/summary`}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  fontSize: 12, color: "var(--ds-text-muted)", textDecoration: "none",
+                  padding: "4px 10px",
+                  border: "0.5px solid var(--ds-border-warm)", borderRadius: 4,
+                  background: "var(--ds-card-bg)",
+                }}
+              >
+                <ClipboardList size={13} /> Summary
+              </Link>
             )}
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              {plan.batchNumber && (
-                <>
-                  <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{plan.batchNumber}</span>
-                  <span className="text-xs text-muted-foreground">·</span>
-                </>
-              )}
-              <p className="text-xs text-muted-foreground">{ageLabel}</p>
-              <span className="text-xs text-muted-foreground">·</span>
-              <p className="text-xs text-muted-foreground">{phaseDoneCount} / {PHASES.length} steps</p>
-              {plan.batchSummary && (
-                <>
-                  <span className="text-xs text-muted-foreground">·</span>
-                  <Link href={`/production/${encodeURIComponent(planId)}/summary`} className="inline-flex items-center gap-1 text-xs text-primary">
-                    <ClipboardList className="w-3 h-3" /> Summary
-                  </Link>
-                </>
-              )}
-            </div>
-            {(linkedOrders.length > 0 || surplusPlanned > 0) && (
-              <div className="flex items-center gap-1.5 mt-1 flex-wrap text-xs">
-                <span className="text-muted-foreground">Contributing to:</span>
-                {linkedOrders.map((lo) => (
-                  <Link
-                    key={lo.orderId}
-                    href={`/orders/${encodeURIComponent(lo.orderId)}`}
-                    className="inline-flex items-center gap-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-0.5 hover:border-primary hover:text-primary"
-                  >
-                    <span className="truncate max-w-[14ch]">{lo.label}</span>
-                    <span className="text-muted-foreground tabular-nums">· {lo.allocatedQuantity} pcs</span>
-                  </Link>
-                ))}
-                {surplusPlanned > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted px-2 py-0.5 text-muted-foreground">
-                    Surplus · {surplusPlanned} pcs
-                  </span>
-                )}
-              </div>
+            {plan.status === "done" && printerEnabled && (
+              <DsButton size="sm" onClick={handlePrintLabels} disabled={printState === "printing"}>
+                <Printer size={13} style={{ marginRight: 4, verticalAlign: "-2px" }} />
+                {printState === "printing" ? "Generating…" : printState === "done" ? "Saved!" : "Save labels"}
+              </DsButton>
+            )}
+            {plan.status === "draft" && (
+              <DsButton
+                size="sm"
+                variant="primary"
+                onClick={async () => {
+                  if (!plan.id) return;
+                  try { await startProductionPlan(plan.id); } catch (e) { console.error(e); }
+                }}
+                title="Mark this batch as in-progress and flip its linked orders to in production."
+              >
+                <Play size={13} style={{ marginRight: 4, verticalAlign: "-2px" }} /> Start production
+              </DsButton>
             )}
           </div>
-
-          {/* Start production — lifts a draft batch into 'active' and
-              promotes its linked pending orders to in_production without
-              requiring the operator to tick the first step. Hidden once
-              the batch is active/done/cancelled. */}
-          {plan.status === "draft" && (
-            <button
-              onClick={async () => {
-                if (!plan.id) return;
-                try { await startProductionPlan(plan.id); } catch (e) { console.error(e); }
-              }}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:opacity-90"
-              title="Mark this batch as in-progress and flip its linked orders to in production. Step ticks keep working as before."
-            >
-              <Play className="w-3.5 h-3.5" /> Start production
-            </button>
+        }
+        tabs={WIZARD_STEPS.map((s) => ({
+          id: s.id,
+          label: s.label,
+          state: stepPillState(s.id),
+        }))}
+        activeTab={activeStep}
+        onTabChange={(id) => changeStep(id as WizardStepId)}
+      >
+        {/* Utilisation bar — planned vs day capacity */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{
+            display: "flex", alignItems: "baseline", justifyContent: "space-between",
+            gap: 8, marginBottom: 4, fontSize: 11, color: "var(--ds-text-muted)",
+          }}>
+            <span>
+              <strong style={{ color: "var(--ds-text-primary)", fontWeight: 500 }}>
+                {batchMinutesPlanned} min
+              </strong>{" "}planned
+              {dayCapacityMinutes > 0 && <> · capacity {dayCapacityMinutes} min</>}
+            </span>
+            {dayCapacityMinutes > 0 && (
+              <span style={{ color: utilizationColor, fontWeight: 500 }}>
+                {utilizationPct}% utilised
+              </span>
+            )}
+          </div>
+          <div style={{
+            height: 6, borderRadius: 4, overflow: "hidden",
+            background: "var(--ds-card-bg-hover, rgba(0,0,0,0.06))",
+            border: "0.5px solid var(--ds-border-warm)",
+          }}>
+            <div style={{
+              height: "100%",
+              width: `${Math.min(100, utilizationPct)}%`,
+              background: utilizationColor, transition: "width 0.3s",
+            }} />
+          </div>
+          {dayCapacityMinutes === 0 && (
+            <p style={{ fontSize: 10, color: "var(--ds-text-muted)", marginTop: 4, fontStyle: "italic" }}>
+              ✗ Capacity unknown — set <code>defaultHoursPerDay</code> on people for utilisation %.
+            </p>
           )}
         </div>
 
-        {/* Progress bar */}
-        <div className="mt-3 h-1.5 rounded-[4px] bg-muted overflow-hidden">
-          <div
-            className="h-full bg-accent rounded-full transition-all duration-300"
-            style={{ width: `${(phaseDoneCount / PHASES.length) * 100}%` }}
-          />
-        </div>
-
-        {/* Batch note */}
-        {editingBatchNote ? (
-          <div className="mt-3">
-            <textarea
-              autoFocus
-              value={batchNoteInput}
-              onChange={(e) => setBatchNoteInput(e.target.value)}
-              onBlur={handleSaveBatchNote}
-              onKeyDown={(e) => { if (e.key === "Escape") setEditingBatchNote(false); }}
-              placeholder="Note for this batch…"
-              rows={3}
-              className="w-full rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-            />
+        {(linkedOrders.length > 0 || surplusPlanned > 0) && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12, fontSize: 12, alignItems: "center" }}>
+            <span style={{ color: "var(--ds-text-muted)" }}>Contributing to:</span>
+            {linkedOrders.map((lo) => (
+              <Link
+                key={lo.orderId}
+                href={`/orders/${encodeURIComponent(lo.orderId)}`}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  padding: "2px 8px",
+                  border: "0.5px solid var(--ds-border-warm)", borderRadius: 6,
+                  background: "var(--ds-card-bg)", color: "var(--ds-text-primary)",
+                  textDecoration: "none",
+                }}
+              >
+                <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lo.label}</span>
+                <span style={{ color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>· {lo.allocatedQuantity} pcs</span>
+              </Link>
+            ))}
+            {surplusPlanned > 0 && (
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                padding: "2px 8px",
+                border: "0.5px solid var(--ds-border-warm)", borderRadius: 4,
+                background: "var(--ds-card-bg-hover, rgba(0,0,0,0.04))",
+                color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums",
+              }}>
+                Surplus · {surplusPlanned} pcs
+              </span>
+            )}
           </div>
+        )}
+
+        {editingBatchNote ? (
+          <textarea
+            autoFocus
+            value={batchNoteInput}
+            onChange={(e) => setBatchNoteInput(e.target.value)}
+            onBlur={handleSaveBatchNote}
+            onKeyDown={(e) => { if (e.key === "Escape") setEditingBatchNote(false); }}
+            placeholder="Note for this batch…"
+            rows={3}
+            style={{
+              width: "100%", padding: "8px 12px", marginBottom: 12,
+              border: "0.5px solid var(--ds-border-warm)", borderRadius: 6,
+              background: "var(--ds-card-bg)", fontSize: 13, resize: "none", outline: "none",
+              color: "var(--ds-text-primary)",
+            }}
+          />
         ) : plan.notes ? (
           <button
             onClick={() => { setBatchNoteInput(plan.notes ?? ""); setEditingBatchNote(true); }}
-            className="mt-3 w-full flex items-start gap-2 text-left group"
+            style={{
+              display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 12,
+              padding: 0, border: "none", background: "transparent",
+              fontSize: 12, color: "var(--ds-text-muted)", fontStyle: "italic",
+              cursor: "pointer", textAlign: "left", width: "100%",
+            }}
           >
-            <StickyNote className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-            <p className="text-xs text-muted-foreground italic flex-1 leading-relaxed">{plan.notes}</p>
-            <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" />
+            <StickyNote size={13} style={{ marginTop: 2, flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{plan.notes}</span>
+            <Pencil size={11} style={{ marginTop: 2, flexShrink: 0, opacity: 0.5 }} />
           </button>
         ) : (
           <button
             onClick={() => { setBatchNoteInput(""); setEditingBatchNote(true); }}
-            className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4, marginBottom: 12,
+              padding: 0, border: "none", background: "transparent",
+              fontSize: 12, color: "var(--ds-text-muted)", cursor: "pointer",
+            }}
           >
-            <StickyNote className="w-3 h-3" /> Add batch note
+            <StickyNote size={12} /> Add batch note
           </button>
         )}
 
-        {/* Deadline impact warning after an unmould yield short-stocks open orders */}
         {deadlineImpact && deadlineImpact.length > 0 && (
-          <div className="mt-3 rounded-[4px] border border-status-alert-edge bg-status-alert-bg px-3 py-2.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-status-alert">
-                  Yield short — {deadlineImpact.length === 1 ? "1 order" : `${deadlineImpact.length} orders`} at risk
-                </p>
-                <ul className="mt-1 space-y-0.5 text-[11px] text-foreground">
-                  {deadlineImpact.map((issue) => (
-                    <li key={issue.orderId}>
-                      <span className="font-medium">{issue.orderName}</span>
-                      {" · "}short {issue.shortfall}
-                      {" · "}needs {issue.required} by {new Date(issue.deadline).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <button
-                onClick={() => setDeadlineImpact(null)}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Dismiss
-              </button>
+          <div style={{
+            marginBottom: 12, padding: "10px 12px",
+            border: "0.5px solid var(--ds-tier-urgent)",
+            background: "rgba(220, 80, 60, 0.06)", borderRadius: 4,
+            display: "flex", justifyContent: "space-between", gap: 12,
+          }}>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-tier-urgent)" }}>
+                Yield short — {deadlineImpact.length === 1 ? "1 order" : `${deadlineImpact.length} orders`} at risk
+              </p>
+              <ul style={{ marginTop: 4, fontSize: 11, color: "var(--ds-text-primary)", listStyle: "none", padding: 0 }}>
+                {deadlineImpact.map((issue) => (
+                  <li key={issue.orderId}>
+                    <span style={{ fontWeight: 500 }}>{issue.orderName}</span>
+                    {" · "}short {issue.shortfall}
+                    {" · "}needs {issue.required} by {new Date(issue.deadline).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-        )}
-
-        {/* Print labels (Niimbot) */}
-        {plan.status === "done" && printerEnabled && (
-          <div className="mt-3">
-            {printState === "error" && (
-              <p className="text-xs text-destructive mb-1">{printError}</p>
-            )}
             <button
-              onClick={handlePrintLabels}
-              disabled={printState === "printing"}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              onClick={() => setDeadlineImpact(null)}
+              style={{ fontSize: 11, color: "var(--ds-text-muted)", background: "transparent", border: "none", cursor: "pointer" }}
             >
-              <Printer className="w-3.5 h-3.5" />
-              {printState === "printing" ? "Generating…" : printState === "done" ? "Saved!" : "Save labels"}
+              Dismiss
             </button>
           </div>
         )}
 
-      </div>
+        {plan.status === "done" && printerEnabled && printState === "error" && (
+          <p style={{ fontSize: 11, color: "var(--ds-tier-urgent)", marginBottom: 8 }}>{printError}</p>
+        )}
+
+        {/* ── Phase C.2 — Plan ───────────────────────────────────── */}
+        {activeStep === "plan" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <Section
+              title="Batches scheduled"
+              action={
+                <DsButton size="sm" variant="primary" onClick={() => setAddBatchDrawerOpen(true)}>
+                  <Plus size={12} style={{ marginRight: 4, verticalAlign: "-2px" }} /> Add batch
+                </DsButton>
+              }
+              noBody
+            >
+              {planProducts.length === 0 ? (
+                <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                  No batches scheduled yet. Use “Add batch” to assign a product + mould + quantity.
+                </p>
+              ) : (
+                [...planProducts].sort((a, b) => a.sortOrder - b.sortOrder).map((pp, idx, arr) => {
+                  const product = productsMap.get(pp.productId);
+                  const mould = mouldsMap.get(pp.mouldId);
+                  const minutes = minutesByPlanProduct.get(pp.id!) ?? 0;
+                  return (
+                    <ListRow
+                      key={pp.id}
+                      title={
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ display: "inline-flex", flexDirection: "column", color: "var(--ds-text-muted)", lineHeight: 0.8 }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); reorderPlanProduct(pp.id!, -1); }}
+                              disabled={idx === 0}
+                              title="Move up"
+                              style={{ background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", padding: 0, opacity: idx === 0 ? 0.3 : 1, fontSize: 8 }}
+                            >▲</button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); reorderPlanProduct(pp.id!, 1); }}
+                              disabled={idx === arr.length - 1}
+                              title="Move down"
+                              style={{ background: "transparent", border: "none", cursor: idx === arr.length - 1 ? "default" : "pointer", padding: 0, opacity: idx === arr.length - 1 ? 0.3 : 1, fontSize: 8 }}
+                            >▼</button>
+                          </span>
+                          <IconGripVertical size={13} stroke={1.4} style={{ color: "var(--ds-text-muted)", opacity: 0.5 }} />
+                          <span>{product?.name ?? "Unknown product"}</span>
+                          <span style={{ fontWeight: 400, color: "var(--ds-text-muted)" }}>
+                            · {pp.quantity} mould{pp.quantity === 1 ? "" : "s"}
+                          </span>
+                        </span>
+                      }
+                      meta={
+                        <>
+                          <span>{mould?.name ?? "—"}</span>
+                          {minutes > 0 && <> · ~{minutes} min</>}
+                          <> · </>
+                          <span style={{ fontStyle: "italic" }}>unassigned ✗</span>
+                        </>
+                      }
+                      side={
+                        <DsButton size="sm" onClick={() => setEditingPlanProductId(pp.id!)}>
+                          <Pencil size={11} style={{ marginRight: 4, verticalAlign: "-2px" }} /> Edit
+                        </DsButton>
+                      }
+                      onClick={() => setEditingPlanProductId(pp.id!)}
+                    />
+                  );
+                })
+              )}
+            </Section>
+
+            <Section title="Day summary">
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 12, padding: "0 20px",
+              }}>
+                <StatCard
+                  label="Total minutes"
+                  value={batchMinutesPlanned > 0 ? `${batchMinutesPlanned}` : "—"}
+                  meta={batchMinutesPlanned > 0 ? `${(batchMinutesPlanned / 60).toFixed(1)} h hands-on` : undefined}
+                />
+                <StatCard
+                  label="Day capacity"
+                  value={dayCapacityMinutes > 0 ? `${dayCapacityMinutes}` : "—"}
+                  meta={dayCapacityMinutes > 0
+                    ? `${batchDates.length} day${batchDates.length === 1 ? "" : "s"} · ${(dayCapacityMinutes / 60).toFixed(1)} h`
+                    : "no people-hours set"}
+                />
+                <StatCard
+                  label="Utilisation"
+                  value={dayCapacityMinutes > 0 ? `${utilizationPct}%` : "—"}
+                  variant={utilizationVariant}
+                />
+                <StatCard
+                  label="Batches"
+                  value={planProducts.length}
+                  meta={planProducts.length === 0 ? "none scheduled" : undefined}
+                />
+              </div>
+            </Section>
+
+            <p style={{ fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+              ✗ Per-batch assignee + drag-drop reorder via grip handle are deferred —
+              schema lacks <code>planProducts.assignedPersonId</code>; reorder uses ▲▼ for now.
+            </p>
+          </div>
+        )}
+
+        {/* ── Phase C.3 — Prep ───────────────────────────────────── */}
+        {activeStep === "prep" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <Section
+              title="Mise en place"
+              action={
+                miseEnPlace.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const next = new Set(preppedIngredientIds);
+                      if (allPrepped) {
+                        for (const r of miseEnPlace) next.delete(r.ingredientId);
+                      } else {
+                        for (const r of miseEnPlace) next.add(r.ingredientId);
+                      }
+                      setPreppedIngredientIds(next);
+                    }}
+                    style={{
+                      fontSize: 11, color: "var(--ds-text-muted)",
+                      background: "transparent", border: "none", cursor: "pointer",
+                    }}
+                  >
+                    {allPrepped ? "Unmark all" : "Mark all prepped"}
+                  </button>
+                )
+              }
+              noBody
+            >
+              {miseEnPlace.length === 0 ? (
+                <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                  No ingredients required yet — add planned batches first.
+                </p>
+              ) : (
+                miseEnPlace.map((row) => {
+                  const isPrepped = preppedIngredientIds.has(row.ingredientId);
+                  const tier: "default" | "done" | "urgent" = isPrepped ? "done" : row.shortG > 0 ? "urgent" : "default";
+                  return (
+                    <ListRow
+                      key={row.ingredientId}
+                      tier={tier}
+                      title={
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={isPrepped}
+                            onChange={(e) => {
+                              const next = new Set(preppedIngredientIds);
+                              if (e.target.checked) next.add(row.ingredientId);
+                              else next.delete(row.ingredientId);
+                              setPreppedIngredientIds(next);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ cursor: "pointer" }}
+                          />
+                          <span style={{ textDecoration: isPrepped ? "line-through" : "none" }}>
+                            {row.ingredientName}
+                          </span>
+                        </span>
+                      }
+                      meta={
+                        <>
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                            need <strong style={{ color: "var(--ds-text-primary)" }}>{formatGrams(row.neededG)}</strong>
+                          </span>
+                          {" · "}
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                            on hand {formatGrams(row.onHandG)}
+                          </span>
+                          {row.shortG > 0 && (
+                            <>
+                              {" · "}
+                              <span style={{ color: "var(--ds-tier-urgent)", fontVariantNumeric: "tabular-nums", fontWeight: 500 }}>
+                                short {formatGrams(row.shortG)}
+                              </span>
+                            </>
+                          )}
+                        </>
+                      }
+                    />
+                  );
+                })
+              )}
+              {miseEnPlace.length > 0 && (
+                <p style={{ padding: "8px 20px 0", fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                  ✗ Prepped ticks are local-only — no <code>planPrepStatus</code> schema yet to persist per-plan prep checklist state.
+                </p>
+              )}
+            </Section>
+
+            <Section title="Moulds ready" noBody>
+              {mouldsNeeded.length === 0 ? (
+                <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                  No moulds required yet.
+                </p>
+              ) : (
+                mouldsNeeded.map((row) => {
+                  const isClean = cleanMouldIds.has(row.mouldId);
+                  const enoughClean = row.free >= row.needed;
+                  const tier: "default" | "positive" | "urgent" | "active" = isClean || enoughClean ? "positive" : row.free === 0 ? "urgent" : "active";
+                  return (
+                    <ListRow
+                      key={row.mouldId}
+                      tier={tier}
+                      title={
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                          <span>{row.mouldName}</span>
+                          <span style={{ color: "var(--ds-text-muted)", fontWeight: 400 }}>
+                            · {row.needed} needed
+                          </span>
+                        </span>
+                      }
+                      meta={
+                        <>
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>free {row.free}</span>
+                          {" · "}
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>in use {row.inUse}</span>
+                          {row.sealed > 0 && (
+                            <>
+                              {" · "}
+                              <span style={{ fontVariantNumeric: "tabular-nums" }}>sealed {row.sealed}</span>
+                            </>
+                          )}
+                        </>
+                      }
+                      side={
+                        <button
+                          onClick={() => {
+                            const next = new Set(cleanMouldIds);
+                            if (isClean) next.delete(row.mouldId);
+                            else next.add(row.mouldId);
+                            setCleanMouldIds(next);
+                          }}
+                          style={{
+                            fontSize: 11, padding: "3px 8px",
+                            border: `0.5px solid ${isClean ? "var(--accent-mint-ink, #4ea58a)" : "var(--ds-border-warm)"}`,
+                            background: isClean ? "var(--accent-mint-bg, #e5f3ec)" : "var(--ds-card-bg)",
+                            color: isClean ? "var(--accent-mint-ink, #2f7259)" : "var(--ds-text-muted)",
+                            borderRadius: 12, cursor: "pointer",
+                          }}
+                        >
+                          {isClean ? "Clean ✓" : "Mark clean"}
+                        </button>
+                      }
+                    />
+                  );
+                })
+              )}
+              {mouldsNeeded.length > 0 && (
+                <p style={{ padding: "8px 20px 0", fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                  ✗ Clean toggles are local-only — pool state derived from <code>mouldPool.currentState</code> but per-plan cleaning isn't persisted.
+                </p>
+              )}
+            </Section>
+
+            <Section title="Machines loaded" noBody>
+              {machinesView.length === 0 ? (
+                <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                  No tempering / melting equipment instances configured. Add them in Production brain → Equipment.
+                </p>
+              ) : (
+                machinesView.map(({ instance, load, loadedIngredientName }) => {
+                  const isEmpty = !load;
+                  const tier: "default" | "active" = isEmpty ? "default" : "active";
+                  return (
+                    <ListRow
+                      key={instance.id}
+                      tier={tier}
+                      title={<span>{instance.name}</span>}
+                      meta={
+                        isEmpty ? (
+                          <span style={{ fontStyle: "italic", color: "var(--ds-text-muted)" }}>empty</span>
+                        ) : (
+                          <>
+                            <span>{loadedIngredientName ?? "Loaded"}</span>
+                            {" · "}
+                            <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                              {formatGrams(load!.remainingQuantityG)} of {formatGrams(load!.loadedQuantityG)}
+                            </span>
+                          </>
+                        )
+                      }
+                      side={
+                        isEmpty ? (
+                          <Link
+                            href="/production-brain/equipment"
+                            style={{
+                              fontSize: 11, padding: "3px 10px",
+                              border: "0.5px solid var(--ds-tier-quarter-focus)",
+                              background: "var(--ds-tier-quarter-focus)", color: "#fff",
+                              borderRadius: 12, textDecoration: "none",
+                            }}
+                          >
+                            Load now
+                          </Link>
+                        ) : (
+                          <StatusTag kind={instance.status === "running" ? "scheduled" : "neutral"}>
+                            {instance.status}
+                          </StatusTag>
+                        )
+                      }
+                    />
+                  );
+                })
+              )}
+            </Section>
+          </div>
+        )}
+
+        {activeStep === "production" && (
+          <>
 
 
       {steps.length === 0 ? (
@@ -1327,87 +2027,266 @@ function PlanContent({
           </div>
         </>
       )}
+          </>
+        )}
 
-      {/* Per-product notes */}
-      {planProducts.length > 0 && (
-        <div className="px-4 mt-2 pb-8 border-t border-[color:var(--ds-border-warm)] pt-4">
-          <h2 className="text-sm font-semibold text-muted-foreground mb-3">Product notes</h2>
-          <div className="space-y-2">
-            {planProducts.map((pb) => {
-              const productName = productNames.get(pb.productId) ?? "Unknown";
-              const isEditing = editingProductNoteId === pb.id;
-              return (
-                <div key={pb.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
-                  <p className="text-xs font-medium text-foreground mb-1.5">{productName}</p>
-                  {isEditing ? (
-                    <textarea
-                      autoFocus
-                      value={productNoteInput}
-                      onChange={(e) => setProductNoteInput(e.target.value)}
-                      onBlur={() => handleSaveProductNote(pb)}
-                      onKeyDown={(e) => { if (e.key === "Escape") setEditingProductNoteId(null); }}
-                      placeholder="What happened with this product…"
-                      rows={3}
-                      className="w-full rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-                    />
-                  ) : pb.notes ? (
-                    <button
-                      onClick={() => { setProductNoteInput(pb.notes ?? ""); setEditingProductNoteId(pb.id!); }}
-                      className="w-full flex items-start gap-2 text-left group"
-                    >
-                      <p className="text-xs text-muted-foreground italic flex-1 leading-relaxed">{pb.notes}</p>
-                      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => { setProductNoteInput(""); setEditingProductNoteId(pb.id!); }}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Plus className="w-3 h-3" /> Add note
-                    </button>
-                  )}
+        {/* ── Phase C.4 — Packing (deferred placeholder) ────────── */}
+        {activeStep === "packing" && (
+          <Section title="Packing">
+            <p style={{ padding: "12px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+              ✗ Dedicated Packing step UI deferred (Phase C.4 spec). For now, tick the
+              <strong style={{ color: "var(--ds-text-primary)", fontWeight: 500 }}>{" "}Packing{" "}</strong>
+              phase under step 3 — Production. Packaging consumption + product-stock
+              deduction still fires the same way through the PackingModal.
+            </p>
+          </Section>
+        )}
+
+        {/* ── Phase C.5 — Wrap up (partial — see spec C.5) ──────── */}
+        {activeStep === "wrapup" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <Section title="Yield" noBody>
+              {planProducts.length === 0 ? (
+                <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                  No batches to record yield against.
+                </p>
+              ) : (
+                <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "var(--ds-card-bg-hover, rgba(0,0,0,0.02))" }}>
+                      <th style={{ textAlign: "left", padding: "8px 20px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Batch</th>
+                      <th style={{ textAlign: "right", padding: "8px 12px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Planned</th>
+                      <th style={{ textAlign: "right", padding: "8px 12px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Actual</th>
+                      <th style={{ textAlign: "right", padding: "8px 20px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {planProducts.map((pp) => {
+                      const product = productsMap.get(pp.productId);
+                      const mould = mouldsMap.get(pp.mouldId);
+                      const planned = pp.quantity * (mould?.numberOfCavities ?? 0);
+                      const actual = pp.actualYield;
+                      const variance = typeof actual === "number" ? actual - planned : null;
+                      return (
+                        <tr key={pp.id} style={{ borderTop: "0.5px solid var(--ds-border-warm)" }}>
+                          <td style={{ padding: "10px 20px" }}>
+                            <span style={{ fontWeight: 500 }}>{product?.name ?? "Unknown"}</span>
+                            <span style={{ color: "var(--ds-text-muted)", marginLeft: 6 }}>· {mould?.name ?? "—"}</span>
+                          </td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{planned}</td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{actual ?? "—"}</td>
+                          <td style={{ padding: "10px 20px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: variance == null ? "var(--ds-text-muted)" : variance < 0 ? "var(--ds-tier-urgent)" : variance > 0 ? "var(--ds-tier-positive)" : "var(--ds-text-primary)" }}>
+                            {variance == null ? "—" : variance > 0 ? `+${variance}` : variance}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+              <p style={{ padding: "8px 20px 0", fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                ✗ Variance reason field deferred — no <code>planProducts.varianceReason</code> column yet.
+              </p>
+            </Section>
+
+            {planProducts.length > 0 && (
+              <Section title="Product notes" noBody>
+                {planProducts.map((pb) => {
+                  const productName = productNames.get(pb.productId) ?? "Unknown";
+                  const isEditing = editingProductNoteId === pb.id;
+                  return (
+                    <div key={pb.id} style={{ padding: "12px 20px", borderTop: "0.5px solid var(--ds-border-warm)" }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>{productName}</p>
+                      {isEditing ? (
+                        <textarea
+                          autoFocus
+                          value={productNoteInput}
+                          onChange={(e) => setProductNoteInput(e.target.value)}
+                          onBlur={() => handleSaveProductNote(pb)}
+                          onKeyDown={(e) => { if (e.key === "Escape") setEditingProductNoteId(null); }}
+                          placeholder="What happened with this product…"
+                          rows={3}
+                          style={{
+                            width: "100%", padding: "8px 10px",
+                            border: "0.5px solid var(--ds-border-warm)", borderRadius: 6,
+                            background: "var(--ds-card-bg)", fontSize: 13, resize: "none", outline: "none",
+                            color: "var(--ds-text-primary)",
+                          }}
+                        />
+                      ) : pb.notes ? (
+                        <button
+                          onClick={() => { setProductNoteInput(pb.notes ?? ""); setEditingProductNoteId(pb.id!); }}
+                          style={{
+                            display: "flex", alignItems: "flex-start", gap: 8, width: "100%",
+                            padding: 0, background: "transparent", border: "none", cursor: "pointer",
+                            textAlign: "left",
+                          }}
+                        >
+                          <span style={{ fontSize: 12, color: "var(--ds-text-muted)", fontStyle: "italic", flex: 1, lineHeight: 1.5 }}>{pb.notes}</span>
+                          <Pencil size={11} style={{ marginTop: 2, opacity: 0.5, color: "var(--ds-text-muted)" }} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => { setProductNoteInput(""); setEditingProductNoteId(pb.id!); }}
+                          style={{
+                            display: "inline-flex", alignItems: "center", gap: 4,
+                            padding: 0, background: "transparent", border: "none",
+                            fontSize: 12, color: "var(--ds-text-muted)", cursor: "pointer",
+                          }}
+                        >
+                          <Plus size={12} /> Add note
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </Section>
+            )}
+
+            {plan.status !== "done" && (
+              <Section title="Mark complete">
+                <div style={{ padding: "12px 20px" }}>
+                  <DsButton variant="primary" onClick={() => setMarkDoneDialogOpen(true)}>
+                    <Check size={13} style={{ marginRight: 4, verticalAlign: "-2px" }} />
+                    Mark production day complete
+                  </DsButton>
+                  <p style={{ marginTop: 8, fontSize: 11, color: "var(--ds-text-muted)" }}>
+                    All {steps.length} steps will be marked complete and the batch will close out.
+                  </p>
                 </div>
-              );
-            })}
+              </Section>
+            )}
+
+            <p style={{ fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+              ✗ Plan-level day notes + issues textareas deferred — no
+              dedicated <code>plan.dayNotes</code> / <code>plan.issuesNotes</code>
+              columns; for now use the per-batch note above the wizard.
+            </p>
+          </div>
+        )}
+      </DsDetailPage>
+
+      {/* Add-batch drawer (Plan step) */}
+      <DsDrawer
+        open={addBatchDrawerOpen}
+        title="Add batch"
+        onClose={() => setAddBatchDrawerOpen(false)}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <DsInlineSelect
+            label="Product"
+            value={addBatchProductId}
+            onSave={(v) => setAddBatchProductId(v as string)}
+            options={[
+              { value: "", label: "Select product…" },
+              ...[...productsMap.values()].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({
+                value: p.id!,
+                label: p.name,
+              })),
+            ]}
+          />
+          <DsInlineSelect
+            label="Mould"
+            value={addBatchMouldId}
+            onSave={(v) => setAddBatchMouldId(v as string)}
+            options={[
+              { value: "", label: "Select mould…" },
+              ...[...mouldsMap.values()].sort((a, b) => a.name.localeCompare(b.name)).map((m) => ({
+                value: m.id!,
+                label: `${m.name} (${m.numberOfCavities} cav)`,
+              })),
+            ]}
+          />
+          <DsInlineField
+            label="Moulds to run"
+            type="number"
+            value={String(addBatchQuantity)}
+            onSave={(v) => setAddBatchQuantity(Math.max(1, parseInt(String(v)) || 1))}
+          />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+            <DsButton onClick={() => setAddBatchDrawerOpen(false)}>Cancel</DsButton>
+            <DsButton
+              variant="primary"
+              onClick={handleAddBatch}
+              disabled={!addBatchProductId || !addBatchMouldId || addBatchQuantity < 1}
+            >
+              Add batch
+            </DsButton>
           </div>
         </div>
-      )}
+      </DsDrawer>
 
-      {/* Mark batch as done — placed at the bottom so it's reached only after reviewing all steps */}
-      {plan.status !== "done" && (
-        <div className="px-4 pt-4 pb-8 border-t border-[color:var(--ds-border-warm)] mt-2">
-          {confirmMarkDone ? (
-            <div className="rounded-[4px] border border-status-ok-edge bg-status-ok-bg px-3 py-2.5">
-              <p className="text-sm font-medium text-status-ok mb-0.5">Mark entire batch as done?</p>
-              <p className="text-xs text-status-ok mb-2.5">
-                All {steps.length} steps will be marked complete and this batch will be closed out.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleMarkAllDone}
-                  className="rounded-full bg-status-ok text-white px-3 py-1.5 text-sm font-medium"
-                >
-                  Yes, mark as done
-                </button>
-                <button
-                  onClick={() => setConfirmMarkDone(false)}
-                  className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm text-muted-foreground"
-                >
-                  Cancel
-                </button>
+      {/* Edit-batch drawer (Plan step) */}
+      <DsDrawer
+        open={!!editingPlanProductId}
+        title="Edit batch"
+        onClose={() => setEditingPlanProductId(null)}
+      >
+        {(() => {
+          const pp = planProducts.find((p) => p.id === editingPlanProductId);
+          if (!pp) return null;
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <DsInlineSelect
+                label="Product"
+                value={pp.productId}
+                onSave={async (v) => {
+                  await savePlanProduct({ ...pp, productId: v as string });
+                }}
+                options={[...productsMap.values()].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({
+                  value: p.id!,
+                  label: p.name,
+                }))}
+              />
+              <DsInlineSelect
+                label="Mould"
+                value={pp.mouldId}
+                onSave={async (v) => {
+                  await savePlanProduct({ ...pp, mouldId: v as string });
+                }}
+                options={[...mouldsMap.values()].sort((a, b) => a.name.localeCompare(b.name)).map((m) => ({
+                  value: m.id!,
+                  label: `${m.name} (${m.numberOfCavities} cav)`,
+                }))}
+              />
+              <DsInlineField
+                label="Moulds to run"
+                type="number"
+                value={String(pp.quantity)}
+                onSave={async (v) => {
+                  const q = Math.max(1, parseInt(String(v)) || 1);
+                  await savePlanProduct({ ...pp, quantity: q });
+                }}
+              />
+              <DsInlineTextarea
+                label="Batch notes"
+                value={pp.notes ?? ""}
+                onSave={async (v) => {
+                  await savePlanProduct({ ...pp, notes: (v as string).trim() || undefined });
+                }}
+              />
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+                <DsButton onClick={() => setEditingPlanProductId(null)}>Close</DsButton>
               </div>
+              <p style={{ fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                ✗ Assignee picker deferred — schema lacks <code>planProducts.assignedPersonId</code>.
+              </p>
             </div>
-          ) : (
-            <button
-              onClick={() => setConfirmMarkDone(true)}
-              className="inline-flex items-center gap-1.5 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-            >
-              <Check className="w-3.5 h-3.5" />
-              Mark batch as done
-            </button>
-          )}
-        </div>
-      )}
+          );
+        })()}
+      </DsDrawer>
+
+      <DsDialog
+        open={markDoneDialogOpen}
+        title="Mark entire batch as done?"
+        description={`All ${steps.length} steps will be marked complete and this batch will close out. Unmould yields not yet recorded will prompt for entry first.`}
+        confirmLabel="Yes, mark as done"
+        onConfirm={async () => {
+          setMarkDoneDialogOpen(false);
+          await handleMarkAllDone();
+        }}
+        onCancel={() => setMarkDoneDialogOpen(false)}
+      />
 
       {/* Yield modal */}
       {yieldModal && (
@@ -1514,7 +2393,7 @@ function PlanContent({
           }}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -1570,6 +2449,20 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
       </div>
     </button>
   );
+}
+
+// ─── Display helpers ────────────────────────────────────────────────
+
+/** Format grams using kg for ≥1000g (de-AT locale). Keeps the Prep
+ *  step's "need / on hand / short" columns scannable for both 35 g
+ *  hazelnut butter and 25 kg dark chocolate without two units fighting
+ *  on the same line. */
+function formatGrams(g: number): string {
+  if (g >= 1000) {
+    const kg = g / 1000;
+    return `${kg.toLocaleString("de-AT", { maximumFractionDigits: 2 })} kg`;
+  }
+  return `${Math.round(g)} g`;
 }
 
 // ─── Allocation-split helpers ───────────────────────────────────────

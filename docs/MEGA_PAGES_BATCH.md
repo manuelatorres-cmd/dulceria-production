@@ -474,9 +474,9 @@ Phase B.2   /orders/[id] line items grid                       ✓ shipped
 Phase B.3   /orders/[id] history section                       ✓ shipped
 Phase B.4   /orders/[id] related section                       ✓ shipped
 
-Phase C.1   /production/[id] wizard chrome (DsTabNav step pills)
-Phase C.2   /production/[id] Plan step
-Phase C.3   /production/[id] Prep step
+Phase C.1   /production/[id] wizard chrome (DsTabNav step pills) ✓ shipped
+Phase C.2   /production/[id] Plan step                            ✓ shipped
+Phase C.3   /production/[id] Prep step                            ✓ shipped
 Phase C.4   /production/[id] Production step
 Phase C.5   /production/[id] Packing step
 Phase C.6   /production/[id] Wrap up step
@@ -505,6 +505,45 @@ Phase F.1   /lab/audit-tab refit (if time)
 ---
 
 **End of spec.**
+
+---
+
+## Phase C.1 — `/production/[id]` wizard chrome · evidence
+
+- ✓ `WIZARD_STEPS` constant (`1 Plan / 2 Prep / 3 Production / 4 Packing / 5 Wrap up`) — `src/app/(app)/production/[id]/page.tsx:71-78`
+- ✓ Page now wrapped in `<DsDetailPage>` (replaces custom BackButton + inline header / status pill / age strip) — `src/app/(app)/production/[id]/page.tsx:1215-2167`
+- ✓ Step pills rendered via `DsTabNav` (variant=pills) with per-tab `state` derived from `stepPillState()` — active=teal, completed=mint+check, future=muted — `src/app/(app)/production/[id]/page.tsx:1287-1291, 687-699`
+- ✓ `DsTabNav` extended with optional `state?: "completed" | "active" | "future"` + `IconCheck` for completed pills — `src/components/dulceria/tab-nav.tsx:9-27, 36-86`
+- ✓ URL state via `?step=…` (preserves alongside existing `?tab=`); `changeStep()` writes via `history.replaceState` — `src/app/(app)/production/[id]/page.tsx:204-227`
+- ✓ Header meta line shows batch number + age + `{phaseDoneCount} / 8 phases` + date range + batch count — `src/app/(app)/production/[id]/page.tsx:1180-1196, 1280`
+- ✓ Status badge from `plan.status` mapped to `StatusTag` (`done`/`scheduled`/`pending`/`neutral`) — `src/app/(app)/production/[id]/page.tsx:701-710`
+- ✓ Header actions: Summary link · Save labels (Niimbot) · Start production — all migrated to `DsButton`/`Link` inside `actions` slot — `src/app/(app)/production/[id]/page.tsx:1246-1284`
+- ✓ Utilisation bar: `batchMinutesPlanned` (sum of `productionDayLineItems.plannedMinutes` for this plan) vs `dayCapacityMinutes` (`people.defaultHoursPerDay × 60 × distinct days`); color-coded `ok` / `warn` / `urgent` at 80% / 100% — `src/app/(app)/production/[id]/page.tsx:482-525, 1296-1330`
+- ✓ Below-header rows preserved: linked-orders chips, batch-note editor, deadline-impact warning, print-error banner — `src/app/(app)/production/[id]/page.tsx:1332-1437`
+- ✗ Capacity falls back to `0` when no person has `defaultHoursPerDay` set; bar shows `✗ Capacity unknown` instead of dividing by zero — `src/app/(app)/production/[id]/page.tsx:1325-1330`
+
+## Phase C.2 — `/production/[id]` Plan step · evidence
+
+- ✓ Section "Batches scheduled" with `ListRow` per `planProduct` (product + qty + mould + est minutes + assignee placeholder) — `src/app/(app)/production/[id]/page.tsx:1444-1502`
+- ✓ Click row → `DsDrawer` for inline edit (product / mould / qty / batch notes) via `DsInlineSelect` + `DsInlineField` + `DsInlineTextarea` — `src/app/(app)/production/[id]/page.tsx:2220-2277`
+- ✓ "+ Add batch" `DsButton variant="primary"` opens `DsDrawer` (product picker + mould picker + qty input) — `src/app/(app)/production/[id]/page.tsx:1446-1450, 2170-2218`
+- ✓ Estimated minutes per batch via `minutesByPlanProduct` (`step.activeMinutes × moulds` for non-perBatch steps, fixed for perBatch) — `src/app/(app)/production/[id]/page.tsx:530-555`
+- ✓ Section "Day summary" with 4 `StatCard`s (Total minutes / Day capacity / Utilisation % / Batches) wired through `utilizationVariant` for colour-coding — `src/app/(app)/production/[id]/page.tsx:1510-1538`
+- ✗ Drag handles render as ▲▼ buttons + grip icon — true HTML5 / dnd-kit drag deferred (kept tap-to-reorder for now); `reorderPlanProduct` swaps `sortOrder` via two `savePlanProduct` calls — `src/app/(app)/production/[id]/page.tsx:735-748, 1465-1486`
+- ✗ "Assigned person" cell prints `unassigned ✗` — schema lacks `planProducts.assignedPersonId`. Migration noted inline (echoes the same gap surfaced on `/production-brain/daily`) — `src/app/(app)/production/[id]/page.tsx:1495, 2272-2275`
+
+## Phase C.3 — `/production/[id]` Prep step · evidence
+
+- ✓ Section "Mise en place" aggregates `consolidatedFillings[].scaledIngredients` + per-`planProduct` shell-ingredient grams (`calculateShellWeightG × cavities × moulds`); rows show `need / on hand / short` from `ingredientStock.quantityG` — `src/app/(app)/production/[id]/page.tsx:558-602, 1576-1612`
+- ✓ Short rows render with `tier="urgent"` (rose left border); prepped rows render with `tier="done"` and line-through label — `src/app/(app)/production/[id]/page.tsx:1583, 1592-1596`
+- ✓ "Mark all prepped" / "Unmark all" bulk action in the Section header toggles every `ingredientId` in/out of `preppedIngredientIds` — `src/app/(app)/production/[id]/page.tsx:1551-1572`
+- ✓ Section "Moulds ready" groups `planProducts` by `mouldId` (sum `quantity`); per-mould pool counts from `mouldPool` (`available` = free, `loaded|filled` = in-use, `sealed` = sealed) — `src/app/(app)/production/[id]/page.tsx:606-635, 1631-1696`
+- ✓ "Mark clean" toggle flips local pill (mint when clean); short rows render `tier="urgent"` when `free === 0`, `active` if some-but-not-enough, `positive` when enough free — `src/app/(app)/production/[id]/page.tsx:1644-1697`
+- ✓ Section "Machines loaded" lists every `equipmentInstance` of kind `tempering` / `melting_pot` with its active `machineLoad` (ingredient name + `remainingQuantityG` of `loadedQuantityG`) — `src/app/(app)/production/[id]/page.tsx:638-672, 1702-1750`
+- ✓ Empty machines render the "Load now" link to `/production-brain/equipment` (red→teal pill); loaded machines surface their `EquipmentInstance.status` via `StatusTag` — `src/app/(app)/production/[id]/page.tsx:1727-1746`
+- ✓ Grams display via shared `formatGrams()` helper — switches to kg ≥ 1000 g (de-AT locale, max 2 dp) — `src/app/(app)/production/[id]/page.tsx:2354-2362`
+- ✗ "Prepped" + "Mark clean" toggles are local-only — no `planPrepStatus` or per-plan mould-clean schema column exists yet; flagged inline under each Section — `src/app/(app)/production/[id]/page.tsx:1623-1626, 1690-1693`
+- ✗ Spec's "drying / ready / blocked" three-way mould pool dot deferred — `mouldPool.currentState` doesn't carry a dedicated drying flag (same gap noted on `/production-brain/daily` D.3). Surfaced as `sealed` count where present — `src/app/(app)/production/[id]/page.tsx:625-633, 1672-1683`
 
 Reference all existing components in `src/components/dulceria/`. Read mockups in `/docs/` for reference if tab body design feels ambiguous. When in doubt: match the visual language of `/customers` (already refit, exemplary).
 
