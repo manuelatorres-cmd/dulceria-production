@@ -1,34 +1,30 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/page-header";
 import {
   useProductsList,
   useProductLocationTotals,
   useProductCategories,
   applyStockAdjustments,
 } from "@/lib/hooks";
+import {
+  PageHeader,
+  Section,
+  DsButton,
+  DsTabNav,
+  useToast,
+} from "@/components/dulceria";
+import { IconSearch } from "@tabler/icons-react";
 
-/**
- * Monthly physical inventory count — reconciles system stock with
- * what's actually on the shelves. Manuela walks through the shop,
- * enters actual counts, saves. Differences go through
- * `applyStockAdjustments` so real productStock totals move (not just
- * an audit row).
- *
- * Kept intentionally simple: no partial drafts, no wizard. One screen,
- * click Save to commit all entries.
- */
 export default function MonthlyCountPage() {
   const products = useProductsList();
   const totals = useProductLocationTotals();
   const categories = useProductCategories(true);
+  const toast = useToast();
 
   const [counts, setCounts] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
 
@@ -53,7 +49,6 @@ export default function MonthlyCountPage() {
     });
   }, [eligible, activeCategories, search]);
 
-  // Categories used in the eligible product set — chip pool.
   const usedCategories = useMemo(() => {
     const ids = new Set<string>();
     for (const p of eligible) if (p.productCategoryId) ids.add(p.productCategoryId);
@@ -74,11 +69,10 @@ export default function MonthlyCountPage() {
 
   const totalVariance = variances.reduce((s, v) => s + Math.abs(v.variance), 0);
   const entered = variances.filter((v) => v.counted !== null).length;
+  const visibleIds = useMemo(() => new Set(visible.map((p) => p.id!)), [visible]);
 
   async function save() {
     setSaving(true);
-    setSavedMsg(null);
-    setSaveError(null);
     try {
       const inputs = variances
         .filter((v) => v.counted !== null && v.variance !== 0)
@@ -94,10 +88,15 @@ export default function MonthlyCountPage() {
         }));
       const result = await applyStockAdjustments(inputs);
       if (result.failed) {
-        setSaveError(`Stopped at "${result.failed.itemId}" after ${result.applied} adjustments. ${result.error instanceof Error ? result.error.message : ""}`);
+        const failedName = eligible.find((p) => p.id === result.failed?.itemId)?.name ?? result.failed.itemId;
+        toast.error(`Stopped after ${result.applied} adjustments`, {
+          description: `Failed at "${failedName}": ${result.error instanceof Error ? result.error.message : "unknown"}`,
+        });
         return;
       }
-      setSavedMsg(`Reconciled ${result.applied} product${result.applied === 1 ? "" : "s"}, ${totalVariance} pieces total. Stock totals updated.`);
+      toast.success(`Reconciled ${result.applied} product${result.applied === 1 ? "" : "s"}`, {
+        description: `${totalVariance} pieces total variance`,
+      });
       setCounts({});
       setNotes("");
     } finally {
@@ -106,98 +105,130 @@ export default function MonthlyCountPage() {
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader
         title="Monthly inventory count"
-        accent="Shop"
-        description="Walk through the shop with a tablet, enter actuals, save. Variances auto-create adjustment transfers so the system reflects reality."
+        meta="Walk through the shop with a tablet, enter actuals, save · variances reconcile real productStock totals"
       />
 
-      {/* Category chip row + search — narrows the count table. */}
-      {usedCategories.length > 0 && (
-        <div className="px-4 mb-3 space-y-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {usedCategories.map((c) => {
-              const active = activeCategories.has(c.id);
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setActiveCategories((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(c.id)) next.delete(c.id);
-                      else next.add(c.id);
-                      return next;
-                    });
-                  }}
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors capitalize ${
-                    active
-                      ? "bg-foreground text-background"
-                      : "bg-card text-muted-foreground border border-border hover:border-foreground"
-                  }`}
-                >
-                  {c.name}
-                </button>
-              );
-            })}
-            {activeCategories.size > 0 && (
-              <button
-                onClick={() => setActiveCategories(new Set())}
-                className="text-[11px] text-muted-foreground hover:text-foreground underline"
-              >
-                Clear
-              </button>
-            )}
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+        {usedCategories.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <DsTabNav
+              variant="pills"
+              tabs={[
+                { id: "", label: "All" },
+                ...usedCategories.map((c) => ({ id: c.id, label: c.name })),
+              ]}
+              activeTab={activeCategories.size === 0 ? "" : [...activeCategories][0] ?? ""}
+              onChange={(id) => {
+                if (id === "") setActiveCategories(new Set());
+                else {
+                  setActiveCategories((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(id)) next.delete(id);
+                    else next.add(id);
+                    return next;
+                  });
+                }
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 10px",
+                border: "0.5px solid var(--ds-border-warm)",
+                background: "var(--ds-card-bg)",
+                borderRadius: 14,
+                maxWidth: 360,
+              }}
+            >
+              <IconSearch size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search products…"
+                style={{
+                  fontSize: 12,
+                  border: "none",
+                  background: "transparent",
+                  outline: "none",
+                  flex: 1,
+                  color: "var(--ds-text-primary)",
+                }}
+              />
+            </div>
           </div>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products…"
-            className="input"
-          />
-        </div>
-      )}
+        )}
 
-      <section
-        className="border border-border bg-card p-4 mb-4"
-        style={{ borderRadius: 4 }}
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full text-[12.5px]">
-            <thead>
-              <tr className="text-left">
-                {["Product", "System", "Count", "Variance"].map((h) => (
-                  <th
-                    key={h}
-                    className="py-2 pr-4 text-[10px] uppercase text-muted-foreground font-medium"
-                    style={{ letterSpacing: "0.1em" }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {variances.filter((v) => visible.some((p) => p.id === v.product.id)).map((v) => (
-                <tr
-                  key={v.product.id}
-                  className="border-t border-border/60"
-                >
-                  <td
-                    className="py-2 pr-4"
+        <Section title="Count" action={`${visible.length} of ${eligible.length} products`}>
+          <div
+            style={{
+              background: "var(--ds-card-bg)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) 80px 110px 90px",
+                gap: 0,
+                padding: "8px 16px",
+                background: "var(--ds-card-bg-hover)",
+                borderBottom: "0.5px solid var(--ds-border-warm)",
+                fontSize: 9,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                color: "var(--ds-text-muted)",
+                fontWeight: 600,
+              }}
+            >
+              <span>Product</span>
+              <span style={{ textAlign: "right" }}>System</span>
+              <span>Count</span>
+              <span style={{ textAlign: "right" }}>Variance</span>
+            </div>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {variances
+                .filter((v) => visibleIds.has(v.product.id!))
+                .map((v) => (
+                  <li
+                    key={v.product.id}
                     style={{
-                      fontFamily: "var(--font-serif)",
-                      fontWeight: 500,
-                      letterSpacing: "-0.01em",
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0, 1fr) 80px 110px 90px",
+                      gap: 0,
+                      padding: "8px 16px",
+                      borderBottom: "0.5px solid var(--ds-border-warm)",
+                      alignItems: "center",
                     }}
                   >
-                    {v.product.name}
-                  </td>
-                  <td className="py-2 pr-4 tabular-nums text-muted-foreground">
-                    {v.system}
-                  </td>
-                  <td className="py-2 pr-4">
+                    <span
+                      style={{
+                        fontFamily: "var(--font-serif)",
+                        fontWeight: 500,
+                        letterSpacing: "-0.01em",
+                        fontSize: 13,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {v.product.name}
+                    </span>
+                    <span
+                      style={{
+                        fontVariantNumeric: "tabular-nums",
+                        color: "var(--ds-text-muted)",
+                        textAlign: "right",
+                        fontSize: 12,
+                      }}
+                    >
+                      {v.system}
+                    </span>
                     <input
                       type="number"
                       min={0}
@@ -209,65 +240,83 @@ export default function MonthlyCountPage() {
                           [v.product.id ?? ""]: e.target.value,
                         }))
                       }
-                      className="input"
-                      style={{ maxWidth: 90, padding: "3px 8px" }}
+                      style={{
+                        width: 88,
+                        padding: "3px 8px",
+                        fontSize: 12,
+                        border: "0.5px solid var(--ds-border-warm)",
+                        borderRadius: 3,
+                        background: "var(--ds-card-bg)",
+                        color: "var(--ds-text-primary)",
+                        textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
                     />
-                  </td>
-                  <td className="py-2 pr-4 tabular-nums">
-                    {v.counted === null ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : v.variance === 0 ? (
-                      <span className="text-status-ok">0</span>
-                    ) : (
-                      <span
-                        className={
-                          v.variance > 0 ? "text-status-warn" : "text-status-alert"
-                        }
-                      >
-                        {v.variance > 0 ? "+" : ""}
-                        {v.variance}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                    <span
+                      style={{
+                        textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color:
+                          v.counted === null
+                            ? "var(--ds-text-muted)"
+                            : v.variance === 0
+                            ? "var(--ds-tier-positive)"
+                            : v.variance > 0
+                            ? "var(--ds-semantic-warn)"
+                            : "var(--ds-tier-urgent)",
+                      }}
+                    >
+                      {v.counted === null
+                        ? "—"
+                        : v.variance === 0
+                        ? "0"
+                        : `${v.variance > 0 ? "+" : ""}${v.variance}`}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        </Section>
 
-      <section
-        className="border border-border bg-card p-4 mb-4"
-        style={{ borderRadius: 4 }}
-      >
-        <label className="label">Notes (optional)</label>
-        <textarea
-          className="input"
-          rows={2}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="e.g. pre-Easter stocktake 2026-03"
-        />
-      </section>
+        <Section title="Notes" action="optional">
+          <div style={{ padding: 16 }}>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. pre-Easter stocktake 2026-03"
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                fontSize: 12,
+                border: "0.5px solid var(--ds-border-warm)",
+                borderRadius: 4,
+                background: "var(--ds-card-bg)",
+                color: "var(--ds-text-primary)",
+                outline: "none",
+                resize: "vertical",
+                fontFamily: "inherit",
+              }}
+            />
+          </div>
+        </Section>
 
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">
-          {entered} counted · {totalVariance} pieces total variance
-        </span>
-        <div className="flex items-center gap-3">
-          {saveError ? (
-            <span className="text-[11px] text-status-alert">{saveError}</span>
-          ) : savedMsg ? (
-            <span className="text-[11px] text-status-ok">{savedMsg}</span>
-          ) : null}
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving || entered === 0}
-            className="btn-primary"
-          >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 12, color: "var(--ds-text-muted)" }}>
+            {entered} counted · {totalVariance} pieces total variance
+          </span>
+          <DsButton variant="primary" size="md" onClick={save} disabled={saving || entered === 0}>
             {saving ? "Saving…" : "Reconcile"}
-          </button>
+          </DsButton>
         </div>
       </div>
     </div>
