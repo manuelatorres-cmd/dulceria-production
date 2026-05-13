@@ -868,7 +868,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
 
       {/* Movement history */}
       <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-        <div className="px-4 py-2 border-b border-[color:var(--ds-border-warm)] bg-muted/40">
+        <div className="px-4 py-2 border-b border-[color:var(--ds-border-warm)] bg-muted">
           <h3 className="text-sm font-semibold text-primary">Recent movements</h3>
         </div>
         {movements.length === 0 ? (

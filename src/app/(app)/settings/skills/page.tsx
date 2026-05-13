@@ -163,7 +163,7 @@ export default function SkillsPage() {
                 {people
                   .filter((p) => !p.archived)
                   .map((p) => (
-                    <tr key={p.id} className="border-t border-[color:var(--ds-border-warm)]/60">
+                    <tr key={p.id} className="border-t border-[color:var(--ds-border-warm)]">
                       <td
                         className="sticky left-0 bg-[color:var(--ds-card-bg)] py-2 pr-4"
                         style={{

@@ -688,7 +688,7 @@ function ProductStockTab() {
               group.isLow ? "border-status-warn-edge border-l-4" : "border-[color:var(--ds-border-warm)]"
             }`}
           >
-            <div className={`px-3 py-2 border-b border-[color:var(--ds-border-warm)] ${group.isLow ? "bg-status-warn-bg" : "bg-muted/30"}`}>
+            <div className={`px-3 py-2 border-b border-[color:var(--ds-border-warm)] ${group.isLow ? "bg-status-warn-bg" : "bg-muted"}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-sm truncate flex items-center gap-1.5 flex-wrap">
@@ -759,7 +759,7 @@ function ProductStockTab() {
                           let cls = "border-[color:var(--ds-border-warm)] bg-background text-foreground";
                           if (editing) cls = "border-primary bg-primary/5 text-primary";
                           else if (below) cls = "border-status-warn-edge bg-status-warn-bg text-status-warn";
-                          else if (empty) cls = "border-[color:var(--ds-border-warm)]/50 bg-muted/30 text-muted-foreground";
+                          else if (empty) cls = "border-[color:var(--ds-border-warm)] bg-muted text-muted-foreground";
                           if (editing) {
                             return (
                               <span key={loc} className={`rounded-sm border px-1.5 py-0 text-[10px] font-medium inline-flex items-center gap-1 ${cls}`}>
@@ -896,7 +896,7 @@ function ProductStockTab() {
 
               if (confirmGone === pb.id) {
                 return (
-                  <div key={pb.id} className={`px-3 py-2 bg-muted/40 flex items-center gap-3 ${!isLast ? "border-b border-[color:var(--ds-border-warm)]" : ""}`}>
+                  <div key={pb.id} className={`px-3 py-2 bg-muted flex items-center gap-3 ${!isLast ? "border-b border-[color:var(--ds-border-warm)]" : ""}`}>
                     <p className="text-xs text-muted-foreground flex-1">Mark as gone?</p>
                     <button onClick={() => handleSetStatus(pb.id!, "gone")} className="text-xs font-medium text-foreground">Yes</button>
                     <button onClick={() => setConfirmGone(null)} className="text-xs text-muted-foreground">Cancel</button>
@@ -956,7 +956,7 @@ function ProductStockTab() {
 
                   {/* Freezer sub-row */}
                   {frozenCount > 0 && (
-                    <div className={`px-3 py-2.5 flex items-start justify-between gap-2 bg-sky-50/40 ${availableCount > 0 ? "border-t border-[color:var(--ds-border-warm)]/60" : ""}`}>
+                    <div className={`px-3 py-2.5 flex items-start justify-between gap-2 bg-sky-50/40 ${availableCount > 0 ? "border-t border-[color:var(--ds-border-warm)]" : ""}`}>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <Snowflake className="w-3 h-3 text-sky-600" />
@@ -1364,7 +1364,7 @@ function FillingStockTab() {
         groups.map((group) => (
           <div key={group.fillingId} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
             {/* Group header */}
-            <div className="px-3 py-2 bg-muted/30 border-b border-[color:var(--ds-border-warm)] flex justify-between items-baseline">
+            <div className="px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)] flex justify-between items-baseline">
               <div>
                 <p className="font-semibold text-sm">{group.fillingName}</p>
                 <p className="text-[10px] text-muted-foreground">
@@ -1414,7 +1414,7 @@ function FillingStockTab() {
 
               if (confirmDiscard === entry.id) {
                 return (
-                  <div key={entry.id} className={`px-3 py-2 bg-muted/40 flex items-center gap-3 ${!isLast ? "border-b border-[color:var(--ds-border-warm)]" : ""}`}>
+                  <div key={entry.id} className={`px-3 py-2 bg-muted flex items-center gap-3 ${!isLast ? "border-b border-[color:var(--ds-border-warm)]" : ""}`}>
                     <p className="text-xs text-muted-foreground flex-1">Discard this stock?</p>
                     <button onClick={() => handleDiscard(entry.id!)} className="text-xs font-medium text-status-alert">Yes</button>
                     <button onClick={() => setConfirmDiscard(null)} className="text-xs text-muted-foreground">Cancel</button>
@@ -1679,7 +1679,7 @@ function MovementsTab() {
       </div>
 
       <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-        <div className="grid grid-cols-[150px_1fr_140px_60px_120px_1fr] gap-2 px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+        <div className="grid grid-cols-[150px_1fr_140px_60px_120px_1fr] gap-2 px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)] text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
           <span>When</span>
           <span>Item</span>
           <span>Move</span>

@@ -595,7 +595,7 @@ export default function DailyCountPage() {
             ) : (
               <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] overflow-hidden">
                 <table className="w-full text-[12px]">
-                  <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+                  <thead className="bg-muted text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
                     <tr>
                       <th className="text-left px-3 py-2">Product</th>
                       <th className="text-right px-2 py-2">Start</th>

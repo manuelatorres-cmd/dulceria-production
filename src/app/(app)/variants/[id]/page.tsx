@@ -1117,7 +1117,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Per-product cost summary */}
           {avgCost && productCosts.length > 0 && (
-            <div className="mt-3 rounded-sm bg-muted/50 px-3 py-2.5 flex items-baseline justify-between">
+            <div className="mt-3 rounded-sm bg-muted px-3 py-2.5 flex items-baseline justify-between">
               <span className="text-xs text-muted-foreground">
                 Avg. product cost <span className="text-[10px]">({avgCost.count} products with pricing)</span>
               </span>
@@ -1348,7 +1348,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       Add at least one product to this variant first (use the <strong>Products</strong> section above), then configure the box qty here.
                     </p>
                   ) : (
-                    <div className="rounded-md border border-[color:var(--ds-border-warm)]/70 bg-background/50 p-2 space-y-1.5">
+                    <div className="rounded-md border border-[color:var(--ds-border-warm)] bg-background/50 p-2 space-y-1.5">
                       {variantProducts.map((vp) => {
                         const name = productMap.get(vp.productId) ?? vp.productId;
                         const qty = newBoxQtys[vp.productId] ?? 0;
@@ -1639,7 +1639,7 @@ function BoxExtras({
   }
 
   return (
-    <div className="mt-1 ml-3 pl-3 border-l border-[color:var(--ds-border-warm)]/40 space-y-1.5 py-1.5">
+    <div className="mt-1 ml-3 pl-3 border-l border-[color:var(--ds-border-warm)] space-y-1.5 py-1.5">
       {overrides.length > 0 && (
         <div>
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground/80 mb-0.5">
@@ -1795,14 +1795,14 @@ function BoxCard({
           <span className="text-muted-foreground">Packaging</span>
           <span className="tabular-nums">{formatPrice(packagingUnitCost, sym)}</span>
         </div>
-        <div className="flex justify-between text-xs font-medium border-t border-[color:var(--ds-border-warm)]/50 pt-1">
+        <div className="flex justify-between text-xs font-medium border-t border-[color:var(--ds-border-warm)] pt-1">
           <span>Total cost</span>
           <span className="tabular-nums">{formatPrice(pricing.totalCost, sym)}</span>
         </div>
       </div>
 
       {/* Sell price + margin */}
-      <div className={`px-3 py-2.5 ${colors.bg} border-t border-[color:var(--ds-border-warm)]/30`}>
+      <div className={`px-3 py-2.5 ${colors.bg} border-t border-[color:var(--ds-border-warm)]`}>
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium">Sell price</span>
@@ -1857,8 +1857,8 @@ function BoxCard({
       </div>
 
       {/* Pricing history */}
-      <div className="border-t border-[color:var(--ds-border-warm)]/40">
-        <div className="flex items-center px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors">
+      <div className="border-t border-[color:var(--ds-border-warm)]">
+        <div className="flex items-center px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted transition-colors">
           <button
             onClick={onToggleHistory}
             className="flex-1 flex items-center gap-1.5 hover:text-foreground text-left"
@@ -2091,7 +2091,7 @@ function VariantNutritionSection({ productIds }: { productIds: string[] }) {
             {panelTitle} · weighted average across products ({totalWeightG.toFixed(0)}g total)
           </p>
           <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden mb-4">
-            <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
+            <div className="flex items-center px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
               <span className="flex-1">Nutrient</span>
               <span className="w-24 text-right">Per 100g</span>
             </div>
@@ -2198,7 +2198,7 @@ function VariantOnHandRow({ variantPackagingId }: { variantPackagingId: string }
   }
 
   return (
-    <div className="mt-2 px-3 py-2 rounded-sm bg-muted/30 border border-[color:var(--ds-border-warm)]">
+    <div className="mt-2 px-3 py-2 rounded-sm bg-muted border border-[color:var(--ds-border-warm)]">
       <p className="text-[10.5px] font-medium uppercase text-muted-foreground tracking-wide mb-1.5">
         On hand
       </p>
@@ -2226,7 +2226,7 @@ function VariantOnHandRow({ variantPackagingId }: { variantPackagingId: string }
           );
         })}
       </div>
-      {err && <p className="text-[11px] text-status-blush mt-1.5">{err}</p>}
+      {err && <p className="text-[11px] text-status-alert mt-1.5">{err}</p>}
     </div>
   );
 }

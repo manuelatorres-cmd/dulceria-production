@@ -429,7 +429,7 @@ export default function FillingConsolidationPage() {
                       </div>
                     </button>
                     {isOpen && (
-                      <div className="px-3 pb-3 border-t border-[color:var(--ds-border-warm)]/60 bg-muted/10 space-y-3 pt-3">
+                      <div className="px-3 pb-3 border-t border-[color:var(--ds-border-warm)] bg-muted/10 space-y-3 pt-3">
                         {/* Ingredients */}
                         {need.scaledIngredients.length > 0 && !nothingToCook && (
                           <div>
@@ -545,7 +545,7 @@ export default function FillingConsolidationPage() {
                 type="button"
                 onClick={() => setCookedModal(null)}
                 disabled={cookedSaving}
-                className="text-[12px] px-3 py-1.5 rounded-sm border border-[color:var(--ds-border-warm)] hover:bg-muted/40"
+                className="text-[12px] px-3 py-1.5 rounded-sm border border-[color:var(--ds-border-warm)] hover:bg-muted"
               >
                 Cancel
               </button>

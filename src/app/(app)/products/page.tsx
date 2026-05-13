@@ -573,7 +573,7 @@ function CategoriesTab({ onSwitchToProducts }: { onSwitchToProducts: () => void 
                               Archived
                             </span>
                           )}
-                          <span className="text-[11px] font-mono text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5 shrink-0">
+                          <span className="text-[11px] font-mono text-muted-foreground bg-muted rounded px-1.5 py-0.5 shrink-0">
                             shell {formatCategoryRange(c)}
                           </span>
                           <span className="text-[11px] text-muted-foreground/80 shrink-0">

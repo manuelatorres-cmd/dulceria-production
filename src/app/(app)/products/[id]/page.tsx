@@ -1750,7 +1750,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
             {/* Restore from "gone" — inline confirmation (mirrors Stock page pattern) */}
             {isDone && pb.stockStatus === "gone" && (
               pendingRestore === pb.id ? (
-                <div className="px-3 py-2 border-t border-[color:var(--ds-border-warm)] bg-muted/40 flex items-center gap-3">
+                <div className="px-3 py-2 border-t border-[color:var(--ds-border-warm)] bg-muted flex items-center gap-3">
                   <p className="text-xs text-muted-foreground flex-1">Restore to in stock?</p>
                   <button
                     onClick={() => { setPlanProductStockStatus(pb.id!, undefined); setPendingRestore(null); }}
@@ -2127,7 +2127,7 @@ function ProductCostTab({
                   <div key={group.layerId} className={gi > 0 ? "border-t border-[color:var(--ds-border-warm)]" : ""}>
                     <button
                       onClick={() => toggleLayer(group.layerId)}
-                      className="w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 bg-muted/40 hover:bg-muted/60 transition-colors text-left"
+                      className="w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 bg-muted hover:bg-muted transition-colors text-left"
                     >
                       <ChevronRight className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${collapsed ? "" : "rotate-90"}`} />
                       <span className="text-sm font-medium">{group.layerName}</span>
@@ -2159,7 +2159,7 @@ function ProductCostTab({
                   </div>
                 );
               })}
-              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 border-t border-[color:var(--ds-border-warm)] bg-muted/40">
+              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 border-t border-[color:var(--ds-border-warm)] bg-muted">
                 <span />
                 <span className="text-sm font-semibold">Total</span>
                 <span />
@@ -2171,7 +2171,7 @@ function ProductCostTab({
             <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted/40">
+                  <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted">
                     <th
                       className="text-left px-3 py-2 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
                       onClick={() => handleSort("layer")}
@@ -2216,7 +2216,7 @@ function ProductCostTab({
                       <td className="px-3 py-2 text-xs">
                         <div className="flex flex-wrap gap-1">
                           {entry.layerNames.map((name, li) => (
-                            <span key={li} className="inline-flex items-center rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                            <span key={li} className="inline-flex items-center rounded-sm border border-[color:var(--ds-border-warm)] bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
                               {name}
                             </span>
                           ))}
@@ -2241,7 +2241,7 @@ function ProductCostTab({
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-[color:var(--ds-border-warm)] bg-muted/40">
+                  <tr className="border-t border-[color:var(--ds-border-warm)] bg-muted">
                     <td colSpan={5} className="px-3 py-2 text-xs font-semibold">Total</td>
                     <td className="px-3 py-2 text-xs text-right font-bold text-primary tabular-nums">
                       {formatCost(totalCost, sym)}
@@ -3227,7 +3227,7 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
           {/* Nutrition table */}
       <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
         {/* Header row */}
-        <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
+        <div className="flex items-center px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
           <span className="flex-1">Nutrient</span>
           <span className="w-24 text-right">Per 100g</span>
           {showPerProduct && (

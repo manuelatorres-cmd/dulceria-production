@@ -3057,7 +3057,7 @@ function MouldPoolReadout({
               className={`flex items-center gap-3 rounded-[8px] px-3 py-1.5 text-[11px] ${
                 m.short
                   ? "bg-[var(--accent-blush-bg)]/40 text-[var(--accent-blush-ink)]"
-                  : "bg-muted/40 text-foreground"
+                  : "bg-muted text-foreground"
               }`}
             >
               <span className="flex-1 truncate">{m.name}</span>
@@ -4606,21 +4606,21 @@ function MonthView(props: {
           <button
             type="button"
             onClick={() => setMonthOffset((m) => m - 1)}
-            className="text-[11px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] hover:bg-muted/40"
+            className="text-[11px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] hover:bg-muted"
           >
             ‹ prev
           </button>
           <button
             type="button"
             onClick={() => setMonthOffset(0)}
-            className="text-[11px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] hover:bg-muted/40"
+            className="text-[11px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] hover:bg-muted"
           >
             today
           </button>
           <button
             type="button"
             onClick={() => setMonthOffset((m) => m + 1)}
-            className="text-[11px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] hover:bg-muted/40"
+            className="text-[11px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] hover:bg-muted"
           >
             next ›
           </button>

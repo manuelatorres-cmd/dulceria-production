@@ -194,7 +194,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
           <div className="overflow-x-auto rounded-md border border-[color:var(--ds-border-warm)]">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted/50">
+                <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted">
                   <th className="px-2 py-1.5 text-left font-medium text-muted-foreground w-8">#</th>
                   {previewColumns.map((col) => (
                     <th key={col.key} className="px-2 py-1.5 text-left font-medium text-muted-foreground">
@@ -300,7 +300,7 @@ function PreviewRow<T>({
   return (
     <>
       <tr
-        className={`${hasError ? "bg-destructive/5" : hasWarning ? "bg-status-warn-bg/50" : ""} cursor-pointer hover:bg-muted/30`}
+        className={`${hasError ? "bg-destructive/5" : hasWarning ? "bg-status-warn-bg/50" : ""} cursor-pointer hover:bg-muted`}
         onClick={() => row.issues.length > 0 && setExpanded(!expanded)}
       >
         <td className="px-2 py-1.5 text-muted-foreground">{row.rowIndex + 1}</td>

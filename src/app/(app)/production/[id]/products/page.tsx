@@ -213,7 +213,7 @@ function FillingProductCard({
 
       {/* Shared breakdown — which products use this filling */}
       {cl.shared && (
-        <div className="border-t border-[color:var(--ds-border-warm)] px-3 py-2 bg-muted/30">
+        <div className="border-t border-[color:var(--ds-border-warm)] px-3 py-2 bg-muted">
           <p className="text-xs font-medium text-muted-foreground mb-1">Used in</p>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5">
             {cl.usedBy.map((u) => (

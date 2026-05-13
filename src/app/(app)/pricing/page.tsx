@@ -300,7 +300,7 @@ export default function PricingPage() {
 
                 {/* Box pricing rows */}
                 {item.boxes.length > 0 ? (
-                  <div className="border-t border-[color:var(--ds-border-warm)]/50">
+                  <div className="border-t border-[color:var(--ds-border-warm)]">
                     {item.boxes.map((box, i) => {
                       const colors = MARGIN_COLORS[box.health];
                       const barWidth = Math.min(Math.max(box.pricing.marginPercent, 0), 100);
@@ -308,7 +308,7 @@ export default function PricingPage() {
                         <div
                           key={i}
                           className={`px-4 py-2.5 flex items-center gap-3 ${
-                            i > 0 ? "border-t border-[color:var(--ds-border-warm)]/30" : ""
+                            i > 0 ? "border-t border-[color:var(--ds-border-warm)]" : ""
                           }`}
                         >
                           {/* Box name + capacity */}
@@ -345,7 +345,7 @@ export default function PricingPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="px-4 py-3 border-t border-[color:var(--ds-border-warm)]/50">
+                  <div className="px-4 py-3 border-t border-[color:var(--ds-border-warm)]">
                     <p className="text-xs text-muted-foreground">No cost data for products yet.</p>
                   </div>
                 )}

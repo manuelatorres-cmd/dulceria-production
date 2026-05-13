@@ -657,7 +657,7 @@ export default function StatsPage() {
                   </div>
                 </div>
                 {(productColorList.length > 1 || chartData.some((d) => d.waste > 0)) && (
-                  <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-[color:var(--ds-border-warm)]/40">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-[color:var(--ds-border-warm)]">
                     {productColorList.map((r) => (
                       <div
                         key={r.id}
@@ -704,7 +704,7 @@ export default function StatsPage() {
             {/* Product leaderboard */}
             {leaderboard.length > 0 && (
               <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-                <div className="px-4 py-3 border-b border-[color:var(--ds-border-warm)]/50">
+                <div className="px-4 py-3 border-b border-[color:var(--ds-border-warm)]">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Product breakdown
                   </p>

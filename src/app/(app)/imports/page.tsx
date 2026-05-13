@@ -188,7 +188,7 @@ export default function ImportsPage() {
               </thead>
               <tbody>
                 {preview.map((row, idx) => (
-                  <tr key={idx} className="border-t border-[color:var(--ds-border-warm)]/60">
+                  <tr key={idx} className="border-t border-[color:var(--ds-border-warm)]">
                     <td className="py-2 pr-4">{row.sku ?? "—"}</td>
                     <td className="py-2 pr-4">{row.quantity ?? 0}</td>
                     <td className="py-2 pr-4">

@@ -180,7 +180,7 @@ function NotificationRow({
       onMouseEnter={onHover}
       className={
         "px-4 py-3 transition-colors " +
-        (focused ? "bg-muted/80" : "hover:bg-muted/40")
+        (focused ? "bg-muted" : "hover:bg-muted")
       }
     >
       <div className="flex items-start gap-3">

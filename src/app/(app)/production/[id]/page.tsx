@@ -941,7 +941,7 @@ function PlanContent({
                   </Link>
                 ))}
                 {surplusPlanned > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/40 px-2 py-0.5 text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted px-2 py-0.5 text-muted-foreground">
                     Surplus · {surplusPlanned} pcs
                   </span>
                 )}

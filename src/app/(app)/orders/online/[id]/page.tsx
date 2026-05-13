@@ -119,7 +119,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
             </div>
           </div>
 
-          <div className="rounded-md bg-muted/30 p-3">
+          <div className="rounded-md bg-muted p-3">
             <p className="text-xs text-muted-foreground">Ship to</p>
             <p className="text-sm font-semibold">{order.customerName ?? "—"}</p>
             {order.deliveryAddress && <p className="text-xs whitespace-pre-line">{order.deliveryAddress}</p>}
@@ -152,7 +152,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
                     const composition = itemsByVariantLine.byLine.get(vl.id ?? "") ?? [];
                     return (
                       <Fragment key={vl.id}>
-                        <tr className="border-b border-[color:var(--ds-border-warm)]/50">
+                        <tr className="border-b border-[color:var(--ds-border-warm)]">
                           <td className="py-1.5 font-medium">
                             {v?.name ?? "Variant"}
                             {sizeLabel && <span className="text-muted-foreground"> · {sizeLabel}</span>}
@@ -167,7 +167,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
                           const avail = locationTotals.get(it.productId)?.production ?? 0;
                           const short = Math.max(0, it.quantity - avail);
                           return (
-                            <tr key={it.id} className="border-b border-[color:var(--ds-border-warm)]/30 text-[12px]">
+                            <tr key={it.id} className="border-b border-[color:var(--ds-border-warm)] text-[12px]">
                               <td className="py-1 pl-4 text-muted-foreground">↳ {product?.name ?? it.productId}</td>
                               <td className="py-1 text-right tabular-nums text-muted-foreground">{it.quantity}</td>
                               <td className={`py-1 text-right tabular-nums print:hidden text-[11px] ${short > 0 ? "text-status-warn" : "text-muted-foreground"}`}>
@@ -186,7 +186,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
                     const avail = locationTotals.get(it.productId)?.production ?? 0;
                     const short = Math.max(0, it.quantity - avail);
                     return (
-                      <tr key={it.id} className="border-b border-[color:var(--ds-border-warm)]/50">
+                      <tr key={it.id} className="border-b border-[color:var(--ds-border-warm)]">
                         <td className="py-1.5">{product?.name ?? it.productId}</td>
                         <td className="py-1.5 text-right tabular-nums">{it.quantity}</td>
                         <td className={`py-1.5 text-right tabular-nums print:hidden ${short > 0 ? "text-status-warn" : "text-muted-foreground"}`}>

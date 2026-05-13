@@ -188,12 +188,12 @@ export function DefrostConfirmModal({
 
         <div className="px-5 pb-3">
           {sellBy ? (
-            <div className="rounded-sm bg-muted/40 border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-foreground">
+            <div className="rounded-sm bg-muted border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-foreground">
               New sell-by date: <span className="font-medium">{sellBy}</span>
               <span className="text-muted-foreground"> ({preservedShelfLifeDays} days from today)</span>
             </div>
           ) : (
-            <div className="rounded-sm bg-muted/40 border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-muted-foreground">
+            <div className="rounded-sm bg-muted border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-muted-foreground">
               No preserved shelf life recorded — defrosting will not set a new sell-by date.
             </div>
           )}

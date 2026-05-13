@@ -327,7 +327,7 @@ function StepRow({
       style={style}
       suppressHydrationWarning
       className={`group flex items-start gap-2 rounded-md border border-transparent px-1 py-1 transition-colors ${
-        isDragging ? "bg-muted/50 border-[color:var(--ds-border-warm)]" : "hover:bg-muted/30"
+        isDragging ? "bg-muted border-[color:var(--ds-border-warm)]" : "hover:bg-muted"
       }`}
     >
       <button

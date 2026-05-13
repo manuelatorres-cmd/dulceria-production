@@ -761,7 +761,7 @@ function ShortageBySupplier({
         const vendorTotal = rows.reduce((s, r) => s + (r.subtotal ?? 0), 0);
         return (
           <div key={vendor} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)]">
+            <div className="flex items-center justify-between px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)]">
               <h3
                 className="text-[13px]"
                 style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
@@ -787,7 +787,7 @@ function ShortageBySupplier({
           </div>
         );
       })}
-      <div className="flex items-center justify-between px-3 py-2 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/30">
+      <div className="flex items-center justify-between px-3 py-2 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted">
         <span className="text-[12px] uppercase tracking-[0.08em] text-muted-foreground font-medium">Approx. total to buy</span>
         <span className="text-[14px] tabular-nums font-semibold">≈ {fmt(grandTotal)}</span>
       </div>
@@ -967,7 +967,7 @@ function ReceiveCell({ ingredientId, purchaseUnit, gramsPerUnit }: {
         type="button"
         onClick={cycleUnit}
         title="Click to switch unit"
-        className="text-[10px] px-1.5 py-0.5 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/40 hover:bg-muted/70 min-w-[28px]"
+        className="text-[10px] px-1.5 py-0.5 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted hover:bg-muted min-w-[28px]"
       >
         {unitLabel(unitMode)}
       </button>
@@ -1088,7 +1088,7 @@ function IngredientStockBelowThresholdSection() {
         Open the ingredient to Receive more.
       </p>
       <div className="rounded-sm border border-status-warn/40 bg-status-warn-bg/20 overflow-hidden">
-        <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
+        <div className="flex items-center px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
           <span className="flex-1">Ingredient</span>
           <span className="w-24 text-right">On hand</span>
           <span className="w-28 text-right">Threshold</span>

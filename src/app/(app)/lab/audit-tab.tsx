@@ -274,7 +274,7 @@ function AuditCard({
 
   return (
     <li className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-      <button onClick={onToggle} className="w-full text-left px-4 py-3 hover:bg-muted/30 transition-colors flex items-start gap-3">
+      <button onClick={onToggle} className="w-full text-left px-4 py-3 hover:bg-muted transition-colors flex items-start gap-3">
         <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${iconTone}`} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">

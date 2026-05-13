@@ -203,7 +203,7 @@ function PackTab() {
                 )}
               </ul>
               {err && (
-                <p className="text-[11px] text-status-blush mt-1.5 flex items-start gap-1">
+                <p className="text-[11px] text-status-alert mt-1.5 flex items-start gap-1">
                   <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
                   {err}
                 </p>
@@ -497,7 +497,7 @@ function BoxTab() {
                 const demand = demandByVp.get(vp.id!) ?? 0;
                 if (demand === 0) return null;
                 const short = Math.max(0, demand - onHandTotal);
-                const cls = short > 0 ? "text-status-blush font-medium" : "text-status-ok";
+                const cls = short > 0 ? "text-status-alert font-medium" : "text-status-ok";
                 return (
                   <span className={"text-[11px] " + cls}>
                     Need {demand} for orders
@@ -505,13 +505,13 @@ function BoxTab() {
                   </span>
                 );
               })()}
-              <span className={"text-[11px] ml-auto " + (max > 0 ? "text-muted-foreground" : "text-status-blush")}>
+              <span className={"text-[11px] ml-auto " + (max > 0 ? "text-muted-foreground" : "text-status-alert")}>
                 Can build {max}
                 {bottleneck && max < 100 ? ` (limited by ${bottleneck})` : ""}
               </span>
             </div>
             {comp.length === 0 ? (
-              <p className="text-[11px] text-status-blush mb-2 flex items-start gap-1">
+              <p className="text-[11px] text-status-alert mb-2 flex items-start gap-1">
                 <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
                 No composition set on this variant yet. Open the variant page to fill it before box-up.
               </p>
@@ -562,7 +562,7 @@ function BoxTab() {
               )}
             </div>
             {err && (
-              <p className="text-[11px] text-status-blush mt-2 flex items-start gap-1">
+              <p className="text-[11px] text-status-alert mt-2 flex items-start gap-1">
                 <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
                 {err}
               </p>

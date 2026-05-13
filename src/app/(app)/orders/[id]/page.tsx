@@ -498,7 +498,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           || linkedCustomer.language
           || linkedCustomer.paymentTerms
         ) && (
-          <div className="rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/30 px-3 py-2 text-xs space-y-1">
+          <div className="rounded-sm border border-[color:var(--ds-border-warm)] bg-muted px-3 py-2 text-xs space-y-1">
             <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
               <User className="w-3.5 h-3.5" /> Customer preferences
             </div>
@@ -1043,7 +1043,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         </label>
         {customerId ? (
           <div className="flex items-center gap-2">
-            <div className="flex-1 rounded-md border border-[color:var(--ds-border-warm)] bg-muted/30 px-3 py-1.5 text-sm">
+            <div className="flex-1 rounded-md border border-[color:var(--ds-border-warm)] bg-muted px-3 py-1.5 text-sm">
               {customerName || "(linked)"}
             </div>
             <button
@@ -1111,7 +1111,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
                       setCustomerListOpen(false);
                     }
                   }}
-                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm border-t border-[color:var(--ds-border-warm)] bg-muted/40 hover:bg-muted text-primary font-medium"
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm border-t border-[color:var(--ds-border-warm)] bg-muted hover:bg-muted text-primary font-medium"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   {customerQuery.trim() ? `+ Add "${customerQuery.trim()}" as customer` : "+ New customer with details…"}
@@ -2576,7 +2576,7 @@ function OrderReadyToPackSection({ orderId }: { orderId: string }) {
               </li>
             ))}
           </ul>
-          <div className="flex items-center justify-between px-3 py-2 border-t border-[color:var(--ds-border-warm)] bg-muted/30">
+          <div className="flex items-center justify-between px-3 py-2 border-t border-[color:var(--ds-border-warm)] bg-muted">
             <p className="text-xs text-muted-foreground">
               Drains allocated stock + deducts this order's packaging.
             </p>

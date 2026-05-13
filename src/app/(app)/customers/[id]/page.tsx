@@ -619,7 +619,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 const value = items.reduce((acc, it) => acc + (it.unitPrice ?? 0) * it.quantity, 0);
                 return (
                   <li key={o.id}>
-                    <Link href={`/orders/${encodeURIComponent(o.id!)}?from=customers&fromId=${encodeURIComponent(customer.id!)}`} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/30">
+                    <Link href={`/orders/${encodeURIComponent(o.id!)}?from=customers&fromId=${encodeURIComponent(customer.id!)}`} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted">
                       <div className="min-w-0">
                         <p className="text-sm truncate">
                           {items.length > 0
@@ -658,7 +658,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
               {quotes.map((q) => (
                 <li key={q.id}>
-                  <Link href={`/quotes/${encodeURIComponent(q.id!)}`} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/30 text-sm">
+                  <Link href={`/quotes/${encodeURIComponent(q.id!)}`} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted text-sm">
                     <div className="min-w-0">
                       <p className="truncate">{q.title || "Untitled quote"}</p>
                       <p className="text-[11px] text-muted-foreground">

@@ -420,7 +420,7 @@ export default function ShopifyImportPage() {
                 return (
                   <li
                     key={o.name}
-                    className={`rounded-sm border bg-[color:var(--ds-card-bg)] p-3 space-y-2 ${isDup ? "border-[color:var(--ds-border-warm)]/60 opacity-60" : excluded.has(o.name) ? "border-[color:var(--ds-border-warm)]/60 opacity-50" : "border-[color:var(--ds-border-warm)]"}`}
+                    className={`rounded-sm border bg-[color:var(--ds-card-bg)] p-3 space-y-2 ${isDup ? "border-[color:var(--ds-border-warm)] opacity-60" : excluded.has(o.name) ? "border-[color:var(--ds-border-warm)] opacity-50" : "border-[color:var(--ds-border-warm)]"}`}
                   >
                     <div className="flex items-start gap-2">
                       <input

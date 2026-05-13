@@ -116,7 +116,7 @@ export function GanacheCalculatorTab() {
           </div>
 
           <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-            <div className="grid grid-cols-[1fr_88px_72px_88px_28px] gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)] bg-muted/40 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+            <div className="grid grid-cols-[1fr_88px_72px_88px_28px] gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)] bg-muted text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
               <div>Ingredient</div>
               <div className="text-right">Grams</div>
               <div className="text-right">% of mix</div>
@@ -131,7 +131,7 @@ export function GanacheCalculatorTab() {
               return (
                 <div
                   key={idx}
-                  className={`grid grid-cols-[1fr_88px_72px_88px_28px] gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)]/50 last:border-b-0 items-center ${missing ? "bg-status-alert-bg/15" : ""}`}
+                  className={`grid grid-cols-[1fr_88px_72px_88px_28px] gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)] last:border-b-0 items-center ${missing ? "bg-status-alert-bg/15" : ""}`}
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
                     <select
@@ -182,7 +182,7 @@ export function GanacheCalculatorTab() {
             })}
             <button
               onClick={addLine}
-              className="w-full px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1.5"
+              className="w-full px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" /> Add ingredient
             </button>
@@ -198,7 +198,7 @@ export function GanacheCalculatorTab() {
             {COMPONENT_ORDER.map((comp) => (
               <ComponentRow key={comp} comp={comp} value={breakdown.percent[comp]} />
             ))}
-            <div className="grid grid-cols-[120px_1fr_72px] items-center gap-3 px-4 py-3 bg-muted/30">
+            <div className="grid grid-cols-[120px_1fr_72px] items-center gap-3 px-4 py-3 bg-muted">
               <span className="text-xs uppercase tracking-widest text-muted-foreground">Total fat</span>
               <BandBar
                 value={breakdown.totalFatPercent}

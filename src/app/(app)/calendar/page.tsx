@@ -225,13 +225,13 @@ export default function CalendarPage() {
           </p>
 
           {selectedMarkers.length === 0 ? (
-            <div className={`${INNER} bg-muted/40 px-3 py-5 text-center text-sm text-muted-foreground mb-3`}>
+            <div className={`${INNER} bg-muted px-3 py-5 text-center text-sm text-muted-foreground mb-3`}>
               Nothing scheduled.
             </div>
           ) : (
             <ul className="space-y-1.5 mb-3">
               {selectedMarkers.map((mk, i) => (
-                <li key={i} className={`${INNER} bg-muted/40 px-3 py-2 flex items-start gap-2`}>
+                <li key={i} className={`${INNER} bg-muted px-3 py-2 flex items-start gap-2`}>
                   <span
                     className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
                     style={{ background: MARKER_COLOR[mk.kind] }}
@@ -289,7 +289,7 @@ function QuickAdd({ href, label, sub }: { href: string; label: string; sub: stri
   return (
     <Link
       href={href}
-      className={`${INNER} flex items-center gap-3 px-3 py-2 bg-[color:var(--ds-card-bg)] hover:bg-muted/40 transition-colors`}
+      className={`${INNER} flex items-center gap-3 px-3 py-2 bg-[color:var(--ds-card-bg)] hover:bg-muted transition-colors`}
     >
       <Plus className="w-3.5 h-3.5 shrink-0" />
       <div className="flex-1 min-w-0">
@@ -341,7 +341,7 @@ function MonthGrid({
                   ? "border-foreground bg-[color:var(--ds-card-bg)]"
                   : isToday
                   ? "border-[var(--accent-terracotta-ink)]/60 bg-[color:var(--ds-card-bg)]"
-                  : "border-[color:var(--ds-border-warm)] bg-muted/30 hover:bg-muted/50"
+                  : "border-[color:var(--ds-border-warm)] bg-muted hover:bg-muted"
               }`}
               title={list.map((m) => `${MARKER_LABEL[m.kind]}: ${m.label}`).join(" · ") || undefined}
             >

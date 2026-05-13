@@ -1093,7 +1093,7 @@ function FillingNutritionTab({
             </p>
 
             <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-              <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
+              <div className="flex items-center px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
                 <span className="flex-1">Nutrient</span>
                 <span className="w-24 text-right">Per 100g</span>
               </div>
@@ -1220,7 +1220,7 @@ function FillingCostTab({
         <div>
           <h2 className="text-sm font-medium text-muted-foreground mb-2">Breakdown</h2>
           <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-            <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
+            <div className="flex items-center px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
               <span className="flex-1">Ingredient</span>
               <span className="w-20 text-right">Grams</span>
               <span className="w-24 text-right">Cost/g</span>

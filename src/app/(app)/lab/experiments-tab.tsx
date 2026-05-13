@@ -106,7 +106,7 @@ export function ExperimentsTab() {
         </button>
         <button
           onClick={() => setCreateMode("clone")}
-          className="w-full text-left group rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-primary/30 hover:bg-muted/40 transition-all px-5 py-4"
+          className="w-full text-left group rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-primary/30 hover:bg-muted transition-all px-5 py-4"
         >
           <div className="flex items-start gap-4">
             <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-sm bg-muted group-hover:bg-primary/10 transition-colors flex items-center justify-center">
@@ -260,7 +260,7 @@ function CreateForm({
     : newName.trim().length > 0 && !!cloneFillingId && !saving;
 
   return (
-    <div className="mb-6 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/40 p-4 space-y-3">
+    <div className="mb-6 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted p-4 space-y-3">
       <p className="text-sm font-medium">
         {mode === "blank" ? "New blank experiment" : "Clone a ganache filling"}
       </p>
@@ -370,7 +370,7 @@ function ExperimentCard({
 
   return (
     <li>
-      <div className={`rounded-sm border transition-colors ${muted ? "border-[color:var(--ds-border-warm)]/60 bg-[color:var(--ds-card-bg)]" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
+      <div className={`rounded-sm border transition-colors ${muted ? "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
         <div className="px-4 pt-3 pb-2">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">

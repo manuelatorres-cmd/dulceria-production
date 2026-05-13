@@ -360,7 +360,7 @@ const MOULD_STATE_CLASS: Record<string, string> = {
   sealed: "bg-status-warn-bg",
   "needs-wash": "bg-status-alert-bg",
   "in-deep-wash": "bg-accent-lilac-bg",
-  retired: "bg-muted/50 opacity-50",
+  retired: "bg-muted opacity-50",
   broken: "bg-destructive/20 opacity-70 ring-1 ring-destructive",
 };
 

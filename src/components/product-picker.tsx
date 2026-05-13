@@ -120,7 +120,7 @@ export function ProductPicker({
                 key={p.id}
                 type="button"
                 onClick={() => pick(p)}
-                className={`flex items-center gap-2 w-full text-left px-3 py-1.5 text-sm hover:bg-muted ${isSelected ? "bg-muted/50" : ""}`}
+                className={`flex items-center gap-2 w-full text-left px-3 py-1.5 text-sm hover:bg-muted ${isSelected ? "bg-muted" : ""}`}
               >
                 <span className="flex-1 truncate">{p.name}</span>
                 {price != null && (

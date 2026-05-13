@@ -346,7 +346,7 @@ export default function ProductionOrderDetailPage({
                 return (
                   <li
                     key={it.id}
-                    className="flex items-baseline justify-between gap-2 rounded-[10px] border border-[color:var(--ds-border-warm)] bg-muted/30 px-3 py-1.5"
+                    className="flex items-baseline justify-between gap-2 rounded-[10px] border border-[color:var(--ds-border-warm)] bg-muted px-3 py-1.5"
                   >
                     <span style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 13.5 }}>
                       {product?.name ?? "—"}
@@ -363,7 +363,7 @@ export default function ProductionOrderDetailPage({
               {items.map((it) => (
                 <li
                   key={it.id}
-                  className="grid items-center gap-2 rounded-[10px] border border-[color:var(--ds-border-warm)] bg-muted/30 px-3 py-2"
+                  className="grid items-center gap-2 rounded-[10px] border border-[color:var(--ds-border-warm)] bg-muted px-3 py-2"
                   style={{ gridTemplateColumns: "1fr 110px 32px" }}
                 >
                   <select
@@ -672,7 +672,7 @@ function ProductPicker({
               <button
                 type="button"
                 onClick={() => onPick(p.id!)}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-muted/60 flex items-center gap-2"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2"
               >
                 <Plus className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <span className="flex-1 truncate">{p.name}</span>

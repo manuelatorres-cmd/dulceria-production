@@ -303,7 +303,7 @@ function RunsPanel({
 
       {/* Add form */}
       <div
-        className="mb-4 p-3 border border-[color:var(--ds-border-warm)] bg-muted/40 space-y-2"
+        className="mb-4 p-3 border border-[color:var(--ds-border-warm)] bg-muted space-y-2"
         style={{ borderRadius: 3 }}
       >
         <Field label="Ship date">

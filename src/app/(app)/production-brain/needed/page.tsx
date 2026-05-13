@@ -426,7 +426,7 @@ function RowCard(p: RowCardProps) {
             <Check className="w-3 h-3" /> covered
           </span>
         ) : (
-          <span className="text-[11px] text-status-blush inline-flex items-center gap-1 shrink-0">
+          <span className="text-[11px] text-status-alert inline-flex items-center gap-1 shrink-0">
             <AlertTriangle className="w-3 h-3" /> short
           </span>
         )}
@@ -461,7 +461,7 @@ function Stat({
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={emphasis ? "text-status-blush font-semibold" : ""}>
+      <div className={emphasis ? "text-status-alert font-semibold" : ""}>
         {value} <span className="text-[10px] text-muted-foreground">{unit}</span>
       </div>
     </div>

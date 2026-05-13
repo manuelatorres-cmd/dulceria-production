@@ -179,7 +179,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
   }
 
   return (
-    <form onSubmit={handleAdd} className="mt-2 p-2 rounded-md border border-[color:var(--ds-border-warm)] bg-muted/50 space-y-2">
+    <form onSubmit={handleAdd} className="mt-2 p-2 rounded-md border border-[color:var(--ds-border-warm)] bg-muted space-y-2">
       {/* Kind toggle — ingredient OR an existing filling used as a
           sub-component. Flipping resets the current selection so the
           search behaves sensibly for the new source. */}

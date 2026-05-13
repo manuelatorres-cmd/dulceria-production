@@ -1575,7 +1575,7 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
       </div>
 
       {adding && (
-        <div className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted/30 p-3 space-y-2">
+        <div className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted p-3 space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="label">Start</label>
@@ -2054,7 +2054,7 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
 
       {/* HACCP temperature tracking — applies to fridges, freezers, chocolate
           storage, and any other device that needs a daily temperature check. */}
-      <div className="rounded-md bg-muted/30 border border-[color:var(--ds-border-warm)] p-3 space-y-2">
+      <div className="rounded-md bg-muted border border-[color:var(--ds-border-warm)] p-3 space-y-2">
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
             type="checkbox"

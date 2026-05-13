@@ -401,7 +401,7 @@ export default function StockAdjustPage() {
             </p>
           ) : (
             <table className="w-full text-[12.5px]">
-              <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+              <thead className="bg-muted text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
                 <tr>
                   <th className="text-left px-3 py-2">Item</th>
                   <th className="text-right px-2 py-2 w-20">Current</th>

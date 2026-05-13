@@ -189,7 +189,7 @@ function AddIngredientForm({
   }
 
   return (
-    <form onSubmit={handleAdd} className="mt-2 p-3 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/50 space-y-2">
+    <form onSubmit={handleAdd} className="mt-2 p-3 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted space-y-2">
       <div>
         <input
           type="text"
@@ -485,7 +485,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
 
       {/* Promote to filling confirmation — inline, below header */}
       {showSaveAsFilling && (
-        <div className="mb-4 p-3 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/40 space-y-2 text-sm">
+        <div className="mb-4 p-3 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted space-y-2 text-sm">
           <p>
             Creates a new filling <strong>&ldquo;{experiment.name}&rdquo;</strong> in{" "}
             <strong>Ganaches (Emulsions)</strong> with all {experimentIngredients.length} ingredient
@@ -727,7 +727,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
       {(experiment.tasteFeedback || experiment.textureFeedback || experiment.batchNotes) && (
         <section className="mb-6">
           <h2 className="text-sm font-semibold text-primary mb-2">Last batch feedback</h2>
-          <div className="bg-muted/40 rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-3 text-xs space-y-1">
+          <div className="bg-muted rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-3 text-xs space-y-1">
             {experiment.tasteFeedback ? <p>Taste: {experiment.tasteFeedback}/5</p> : null}
             {experiment.textureFeedback ? <p>Texture/mouthfeel: {experiment.textureFeedback}/5</p> : null}
             {experiment.batchNotes && <p className="text-muted-foreground">{experiment.batchNotes}</p>}
@@ -799,7 +799,7 @@ function ExperimentIngredientRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className={`border-b border-[color:var(--ds-border-warm)]/40 ${isDragging ? "opacity-50 bg-muted" : ""}`}
+      className={`border-b border-[color:var(--ds-border-warm)] ${isDragging ? "opacity-50 bg-muted" : ""}`}
       suppressHydrationWarning
     >
       <td className="py-1.5 pl-1 pr-0 w-6">

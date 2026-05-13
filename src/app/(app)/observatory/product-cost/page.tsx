@@ -590,7 +590,7 @@ export default function ProductCostPage() {
                     className={`text-[11px] px-2 py-0.5 rounded-sm border font-medium transition-colors ${
                       active
                         ? catChipClass(cat) + " ring-1 ring-current/40"
-                        : "text-muted-foreground bg-background border-[color:var(--ds-border-warm)] hover:bg-muted/60"
+                        : "text-muted-foreground bg-background border-[color:var(--ds-border-warm)] hover:bg-muted"
                     }`}
                     aria-pressed={active}
                   >
@@ -612,7 +612,7 @@ export default function ProductCostPage() {
         ) : (
           <div className="space-y-px rounded-sm border border-[color:var(--ds-border-warm)] overflow-hidden">
             {/* Header row */}
-            <div className="grid grid-cols-[2rem_1fr_auto_auto] gap-3 items-center px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="grid grid-cols-[2rem_1fr_auto_auto] gap-3 items-center px-4 py-2 bg-muted text-xs font-medium text-muted-foreground uppercase tracking-wide">
               <span>#</span>
               <span>Product</span>
               <span className="text-right">Cost/product</span>
@@ -643,7 +643,7 @@ export default function ProductCostPage() {
                   <button
                     key={product.id}
                     onClick={() => setFocusId(product.id!)}
-                    className="grid grid-cols-[2rem_1fr_auto_auto] gap-3 items-center w-full px-4 py-3 text-left hover:bg-muted/40 transition-colors border-t border-[color:var(--ds-border-warm)] first:border-t-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+                    className="grid grid-cols-[2rem_1fr_auto_auto] gap-3 items-center w-full px-4 py-3 text-left hover:bg-muted transition-colors border-t border-[color:var(--ds-border-warm)] first:border-t-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
                   >
                     {/* Rank */}
                     <span className="text-xs font-mono text-muted-foreground tabular-nums">
@@ -974,7 +974,7 @@ export default function ProductCostPage() {
                       <button
                         key={r.id}
                         onClick={() => addToCompare(r.id!)}
-                        className="flex items-center justify-between w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors border-b border-[color:var(--ds-border-warm)] last:border-b-0"
+                        className="flex items-center justify-between w-full px-3 py-2.5 text-left hover:bg-muted transition-colors border-b border-[color:var(--ds-border-warm)] last:border-b-0"
                       >
                         <span className="text-sm">{r.name}</span>
                         {snap && (
@@ -1014,7 +1014,7 @@ export default function ProductCostPage() {
           <div className="overflow-x-auto rounded-sm border border-[color:var(--ds-border-warm)]">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted/40">
+                <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-36 sm:w-44">
                     Metric
                   </th>
@@ -1130,7 +1130,7 @@ export default function ProductCostPage() {
                     <tr>
                       <td
                         colSpan={allCompareIds.length + 1}
-                        className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted/30 border-t border-[color:var(--ds-border-warm)]"
+                        className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted border-t border-[color:var(--ds-border-warm)]"
                       >
                         Shared ingredients
                       </td>

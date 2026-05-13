@@ -214,7 +214,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
 
           {/* Recipient */}
           {customer && (
-            <div className="rounded-md bg-muted/30 p-3">
+            <div className="rounded-md bg-muted p-3">
               <p className="text-xs text-muted-foreground">For</p>
               <p className="text-sm font-semibold">{customer.companyName}</p>
               {customer.contactName && <p className="text-xs">{customer.contactName}</p>}
@@ -238,7 +238,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               </thead>
               <tbody>
                 {(quote.costBreakdown?.perLine ?? []).map((row, i) => (
-                  <tr key={i} className="border-b border-[color:var(--ds-border-warm)]/50">
+                  <tr key={i} className="border-b border-[color:var(--ds-border-warm)]">
                     <td className="py-1.5">
                       {row.productId
                         ? (productById.get(row.productId)?.name ?? row.label)

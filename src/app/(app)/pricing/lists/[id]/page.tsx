@@ -383,7 +383,7 @@ function RulesPanel({
 
       {/* Add form */}
       <div
-        className="mb-4 p-3 border border-[color:var(--ds-border-warm)] bg-muted/40"
+        className="mb-4 p-3 border border-[color:var(--ds-border-warm)] bg-muted"
         style={{ borderRadius: 3 }}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">

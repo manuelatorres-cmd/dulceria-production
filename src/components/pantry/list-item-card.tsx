@@ -43,7 +43,7 @@ export function ListItemCard({
     : lowStock
     ? "border-status-warn-edge"
     : archived
-    ? "border-[color:var(--ds-border-warm)]/50 opacity-60"
+    ? "border-[color:var(--ds-border-warm)] opacity-60"
     : "border-[color:var(--ds-border-warm)]";
 
   return (

@@ -152,7 +152,7 @@ export default function MonthlyReviewPage() {
                 const prev = revenueByChannelPrev.find((r) => r.channel === row.channel);
                 const delta = prev && prev.gross > 0 ? (row.gross - prev.gross) / prev.gross : undefined;
                 return (
-                  <tr key={row.channel} className="border-t border-[color:var(--ds-border-warm)]/60">
+                  <tr key={row.channel} className="border-t border-[color:var(--ds-border-warm)]">
                     <td className="py-2 capitalize">{row.channel}</td>
                     <td className="py-2 tabular-nums">{row.orderCount}</td>
                     <td className="py-2 tabular-nums">{fmtEur(row.gross)}</td>
@@ -192,7 +192,7 @@ export default function MonthlyReviewPage() {
             </thead>
             <tbody>
               {productMargins.slice(0, 10).map((m) => (
-                <tr key={m.productId} className="border-t border-[color:var(--ds-border-warm)]/60">
+                <tr key={m.productId} className="border-t border-[color:var(--ds-border-warm)]">
                   <td
                     className="py-2"
                     style={{
@@ -250,7 +250,7 @@ export default function MonthlyReviewPage() {
             </thead>
             <tbody>
               {yieldByProduct.map((y) => (
-                <tr key={y.productId} className="border-t border-[color:var(--ds-border-warm)]/60">
+                <tr key={y.productId} className="border-t border-[color:var(--ds-border-warm)]">
                   <td
                     className="py-2"
                     style={{

@@ -95,7 +95,7 @@ export function RecipeCalculatorTab() {
                 className={`w-full text-left px-3 py-2 rounded-sm text-sm transition-colors ${
                   t.id === categoryId
                     ? "bg-primary/5 text-foreground border border-primary/20"
-                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground border border-transparent"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
                 }`}
               >
                 {t.name}
@@ -154,14 +154,14 @@ export function RecipeCalculatorTab() {
                   onAdd={() => addLineForSlot(slotIdx)}
                 >
                   {slotLines.length > 0 && (
-                    <div className="rounded-sm border border-[color:var(--ds-border-warm)]/60 bg-[color:var(--ds-card-bg)] overflow-hidden">
+                    <div className="rounded-sm border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
                       {slotLines.map(({ line, lineIdx }) => {
                         const ing = byId[line.ingredientId];
                         const missing = ing ? missingComposition(ing) : false;
                         return (
                           <div
                             key={lineIdx}
-                            className={`grid grid-cols-[1fr_88px_60px_28px] gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)]/40 last:border-b-0 items-center ${missing ? "bg-status-alert-bg/15" : ""}`}
+                            className={`grid grid-cols-[1fr_88px_60px_28px] gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)] last:border-b-0 items-center ${missing ? "bg-status-alert-bg/15" : ""}`}
                           >
                             <div className="flex items-center gap-1.5 min-w-0">
                               <select
@@ -270,7 +270,7 @@ function SlotCard({
       : severity === "warn"
       ? "border-status-warn-edge"
       : severity === "missing"
-      ? "border-[color:var(--ds-border-warm)]/60"
+      ? "border-[color:var(--ds-border-warm)]"
       : "border-status-ok-edge";
 
   const Icon = severity === "bad" ? AlertCircle : severity === "warn" ? AlertTriangle : severity === "ok" ? CheckCircle2 : Info;
@@ -312,7 +312,7 @@ function SlotCard({
       <button
         onClick={onAdd}
         disabled={candidateCount === 0}
-        className="w-full px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1.5 border-t border-[color:var(--ds-border-warm)]/60 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+        className="w-full px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1.5 border-t border-[color:var(--ds-border-warm)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
       >
         <Plus className="w-3.5 h-3.5" /> Add ingredient
       </button>

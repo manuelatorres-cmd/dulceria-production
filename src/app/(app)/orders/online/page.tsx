@@ -100,7 +100,7 @@ export default function OnlineOrdersPage() {
               </h2>
             </div>
             <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-              <div className="flex items-center px-3 py-1.5 bg-muted/30 border-b border-[color:var(--ds-border-warm)] text-[10px] uppercase tracking-wide text-muted-foreground">
+              <div className="flex items-center px-3 py-1.5 bg-muted border-b border-[color:var(--ds-border-warm)] text-[10px] uppercase tracking-wide text-muted-foreground">
                 <span className="flex-1">Product</span>
                 <span className="w-20 text-right">Ordered</span>
                 <span className="w-24 text-right">In production</span>
