@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/dulceria";
+import { PageHeader, Section } from "@/components/dulceria";
 import {
   useColdStorageUnits,
   useTemperatureReadings,
@@ -13,7 +13,6 @@ import {
 } from "@/lib/hooks";
 import type { ColdStorageUnit, TemperatureReading } from "@/types";
 import { COLD_STORAGE_LOCATIONS, COLD_STORAGE_TYPES } from "@/types";
-import { BackButton } from "@/components/back-button";
 
 /**
  * Production Brain · HACCP (phase 3 UI)
@@ -28,46 +27,60 @@ export default function ProductionBrainHaccpPage() {
   const incidents = useHaccpIncidents(true);
 
   return (
-    <div>
-      <div className="px-4 pt-4">
-        <BackButton />
-      </div>
-      <PageHeader title="HACCP" meta="Temperature logs per cold storage unit + open incidents." />
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader title="HACCP" meta="Temperature logs per cold storage unit + open incidents" />
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
 
-      <section className="rounded-sm border border-border bg-card p-4 mb-4">
-        <NewUnitForm hasAny={units.length > 0} />
-      </section>
+        <Section title="New unit">
+          <div style={{ padding: 16 }}>
+            <NewUnitForm hasAny={units.length > 0} />
+          </div>
+        </Section>
 
-      {units.length === 0 ? (
-        <section className="rounded-sm border border-border bg-card p-6 text-sm text-muted-foreground">
-          <p>
+        {units.length === 0 ? (
+          <p
+            style={{
+              padding: "32px 16px",
+              textAlign: "center",
+              fontStyle: "italic",
+              fontFamily: "var(--font-serif)",
+              color: "var(--ds-text-muted)",
+              fontSize: 14,
+              background: "var(--ds-card-bg)",
+              border: "0.5px solid var(--ds-border-warm)",
+              borderRadius: 6,
+            }}
+          >
             No cold storage units yet. Add your first one above (fridge, freezer, ambient room).
           </p>
-        </section>
-      ) : (
-        <ul className="space-y-4">
-          {units.map((unit) => (
-            <UnitCard key={unit.id} unit={unit} />
-          ))}
-        </ul>
-      )}
+        ) : (
+          units.map((unit) => <UnitCard key={unit.id} unit={unit} />)
+        )}
 
-      {incidents.length > 0 ? (
-        <section className="mt-8 rounded-sm border border-status-alert-edge bg-status-alert-bg p-4">
-          <h3 className="uppercase tracking-wider text-[10px] text-status-alert font-semibold mb-3">
-            Open incidents · {incidents.length}
-          </h3>
-          <ul className="space-y-2">
-            {incidents.map((inc) => (
-              <li key={inc.id} className="text-xs">
-                <strong>{unitNameById(units, inc.coldStorageUnitId)}</strong>{" "}
-                opened {new Date(inc.startedAt).toLocaleString()}.{" "}
-                {inc.actionTaken ?? "No action logged."}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+        {incidents.length > 0 && (
+          <Section title={`Open incidents · ${incidents.length}`}>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {incidents.map((inc) => (
+                <li
+                  key={inc.id}
+                  style={{
+                    padding: "10px 16px",
+                    fontSize: 12,
+                    borderTop: "0.5px solid var(--ds-border-warm)",
+                    borderLeft: "3px solid var(--ds-tier-urgent)",
+                  }}
+                >
+                  <strong style={{ fontWeight: 600 }}>{unitNameById(units, inc.coldStorageUnitId)}</strong>{" "}
+                  opened {new Date(inc.startedAt).toLocaleString()}.{" "}
+                  <span style={{ color: "var(--ds-text-muted)" }}>
+                    {inc.actionTaken ?? "No action logged."}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+      </div>
     </div>
   );
 }
