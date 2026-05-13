@@ -9,7 +9,7 @@ import {
   useOrders,
 } from "@/lib/hooks";
 import { IconChevronLeft as ChevronLeft, IconChevronRight as ChevronRight, IconPlus as Plus, IconCalendar as CalIcon } from "@tabler/icons-react";
-import { BackButton } from "@/components/back-button";
+import { PageHeader, DsButton } from "@/components/dulceria";
 
 /**
  * Master calendar — focused month view with a side panel showing the
@@ -152,43 +152,41 @@ export default function CalendarPage() {
   });
 
   return (
-    <div className="px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto">
-      <div className="mb-2">
-        <BackButton />
-      </div>
-      {/* Header */}
-      <div className="mb-4 flex flex-wrap items-baseline gap-3">
-        <h1
-          className="text-[26px] tracking-[-0.025em]"
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 400 }}
-        >
-          Calendar
-        </h1>
-        <span className="text-[12px] text-muted-foreground">
-          Campaigns · event orders · closures · holidays · production days
-        </span>
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            onClick={() => shiftMonth(-1)}
-            className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] w-8 h-8 flex items-center justify-center hover:border-foreground/30"
-            aria-label="Previous month"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => { setFocusYear(today.getFullYear()); setFocusMonth(today.getMonth()); setSelectedIso(todayIso); }}
-            className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 h-8 text-[12px] hover:border-foreground/30"
-          >
-            Today
-          </button>
-          <button
-            onClick={() => shiftMonth(1)}
-            className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] w-8 h-8 flex items-center justify-center hover:border-foreground/30"
-            aria-label="Next month"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Calendar"
+        meta="Campaigns · event orders · closures · holidays · production days"
+        actions={
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => shiftMonth(-1)}
+              className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] w-8 h-8 flex items-center justify-center hover:border-foreground/30"
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <DsButton
+              variant="default"
+              size="sm"
+              onClick={() => {
+                setFocusYear(today.getFullYear());
+                setFocusMonth(today.getMonth());
+                setSelectedIso(todayIso);
+              }}
+            >
+              Today
+            </DsButton>
+            <button
+              onClick={() => shiftMonth(1)}
+              className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] w-8 h-8 flex items-center justify-center hover:border-foreground/30"
+              aria-label="Next month"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        }
+      />
+      <div className="px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto">
       </div>
 
       {/* Main: focused month + side panel */}
@@ -280,6 +278,7 @@ export default function CalendarPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <MiniMonth grid={nextGrid} markers={markersByDate} onPick={(iso) => { setSelectedIso(iso); setFocusYear(new Date(iso).getFullYear()); setFocusMonth(new Date(iso).getMonth()); }} />
         <MiniMonth grid={next2Grid} markers={markersByDate} onPick={(iso) => { setSelectedIso(iso); setFocusYear(new Date(iso).getFullYear()); setFocusMonth(new Date(iso).getMonth()); }} />
+      </div>
       </div>
     </div>
   );
