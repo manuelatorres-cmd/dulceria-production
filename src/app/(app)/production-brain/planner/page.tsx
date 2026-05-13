@@ -323,8 +323,15 @@ function ProposalCard({
           {productName ?? proposal.productId.slice(0, 8)}
         </strong>
         <span
+          title={
+            proposal.priorityTier === 1
+              ? "Tier 1 — critical (needed in next 7 days)"
+              : proposal.priorityTier === 2
+              ? "Tier 2 — urgent (needed in 8-21 days)"
+              : "Tier 3 — standard (longer horizon)"
+          }
           className={
-            "text-[9px] uppercase font-medium " +
+            "text-[9px] uppercase font-medium cursor-help " +
             (proposal.priorityTier === 1
               ? "text-status-alert"
               : proposal.priorityTier === 2
