@@ -9,3 +9,9 @@ export { DsIcon, type DsIconProps, type DsIconSize } from "./icon";
 export { ZoneCard, type ZoneVariant } from "./zone-card";
 export { StepPill, type StepPillStatus } from "./step-pill";
 export { MiniDay, type MiniDayVariant } from "./mini-day";
+export {
+  CampaignCard,
+  AddCampaignCard,
+  type CampaignCardVariant,
+  type CampaignTypeTag,
+} from "./campaign-card";

@@ -1,20 +1,73 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { PageHeader } from "@/components/page-header";
-import { useCampaigns, saveCampaign } from "@/lib/hooks";
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  useCampaigns,
+  saveCampaign,
+  useProductionPlans,
+  useAllPlanProducts,
+  useAllPlanStepStatuses,
+} from "@/lib/hooks";
 import { newId } from "@/lib/supabase";
+import {
+  PageHeader,
+  Section,
+  CampaignCard,
+  AddCampaignCard,
+  DsButton,
+  StatusTag,
+  type CampaignCardVariant,
+  type CampaignTypeTag,
+} from "@/components/dulceria";
+import {
+  IconPlus,
+  IconCalendar,
+  IconSearch,
+} from "@tabler/icons-react";
+import type { Campaign } from "@/types";
 
-/**
- * Campaigns list — Easter, Mother's Day, limited editions, launches.
- * One card per campaign, grouped by status. Quick-add at the top
- * creates an empty campaign and navigates to its detail page.
- */
+type FilterKey =
+  | "all"
+  | "active"
+  | "planned"
+  | "done"
+  | "seasonal"
+  | "launch"
+  | "market_event";
+
+const FILTERS: Array<{ id: FilterKey; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "active", label: "Active" },
+  { id: "planned", label: "Planned" },
+  { id: "done", label: "Done" },
+  { id: "seasonal", label: "Seasonal" },
+  { id: "launch", label: "Launch" },
+  { id: "market_event", label: "Market event" },
+];
+
+function isoToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatShortDate(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso;
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("de-AT", { day: "numeric", month: "short" });
+}
+
 export default function CampaignsPage() {
-  const campaigns = useCampaigns();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const campaigns = useCampaigns();
+  const plans = useProductionPlans();
+  const planProducts = useAllPlanProducts();
+  const stepStatuses = useAllPlanStepStatuses();
+
+  const [search, setSearch] = useState<string>(searchParams.get("q") ?? "");
+  const [filter, setFilter] = useState<FilterKey>(
+    (searchParams.get("filter") as FilterKey | null) ?? "all",
+  );
   const [creating, setCreating] = useState(false);
 
   async function handleAdd() {
@@ -25,10 +78,8 @@ export default function CampaignsPage() {
         id,
         name: "New campaign",
         type: "seasonal",
-        startDate: new Date().toISOString().slice(0, 10),
-        endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .slice(0, 10),
+        startDate: isoToday(),
+        endDate: new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10),
         productIds: [],
         status: "planned",
       });
@@ -38,106 +89,289 @@ export default function CampaignsPage() {
     }
   }
 
-  const byStatus = {
-    active: campaigns.filter((c) => c.status === "active"),
-    planned: campaigns.filter((c) => c.status === "planned"),
-    wrapping: campaigns.filter((c) => c.status === "wrapping"),
-    done: campaigns.filter((c) => c.status === "done"),
-    cancelled: campaigns.filter((c) => c.status === "cancelled"),
-  };
+  const planProductsByPlan = useMemo(() => {
+    const m = new Map<string, typeof planProducts>();
+    for (const pp of planProducts) {
+      const arr = m.get(pp.planId) ?? [];
+      arr.push(pp);
+      m.set(pp.planId, arr);
+    }
+    return m;
+  }, [planProducts]);
+
+  const todayMs = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+
+  function plansForCampaign(c: Campaign): typeof plans {
+    const matches: typeof plans = [];
+    for (const p of plans) {
+      const name = p.name ?? "";
+      if (
+        name.startsWith(`Campaign: ${c.name}`) ||
+        name.includes(`Campaign: ${c.name} —`) ||
+        name === c.name
+      ) {
+        matches.push(p);
+      }
+    }
+    return matches;
+  }
+
+  function buildVm(c: Campaign) {
+    const end = c.endDate ? new Date(c.endDate + "T23:59:59").getTime() : 0;
+    const prodStart = c.productionStartDate
+      ? new Date(c.productionStartDate + "T00:00:00").getTime()
+      : 0;
+    const daysToLaunch = end ? Math.ceil((end - todayMs) / 86_400_000) : null;
+    const daysToProd = prodStart ? Math.ceil((prodStart - todayMs) / 86_400_000) : null;
+
+    const productCount = Math.max(
+      c.productIds?.length ?? 0,
+      Object.keys(c.productTargets ?? {}).length,
+    );
+
+    const linkedPlans = plansForCampaign(c);
+    const batchCount = linkedPlans.length;
+
+    let doneSteps = 0;
+    let totalSteps = 0;
+    for (const p of linkedPlans) {
+      const pps = planProductsByPlan.get(p.id ?? "") ?? [];
+      totalSteps += pps.length * 5;
+      doneSteps += stepStatuses.filter((s) => s.planId === p.id && s.done).length;
+    }
+    const progressPct = totalSteps > 0 ? Math.round((doneSteps / totalSteps) * 100) : 0;
+
+    let variant: CampaignCardVariant;
+    if (c.status === "done") variant = "done";
+    else if (c.status === "cancelled") variant = "planned";
+    else if (daysToLaunch != null && daysToLaunch <= 7 && progressPct < 50) variant = "urgent";
+    else if (daysToProd != null && daysToProd >= 0 && daysToProd <= 14) variant = "warn";
+    else if (c.status === "active") variant = "active";
+    else variant = "planned";
+
+    let statusText = "";
+    if (c.status === "done") statusText = "shipped";
+    else if (c.status === "cancelled") statusText = "cancelled";
+    else if (daysToLaunch == null) statusText = "no end date";
+    else if (daysToLaunch < 0) statusText = `launched ${-daysToLaunch}d ago`;
+    else if (daysToLaunch === 0) statusText = "launches today";
+    else if (daysToProd != null && daysToProd > 0)
+      statusText = `production starts in ${daysToProd}d`;
+    else statusText = `${daysToLaunch}d to launch`;
+
+    const dateLabel =
+      c.startDate && c.endDate
+        ? `${formatShortDate(c.startDate)} → ${formatShortDate(c.endDate)}`
+        : c.startDate
+        ? `from ${formatShortDate(c.startDate)}`
+        : "no dates";
+    const daysToLaunchLabel =
+      daysToLaunch != null && daysToLaunch >= 0 && c.status !== "done"
+        ? `${daysToLaunch}d to launch`
+        : "";
+
+    return {
+      campaign: c,
+      typeTag: (c.type as CampaignTypeTag) ?? "seasonal",
+      variant,
+      statusText,
+      progressPct,
+      productCount,
+      batchCount,
+      doneCount: doneSteps,
+      dateLabel,
+      daysToLaunchLabel,
+    };
+  }
+
+  const allVms = useMemo(
+    () => campaigns.map(buildVm),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [campaigns, todayMs, plans, planProductsByPlan, stepStatuses],
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allVms.filter((vm) => {
+      if (q && !vm.campaign.name.toLowerCase().includes(q)) return false;
+      switch (filter) {
+        case "active":
+          return vm.campaign.status === "active";
+        case "planned":
+          return vm.campaign.status === "planned";
+        case "done":
+          return vm.campaign.status === "done";
+        case "seasonal":
+          return vm.campaign.type === "seasonal";
+        case "launch":
+          return vm.campaign.type === "launch";
+        case "market_event":
+          return vm.campaign.type === "market_event";
+        case "all":
+        default:
+          return true;
+      }
+    });
+  }, [allVms, filter, search]);
+
+  const sections = useMemo(() => {
+    const lists: Array<{ id: string; label: string; list: typeof filtered }> = [
+      { id: "active", label: "Active", list: filtered.filter((v) => v.campaign.status === "active") },
+      { id: "planned", label: "Planned", list: filtered.filter((v) => v.campaign.status === "planned") },
+      { id: "wrapping", label: "Wrapping up", list: filtered.filter((v) => v.campaign.status === "wrapping") },
+      { id: "done", label: "Done", list: filtered.filter((v) => v.campaign.status === "done") },
+      { id: "cancelled", label: "Cancelled", list: filtered.filter((v) => v.campaign.status === "cancelled") },
+    ];
+    return lists.filter((s) => s.list.length > 0);
+  }, [filtered]);
+
+  const total = allVms.length;
+  const activeCount = allVms.filter((v) => v.campaign.status === "active").length;
+  const urgentCount = allVms.filter((v) => v.variant === "urgent").length;
 
   return (
-    <div className="px-6 sm:px-10 pt-2 pb-12 max-w-[1400px] mx-auto">
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader
         title="Campaigns"
-        description="Seasonal boxes, limited editions, collaborations, and launches. The brain auto-proposes ramp-up batches between productionStartDate and startDate."
+        meta={`Seasonal boxes, limited editions, launches · ${total} total · ${activeCount} active · ${urgentCount} urgent`}
+        badges={
+          urgentCount > 0 ? (
+            <StatusTag kind="overdue">{urgentCount} urgent</StatusTag>
+          ) : undefined
+        }
+        actions={
+          <>
+            <DsButton variant="default" size="md" onClick={() => router.push("/calendar")}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <IconCalendar size={14} stroke={1.5} /> Calendar view
+              </span>
+            </DsButton>
+            <DsButton variant="primary" size="md" onClick={handleAdd} disabled={creating}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <IconPlus size={14} stroke={1.5} />
+                {creating ? "Creating…" : "New campaign"}
+              </span>
+            </DsButton>
+          </>
+        }
       />
 
-      <div className="flex justify-end mb-4">
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={creating}
-          className="btn-primary"
-        >
-          {creating ? "Creating…" : "+ New campaign"}
-        </button>
-      </div>
-
-      {campaigns.length === 0 ? (
-        <p
-          className="text-muted-foreground text-center py-12 italic"
-          style={{ fontFamily: "var(--font-serif)", fontSize: 13 }}
-        >
-          No campaigns yet. Tap "New campaign" to plan one.
-        </p>
-      ) : null}
-
-      {(
-        [
-          ["active", "Active"],
-          ["planned", "Planned"],
-          ["wrapping", "Wrapping up"],
-          ["done", "Done"],
-          ["cancelled", "Cancelled"],
-        ] as const
-      ).map(([key, label]) => {
-        const list = byStatus[key];
-        if (list.length === 0) return null;
-        return (
-          <section key={key} className="mb-6">
-            <h2
-              className="text-[13px] mb-2"
+      <div style={{ padding: "16px 32px 32px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {FILTERS.map((f) => {
+              const active = filter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setFilter(f.id)}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: 12,
+                    border: `0.5px solid ${active ? "var(--ds-tier-quarter-focus)" : "var(--ds-border-warm)"}`,
+                    background: active ? "var(--ds-tier-quarter-focus)" : "var(--ds-card-bg)",
+                    color: active ? "#ffffff" : "var(--ds-text-muted)",
+                    borderRadius: 14,
+                  }}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+          <div
+            style={{
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              borderRadius: 14,
+              minWidth: 220,
+            }}
+          >
+            <IconSearch size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search campaign name…"
               style={{
-                fontFamily: "var(--font-serif)",
-                fontWeight: 500,
-                letterSpacing: "-0.012em",
+                fontSize: 12,
+                border: "none",
+                background: "transparent",
+                outline: "none",
+                flex: 1,
+                color: "var(--ds-text-primary)",
               }}
+            />
+          </div>
+        </div>
+
+        {sections.length === 0 ? (
+          <p
+            className="text-ds-meta"
+            style={{
+              padding: "32px 0",
+              textAlign: "center",
+              fontFamily: "var(--font-serif)",
+              fontSize: 14,
+            }}
+          >
+            No campaigns match the current filter.
+          </p>
+        ) : (
+          sections.map((sec) => (
+            <Section
+              key={sec.id}
+              title={sec.label}
+              action={`${sec.list.length} campaign${sec.list.length === 1 ? "" : "s"}`}
             >
-              {label}
-              <span
-                className="ml-2 text-[10px] uppercase text-muted-foreground"
-                style={{ letterSpacing: "0.12em" }}
+              <div
+                style={{
+                  padding: "0 16px 14px",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                  gap: 12,
+                }}
               >
-                {list.length}
-              </span>
-            </h2>
-            <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {list.map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={`/campaigns/${encodeURIComponent(c.id ?? "")}`}
-                    className="block border border-border bg-card p-4 hover:border-foreground transition-colors"
-                    style={{ borderRadius: 4 }}
-                  >
-                    <div
-                      className="text-[14px] mb-1"
-                      style={{
-                        fontFamily: "var(--font-serif)",
-                        fontWeight: 500,
-                        letterSpacing: "-0.012em",
-                      }}
-                    >
-                      {c.name}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {c.type} · {c.startDate} → {c.endDate}
-                    </div>
-                    {c.targetTotalUnits ? (
-                      <div className="text-[11px] text-muted-foreground mt-1">
-                        Target {c.targetTotalUnits} units
-                      </div>
-                    ) : null}
-                    <div className="text-[10px] text-muted-foreground mt-2 uppercase" style={{ letterSpacing: "0.12em" }}>
-                      {c.productIds.length} product{c.productIds.length === 1 ? "" : "s"}
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+                {sec.list.map((vm) => (
+                  <CampaignCard
+                    key={vm.campaign.id}
+                    href={`/campaigns/${encodeURIComponent(vm.campaign.id ?? "")}`}
+                    name={vm.campaign.name || "Untitled campaign"}
+                    typeTag={vm.typeTag}
+                    variant={vm.variant}
+                    dateLabel={vm.dateLabel}
+                    daysToLaunchLabel={vm.daysToLaunchLabel}
+                    stats={[
+                      { label: "Products", value: vm.productCount },
+                      { label: "Batches", value: vm.batchCount },
+                      { label: "Done", value: vm.doneCount },
+                    ]}
+                    progressPct={vm.progressPct}
+                    statusText={vm.statusText}
+                  />
+                ))}
+                {sec.id === "planned" && (
+                  <AddCampaignCard
+                    label="new planned campaign"
+                    onClick={handleAdd}
+                    disabled={creating}
+                  />
+                )}
+              </div>
+            </Section>
+          ))
+        )}
+      </div>
     </div>
   );
 }
