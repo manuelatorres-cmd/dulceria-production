@@ -80,6 +80,7 @@
   /* Sky — mockup (kept, cool accent) */
   --accent-sky-bg:        #e8f0f9;
   --accent-sky-ink:       #4b6b8f;
+  --accent-sky-edge:      #cfe0f0;
   /* Blue — aliased to sky (sky is the cool-blue accent in the mockup). */
   --accent-blue-bg:       #e8f0f9;
   --accent-blue-ink:      #4b6b8f;

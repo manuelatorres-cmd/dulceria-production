@@ -1067,14 +1067,14 @@ export default function PlanPage() {
                     if (n.includes("paint") || n.includes("colour") || n.includes("color"))
                                                 return { bg: surface, ink: "var(--accent-blush-ink)" };
                     if (n.includes("shell") || n.includes("temper"))
-                                                return { bg: surface, ink: "#9a6640" };
-                    if (n.includes("prep"))     return { bg: surface, ink: "#6a4d89" };
+                                                return { bg: surface, ink: "var(--accent-peach-ink)" };
+                    if (n.includes("prep"))     return { bg: surface, ink: "var(--accent-lilac-ink)" };
                     if (n.includes("fill"))     return { bg: surface, ink: "var(--accent-sky-ink)" };
-                    if (n.includes("cap"))      return { bg: surface, ink: "#5c7050" };
+                    if (n.includes("cap"))      return { bg: surface, ink: "var(--accent-sage-ink)" };
                     if (n.includes("unmould") || n.includes("unmold"))
                                                 return { bg: surface, ink: "var(--accent-mint-ink)" };
-                    if (n.includes("pack"))     return { bg: surface, ink: "#9a6640" };
-                    return { bg: surface, ink: "#1c1d1f" };
+                    if (n.includes("pack"))     return { bg: surface, ink: "var(--accent-peach-ink)" };
+                    return { bg: surface, ink: "var(--ds-text-primary)" };
                   }
 
                   // Mega-grouping: when a step name (e.g. "Polishing")
@@ -1504,7 +1504,7 @@ function WeekView(props: {
         ref={setNodeRef}
         className={
           "transition rounded-[12px] " +
-          (isOver ? "ring-2 ring-[#4a6b5b] ring-offset-1" : "")
+          (isOver ? "ring-2 ring-[var(--accent-mint-ink)] ring-offset-1" : "")
         }
       >
         {children}
@@ -1539,16 +1539,16 @@ function WeekView(props: {
     const n = stepName.toLowerCase();
     if (n.includes("polish"))   return { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)" };
     if (n.includes("paint") || n.includes("colour") || n.includes("color"))
-                                return { bg: "#fdeeea", ink: "var(--accent-blush-ink)" };
+                                return { bg: "var(--accent-blush-bg)", ink: "var(--accent-blush-ink)" };
     if (n.includes("shell") || n.includes("temper"))
-                                return { bg: "#fdf1e2", ink: "#9a6640" };
-    if (n.includes("prep"))     return { bg: "#f3eef6", ink: "#6a4d89" };
+                                return { bg: "var(--accent-peach-bg)", ink: "var(--accent-peach-ink)" };
+    if (n.includes("prep"))     return { bg: "var(--accent-lilac-bg)", ink: "var(--accent-lilac-ink)" };
     if (n.includes("fill"))     return { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)" };
-    if (n.includes("cap"))      return { bg: "#eff3ec", ink: "#5c7050" };
+    if (n.includes("cap"))      return { bg: "var(--accent-sage-bg)", ink: "var(--accent-sage-ink)" };
     if (n.includes("unmould") || n.includes("unmold"))
                                 return { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)" };
-    if (n.includes("pack"))     return { bg: "#fdf1e2", ink: "#9a6640" };
-    return { bg: "rgba(245,243,239,0.7)", ink: "#1c1d1f" };
+    if (n.includes("pack"))     return { bg: "var(--accent-peach-bg)", ink: "var(--accent-peach-ink)" };
+    return { bg: "rgba(245,243,239,0.7)", ink: "var(--ds-text-primary)" };
   }
 
   // ── Weekly stats over the visible 14-day window ──
@@ -1648,7 +1648,7 @@ function WeekView(props: {
             className="mt-1 tabular-nums"
             style={{
               fontFamily: "var(--font-serif)", fontSize: 22, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.012em",
-              color: tightDays > 0 ? "var(--accent-blush-ink)" : "#1c1d1f",
+              color: tightDays > 0 ? "var(--accent-blush-ink)" : "var(--ds-text-primary)",
             }}
           >
             {tightDays}
@@ -1740,7 +1740,7 @@ function WeekView(props: {
               const others = [...affected.entries()].filter(([oid]) => !focusOrderIds.has(oid));
               if (affected.size === 0) return null;
               return (
-                <div className="rounded-[10px] border border-[var(--accent-butter-bg)] bg-[#fef9e6] px-3 py-2 mb-4">
+                <div className="rounded-[10px] border border-[var(--accent-butter-bg)] bg-[var(--accent-butter-bg)] px-3 py-2 mb-4">
                   <p className="text-[11px] uppercase tracking-wider text-[var(--accent-butter-ink)] font-medium mb-1">
                     Also affects {affected.size} order{affected.size === 1 ? "" : "s"}
                   </p>
@@ -1776,7 +1776,7 @@ function WeekView(props: {
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => applyDrop(true)}
-                className="rounded-full bg-[#4a6b5b] text-white px-4 py-1.5 text-[12px] font-medium inline-flex items-center gap-1.5 hover:bg-[#3d5b4d]"
+                className="rounded-full bg-[var(--accent-mint-ink)] text-white px-4 py-1.5 text-[12px] font-medium inline-flex items-center gap-1.5 hover:bg-[var(--ds-tier-quarter-focus)]"
               >
                 <Lock className="w-3.5 h-3.5" /> Move + lock
               </button>
@@ -1878,7 +1878,7 @@ function WeekView(props: {
                 <span
                   className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full"
                   style={{
-                    background: ds.level === "ok" ? "var(--accent-mint-bg)" : ds.level === "warn" ? "var(--accent-butter-bg)" : "#fdeeea",
+                    background: ds.level === "ok" ? "var(--accent-mint-bg)" : ds.level === "warn" ? "var(--accent-butter-bg)" : "var(--accent-blush-bg)",
                     color: LEVEL_BAR_LOCAL[ds.level],
                   }}
                 >
@@ -2509,7 +2509,7 @@ function ScheduledPanel({
                 className="rounded-[10px] border border-[color:var(--ds-border-warm)] p-2"
                 style={{ background: isShared ? tint.bg : "rgba(255,255,255,0.55)" }}
               >
-                <p className="text-[10px] uppercase mb-1 opacity-75 flex items-center gap-1.5" style={{ letterSpacing: "0.08em", color: isShared ? tint.ink : "#8a8780" }}>
+                <p className="text-[10px] uppercase mb-1 opacity-75 flex items-center gap-1.5" style={{ letterSpacing: "0.08em", color: isShared ? tint.ink : "var(--ds-text-muted)" }}>
                   {isShared
                     ? <>Shared · {g.orders.length} orders · {g.sharedPlanCount} batch{g.sharedPlanCount === 1 ? "" : "es"}</>
                     : <>Solo</>}
@@ -2640,8 +2640,8 @@ function DemandByUrgency({
     b2b: { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)" },
     event: { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)" },
     shop: { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)" },
-    walkin: { bg: "#f3eef6", ink: "#6a4d89" },
-    other: { bg: "rgba(0,0,0,0.05)", ink: "#1c1d1f" },
+    walkin: { bg: "var(--accent-lilac-bg)", ink: "var(--accent-lilac-ink)" },
+    other: { bg: "rgba(0,0,0,0.05)", ink: "var(--ds-text-primary)" },
   };
 
   // Map orderId → set of plan ids linked via the (orderItem → plan)
@@ -2926,7 +2926,7 @@ function DemandByUrgency({
               ? { bg: surface, ink: "var(--accent-butter-ink)" }
               : o.bucket === "tomorrow"
                 ? { bg: surface, ink: "var(--accent-sky-ink)" }
-                : { bg: surface, ink: "#1c1d1f" };
+                : { bg: surface, ink: "var(--ds-text-primary)" };
           const channelTint = CHANNEL_TINT[o.channel] ?? CHANNEL_TINT.other;
           const date = new Date(o.deadline);
           const dateStr = date.toLocaleDateString("de-AT", { weekday: "short", day: "2-digit", month: "2-digit" });
@@ -3226,7 +3226,7 @@ function BatchGroupRow({
   const tint = (() => {
     if (allDone) return { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)", bar: "var(--accent-mint-ink)" };
     if (anyDone) return { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)", bar: "var(--accent-butter-ink)" };
-    return { bg: "rgba(245,243,239,0.7)", ink: "#1c1d1f", bar: "#bdbcc1" };
+    return { bg: "rgba(245,243,239,0.7)", ink: "var(--ds-text-primary)", bar: "#bdbcc1" };
   })();
   const doneSteps = aggStepStates.filter((s) => s.allDone).length;
   const totalSteps = aggStepStates.length;
@@ -3313,14 +3313,14 @@ function BatchGroupRow({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11.5px] font-medium truncate" style={{ color: "#1c1d1f" }}>
+                    <p className="text-[11.5px] font-medium truncate" style={{ color: "var(--ds-text-primary)" }}>
                       {b.batchNumber ?? b.planName}
                       <span className="opacity-65 font-normal ml-1.5 text-[10.5px]">
                         · {b.mouldCount} mould{b.mouldCount === 1 ? "" : "s"}
                       </span>
                     </p>
                     {b.orderRef && (
-                      <p className="text-[10.5px] opacity-70 truncate flex items-center gap-1" style={{ color: "#1c1d1f" }}>
+                      <p className="text-[10.5px] opacity-70 truncate flex items-center gap-1" style={{ color: "var(--ds-text-primary)" }}>
                         <span className="truncate">for {b.orderRef}</span>
                         {b.fulfillmentType && (
                           <span
@@ -3333,7 +3333,7 @@ function BatchGroupRow({
                       </p>
                     )}
                   </div>
-                  <span className="text-[10.5px] tabular-nums shrink-0 opacity-70" style={{ color: "#1c1d1f" }}>
+                  <span className="text-[10.5px] tabular-nums shrink-0 opacity-70" style={{ color: "var(--ds-text-primary)" }}>
                     {b.plannedMinutes}m
                   </span>
                 </div>
@@ -3540,10 +3540,10 @@ function PivotView(props: {
   const PHASE_TINT: Record<string, { bg: string; ink: string }> = {
     polishing: { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-butter-ink)" },
     colour:    { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-blush-ink)" },
-    shell:     { bg: "rgba(255,255,255,0.65)", ink: "#9a6640" },
+    shell:     { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-peach-ink)" },
     filling:   { bg: "rgba(255,255,255,0.65)", ink: "#735a78" },
     fill:      { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-sky-ink)" },
-    cap:       { bg: "rgba(255,255,255,0.65)", ink: "#5c7050" },
+    cap:       { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-sage-ink)" },
     unmould:   { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-mint-ink)" },
     packing:   { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-blush-ink)" },
   };
@@ -3858,7 +3858,7 @@ function PivotView(props: {
                   >
                     <div
                       className="text-[13px]"
-                      style={{ fontFamily: "var(--font-serif)", fontWeight: 500, color: isToday ? "var(--accent-mint-ink)" : "#1c1d1f" }}
+                      style={{ fontFamily: "var(--font-serif)", fontWeight: 500, color: isToday ? "var(--accent-mint-ink)" : "var(--ds-text-primary)" }}
                     >
                       {d.label}
                     </div>
@@ -3879,7 +3879,7 @@ function PivotView(props: {
                       padding: "8px 10px",
                       background: rowBg,
                       borderRadius: "12px 0 0 12px",
-                      borderLeft: `4px solid ${src.isShared ? "#4a6b5b" : accent}`,
+                      borderLeft: `4px solid ${src.isShared ? "var(--accent-mint-ink)" : accent}`,
                       verticalAlign: "top",
                     }}
                   >
@@ -3899,7 +3899,7 @@ function PivotView(props: {
                               className="ml-1.5 align-middle"
                               style={{
                                 fontSize: 9.5, padding: "1px 6px", borderRadius: 999,
-                                background: "#4a6b5b", color: "#ffffff", fontFamily: "system-ui",
+                                background: "var(--accent-mint-ink)", color: "#ffffff", fontFamily: "system-ui",
                               }}
                             >
                               shared
@@ -3908,7 +3908,7 @@ function PivotView(props: {
                         </div>
                         <div
                           className="text-[10.5px] mt-0.5"
-                          style={{ color: src.isOverdue ? "var(--accent-blush-ink)" : "#8a8780", fontWeight: src.isOverdue ? 600 : 400 }}
+                          style={{ color: src.isOverdue ? "var(--accent-blush-ink)" : "var(--ds-text-muted)", fontWeight: src.isOverdue ? 600 : 400 }}
                         >
                           {src.sub || `earliest ${src.earliestIso}`}
                         </div>
@@ -4004,7 +4004,7 @@ function PivotView(props: {
               const stat = cell?.phases.get(phase);
               const src = focusedSources.find((s) => s.token === token);
               if (!stat || !src) return null;
-              const tint = PHASE_TINT[phase] ?? { bg: "#fff", ink: "#1c1d1f" };
+              const tint = PHASE_TINT[phase] ?? { bg: "#fff", ink: "var(--ds-text-primary)" };
               const planList = [...stat.planIds];
               return (
                 <tr key="pivot-expand">
@@ -4241,10 +4241,10 @@ function MonthView(props: {
   const PHASE_TINT: Record<string, { bg: string; ink: string }> = {
     polishing: { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-butter-ink)" },
     colour:    { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-blush-ink)" },
-    shell:     { bg: "rgba(255,255,255,0.65)", ink: "#9a6640" },
+    shell:     { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-peach-ink)" },
     filling:   { bg: "rgba(255,255,255,0.65)", ink: "#735a78" },
     fill:      { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-sky-ink)" },
-    cap:       { bg: "rgba(255,255,255,0.65)", ink: "#5c7050" },
+    cap:       { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-sage-ink)" },
     unmould:   { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-mint-ink)" },
     packing:   { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-blush-ink)" },
   };
@@ -4662,7 +4662,7 @@ function MonthView(props: {
                       : c.isToday
                       ? "rgba(253,242,244,0.7)"
                       : "rgba(255,255,255,0.7)",
-                    borderColor: isOpen ? "var(--accent-mint-ink)" : c.isToday ? "#4a6b5b" : "rgba(255,255,255,0.6)",
+                    borderColor: isOpen ? "var(--accent-mint-ink)" : c.isToday ? "var(--accent-mint-ink)" : "rgba(255,255,255,0.6)",
                     borderStyle: closed ? "dashed" : "solid",
                     borderWidth: isOpen ? 2 : 1,
                     opacity: dimmed ? 0.45 : 1,
@@ -4676,7 +4676,7 @@ function MonthView(props: {
                     <span
                       style={{
                         fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 14,
-                        color: c.isToday ? "var(--accent-mint-ink)" : "#1c1d1f",
+                        color: c.isToday ? "var(--accent-mint-ink)" : "var(--ds-text-primary)",
                       }}
                     >
                       {c.date.getDate()}
@@ -4769,7 +4769,7 @@ function MonthView(props: {
                     style={{
                       fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 22,
                       letterSpacing: "-0.012em",
-                      color: isToday ? "var(--accent-mint-ink)" : "#1c1d1f",
+                      color: isToday ? "var(--accent-mint-ink)" : "var(--ds-text-primary)",
                     }}
                   >
                     {dayLabel}
@@ -5004,7 +5004,7 @@ function MonthView(props: {
                                           <Link
                                             href={`/production/${pid}?from=plan`}
                                             className="hover:underline"
-                                            style={{ color: "#1c1d1f", fontWeight: 500 }}
+                                            style={{ color: "var(--ds-text-primary)", fontWeight: 500 }}
                                           >
                                             {productLabel}
                                           </Link>

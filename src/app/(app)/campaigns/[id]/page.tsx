@@ -923,7 +923,7 @@ function CampaignEditor({
               type="checkbox"
               checked={isolated}
               onChange={(e) => setIsolated(e.target.checked)}
-              className="mt-0.5 accent-[#4a6b5b]"
+              className="mt-0.5 accent-[var(--accent-mint-ink)]"
             />
             <span className="text-[12.5px] leading-snug">
               <span className="block font-medium">Keep production isolated</span>

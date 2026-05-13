@@ -531,7 +531,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </Link>
             <Link
               href={`/plan?focus=order:${encodeURIComponent(orderId)}`}
-              className="inline-flex items-center gap-2 rounded-[6px] bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] px-4 py-2.5 text-sm font-medium hover:bg-[#d4e0d8]"
+              className="inline-flex items-center gap-2 rounded-[6px] bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] px-4 py-2.5 text-sm font-medium hover:bg-[var(--accent-mint-edge)]"
             >
               Plan this in /plan →
             </Link>
@@ -1215,7 +1215,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
           type="checkbox"
           checked={isolated}
           onChange={(e) => setIsolated(e.target.checked)}
-          className="mt-0.5 accent-[#4a6b5b]"
+          className="mt-0.5 accent-[var(--accent-mint-ink)]"
         />
         <span className="text-[12.5px] leading-snug">
           <span className="block font-medium">Keep production isolated</span>

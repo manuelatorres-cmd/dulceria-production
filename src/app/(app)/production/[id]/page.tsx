@@ -1079,7 +1079,7 @@ function PlanContent({
                 const palette = (() => {
                   if (allPhaseDone) return { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)", bar: "var(--accent-mint-ink)" };
                   if (active)       return { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)", bar: "var(--accent-sky-ink)" };
-                  return { bg: "rgba(245,243,239,0.7)", ink: "#1c1d1f", bar: "#bdbcc1" };
+                  return { bg: "rgba(245,243,239,0.7)", ink: "var(--ds-text-primary)", bar: "#bdbcc1" };
                 })();
                 const pct = phaseSteps.length === 0 ? 0 : Math.round((phaseDone / phaseSteps.length) * 100);
                 return (

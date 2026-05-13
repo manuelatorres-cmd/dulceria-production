@@ -1819,7 +1819,7 @@ export default function DailyV2Page() {
           let cls: string;
           let dotCls: string;
           if (isActive) {
-            cls = "bg-[#4a6b5b] text-white";
+            cls = "bg-[var(--accent-mint-ink)] text-white";
             dotCls = "bg-white";
           } else if (allDone) {
             cls = "text-[#355a35]";
@@ -1865,7 +1865,7 @@ export default function DailyV2Page() {
         <span className="text-[11.5px] text-foreground/70">Log cold-storage temperatures + open incidents</span>
         <Link
           href="/production-brain/haccp"
-          className="ml-auto text-[11px] font-medium text-[#4a6b5b] hover:underline"
+          className="ml-auto text-[11px] font-medium text-[var(--accent-mint-ink)] hover:underline"
         >
           Log →
         </Link>
@@ -2029,7 +2029,7 @@ export default function DailyV2Page() {
                             >
                               Moulds to paint · {totalMouldsThisPhase} total
                             </p>
-                            <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12.5px]" style={{ color: "#1c1d1f" }}>
+                            <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12.5px]" style={{ color: "var(--ds-text-primary)" }}>
                               {mouldSummary.map((m) => (
                                 <li key={m.mouldId} className="flex items-baseline justify-between gap-2">
                                   <span className="truncate">{m.mouldName}</span>
@@ -2060,7 +2060,7 @@ export default function DailyV2Page() {
                                       border: "1px solid rgba(0,0,0,0.12)",
                                     }}
                                   />
-                                  <span style={{ color: "#1c1d1f" }}>{mat?.name ?? mid}</span>
+                                  <span style={{ color: "var(--ds-text-primary)" }}>{mat?.name ?? mid}</span>
                                   {mat?.lowStock && (
                                     <span className="text-[9.5px] uppercase opacity-70">low</span>
                                   )}
@@ -2099,7 +2099,7 @@ export default function DailyV2Page() {
                                   <span className="flex-1 h-px" style={{ background: "rgba(0,0,0,0.12)" }} />
                                   <span
                                     className="text-[10.5px] uppercase tracking-wider flex items-center gap-1.5"
-                                    style={{ letterSpacing: "0.1em", color: "#1c1d1f", opacity: 0.7 }}
+                                    style={{ letterSpacing: "0.1em", color: "var(--ds-text-primary)", opacity: 0.7 }}
                                   >
                                     Switch to
                                     <span
@@ -2110,7 +2110,7 @@ export default function DailyV2Page() {
                                         border: "1px solid rgba(0,0,0,0.12)",
                                       }}
                                     />
-                                    <span style={{ color: "#1c1d1f" }}>{mat?.name ?? row.toColorId}</span>
+                                    <span style={{ color: "var(--ds-text-primary)" }}>{mat?.name ?? row.toColorId}</span>
                                   </span>
                                   <span className="flex-1 h-px" style={{ background: "rgba(0,0,0,0.12)" }} />
                                 </li>
@@ -2138,11 +2138,11 @@ export default function DailyV2Page() {
                                   }}
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-[13px]" style={{ color: "#1c1d1f", fontWeight: 500 }}>
+                                  <div className="text-[13px]" style={{ color: "var(--ds-text-primary)", fontWeight: 500 }}>
                                     {row.technique || "Colour & brush mould"}: {row.mouldName}
                                     <span className="opacity-70 font-normal"> ({row.productName})</span>
                                   </div>
-                                  <div className="text-[10.5px] opacity-75 mt-0.5" style={{ color: "#1c1d1f" }}>
+                                  <div className="text-[10.5px] opacity-75 mt-0.5" style={{ color: "var(--ds-text-primary)" }}>
                                     {row.qty} × {row.cavities} cavities = {row.qty * row.cavities} products
                                     {row.colors.length > 0 && (
                                       <>
@@ -2170,7 +2170,7 @@ export default function DailyV2Page() {
                                       <span className="opacity-80"> · {row.notes}</span>
                                     )}
                                   </div>
-                                  <div className="text-[10px] opacity-55 mt-0.5" style={{ color: "#1c1d1f" }}>
+                                  <div className="text-[10px] opacity-55 mt-0.5" style={{ color: "var(--ds-text-primary)" }}>
                                     {row.batchLabel}
                                   </div>
                                 </div>
@@ -2198,7 +2198,7 @@ export default function DailyV2Page() {
                         >
                           Moulds for {activeLabel.toLowerCase()} · {totalMouldsThisPhase} total
                         </p>
-                        <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12.5px]" style={{ color: "#1c1d1f" }}>
+                        <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12.5px]" style={{ color: "var(--ds-text-primary)" }}>
                           {mouldSummary.map((m) => (
                             <li key={m.mouldId} className="flex items-baseline justify-between gap-2">
                               <span className="truncate">{m.mouldName}</span>
@@ -2336,7 +2336,7 @@ export default function DailyV2Page() {
                 const palette = (() => {
                   if (status === "done") return { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)", bar: "var(--accent-mint-ink)" };
                   if (status === "active") return { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)", bar: "var(--accent-sky-ink)" };
-                  return { bg: "rgba(245,243,239,0.7)", ink: "#1c1d1f", bar: "#bdbcc1" };
+                  return { bg: "rgba(245,243,239,0.7)", ink: "var(--ds-text-primary)", bar: "#bdbcc1" };
                 })();
                 return (
                   <li key={ph.id}>

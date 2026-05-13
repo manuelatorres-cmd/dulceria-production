@@ -499,8 +499,8 @@ function LinkedBatches({
               : p.status === "active"
                 ? { bg: "linear-gradient(180deg,var(--accent-butter-bg),#fdf1e2)", ink: "var(--accent-butter-ink)" }
                 : p.status === "cancelled" || p.status === "orphaned"
-                  ? { bg: "rgba(0,0,0,0.04)", ink: "#8a8780" }
-                  : { bg: "linear-gradient(180deg,rgba(255,255,255,0.7),rgba(245,243,239,0.55))", ink: "#1c1d1f" };
+                  ? { bg: "rgba(0,0,0,0.04)", ink: "var(--ds-text-muted)" }
+                  : { bg: "linear-gradient(180deg,rgba(255,255,255,0.7),rgba(245,243,239,0.55))", ink: "var(--ds-text-primary)" };
             return (
               <li key={p.id} className="rounded-[10px] border border-[color:var(--ds-border-warm)] px-2.5 py-1.5" style={{ background: tint.bg, color: tint.ink }}>
                 <Link href={`/production/${encodeURIComponent(p.id!)}?from=production-orders&fromId=${encodeURIComponent(poId)}`} className="block hover:underline">
