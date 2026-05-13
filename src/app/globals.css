@@ -305,14 +305,16 @@
 @layer utilities {
   /* Standardised form input — use on <input>, <select>, <textarea>. */
   .input {
-    @apply w-full min-w-0 border border-border bg-card px-3 py-2 text-sm
-           focus:outline-none transition-colors;
+    @apply w-full min-w-0 px-3 py-2 text-sm focus:outline-none transition-colors;
+    border: 0.5px solid var(--ds-border-warm);
+    background: var(--ds-card-bg);
+    color: var(--ds-text-primary);
     border-radius: 4px;
   }
   .input:focus,
   .input:focus-visible {
-    border-color: var(--color-foreground);
-    box-shadow: inset 0 0 0 1px var(--color-foreground);
+    border-color: var(--ds-tier-quarter-focus);
+    box-shadow: inset 0 0 0 1px var(--ds-tier-quarter-focus);
     outline: none;
   }
   /* Type-aware max-widths — never make tiny inputs page-wide.
@@ -328,7 +330,8 @@
 
   /* Standardised field label — small caps, warm grey */
   .label {
-    @apply block text-xs font-medium text-muted-foreground mb-1 uppercase;
+    @apply block text-xs font-medium mb-1 uppercase;
+    color: var(--ds-text-muted);
     letter-spacing: 0.08em;
   }
 
