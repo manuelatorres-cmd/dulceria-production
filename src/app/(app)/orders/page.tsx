@@ -209,7 +209,7 @@ export default function OrdersPage() {
   }, [orders, search, filterStatus]);
 
   return (
-    <div className="px-4 pt-5 pb-6">
+    <div className="ds px-4 pt-5 pb-6" style={{ background: "var(--ds-page-bg)", minHeight: "100vh" }}>
       <div className="flex items-baseline gap-3 mb-4 flex-wrap">
         <h1
           className="text-3xl"

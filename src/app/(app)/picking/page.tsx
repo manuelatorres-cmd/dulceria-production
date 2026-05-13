@@ -40,7 +40,7 @@ export default function PickingPage() {
   const [tab, setTab] = useState<Tab>("pack");
 
   return (
-    <div className="px-6 py-5 max-w-5xl mx-auto">
+    <div className="ds px-6 py-5 max-w-5xl mx-auto" style={{ background: "var(--ds-page-bg)" }}>
       <div className="mb-2">
         <BackButton />
       </div>

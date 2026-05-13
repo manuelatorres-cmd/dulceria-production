@@ -406,7 +406,7 @@ export default function StatsPage() {
   const barWidth = granularity === "week" ? "20px" : "28px";
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       {tooltip && (
         <div
           className="fixed z-50 pointer-events-none bg-stone-900 text-white text-xs px-2 py-1.5 rounded shadow-lg whitespace-nowrap"
@@ -417,7 +417,7 @@ export default function StatsPage() {
           ))}
         </div>
       )}
-      <PageHeader title="Production Stats" meta="Historical output across batches, products, and variants." />
+      <PageHeader title="Production stats" meta="Historical output across batches, products, and variants" />
 
       <div className="px-4 pb-10 space-y-6">
         {/* Filters */}

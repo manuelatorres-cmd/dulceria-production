@@ -273,8 +273,8 @@ export default function StockAdjustPage() {
   const showLocation = uiType === "product"; // location only meaningful for products
 
   return (
-    <div>
-      <PageHeader title="Stock adjustment" meta="Bulk-enter opening balances, recounts, breakage. One audit log." />
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader title="Stock adjustment" meta="Bulk-enter opening balances, recounts, breakage · one audit log" />
       <div className="px-4 pb-10 space-y-4">
         <button onClick={() => router.back()} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-3.5 h-3.5" /> Back

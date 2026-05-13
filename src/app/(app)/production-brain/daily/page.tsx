@@ -1665,10 +1665,7 @@ export default function DailyV2Page() {
   }
 
   return (
-    <div className="px-2 sm:px-4 pt-4 pb-10">
-      <div className="mb-2">
-        <BackButton />
-      </div>
+    <div className="ds px-2 sm:px-4 pt-4 pb-10" style={{ background: "var(--ds-page-bg)", minHeight: "100vh" }}>
       <PlanTabs />
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap mb-4">

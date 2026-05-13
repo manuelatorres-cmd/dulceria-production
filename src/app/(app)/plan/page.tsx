@@ -529,10 +529,7 @@ export default function PlanPage() {
   }
 
   return (
-    <div className="px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto">
-      <div className="mb-2">
-        <BackButton />
-      </div>
+    <div className="ds px-3 sm:px-5 pt-5 pb-10 max-w-[1700px] mx-auto" style={{ background: "var(--ds-page-bg)", minHeight: "100vh" }}>
       <PlanTabs focusParam={focusParam} />
 
       <PlanHeader

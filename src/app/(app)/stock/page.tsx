@@ -113,7 +113,7 @@ export default function StockPage() {
   const [activeTab, setActiveTab] = useState<"products" | "boxes" | "fillings" | "movements">("products");
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Stock" meta="Track what's still in stock" />
 
       {/* Tab strip + adjust link */}
