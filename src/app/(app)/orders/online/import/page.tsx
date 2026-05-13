@@ -602,7 +602,7 @@ export default function ShopifyImportPage() {
                                 const avail = shop + prod;
                                 const enough = avail >= li.quantity;
                                 stockLabel = `${avail} in stock (${shop} shop · ${prod} prod)`;
-                                stockClass = enough ? "text-[#4a7a5e]" : "text-[#9b4f48]";
+                                stockClass = enough ? "text-[var(--accent-mint-ink)]" : "text-[var(--accent-blush-ink)]";
                               } else {
                                 stockLabel = "stock varies per chocolate";
                                 stockClass = "text-muted-foreground";
@@ -631,7 +631,7 @@ export default function ShopifyImportPage() {
                                       className={
                                         "px-2.5 py-0.5 transition " +
                                         (isBorrow
-                                          ? "bg-[#e3ebe6] text-[#2e4839]"
+                                          ? "bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)]"
                                           : "text-muted-foreground hover:text-foreground")
                                       }
                                     >

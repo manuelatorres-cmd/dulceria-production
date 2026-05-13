@@ -156,7 +156,7 @@ export default function ProductionOrderDetailPage({
         {order.name && (
           <Link
             href={`/plan?focus=po:${encodeURIComponent(order.name)}`}
-            className="text-[11.5px] px-3 py-1 rounded-full bg-[#e3ebe6] text-[#2e4839] font-medium hover:bg-[#d4e0d8]"
+            className="text-[11.5px] px-3 py-1 rounded-full bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] font-medium hover:bg-[#d4e0d8]"
           >
             Plan this in /plan →
           </Link>
@@ -185,7 +185,7 @@ export default function ProductionOrderDetailPage({
                       try { await markProductionOrderDone(order.id!); }
                       catch (e) { alert(e instanceof Error ? e.message : "Failed"); }
                     }}
-                    className="rounded-full bg-[#eff3ec] text-[#5c7050] border border-[#cfe5d9] px-3 py-1 text-[11.5px] font-medium hover:bg-[#e6ede0]"
+                    className="rounded-full bg-[#eff3ec] text-[#5c7050] border border-[var(--accent-mint-edge)] px-3 py-1 text-[11.5px] font-medium hover:bg-[#e6ede0]"
                   >
                     Mark done
                   </button>
@@ -504,9 +504,9 @@ function LinkedBatches({
             const product = (p.name ?? "").slice(prefix.length);
             const day = dayByPlan.get(p.id!);
             const tint = p.status === "done"
-              ? { bg: "linear-gradient(180deg,#f1faf4,#fdf8e2)", ink: "#4a7a5e" }
+              ? { bg: "linear-gradient(180deg,var(--accent-mint-bg),var(--accent-butter-bg))", ink: "var(--accent-mint-ink)" }
               : p.status === "active"
-                ? { bg: "linear-gradient(180deg,#fdf8e2,#fdf1e2)", ink: "#8a7030" }
+                ? { bg: "linear-gradient(180deg,var(--accent-butter-bg),#fdf1e2)", ink: "var(--accent-butter-ink)" }
                 : p.status === "cancelled" || p.status === "orphaned"
                   ? { bg: "rgba(0,0,0,0.04)", ink: "#8a8780" }
                   : { bg: "linear-gradient(180deg,rgba(255,255,255,0.7),rgba(245,243,239,0.55))", ink: "#1c1d1f" };

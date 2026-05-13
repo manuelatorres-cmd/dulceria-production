@@ -20,8 +20,8 @@ const WEEKDAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "F
 
 /* Same glass card pattern as /plan + /dashboard. */
 const CARD = "bg-[color:var(--ds-card-bg)] border-[0.5px] border-[color:var(--ds-border-warm)] rounded-[8px] p-5";
-const PINK = "bg-[#e3ebe6] text-[#2e4839] hover:bg-[#d4e0d8]";
-const PINK_INK = "text-[#2e4839]";
+const PINK = "bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] hover:bg-[#d4e0d8]";
+const PINK_INK = "text-[var(--accent-mint-ink)]";
 
 export default function ShopPage() {
   const hours = useShopOpeningHours();
@@ -82,14 +82,14 @@ function LiveStatusInline({ live }: { live: ReturnType<typeof computeLiveShopSta
     <span
       className="inline-flex items-center gap-2 text-[11.5px] px-3 py-1 rounded-full"
       style={{
-        background: open ? "#f1faf4" : "#fdeeea",
-        color: open ? "#4a7a5e" : "#9b4f48",
-        border: `1px solid ${open ? "#cfe5d9" : "#c8d4cc"}`,
+        background: open ? "var(--accent-mint-bg)" : "#fdeeea",
+        color: open ? "var(--accent-mint-ink)" : "var(--accent-blush-ink)",
+        border: `1px solid ${open ? "var(--accent-mint-edge)" : "#c8d4cc"}`,
       }}
     >
       <span
         className="w-1.5 h-1.5 rounded-full"
-        style={{ background: open ? "#4a7a5e" : "#9b4f48" }}
+        style={{ background: open ? "var(--accent-mint-ink)" : "var(--accent-blush-ink)" }}
       />
       {open
         ? `Open · ${live.todayHours?.openAt}–${live.todayHours?.closeAt}`
@@ -156,9 +156,9 @@ function PickupsTodayCard() {
             const oItems = itemsByOrder.get(o.id!) ?? [];
             const totalPcs = oItems.reduce((s, it) => s + it.quantity, 0);
             const dueTime = o.deadline ? new Date(o.deadline).toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" }) : "";
-            const tag = o.channel === "online" ? { bg: "#e3ebe6", ink: "#2e4839", t: "Online" }
-              : o.channel === "b2b" ? { bg: "#eff5fb", ink: "#4b6b8f", t: "B2B" }
-                : { bg: "#fdf8e2", ink: "#8a7030", t: "Walk-in" };
+            const tag = o.channel === "online" ? { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)", t: "Online" }
+              : o.channel === "b2b" ? { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)", t: "B2B" }
+                : { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)", t: "Walk-in" };
             return (
               <li key={o.id} className="rounded-[10px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2">
                 <div className="flex items-baseline justify-between gap-2">
@@ -266,7 +266,7 @@ function ArrivingCard() {
                   </span>
                   <span className="text-muted-foreground">{more}</span>
                 </span>
-                <span className="text-[11px] tabular-nums shrink-0" style={{ color: o.status === "in_production" ? "#8a7030" : "#8a8780" }}>
+                <span className="text-[11px] tabular-nums shrink-0" style={{ color: o.status === "in_production" ? "var(--accent-butter-ink)" : "#8a8780" }}>
                   {o.status === "in_production" ? "Producing" : "Planned"} · {new Date(o.deadline).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
                 </span>
               </li>
@@ -394,7 +394,7 @@ function ShopStockGrid() {
 
       <div className="flex items-center gap-3 mb-3 text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.06em" }}>
         <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "#d6ead9" }} />ok {okN}</span>
-        <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "#fdf8e2" }} />low {lowN}</span>
+        <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "var(--accent-butter-bg)" }} />low {lowN}</span>
         <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "#fdeeea" }} />out {outN}</span>
       </div>
 
@@ -427,10 +427,10 @@ function ShopStockGrid() {
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
           {visible.map((r) => {
-            const tint = r.status === "out" ? { bg: "#fdeeea", ink: "#9b4f48" }
-              : r.status === "low" ? { bg: "#fdf8e2", ink: "#8a7030" }
+            const tint = r.status === "out" ? { bg: "#fdeeea", ink: "var(--accent-blush-ink)" }
+              : r.status === "low" ? { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)" }
                 : r.status === "over" ? { bg: "#f3eef6", ink: "#6a4d89" }
-                  : { bg: "#f1faf4", ink: "#4a7a5e" };
+                  : { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)" };
             return (
               <button
                 key={r.product.id}
@@ -561,7 +561,7 @@ function OpeningHoursCard({
                 Closures · {closures.length}
               </p>
               {closures.slice(0, 3).map((c) => (
-                <p key={c.id} className="text-[11.5px]" style={{ color: "#9b4f48" }}>
+                <p key={c.id} className="text-[11.5px]" style={{ color: "var(--accent-blush-ink)" }}>
                   {new Date(c.startDate).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
                   {c.endDate !== c.startDate && ` – ${new Date(c.endDate).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}`}
                   {c.reason && <span className="text-muted-foreground"> · {c.reason}</span>}
@@ -627,7 +627,7 @@ function WeekdayRow({ dow, row }: {
         className={
           "text-[10.5px] px-2 py-0.5 rounded-full border transition " +
           (isOpen
-            ? "bg-[#f1faf4] text-[#4a7a5e] border-[#cfe5d9]"
+            ? "bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] border-[var(--accent-mint-edge)]"
             : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:border-foreground")
         }
       >
@@ -685,8 +685,8 @@ function ClosuresEditor({ closures }: {
     <div className="space-y-1.5">
       {closures.map((c) => (
         <div key={c.id} className="flex items-center gap-2 rounded-[10px] border border-[#dfe6e0] bg-[#e9efe9] px-2.5 py-1.5">
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#9b4f48" }} />
-          <span className="flex-1 min-w-0 text-[12px]" style={{ color: "#9b4f48" }}>
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--accent-blush-ink)" }} />
+          <span className="flex-1 min-w-0 text-[12px]" style={{ color: "var(--accent-blush-ink)" }}>
             {new Date(c.startDate).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
             {c.endDate !== c.startDate && ` – ${new Date(c.endDate).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}`}
             {c.reason && <span className="text-muted-foreground"> · {c.reason}</span>}

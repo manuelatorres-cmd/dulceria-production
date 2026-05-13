@@ -1077,8 +1077,8 @@ function PlanContent({
                     ? new Date(days[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })
                     : `${new Date(days[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })} +${days.length - 1}`;
                 const palette = (() => {
-                  if (allPhaseDone) return { bg: "#f1faf4", ink: "#4a7a5e", bar: "#4a7a5e" };
-                  if (active)       return { bg: "#eff5fb", ink: "#4b6b8f", bar: "#4b6b8f" };
+                  if (allPhaseDone) return { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)", bar: "var(--accent-mint-ink)" };
+                  if (active)       return { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)", bar: "var(--accent-sky-ink)" };
                   return { bg: "rgba(245,243,239,0.7)", ink: "#1c1d1f", bar: "#bdbcc1" };
                 })();
                 const pct = phaseSteps.length === 0 ? 0 : Math.round((phaseDone / phaseSteps.length) * 100);

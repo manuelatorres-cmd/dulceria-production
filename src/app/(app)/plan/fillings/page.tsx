@@ -334,9 +334,9 @@ export default function FillingConsolidationPage() {
                     }`}
                     style={
                       cookable === "short"
-                        ? { boxShadow: "inset 4px 0 0 #9b4f48" }
+                        ? { boxShadow: "inset 4px 0 0 var(--accent-blush-ink)" }
                         : cookable === "ready"
-                        ? { boxShadow: "inset 4px 0 0 #4a7a5e" }
+                        ? { boxShadow: "inset 4px 0 0 var(--accent-mint-ink)" }
                         : undefined
                     }
                   >

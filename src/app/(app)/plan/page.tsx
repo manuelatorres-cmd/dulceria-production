@@ -1063,16 +1063,16 @@ export default function PlanPage() {
                   function tintFor(stepName: string): { bg: string; ink: string } {
                     const n = stepName.toLowerCase();
                     const surface = "rgba(255,255,255,0.65)";
-                    if (n.includes("polish"))   return { bg: surface, ink: "#8a7030" };
+                    if (n.includes("polish"))   return { bg: surface, ink: "var(--accent-butter-ink)" };
                     if (n.includes("paint") || n.includes("colour") || n.includes("color"))
-                                                return { bg: surface, ink: "#9b4f48" };
+                                                return { bg: surface, ink: "var(--accent-blush-ink)" };
                     if (n.includes("shell") || n.includes("temper"))
                                                 return { bg: surface, ink: "#9a6640" };
                     if (n.includes("prep"))     return { bg: surface, ink: "#6a4d89" };
-                    if (n.includes("fill"))     return { bg: surface, ink: "#4b6b8f" };
+                    if (n.includes("fill"))     return { bg: surface, ink: "var(--accent-sky-ink)" };
                     if (n.includes("cap"))      return { bg: surface, ink: "#5c7050" };
                     if (n.includes("unmould") || n.includes("unmold"))
-                                                return { bg: surface, ink: "#4a7a5e" };
+                                                return { bg: surface, ink: "var(--accent-mint-ink)" };
                     if (n.includes("pack"))     return { bg: surface, ink: "#9a6640" };
                     return { bg: surface, ink: "#1c1d1f" };
                   }
@@ -1487,10 +1487,10 @@ function WeekView(props: {
     summaryByDate.set(ds.day.date, ds);
   }
 
-  const PINK_INK = "#2e4839";
+  const PINK_INK = "var(--accent-mint-ink)";
   const LEVEL_BAR_LOCAL: Record<string, string> = {
-    ok: "#4a7a5e",
-    warn: "#8a7030",
+    ok: "var(--accent-mint-ink)",
+    warn: "var(--accent-butter-ink)",
     critical: PINK_INK,
     over: PINK_INK,
   };
@@ -1537,16 +1537,16 @@ function WeekView(props: {
 
   function tintFor(stepName: string): { bg: string; ink: string } {
     const n = stepName.toLowerCase();
-    if (n.includes("polish"))   return { bg: "#fdf8e2", ink: "#8a7030" };
+    if (n.includes("polish"))   return { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)" };
     if (n.includes("paint") || n.includes("colour") || n.includes("color"))
-                                return { bg: "#fdeeea", ink: "#9b4f48" };
+                                return { bg: "#fdeeea", ink: "var(--accent-blush-ink)" };
     if (n.includes("shell") || n.includes("temper"))
                                 return { bg: "#fdf1e2", ink: "#9a6640" };
     if (n.includes("prep"))     return { bg: "#f3eef6", ink: "#6a4d89" };
-    if (n.includes("fill"))     return { bg: "#eff5fb", ink: "#4b6b8f" };
+    if (n.includes("fill"))     return { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)" };
     if (n.includes("cap"))      return { bg: "#eff3ec", ink: "#5c7050" };
     if (n.includes("unmould") || n.includes("unmold"))
-                                return { bg: "#f1faf4", ink: "#4a7a5e" };
+                                return { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)" };
     if (n.includes("pack"))     return { bg: "#fdf1e2", ink: "#9a6640" };
     return { bg: "rgba(245,243,239,0.7)", ink: "#1c1d1f" };
   }
@@ -1637,7 +1637,7 @@ function WeekView(props: {
             {totalUsed} / {totalAvail} min
           </p>
           <div className="h-[3px] rounded-[4px] mt-1 overflow-hidden" style={{ background: "rgba(0,0,0,0.05)" }}>
-            <div style={{ width: `${Math.min(100, weekUtil)}%`, height: "100%", background: weekUtil >= 100 ? "#2e4839" : weekUtil >= 80 ? "#8a7030" : "#4a7a5e" }} />
+            <div style={{ width: `${Math.min(100, weekUtil)}%`, height: "100%", background: weekUtil >= 100 ? "var(--accent-mint-ink)" : weekUtil >= 80 ? "var(--accent-butter-ink)" : "var(--accent-mint-ink)" }} />
           </div>
         </div>
         <div>
@@ -1648,7 +1648,7 @@ function WeekView(props: {
             className="mt-1 tabular-nums"
             style={{
               fontFamily: "var(--font-serif)", fontSize: 22, fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.012em",
-              color: tightDays > 0 ? "#9b4f48" : "#1c1d1f",
+              color: tightDays > 0 ? "var(--accent-blush-ink)" : "#1c1d1f",
             }}
           >
             {tightDays}
@@ -1740,15 +1740,15 @@ function WeekView(props: {
               const others = [...affected.entries()].filter(([oid]) => !focusOrderIds.has(oid));
               if (affected.size === 0) return null;
               return (
-                <div className="rounded-[10px] border border-[#fdf8e2] bg-[#fef9e6] px-3 py-2 mb-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[#8a7030] font-medium mb-1">
+                <div className="rounded-[10px] border border-[var(--accent-butter-bg)] bg-[#fef9e6] px-3 py-2 mb-4">
+                  <p className="text-[11px] uppercase tracking-wider text-[var(--accent-butter-ink)] font-medium mb-1">
                     Also affects {affected.size} order{affected.size === 1 ? "" : "s"}
                   </p>
                   <ul className="text-[11.5px] space-y-0.5">
                     {[...affected.entries()].map(([oid, o]) => {
                       const isOtherFocus = focusOrderIds.size > 0 && !focusOrderIds.has(oid);
                       return (
-                        <li key={oid} className={isOtherFocus ? "text-[#9b4f48] font-medium" : ""}>
+                        <li key={oid} className={isOtherFocus ? "text-[var(--accent-blush-ink)] font-medium" : ""}>
                           {o.ref}
                           {o.deadline && (
                             <span className="opacity-65 ml-1">
@@ -1761,7 +1761,7 @@ function WeekView(props: {
                     })}
                   </ul>
                   {others.length > 0 && focusOrderIds.size > 0 && (
-                    <p className="text-[10.5px] text-[#9b4f48] mt-1.5">
+                    <p className="text-[10.5px] text-[var(--accent-blush-ink)] mt-1.5">
                       ⚠ This batch also fulfils orders outside your current focus. Moving it shifts production for them too.
                     </p>
                   )}
@@ -1878,7 +1878,7 @@ function WeekView(props: {
                 <span
                   className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full"
                   style={{
-                    background: ds.level === "ok" ? "#f1faf4" : ds.level === "warn" ? "#fdf8e2" : "#fdeeea",
+                    background: ds.level === "ok" ? "var(--accent-mint-bg)" : ds.level === "warn" ? "var(--accent-butter-bg)" : "#fdeeea",
                     color: LEVEL_BAR_LOCAL[ds.level],
                   }}
                 >
@@ -1948,7 +1948,7 @@ function WeekView(props: {
                                     }
                                   }}
                                   title={allPinned ? "Unlock all batches in this step" : "Lock all batches in this step to current day"}
-                                  className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                  className={allPinned ? "text-[var(--accent-mint-ink)] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                                 >
                                   <Lock className="w-3 h-3" />
                                 </button>
@@ -2000,7 +2000,7 @@ function WeekView(props: {
                                               }
                                             }}
                                             title={allPinned ? `Unlock all ${g.productName} batches` : `Lock all ${g.productName} batches to current day`}
-                                            className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                            className={allPinned ? "text-[var(--accent-mint-ink)] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                                           >
                                             <Lock className="w-3 h-3" />
                                           </button>
@@ -2032,7 +2032,7 @@ function WeekView(props: {
                                                   }
                                                 }}
                                                 title={pinned ? `Pinned to ${planRow?.pinnedDate} — click to unpin` : "Click to lock to current day"}
-                                                className={pinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                                className={pinned ? "text-[var(--accent-mint-ink)] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                                               >
                                                 <Lock className="w-3 h-3" />
                                               </button>
@@ -2099,7 +2099,7 @@ function WeekView(props: {
                                   }
                                 }}
                                 title={allPinned ? `Unlock all ${name.toLowerCase()} batches` : `Lock all ${name.toLowerCase()} batches to current day`}
-                                className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                className={allPinned ? "text-[var(--accent-mint-ink)] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                               >
                                 <Lock className="w-3 h-3" />
                               </button>
@@ -2154,7 +2154,7 @@ function WeekView(props: {
                                             }
                                           }}
                                           title={allPinned ? "Unlock all batches in this category step" : "Lock all batches in this category step to current day"}
-                                          className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                          className={allPinned ? "text-[var(--accent-mint-ink)] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                                         >
                                           <Lock className="w-3 h-3" />
                                         </button>
@@ -2206,7 +2206,7 @@ function WeekView(props: {
                                                       }
                                                     }}
                                                     title={allPinned ? `Unlock all ${g.productName} batches` : `Lock all ${g.productName} batches to current day`}
-                                                    className={allPinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                                    className={allPinned ? "text-[var(--accent-mint-ink)] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                                                   >
                                                     <Lock className="w-3 h-3" />
                                                   </button>
@@ -2238,7 +2238,7 @@ function WeekView(props: {
                                                           }
                                                         }}
                                                         title={pinned ? `Pinned to ${planRow?.pinnedDate} — click to unpin` : "Click to lock to current day"}
-                                                        className={pinned ? "text-[#2e4839] hover:opacity-70" : "opacity-60 hover:opacity-100"}
+                                                        className={pinned ? "text-[var(--accent-mint-ink)] hover:opacity-70" : "opacity-60 hover:opacity-100"}
                                                       >
                                                         <Lock className="w-3 h-3" />
                                                       </button>
@@ -2380,9 +2380,9 @@ function ScheduledPanel({
   if (sources.size === 0) return null;
 
   const KIND_TINT: Record<Source["kind"], { bg: string; ink: string }> = {
-    campaign: { bg: "#fdf8e2", ink: "#8a7030" },
-    po: { bg: "#eff5fb", ink: "#4b6b8f" },
-    order: { bg: "#e3ebe6", ink: "#2e4839" },
+    campaign: { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)" },
+    po: { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)" },
+    order: { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)" },
   };
   const KIND_LABEL: Record<Source["kind"], string> = {
     campaign: "Campaigns",
@@ -2571,7 +2571,7 @@ function ScheduledPanel({
           </span>
         </div>
         {focusTokens.length > 0 && (
-          <span className="text-[11px] text-[#2e4839]">
+          <span className="text-[11px] text-[var(--accent-mint-ink)]">
             {focusTokens.length} selected
           </span>
         )}
@@ -2636,10 +2636,10 @@ function DemandByUrgency({
     other: "Other",
   };
   const CHANNEL_TINT: Record<string, { bg: string; ink: string }> = {
-    online: { bg: "#e3ebe6", ink: "#2e4839" },
-    b2b: { bg: "#eff5fb", ink: "#4b6b8f" },
-    event: { bg: "#fdf8e2", ink: "#8a7030" },
-    shop: { bg: "#f1faf4", ink: "#4a7a5e" },
+    online: { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)" },
+    b2b: { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)" },
+    event: { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)" },
+    shop: { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)" },
     walkin: { bg: "#f3eef6", ink: "#6a4d89" },
     other: { bg: "rgba(0,0,0,0.05)", ink: "#1c1d1f" },
   };
@@ -2843,16 +2843,16 @@ function DemandByUrgency({
         </div>
         <div className="flex items-center gap-2 text-[11px]">
           {totalOverdue > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-[#fdeeea] text-[#9b4f48] tabular-nums">
+            <span className="px-2 py-0.5 rounded-full bg-[#fdeeea] text-[var(--accent-blush-ink)] tabular-nums">
               {totalOverdue} overdue
             </span>
           )}
           {totalToday > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-[#fdf8e2] text-[#8a7030] tabular-nums">
+            <span className="px-2 py-0.5 rounded-full bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)] tabular-nums">
               {totalToday} today
             </span>
           )}
-          <span className="px-2 py-0.5 rounded-full bg-[#f1faf4] text-[#4a7a5e] tabular-nums">
+          <span className="px-2 py-0.5 rounded-full bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] tabular-nums">
             {totalNet} pcs to produce
           </span>
         </div>
@@ -2921,11 +2921,11 @@ function DemandByUrgency({
         {orderRows.map((o) => {
           const surface = "rgba(255,255,255,0.65)";
           const tint = o.bucket === "overdue"
-            ? { bg: surface, ink: "#9b4f48" }
+            ? { bg: surface, ink: "var(--accent-blush-ink)" }
             : o.bucket === "today"
-              ? { bg: surface, ink: "#8a7030" }
+              ? { bg: surface, ink: "var(--accent-butter-ink)" }
               : o.bucket === "tomorrow"
-                ? { bg: surface, ink: "#4b6b8f" }
+                ? { bg: surface, ink: "var(--accent-sky-ink)" }
                 : { bg: surface, ink: "#1c1d1f" };
           const channelTint = CHANNEL_TINT[o.channel] ?? CHANNEL_TINT.other;
           const date = new Date(o.deadline);
@@ -3224,8 +3224,8 @@ function BatchGroupRow({
   const allDone = aggStepStates.every((s) => s.allDone);
   const anyDone = aggStepStates.some((s) => s.allDone || s.someDone);
   const tint = (() => {
-    if (allDone) return { bg: "#f1faf4", ink: "#4a7a5e", bar: "#4a7a5e" };
-    if (anyDone) return { bg: "#fdf8e2", ink: "#8a7030", bar: "#8a7030" };
+    if (allDone) return { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)", bar: "var(--accent-mint-ink)" };
+    if (anyDone) return { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)", bar: "var(--accent-butter-ink)" };
     return { bg: "rgba(245,243,239,0.7)", ink: "#1c1d1f", bar: "#bdbcc1" };
   })();
   const doneSteps = aggStepStates.filter((s) => s.allDone).length;
@@ -3538,17 +3538,17 @@ function PivotView(props: {
     fill: "Fill", cap: "Cap", unmould: "Unmould", packing: "Pack",
   };
   const PHASE_TINT: Record<string, { bg: string; ink: string }> = {
-    polishing: { bg: "rgba(255,255,255,0.65)", ink: "#8a7030" },
-    colour:    { bg: "rgba(255,255,255,0.65)", ink: "#9b4f48" },
+    polishing: { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-butter-ink)" },
+    colour:    { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-blush-ink)" },
     shell:     { bg: "rgba(255,255,255,0.65)", ink: "#9a6640" },
     filling:   { bg: "rgba(255,255,255,0.65)", ink: "#735a78" },
-    fill:      { bg: "rgba(255,255,255,0.65)", ink: "#4b6b8f" },
+    fill:      { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-sky-ink)" },
     cap:       { bg: "rgba(255,255,255,0.65)", ink: "#5c7050" },
-    unmould:   { bg: "rgba(255,255,255,0.65)", ink: "#4a7a5e" },
-    packing:   { bg: "rgba(255,255,255,0.65)", ink: "#9b4f48" },
+    unmould:   { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-mint-ink)" },
+    packing:   { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-blush-ink)" },
   };
   const SRC_COLOR: Record<"order" | "campaign" | "po", string> = {
-    order: "#2b6cb0", campaign: "#6a3a8c", po: "#2e4839",
+    order: "#2b6cb0", campaign: "#6a3a8c", po: "var(--accent-mint-ink)",
   };
 
   // ── 14-day window starting today (matches WeekView convention). ─
@@ -3858,7 +3858,7 @@ function PivotView(props: {
                   >
                     <div
                       className="text-[13px]"
-                      style={{ fontFamily: "var(--font-serif)", fontWeight: 500, color: isToday ? "#2e4839" : "#1c1d1f" }}
+                      style={{ fontFamily: "var(--font-serif)", fontWeight: 500, color: isToday ? "var(--accent-mint-ink)" : "#1c1d1f" }}
                     >
                       {d.label}
                     </div>
@@ -3871,7 +3871,7 @@ function PivotView(props: {
           <tbody>
             {focusedSources.map((src) => {
               const accent = SRC_COLOR[src.kind];
-              const rowBg = src.isShared ? "#e3ebe6" : "#fff";
+              const rowBg = src.isShared ? "var(--accent-mint-bg)" : "#fff";
               return (
                 <tr key={src.token}>
                   <td
@@ -3908,7 +3908,7 @@ function PivotView(props: {
                         </div>
                         <div
                           className="text-[10.5px] mt-0.5"
-                          style={{ color: src.isOverdue ? "#9b4f48" : "#8a8780", fontWeight: src.isOverdue ? 600 : 400 }}
+                          style={{ color: src.isOverdue ? "var(--accent-blush-ink)" : "#8a8780", fontWeight: src.isOverdue ? 600 : 400 }}
                         >
                           {src.sub || `earliest ${src.earliestIso}`}
                         </div>
@@ -3966,8 +3966,8 @@ function PivotView(props: {
                                     fontSize: 10.5,
                                     lineHeight: 1.2,
                                     outline: expandedCellKey === `${src.token}|${d.iso}|${phase}`
-                                      ? "2px solid #2e4839"
-                                      : isDeadline ? "1.5px solid #2e4839" : undefined,
+                                      ? "2px solid var(--accent-mint-ink)"
+                                      : isDeadline ? "1.5px solid var(--accent-mint-ink)" : undefined,
                                     outlineOffset: isDeadline || expandedCellKey === `${src.token}|${d.iso}|${phase}` ? 1 : undefined,
                                     opacity: allDone ? 0.4 : 1,
                                     textDecoration: allDone ? "line-through" : undefined,
@@ -3983,8 +3983,8 @@ function PivotView(props: {
                                 style={{
                                   display: "inline-block",
                                   fontSize: 9.5, padding: "2px 6px", borderRadius: 6,
-                                  outline: "1.5px solid #2e4839",
-                                  color: "#2e4839",
+                                  outline: "1.5px solid var(--accent-mint-ink)",
+                                  color: "var(--accent-mint-ink)",
                                 }}
                               >
                                 due
@@ -4070,7 +4070,7 @@ function PivotView(props: {
                                     ? `Pinned to ${plan?.pinnedDate} — click to unpin`
                                     : "Click to lock to current day"
                                 }
-                                className={pinned ? "text-[#2e4839]" : "opacity-40 hover:opacity-100"}
+                                className={pinned ? "text-[var(--accent-mint-ink)]" : "opacity-40 hover:opacity-100"}
                               >
                                 <Lock className="w-3 h-3" />
                               </button>
@@ -4145,7 +4145,7 @@ function MonthDayDrop({
       className="rounded-[6px] p-4"
       style={{
         background: isOver ? "rgba(246,198,203,0.45)" : "rgba(255,255,255,0.85)",
-        border: isOver ? "2px solid #2e4839" : "1px solid var(--border)",
+        border: isOver ? "2px solid var(--accent-mint-ink)" : "1px solid var(--border)",
         transition: "background-color 80ms ease, border-color 80ms ease",
       }}
     >
@@ -4178,7 +4178,7 @@ function CalendarCellDrop({
         ...baseStyle,
         ...(isOver ? {
           background: "rgba(246,198,203,0.55)",
-          borderColor: "#2e4839",
+          borderColor: "var(--accent-mint-ink)",
           borderWidth: 2,
         } : {}),
       }}
@@ -4239,17 +4239,17 @@ function MonthView(props: {
     fill: "Fill", cap: "Cap", unmould: "Unmould", packing: "Pack",
   };
   const PHASE_TINT: Record<string, { bg: string; ink: string }> = {
-    polishing: { bg: "rgba(255,255,255,0.65)", ink: "#8a7030" },
-    colour:    { bg: "rgba(255,255,255,0.65)", ink: "#9b4f48" },
+    polishing: { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-butter-ink)" },
+    colour:    { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-blush-ink)" },
     shell:     { bg: "rgba(255,255,255,0.65)", ink: "#9a6640" },
     filling:   { bg: "rgba(255,255,255,0.65)", ink: "#735a78" },
-    fill:      { bg: "rgba(255,255,255,0.65)", ink: "#4b6b8f" },
+    fill:      { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-sky-ink)" },
     cap:       { bg: "rgba(255,255,255,0.65)", ink: "#5c7050" },
-    unmould:   { bg: "rgba(255,255,255,0.65)", ink: "#4a7a5e" },
-    packing:   { bg: "rgba(255,255,255,0.65)", ink: "#9b4f48" },
+    unmould:   { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-mint-ink)" },
+    packing:   { bg: "rgba(255,255,255,0.65)", ink: "var(--accent-blush-ink)" },
   };
   const SRC_COLOR: Record<"order" | "campaign" | "po", string> = {
-    order: "#2b6cb0", campaign: "#6a3a8c", po: "#2e4839",
+    order: "#2b6cb0", campaign: "#6a3a8c", po: "var(--accent-mint-ink)",
   };
 
   // ── Month navigation. monthOffset 0 = current. ──────────────────
@@ -4662,7 +4662,7 @@ function MonthView(props: {
                       : c.isToday
                       ? "rgba(253,242,244,0.7)"
                       : "rgba(255,255,255,0.7)",
-                    borderColor: isOpen ? "#2e4839" : c.isToday ? "#4a6b5b" : "rgba(255,255,255,0.6)",
+                    borderColor: isOpen ? "var(--accent-mint-ink)" : c.isToday ? "#4a6b5b" : "rgba(255,255,255,0.6)",
                     borderStyle: closed ? "dashed" : "solid",
                     borderWidth: isOpen ? 2 : 1,
                     opacity: dimmed ? 0.45 : 1,
@@ -4676,7 +4676,7 @@ function MonthView(props: {
                     <span
                       style={{
                         fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 14,
-                        color: c.isToday ? "#2e4839" : "#1c1d1f",
+                        color: c.isToday ? "var(--accent-mint-ink)" : "#1c1d1f",
                       }}
                     >
                       {c.date.getDate()}
@@ -4696,7 +4696,7 @@ function MonthView(props: {
                           style={{
                             width: 6, height: 6,
                             background: SRC_COLOR[s.kind],
-                            outline: s.isMustDo ? "1.5px solid #2e4839" : undefined,
+                            outline: s.isMustDo ? "1.5px solid var(--accent-mint-ink)" : undefined,
                             outlineOffset: 1,
                           }}
                         />
@@ -4730,7 +4730,7 @@ function MonthView(props: {
                   {hasMustDo && (
                     <span
                       className="text-[9px]"
-                      style={{ color: "#2e4839", fontWeight: 500 }}
+                      style={{ color: "var(--accent-mint-ink)", fontWeight: 500 }}
                     >
                       ⚠ must-do
                     </span>
@@ -4769,7 +4769,7 @@ function MonthView(props: {
                     style={{
                       fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 22,
                       letterSpacing: "-0.012em",
-                      color: isToday ? "#2e4839" : "#1c1d1f",
+                      color: isToday ? "var(--accent-mint-ink)" : "#1c1d1f",
                     }}
                   >
                     {dayLabel}
@@ -4777,7 +4777,7 @@ function MonthView(props: {
                   {isToday && (
                     <span
                       className="text-[10px] uppercase px-2 py-0.5 rounded-full"
-                      style={{ background: "#e3ebe6", color: "#2e4839", letterSpacing: "0.08em" }}
+                      style={{ background: "var(--accent-mint-bg)", color: "var(--accent-mint-ink)", letterSpacing: "0.08em" }}
                     >
                       today
                     </span>
@@ -4803,7 +4803,7 @@ function MonthView(props: {
                         type="button"
                         onClick={() => toggleSection(iso, "must-do")}
                         className="w-full flex items-baseline gap-1.5 text-left text-[10px] uppercase mb-1.5 hover:opacity-80"
-                        style={{ letterSpacing: "0.1em", color: "#2e4839" }}
+                        style={{ letterSpacing: "0.1em", color: "var(--accent-mint-ink)" }}
                       >
                         <span className="opacity-70">{expanded ? "▾" : "▸"}</span>
                         <span style={{ fontWeight: 600 }}>Must do · {mustDo.length}</span>
@@ -4815,8 +4815,8 @@ function MonthView(props: {
                               key={s.token}
                               className="flex items-baseline gap-2 px-2 py-1.5 rounded-[6px]"
                               style={{
-                                background: "#e3ebe6",
-                                borderLeft: "2px solid #2e4839",
+                                background: "var(--accent-mint-bg)",
+                                borderLeft: "2px solid var(--accent-mint-ink)",
                               }}
                             >
                               <span
@@ -4824,12 +4824,12 @@ function MonthView(props: {
                                 style={{ width: 7, height: 7, background: SRC_COLOR[s.kind], marginTop: 4, alignSelf: "flex-start" }}
                               />
                               <div className="flex-1 min-w-0">
-                                <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 13.5, color: "#2e4839" }}>
+                                <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 13.5, color: "var(--accent-mint-ink)" }}>
                                   {s.label}
                                   {s.qty != null && <span className="opacity-70 font-normal ml-1.5 text-[11px]">{s.qty} pcs</span>}
                                 </div>
                                 {s.subline && (
-                                  <div className="text-[10.5px]" style={{ color: "#2e4839", opacity: 0.85 }}>{s.subline}</div>
+                                  <div className="text-[10.5px]" style={{ color: "var(--accent-mint-ink)", opacity: 0.85 }}>{s.subline}</div>
                                 )}
                               </div>
                             </li>

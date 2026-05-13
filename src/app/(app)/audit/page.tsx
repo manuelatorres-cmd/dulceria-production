@@ -188,9 +188,9 @@ export default function AuditPage() {
   }, [packagings]);
 
   const groups = [
-    { title: "Variants", issues: variantIssues, color: "#9b4f48", bg: "#fdeeea" },
-    { title: "Products", issues: productIssues, color: "#8a7030", bg: "#fdf8e2" },
-    { title: "Ingredients", issues: ingredientIssues, color: "#4b6b8f", bg: "#eff5fb" },
+    { title: "Variants", issues: variantIssues, color: "var(--accent-blush-ink)", bg: "#fdeeea" },
+    { title: "Products", issues: productIssues, color: "var(--accent-butter-ink)", bg: "var(--accent-butter-bg)" },
+    { title: "Ingredients", issues: ingredientIssues, color: "var(--accent-sky-ink)", bg: "var(--accent-sky-bg)" },
     { title: "Fillings", issues: fillingIssues, color: "#6a4d89", bg: "#f3eef6" },
     { title: "Moulds", issues: mouldIssues, color: "#9a6640", bg: "#fdf1e2" },
     { title: "Packaging", issues: packagingIssues, color: "#5c7050", bg: "#eff3ec" },

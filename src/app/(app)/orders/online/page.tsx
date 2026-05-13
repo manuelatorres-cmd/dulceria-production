@@ -231,8 +231,8 @@ function DeliveryPill({ type }: { type?: string | null }) {
       className="inline-flex items-center gap-1 text-[10.5px] px-2 py-0.5 rounded-full"
       style={
         isShip
-          ? { background: "#eff5fb", color: "#4b6b8f", border: "1px solid #cfe0f0" }
-          : { background: "#e3ebe6", color: "#2e4839", border: "1px solid #c8d4cc" }
+          ? { background: "var(--accent-sky-bg)", color: "var(--accent-sky-ink)", border: "1px solid #cfe0f0" }
+          : { background: "var(--accent-mint-bg)", color: "var(--accent-mint-ink)", border: "1px solid #c8d4cc" }
       }
     >
       {isShip ? "🚚 Ship" : "🛍 Pickup"}

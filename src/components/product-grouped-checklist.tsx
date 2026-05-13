@@ -133,7 +133,7 @@ export function ProductGroupedChecklist({
                 </span>
               )}
               {allDone && (
-                <CheckSquare className="w-4 h-4 flex-shrink-0" style={{ color: "#4a7a5e" }} />
+                <CheckSquare className="w-4 h-4 flex-shrink-0" style={{ color: "var(--accent-mint-ink)" }} />
               )}
             </button>
 
@@ -171,7 +171,7 @@ export function ProductGroupedChecklist({
                               className="inline-block rounded-full"
                               style={{
                                 width: 10, height: 10,
-                                background: row.done ? "#4a7a5e" : "#9b4f48",
+                                background: row.done ? "var(--accent-mint-ink)" : "var(--accent-blush-ink)",
                               }}
                             />
                           </span>
@@ -183,7 +183,7 @@ export function ProductGroupedChecklist({
                             className="flex-shrink-0 hover:scale-110 transition"
                           >
                             {row.done ? (
-                              <CheckSquare className="w-[18px] h-[18px]" style={{ color: "#4a7a5e" }} />
+                              <CheckSquare className="w-[18px] h-[18px]" style={{ color: "var(--accent-mint-ink)" }} />
                             ) : (
                               <Square className="w-[18px] h-[18px]" style={{ color: tintInk }} />
                             )}

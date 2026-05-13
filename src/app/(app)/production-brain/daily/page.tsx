@@ -71,13 +71,13 @@ const PHASES = [
 type PhaseId = (typeof PHASES)[number]["id"];
 
 const PHASE_TINT: Record<PhaseId, { from: string; to: string; ink: string }> = {
-  polishing: { from: "#fdf8e2", to: "#fdf1e2", ink: "#8a7030" },
-  colour:    { from: "#fdeeea", to: "#fdf1e2", ink: "#9b4f48" },
-  shell:     { from: "#fdf8e2", to: "#fdf1e2", ink: "#8a7030" },
+  polishing: { from: "var(--accent-butter-bg)", to: "#fdf1e2", ink: "var(--accent-butter-ink)" },
+  colour:    { from: "#fdeeea", to: "#fdf1e2", ink: "var(--accent-blush-ink)" },
+  shell:     { from: "var(--accent-butter-bg)", to: "#fdf1e2", ink: "var(--accent-butter-ink)" },
   filling:   { from: "#f3eef6", to: "#fdeeea", ink: "#6a4d89" },
-  fill:      { from: "#eff5fb", to: "#f3eef6", ink: "#4b6b8f" },
-  cap:       { from: "#eff3ec", to: "#f1faf4", ink: "#5c7050" },
-  unmould:   { from: "#f1faf4", to: "#fdf8e2", ink: "#4a7a5e" },
+  fill:      { from: "var(--accent-sky-bg)", to: "#f3eef6", ink: "var(--accent-sky-ink)" },
+  cap:       { from: "#eff3ec", to: "var(--accent-mint-bg)", ink: "#5c7050" },
+  unmould:   { from: "var(--accent-mint-bg)", to: "var(--accent-butter-bg)", ink: "var(--accent-mint-ink)" },
   packing:   { from: "#fdf1e2", to: "#fdeeea", ink: "#9a6640" },
 };
 
@@ -2081,7 +2081,7 @@ export default function DailyV2Page() {
                                   <span className="flex-1 h-px" style={{ background: "rgba(74,122,94,0.25)" }} />
                                   <span
                                     className="text-[10.5px] uppercase tracking-wider"
-                                    style={{ letterSpacing: "0.1em", color: "#4a7a5e", opacity: 0.85 }}
+                                    style={{ letterSpacing: "0.1em", color: "var(--accent-mint-ink)", opacity: 0.85 }}
                                   >
                                     Done · {row.count}
                                   </span>
@@ -2133,8 +2133,8 @@ export default function DailyV2Page() {
                                   className="mt-1 inline-block rounded-[4px] flex-shrink-0"
                                   style={{
                                     width: 14, height: 14,
-                                    background: row.done ? "#4a7a5e" : "transparent",
-                                    border: row.done ? "1px solid #4a7a5e" : "1.5px solid rgba(0,0,0,0.4)",
+                                    background: row.done ? "var(--accent-mint-ink)" : "transparent",
+                                    border: row.done ? "1px solid var(--accent-mint-ink)" : "1.5px solid rgba(0,0,0,0.4)",
                                   }}
                                 />
                                 <div className="flex-1 min-w-0">
@@ -2245,12 +2245,12 @@ export default function DailyV2Page() {
                                   className="text-[11.5px] px-3 py-1.5 rounded-full inline-flex items-center gap-1.5"
                                   style={{
                                     background: ready ? "rgba(74,122,94,0.15)" : "rgba(155,79,72,0.15)",
-                                    color: ready ? "#4a7a5e" : "#9b4f48",
+                                    color: ready ? "var(--accent-mint-ink)" : "var(--accent-blush-ink)",
                                   }}
                                 >
                                   <span
                                     className="inline-block rounded-full"
-                                    style={{ width: 8, height: 8, background: ready ? "#4a7a5e" : "#9b4f48" }}
+                                    style={{ width: 8, height: 8, background: ready ? "var(--accent-mint-ink)" : "var(--accent-blush-ink)" }}
                                   />
                                   {ready ? "Filling ready" : "Cook in /plan/fillings"}
                                 </span>
@@ -2280,7 +2280,7 @@ export default function DailyV2Page() {
                               className="text-[11.5px] px-3 py-1.5 rounded-full"
                               style={{
                                 background: sel.done ? "rgba(74,122,94,0.15)" : tint.ink,
-                                color: sel.done ? "#4a7a5e" : "#fff",
+                                color: sel.done ? "var(--accent-mint-ink)" : "#fff",
                               }}
                             >
                               {sel.done ? "✓ done — undo" : `Mark ${activeLabel.toLowerCase()} done`}
@@ -2334,8 +2334,8 @@ export default function DailyV2Page() {
                     ? "active"
                     : "todo";
                 const palette = (() => {
-                  if (status === "done") return { bg: "#f1faf4", ink: "#4a7a5e", bar: "#4a7a5e" };
-                  if (status === "active") return { bg: "#eff5fb", ink: "#4b6b8f", bar: "#4b6b8f" };
+                  if (status === "done") return { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)", bar: "var(--accent-mint-ink)" };
+                  if (status === "active") return { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)", bar: "var(--accent-sky-ink)" };
                   return { bg: "rgba(245,243,239,0.7)", ink: "#1c1d1f", bar: "#bdbcc1" };
                 })();
                 return (

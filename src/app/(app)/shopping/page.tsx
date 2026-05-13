@@ -868,7 +868,7 @@ function BuyRowWithBreakdown({ r }: {
                     color:
                       b.kind === "order" ? "#2b6cb0"
                       : b.kind === "campaign" ? "#6a3a8c"
-                      : "#2e4839",
+                      : "var(--accent-mint-ink)",
                   }}
                 >
                   {b.kind}
