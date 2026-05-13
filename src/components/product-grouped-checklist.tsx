@@ -103,7 +103,7 @@ export function ProductGroupedChecklist({
         const open = isOpen(g.productId, g.rows.length);
         const chips = [...new Set(g.rows.map((r) => r.chip).filter(Boolean) as string[])];
         return (
-          <li key={g.productId} className="rounded-[12px] bg-white/70 border border-white/50 overflow-hidden">
+          <li key={g.productId} className="rounded-[12px] bg-[color:var(--ds-card-bg)] border border-white/50 overflow-hidden">
             <button
               onClick={() => toggleOpen(g.productId, open)}
               className={
@@ -138,7 +138,7 @@ export function ProductGroupedChecklist({
             </button>
 
             {open && (
-              <ul className="border-t border-white/60 bg-white/40">
+              <ul className="border-t border-[color:var(--ds-border-warm)] bg-white/40">
                 {g.rows.map((row) => {
                   const isSelected = selectedPlanProductId && selectedPlanProductId === row.planProductId;
                   // When `onSelect` is provided we split the row into a
@@ -204,7 +204,7 @@ export function ProductGroupedChecklist({
                           </div>
                           {row.chip && (
                             <span
-                              className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/80"
+                              className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[color:var(--ds-card-bg)]"
                               style={{ letterSpacing: "0.05em", color: "#1c1d1f" }}
                             >
                               {row.chip}

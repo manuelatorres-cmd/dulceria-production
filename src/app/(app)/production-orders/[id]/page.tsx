@@ -511,7 +511,7 @@ function LinkedBatches({
                   ? { bg: "rgba(0,0,0,0.04)", ink: "#8a8780" }
                   : { bg: "linear-gradient(180deg,rgba(255,255,255,0.7),rgba(245,243,239,0.55))", ink: "#1c1d1f" };
             return (
-              <li key={p.id} className="rounded-[10px] border border-white/60 px-2.5 py-1.5" style={{ background: tint.bg, color: tint.ink }}>
+              <li key={p.id} className="rounded-[10px] border border-[color:var(--ds-border-warm)] px-2.5 py-1.5" style={{ background: tint.bg, color: tint.ink }}>
                 <Link href={`/production/${encodeURIComponent(p.id!)}?from=production-orders&fromId=${encodeURIComponent(poId)}`} className="block hover:underline">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="truncate" style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 13 }}>

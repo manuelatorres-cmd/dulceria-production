@@ -65,7 +65,7 @@ export function BackButton({
 /** iOS-glass pill chip — soft tint, hairline border, brand-accent focus ring. */
 const PILL_CLS = [
   "group inline-flex items-center gap-1.5 rounded-full",
-  "bg-white/55 backdrop-blur-md",
+  "bg-[color:var(--ds-card-bg)] ",
   "border border-foreground/10",
   "px-3 py-1.5 min-h-[32px]",
   "text-[12px] font-medium tracking-tight text-foreground/65",

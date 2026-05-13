@@ -508,7 +508,7 @@ export default function FillingConsolidationPage() {
       {/* Mark-cooked confirm modal */}
       {cookedModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 "
           onClick={() => !cookedSaving && setCookedModal(null)}
         >
           <div

@@ -22,7 +22,7 @@ import { BackButton } from "@/components/back-button";
  * creation flows (orders / campaigns / settings → blocked days).
  */
 
-const CARD = "bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+const CARD = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
 const INNER = "rounded-[12px] border border-border";
 
 type MarkerKind = "campaign" | "closure" | "holiday" | "production" | "order";

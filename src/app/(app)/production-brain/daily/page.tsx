@@ -1807,7 +1807,7 @@ export default function DailyV2Page() {
           active/upcoming colour-coded. Replaces the heavy tinted strip
           (layout C migration). Phases with no batches today are still
           shown as upcoming so total day shape stays consistent. */}
-      <div className="mb-3 flex gap-1.5 items-center bg-card/60 backdrop-blur-md border border-border rounded-full px-2.5 py-1.5 overflow-x-auto">
+      <div className="mb-3 flex gap-1.5 items-center bg-card/60 border border-border rounded-full px-2.5 py-1.5 overflow-x-auto">
         {PHASES.map((ph) => {
           const r = rollups[ph.id];
           const total = r.totalBatches;
@@ -1879,7 +1879,7 @@ export default function DailyV2Page() {
         <div className="space-y-3">
           {/* Right now focus card */}
           <div
-            className="rounded-[24px] p-5 sm:p-6 bg-white/65 backdrop-blur-md border border-white/60 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]"
+            className="rounded-[24px] p-5 sm:p-6 bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]"
             style={{
               borderLeft: `4px solid ${tint.ink}`,
               color: "#1d2421",
@@ -2322,7 +2322,7 @@ export default function DailyV2Page() {
           {/* Phase peek-card grid — compact, click to focus. Same
               hide-empty rule as the top strip: phases without batches
               today drop out so the grid only shows active work. */}
-          <section className="rounded-[14px] bg-white/65 backdrop-blur-2xl border border-white/60 p-2">
+          <section className="rounded-[14px] bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] p-2">
             <ul className="grid grid-cols-4 lg:grid-cols-8 gap-1.5">
               {PHASES.filter((ph) => rollups[ph.id].totalBatches > 0).map((ph) => {
                 const r = rollups[ph.id];

@@ -47,7 +47,7 @@ export function PlanTabs({ focusParam }: { focusParam?: string | null } = {}) {
               "px-3.5 py-1.5 font-medium transition-colors " +
               (active
                 ? "bg-[#4a6b5b] text-white"
-                : "text-muted-foreground hover:text-foreground hover:bg-white/60")
+                : "text-muted-foreground hover:text-foreground hover:bg-[color:var(--ds-card-bg)]")
             }
             aria-current={active ? "page" : undefined}
           >

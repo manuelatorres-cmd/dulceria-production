@@ -1174,7 +1174,7 @@ export default function PlanPage() {
                                     return (
                                       <li
                                         key={g.productId}
-                                        className="rounded-[10px] overflow-hidden bg-white/40 border border-white/55"
+                                        className="rounded-[10px] overflow-hidden bg-white/40 border border-[color:var(--ds-border-warm)]"
                                       >
                                         <button
                                           type="button"
@@ -1231,7 +1231,7 @@ export default function PlanPage() {
                                     return (
                                       <li
                                         key={c.catId}
-                                        className="rounded-[10px] overflow-hidden bg-white/30 border border-white/55"
+                                        className="rounded-[10px] overflow-hidden bg-white/30 border border-[color:var(--ds-border-warm)]"
                                       >
                                         <button
                                           type="button"
@@ -1603,7 +1603,7 @@ function WeekView(props: {
     <div>
       {/* Weekly stats — replaces the old per-day strip; numbers cover
           the full 14-day visible window. */}
-      <div className="rounded-[18px] border border-white/60 bg-white/55 backdrop-blur-2xl shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] p-4 mb-3 grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="rounded-[18px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] p-4 mb-3 grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
           <p className="text-[10px] uppercase text-muted-foreground" style={{ letterSpacing: "0.12em" }}>
             Window
@@ -1701,7 +1701,7 @@ function WeekView(props: {
           onClick={() => setPendingDrop(null)}
         >
           <div
-            className="rounded-[18px] border border-white/60 bg-white p-5 max-w-md w-full mx-4 shadow-xl"
+            className="rounded-[18px] border border-[color:var(--ds-border-warm)] bg-white p-5 max-w-md w-full mx-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3
@@ -1886,7 +1886,7 @@ function WeekView(props: {
                 </span>
               </div>
 
-              <div className="rounded-[12px] border border-white/60 bg-white/55 p-2 space-y-1.5 min-h-[60px]">
+              <div className="rounded-[12px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-2 space-y-1.5 min-h-[60px]">
                 {orderedMega.length === 0 ? (
                   <p className="text-[10.5px] text-muted-foreground italic px-1 py-2 text-center">
                     No batches
@@ -1963,7 +1963,7 @@ function WeekView(props: {
                                 const gMoulds = g.batches.reduce((s, x) => s + x.mouldCount, 0);
                                 const productPlanIds = [...new Set(g.batches.map((bb) => bb.planId))];
                                 return (
-                                  <li key={g.productId} className="rounded-[6px] bg-white/55 border border-white/60 px-1.5 py-1">
+                                  <li key={g.productId} className="rounded-[6px] bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] px-1.5 py-1">
                                     <div className="w-full flex items-baseline gap-1">
                                       <DragHandle
                                         id={`prod:${ds.day.id}:${b.stepId}:${g.productId}`}
@@ -2115,7 +2115,7 @@ function WeekView(props: {
                               const innerMoulds = groupsArr.reduce((s, g) => s + g.batches.reduce((s2, x) => s2 + x.mouldCount, 0), 0);
                               const innerPlanIds = [...new Set(groupsArr.flatMap((g) => g.batches.map((x) => x.planId)))];
                               return (
-                                <div key={b.stepId} className="rounded-[6px] bg-white/55 border border-white/60 px-1.5 py-1">
+                                <div key={b.stepId} className="rounded-[6px] bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] px-1.5 py-1">
                                   <div className="w-full flex items-baseline gap-1">
                                     <DragHandle
                                       id={`cat:${ds.day.id}:${b.stepId}`}
@@ -2169,7 +2169,7 @@ function WeekView(props: {
                                         const pExpanded = expandedProducts.has(productKey);
                                         const gMoulds = g.batches.reduce((s, x) => s + x.mouldCount, 0);
                                         return (
-                                          <li key={g.productId} className="rounded-[5px] bg-white/55 border border-white/60 px-1 py-0.5">
+                                          <li key={g.productId} className="rounded-[5px] bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] px-1 py-0.5">
                                             <div className="w-full flex items-baseline gap-1">
                                               <DragHandle
                                                 id={`prod:${ds.day.id}:${b.stepId}:${g.productId}`}
@@ -2411,7 +2411,7 @@ function ScheduledPanel({
                   "inline-flex items-baseline gap-1.5 text-[11px] px-2.5 py-1 rounded-full border transition " +
                   (checked
                     ? "bg-foreground text-background border-foreground"
-                    : "border-white/60 hover:opacity-90")
+                    : "border-[color:var(--ds-border-warm)] hover:opacity-90")
                 }
                 style={!checked ? { background: tint.bg, color: tint.ink } : undefined}
                 title={`Earliest day · ${s.earliestDate}`}
@@ -2506,7 +2506,7 @@ function ScheduledPanel({
             return (
               <div
                 key={idx}
-                className="rounded-[10px] border border-white/60 p-2"
+                className="rounded-[10px] border border-[color:var(--ds-border-warm)] p-2"
                 style={{ background: isShared ? tint.bg : "rgba(255,255,255,0.55)" }}
               >
                 <p className="text-[10px] uppercase mb-1 opacity-75 flex items-center gap-1.5" style={{ letterSpacing: "0.08em", color: isShared ? tint.ink : "#8a8780" }}>
@@ -2529,7 +2529,7 @@ function ScheduledPanel({
                           "inline-flex items-baseline gap-1.5 text-[10.5px] px-2 py-0.5 rounded-full border transition " +
                           (checked
                             ? "bg-foreground text-background border-foreground"
-                            : "border-white/60 bg-white/55 hover:opacity-90 text-foreground")
+                            : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:opacity-90 text-foreground")
                         }
                         title={`Earliest day · ${s.earliestDate}${ft ? ` · ${ft}` : ""}`}
                       >
@@ -2552,7 +2552,7 @@ function ScheduledPanel({
   }
 
   return (
-    <section className="bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] mb-4">
+    <section className="bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] mb-4">
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
@@ -2826,7 +2826,7 @@ function DemandByUrgency({
   const totalNet = productTotals.reduce((s, p) => s + p.net, 0);
 
   return (
-    <section className="bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] mb-4">
+    <section className="bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] mb-4">
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
@@ -2899,7 +2899,7 @@ function DemandByUrgency({
           {productTotals.map((p) => (
             <span
               key={p.name}
-              className="inline-flex items-baseline gap-1 text-[10.5px] rounded-full px-2 py-0.5 border border-white/60"
+              className="inline-flex items-baseline gap-1 text-[10.5px] rounded-full px-2 py-0.5 border border-[color:var(--ds-border-warm)]"
               style={{ background: "rgba(255,255,255,0.65)", borderLeft: p.net > 0 ? "3px solid #4a6b5b" : undefined }}
               title={`${p.qty} ordered · ${p.stock} in stock · make ${p.net}`}
             >
@@ -2935,7 +2935,7 @@ function DemandByUrgency({
           return (
             <div
               key={o.orderId}
-              className="rounded-[12px] border border-white/60 p-2.5"
+              className="rounded-[12px] border border-[color:var(--ds-border-warm)] p-2.5"
               style={{ background: tint.bg, color: tint.ink, borderLeft: `3px solid ${tint.ink}` }}
             >
               {/* Header: customer + total */}
@@ -2974,7 +2974,7 @@ function DemandByUrgency({
                 {o.productLines.map((line) => (
                   <span
                     key={line.productId}
-                    className="inline-flex items-baseline gap-0.5 text-[10px] rounded-full bg-white/55 border border-white/60 px-1.5 py-0"
+                    className="inline-flex items-baseline gap-0.5 text-[10px] rounded-full bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] px-1.5 py-0"
                     title={`${line.productName} · ${line.qty} pcs (stock ${line.stock})`}
                   >
                     <span className="truncate max-w-[110px]">{line.productName}</span>
@@ -2990,7 +2990,7 @@ function DemandByUrgency({
                   disabled={busy}
                   onClick={() => handleDefer(o.orderId)}
                   title="Move this order's batches to tomorrow + lock"
-                  className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-white/60 bg-white/55 hover:bg-white/80 transition disabled:opacity-50"
+                  className="ml-auto text-[10px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:bg-[color:var(--ds-card-bg)] transition disabled:opacity-50"
                 >
                   {busy ? "…" : "→ tomorrow"}
                 </button>
@@ -3309,7 +3309,7 @@ function BatchGroupRow({
             <li key={b.lineItemId}>
               <Link
                 href={`/production/${encodeURIComponent(b.planId)}?from=plan`}
-                className="block px-3 py-2 hover:bg-white/60 transition border-b border-white/30 last:border-b-0"
+                className="block px-3 py-2 hover:bg-[color:var(--ds-card-bg)] transition border-b border-white/30 last:border-b-0"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -3799,7 +3799,7 @@ function PivotView(props: {
   const [expandedCellKey, setExpandedCellKey] = useState<string | null>(null);
 
   // ── Render. ─────────────────────────────────────────────────────
-  const CARD_LOCAL = "bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+  const CARD_LOCAL = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
 
   if (focusedSources.length === 0) {
     return (
@@ -4589,7 +4589,7 @@ function MonthView(props: {
   }
 
   // ── Render. ─────────────────────────────────────────────────────
-  const CARD_LOCAL = "bg-white/65 backdrop-blur-2xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+  const CARD_LOCAL = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={pointerWithin}>

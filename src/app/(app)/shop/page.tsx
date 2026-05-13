@@ -53,13 +53,13 @@ export default function ShopPage() {
           <Link href="/shop/counter" className={`${PINK} text-[12px] px-3.5 py-1.5 rounded-full font-medium`}>
             Counter
           </Link>
-          <Link href="/shop/daily-count" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-white/70 border border-border text-foreground hover:border-foreground">
+          <Link href="/shop/daily-count" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-[color:var(--ds-card-bg)] border border-border text-foreground hover:border-foreground">
             Daily count
           </Link>
-          <Link href="/shop/transfer" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-white/70 border border-border text-foreground hover:border-foreground">
+          <Link href="/shop/transfer" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-[color:var(--ds-card-bg)] border border-border text-foreground hover:border-foreground">
             Transfer in
           </Link>
-          <Link href="/shop/breakage" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-white/70 border border-border text-foreground hover:border-foreground">
+          <Link href="/shop/breakage" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-[color:var(--ds-card-bg)] border border-border text-foreground hover:border-foreground">
             Stock out
           </Link>
         </div>
@@ -167,7 +167,7 @@ function PickupsTodayCard() {
               : o.channel === "b2b" ? { bg: "#eff5fb", ink: "#4b6b8f", t: "B2B" }
                 : { bg: "#fdf8e2", ink: "#8a7030", t: "Walk-in" };
             return (
-              <li key={o.id} className="rounded-[10px] border border-white/60 bg-white/55 px-3 py-2">
+              <li key={o.id} className="rounded-[10px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <Link href={`/orders/${encodeURIComponent(o.id!)}?from=shop`} className="flex-1 min-w-0 hover:underline">
                     <span style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 14 }}>
@@ -414,7 +414,7 @@ function ShopStockGrid() {
               "text-[11px] px-2.5 py-0.5 rounded-full border transition " +
               (filter === k
                 ? "bg-foreground text-background border-foreground"
-                : "bg-white/65 border-border text-foreground hover:border-foreground")
+                : "bg-[color:var(--ds-card-bg)] border-border text-foreground hover:border-foreground")
             }
           >
             {k === "all" ? "All" : k === "low" ? `Low (${lowN + outN})` : "OK"}
@@ -443,7 +443,7 @@ function ShopStockGrid() {
                 key={r.product.id}
                 onClick={() => setEditing(editing === r.product.id ? null : r.product.id ?? null)}
                 title={`${r.product.name} · min ${r.min}${r.max != null ? ` · max ${r.max}` : ""}`}
-                className="aspect-square rounded-[8px] border border-white/55 px-1 py-1 flex flex-col justify-between text-left transition hover:opacity-90 hover:scale-[1.02]"
+                className="aspect-square rounded-[8px] border border-[color:var(--ds-border-warm)] px-1 py-1 flex flex-col justify-between text-left transition hover:opacity-90 hover:scale-[1.02]"
                 style={{ background: tint.bg, color: tint.ink }}
               >
                 <span className="text-[8.5px] uppercase truncate" style={{ letterSpacing: "0.06em", lineHeight: 1.1 }}>
@@ -498,7 +498,7 @@ function StockMinEditor({ row, onClose }: {
     }
   }
   return (
-    <div className="mt-3 rounded-[12px] border border-white/60 bg-white/80 p-3">
+    <div className="mt-3 rounded-[12px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3">
       <div className="flex items-center justify-between mb-2">
         <span style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 14 }}>
           {row.product.name}
@@ -563,7 +563,7 @@ function OpeningHoursCard({
             );
           })}
           {closures.length > 0 && (
-            <div className="mt-3 pt-2 border-t border-white/55 space-y-0.5">
+            <div className="mt-3 pt-2 border-t border-[color:var(--ds-border-warm)] space-y-0.5">
               <p className="text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.12em" }}>
                 Closures · {closures.length}
               </p>
@@ -582,7 +582,7 @@ function OpeningHoursCard({
       {/* Expanded edit mode */}
       {expanded && (
         <>
-          <div className="rounded-[12px] border border-white/60 bg-white/55 divide-y divide-white/55">
+          <div className="rounded-[12px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-white/55">
             {WEEKDAY_FULL.map((_, dow) => {
               const row = hours.find((h) => h.dayOfWeek === dow);
               return <WeekdayRow key={dow} dow={dow} row={row} />;
@@ -635,7 +635,7 @@ function WeekdayRow({ dow, row }: {
           "text-[10.5px] px-2 py-0.5 rounded-full border transition " +
           (isOpen
             ? "bg-[#f1faf4] text-[#4a7a5e] border-[#cfe5d9]"
-            : "bg-white/60 text-muted-foreground border-border hover:border-foreground")
+            : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-border hover:border-foreground")
         }
       >
         {isOpen ? "Open" : "Closed"}
@@ -708,7 +708,7 @@ function ClosuresEditor({ closures }: {
         </div>
       ))}
       {adding ? (
-        <div className="rounded-[10px] border border-white/60 bg-white/55 p-2 space-y-2">
+        <div className="rounded-[10px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-2 space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input !py-0.5 !text-[12px]" />
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input !py-0.5 !text-[12px]" />

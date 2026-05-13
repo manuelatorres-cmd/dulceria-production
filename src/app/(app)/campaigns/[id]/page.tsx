@@ -121,7 +121,7 @@ type CampaignViewProps = {
   onEdit: () => void;
 };
 
-const CARD = "bg-white/70 backdrop-blur-xl border border-white/60 rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+const CARD = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
 
 function CampaignView({
   campaign, products, productCategories, allPlans, allPlanProducts, allStepStatuses, productionSteps, orders, orderItems, onEdit,
@@ -808,7 +808,7 @@ function CampaignEditor({
 
   // Glass-style input chrome — matches site-wide iOS direction. Input
   // sits on the gradient body, not a flat white rectangle.
-  const glassInput = "w-full rounded-[10px] border border-white/60 bg-white/50 backdrop-blur-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-foreground/30 transition-colors";
+  const glassInput = "w-full rounded-[10px] border border-[color:var(--ds-border-warm)] bg-white/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-foreground/30 transition-colors";
 
   const categoryMap = useMemo(() => new Map(productCategories.map((c) => [c.id!, c])), [productCategories]);
   const [productSearch, setProductSearch] = useState("");
@@ -918,7 +918,7 @@ function CampaignEditor({
             />
           </Field>
 
-          <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-[10px] border border-white/60 bg-white/40 backdrop-blur-md px-3 py-2.5">
+          <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-[10px] border border-[color:var(--ds-border-warm)] bg-white/40 px-3 py-2.5">
             <input
               type="checkbox"
               checked={isolated}
@@ -995,7 +995,7 @@ function CampaignEditor({
                 const hidden = hiddenCategories.has(catName);
                 const allSelected = selectedInCat === catIds.length && catIds.length > 0;
                 return (
-                  <div key={catName} className="rounded-[10px] border border-white/60 bg-white/40 backdrop-blur-md overflow-hidden">
+                  <div key={catName} className="rounded-[10px] border border-[color:var(--ds-border-warm)] bg-white/40 overflow-hidden">
                     <div className="flex items-center gap-2 px-3 py-2">
                       <button
                         type="button"
@@ -1029,7 +1029,7 @@ function CampaignEditor({
                           const checked = productIds.includes(p.id ?? "");
                           return (
                             <li key={p.id}>
-                              <label className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/60 text-[13px] cursor-pointer">
+                              <label className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[color:var(--ds-card-bg)] text-[13px] cursor-pointer">
                                 <input
                                   type="checkbox"
                                   className="w-3.5 h-3.5"
