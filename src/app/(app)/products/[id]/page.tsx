@@ -101,7 +101,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     router.replace(`/products/${encodeURIComponent(productId)}${next ? `?${next}` : ""}`, { scroll: false });
   }
 
-  const [editing, setEditing] = useState(isNew);
+  // Editing flag now only controls the Shell-tab buffered design editor
+  // (Product tab body is inline-edit always). Default false even on ?new=1
+  // — first inline patch on a Product field commits the record.
+  const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [productProduced, setProductProduced] = useState(false);
   const [confirmRemovePhoto, setConfirmRemovePhoto] = useState(false);
@@ -477,6 +480,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   async function patchProduct(patch: Partial<Product>) {
     if (!product) return;
     await saveProduct({ id: productId, name: product.name, ...patch });
+    // First inline save on a ?new=1 record commits it — flip savedOnce so the
+    // nav guard stops threatening to delete, and drop ?new=1 from the URL.
+    if (isNew && !savedOnce) {
+      setSavedOnce(true);
+      router.replace(`/products/${encodeURIComponent(productId)}`);
+    }
   }
 
   function handleAddTag(tag: string) {
