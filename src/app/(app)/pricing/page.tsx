@@ -12,7 +12,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import { PageHeader } from "@/components/dulceria";
+import { PageHeader, StatCard } from "@/components/dulceria";
 import Link from "next/link";
 import type { Variant, VariantPackaging, Packaging, PackagingOrder, ProductCostSnapshot, VariantProduct } from "@/types";
 import {
@@ -214,32 +214,29 @@ export default function PricingPage() {
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <PageHeader title="Pricing & Margins" />
+      <PageHeader
+        title="Pricing & margins"
+        meta={summary.total > 0 ? `${summary.healthyCount} healthy · ${summary.thinCount} thin · ${summary.negativeCount} negative` : undefined}
+      />
 
-      <div className="px-4 space-y-6 pb-10">
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
         {/* Summary banner */}
         {summary.total > 0 && (
-          <div className="rounded-sm border border-border bg-card p-4">
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Avg. margin</p>
-                <p className="text-lg font-semibold tabular-nums mt-0.5">
-                  {summary.avgMargin !== null ? formatMarginPercent(summary.avgMargin) : "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Healthy</p>
-                <p className="text-lg font-semibold text-status-ok tabular-nums mt-0.5">{summary.healthyCount}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Thin</p>
-                <p className="text-lg font-semibold text-status-warn tabular-nums mt-0.5">{summary.thinCount}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Negative</p>
-                <p className="text-lg font-semibold text-status-alert tabular-nums mt-0.5">{summary.negativeCount}</p>
-              </div>
-            </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <StatCard
+              variant="default"
+              label="Avg margin"
+              value={summary.avgMargin !== null ? formatMarginPercent(summary.avgMargin) : "—"}
+            />
+            <StatCard variant="ok" label="Healthy" value={summary.healthyCount} />
+            <StatCard variant="warn" label="Thin" value={summary.thinCount} />
+            <StatCard variant="urgent" label="Negative" value={summary.negativeCount} />
           </div>
         )}
 
