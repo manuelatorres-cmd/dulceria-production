@@ -1,85 +1,27 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
 import { useMoulds, saveMould } from "@/lib/hooks";
-import { ListToolbar, FilterPanel, FilterChipGroup, ArchiveFilterChip, ListItemCard } from "@/components/pantry";
-import { useNShortcut } from "@/lib/use-n-shortcut";
+import {
+  PageHeader,
+  MouldCard,
+  AddCard,
+  DsButton,
+  inferMouldShape,
+} from "@/components/dulceria";
+import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { usePersistedFilters } from "@/lib/use-persisted-filters";
-
-const CAVITY_WEIGHT_OPTIONS = [
-  { value: "1-10", label: "≤ 10 g" },
-  { value: "11-15", label: "11–15 g" },
-  { value: "16-25", label: "16–25 g" },
-  { value: "26+", label: "26+ g" },
-];
-
-function matchesCavityWeight(wt: number, filter: string): boolean {
-  if (wt <= 0) return false;
-  if (filter === "1-10") return wt <= 10;
-  if (filter === "11-15") return wt >= 11 && wt <= 15;
-  if (filter === "16-25") return wt >= 16 && wt <= 25;
-  if (filter === "26+") return wt >= 26;
-  return true;
-}
-
-const CAVITY_COUNT_OPTIONS = [
-  { value: "1-15", label: "≤ 15" },
-  { value: "16-24", label: "16–24" },
-  { value: "25-36", label: "25–36" },
-  { value: "37+", label: "37+" },
-];
-
-function matchesCavityCount(count: number, filter: string): boolean {
-  if (count <= 0) return false;
-  if (filter === "1-15") return count <= 15;
-  if (filter === "16-24") return count >= 16 && count <= 24;
-  if (filter === "25-36") return count >= 25 && count <= 36;
-  if (filter === "37+") return count >= 37;
-  return true;
-}
-
-const OWNED_OPTIONS = [
-  { value: "1", label: "1" },
-  { value: "2-3", label: "2–3" },
-  { value: "4+", label: "4+" },
-];
-
-function matchesOwned(qty: number | undefined, filter: string): boolean {
-  const n = qty ?? 0;
-  if (filter === "1") return n === 1;
-  if (filter === "2-3") return n >= 2 && n <= 3;
-  if (filter === "4+") return n >= 4;
-  return true;
-}
 
 export default function MouldsPage() {
   const router = useRouter();
-  const [f, setF] = usePersistedFilters("moulds", {
+  const [f, setF] = usePersistedFilters("moulds-v2", {
     search: "",
-    showFilters: false,
+    filterTag: "",
+    filterBrand: "",
     showArchived: false,
-    filterBrands: [] as string[],
-    filterTags: [] as string[],
-    filterCavityWeight: "" as string,
-    filterCavityCount: "" as string,
-    filterOwned: "" as string,
   });
   const moulds = useMoulds(f.showArchived);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newName, setNewName] = useState("");
-
-  useNShortcut(() => setShowAdd(true), showAdd);
-
-  const filterBrandsSet = useMemo(() => new Set(f.filterBrands), [f.filterBrands]);
-  const filterTagsSet = useMemo(() => new Set(f.filterTags), [f.filterTags]);
-
-  const allBrands = useMemo(() => {
-    const set = new Set<string>();
-    for (const m of moulds) if (m.brand) set.add(m.brand);
-    return Array.from(set).sort();
-  }, [moulds]);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -87,267 +29,184 @@ export default function MouldsPage() {
     return Array.from(set).sort();
   }, [moulds]);
 
-  const brandOptions = useMemo(
-    () => allBrands.map((b) => ({ value: b, label: b })),
-    [allBrands],
-  );
-
-  const activeFilterCount =
-    (filterBrandsSet.size > 0 ? 1 : 0) +
-    (filterTagsSet.size > 0 ? 1 : 0) +
-    (f.filterCavityWeight ? 1 : 0) +
-    (f.filterCavityCount ? 1 : 0) +
-    (f.filterOwned ? 1 : 0) +
-    (f.showArchived ? 1 : 0);
-
-  function clearFilters() {
-    setF("filterBrands", []);
-    setF("filterTags", []);
-    setF("filterCavityWeight", "");
-    setF("filterCavityCount", "");
-    setF("filterOwned", "");
-    setF("showArchived", false);
-  }
-
-  function toggleFilterBrand(brand: string) {
-    const next = new Set(filterBrandsSet);
-    if (next.has(brand)) next.delete(brand); else next.add(brand);
-    setF("filterBrands", Array.from(next));
-  }
-
-  function toggleFilterTag(tag: string) {
-    const next = new Set(filterTagsSet);
-    if (next.has(tag)) next.delete(tag); else next.add(tag);
-    setF("filterTags", Array.from(next));
-  }
+  const allBrands = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of moulds) if (m.brand) set.add(m.brand);
+    return Array.from(set).sort();
+  }, [moulds]);
 
   const filtered = useMemo(() => {
+    const q = f.search.trim().toLowerCase();
     return moulds.filter((m) => {
-      if (f.search && !m.name.toLowerCase().includes(f.search.toLowerCase()) && !(m.brand ?? "").toLowerCase().includes(f.search.toLowerCase())) return false;
-      if (filterBrandsSet.size > 0 && !filterBrandsSet.has(m.brand ?? "")) return false;
-      if (filterTagsSet.size > 0) {
-        const tags = new Set(m.tags ?? []);
-        let any = false;
-        for (const t of filterTagsSet) if (tags.has(t)) { any = true; break; }
-        if (!any) return false;
-      }
-      if (f.filterCavityWeight && !matchesCavityWeight(m.cavityWeightG, f.filterCavityWeight)) return false;
-      if (f.filterCavityCount && !matchesCavityCount(m.numberOfCavities, f.filterCavityCount)) return false;
-      if (f.filterOwned && !matchesOwned(m.quantityOwned, f.filterOwned)) return false;
+      if (q && !m.name.toLowerCase().includes(q) && !(m.brand ?? "").toLowerCase().includes(q)) return false;
+      if (f.filterTag && !(m.tags ?? []).includes(f.filterTag)) return false;
+      if (f.filterBrand && m.brand !== f.filterBrand) return false;
       return true;
     });
-  }, [moulds, f.search, filterBrandsSet, filterTagsSet, f.filterCavityWeight, f.filterCavityCount, f.filterOwned]);
+  }, [moulds, f.search, f.filterTag, f.filterBrand]);
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newName.trim()) return;
-    const id = await saveMould({
-      name: newName.trim(),
-      cavityWeightG: 0,
-      numberOfCavities: 0,
-    });
+  const totalCavities = useMemo(() => moulds.reduce((s, m) => s + (m.numberOfCavities || 0), 0), [moulds]);
+  const productCount = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of moulds) for (const t of m.tags ?? []) set.add(t);
+    return set.size; // approximation: no direct mould→product link in pantry list
+  }, [moulds]);
+
+  async function handleAdd() {
+    const id = await saveMould({ name: "New mould", cavityWeightG: 0, numberOfCavities: 0 });
     router.push(`/moulds/${encodeURIComponent(String(id))}?new=1`);
   }
 
   return (
-    <div>
-      <PageHeader title="Moulds" description="Your mould collection" />
-      <div className="px-4 space-y-3 pb-6">
-        <ListToolbar
-          search={f.search}
-          onSearchChange={(v) => setF("search", v)}
-          searchPlaceholder="Search name or brand…"
-          searchAriaLabel="Search moulds"
-          onAdd={() => setShowAdd(true)}
-          addAriaLabel="Add mould"
-          addTitle="Add mould (n)"
-          showFilters
-          filterPanelOpen={f.showFilters}
-          onToggleFilters={() => setF("showFilters", !f.showFilters)}
-          activeFilterCount={activeFilterCount}
-        />
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Moulds"
+        meta={`${moulds.length} moulds${productCount > 0 ? ` · used by ${productCount} product tag${productCount === 1 ? "" : "s"}` : ""} · total capacity ${totalCavities} fills simultaneously`}
+        actions={
+          <DsButton variant="primary" size="md" onClick={handleAdd}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <IconPlus size={14} stroke={1.5} /> New mould
+            </span>
+          </DsButton>
+        }
+      />
 
-        {/* Quick filters under search — baseline pattern. */}
-        {allTags.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-            <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Tag</span>
-            {allTags.map((t) => {
-              const active = filterTagsSet.has(t);
-              return (
-                <button
-                  key={t}
-                  onClick={() => toggleFilterTag(t)}
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                    active
-                      ? "bg-[var(--accent-lilac-bg)] text-[var(--accent-lilac-ink)]"
-                      : "bg-card text-muted-foreground border border-border hover:bg-muted"
-                  }`}
-                >
-                  {t}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        {(brandOptions.length > 0) && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-medium mr-1">Brand</span>
-            {brandOptions.length > 8 ? (
-              <>
-                <select
-                  value=""
-                  onChange={(e) => { if (e.target.value) toggleFilterBrand(e.target.value); }}
-                  className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs"
-                >
-                  <option value="">Add brand…</option>
-                  {brandOptions.filter((b) => !filterBrandsSet.has(b.value)).map((b) => (
-                    <option key={b.value} value={b.value}>{b.label}</option>
-                  ))}
-                </select>
-                {[...filterBrandsSet].map((b) => (
-                  <button
-                    key={b}
-                    onClick={() => toggleFilterBrand(b)}
-                    className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-accent text-accent-foreground"
-                  >
-                    {b} ×
-                  </button>
-                ))}
-              </>
-            ) : (
-              brandOptions.map((b) => {
-                const active = filterBrandsSet.has(b.value);
-                return (
-                  <button
-                    key={b.value}
-                    onClick={() => toggleFilterBrand(b.value)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                      active
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
-                    }`}
-                  >
-                    {b.label}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        )}
-
-        {f.showFilters && (
-          <FilterPanel activeFilterCount={activeFilterCount} onClearAll={clearFilters}>
-            {brandOptions.length > 0 && (
-              <FilterChipGroup
-                label="Brand"
-                options={brandOptions}
-                multi
-                selected={filterBrandsSet}
-                onToggle={toggleFilterBrand}
-              />
-            )}
-            <FilterChipGroup
-              label="Cavity weight"
-              options={CAVITY_WEIGHT_OPTIONS}
-              value={f.filterCavityWeight}
-              defaultValue=""
-              onChange={(v) => setF("filterCavityWeight", v)}
-            />
-            <FilterChipGroup
-              label="Cavities"
-              options={CAVITY_COUNT_OPTIONS}
-              value={f.filterCavityCount}
-              defaultValue=""
-              onChange={(v) => setF("filterCavityCount", v)}
-            />
-            <FilterChipGroup
-              label="Moulds owned"
-              options={OWNED_OPTIONS}
-              value={f.filterOwned}
-              defaultValue=""
-              onChange={(v) => setF("filterOwned", v)}
-            />
-            <ArchiveFilterChip
-              value={f.showArchived}
-              onChange={(v) => setF("showArchived", v)}
-            />
-          </FilterPanel>
-        )}
-
-        {showAdd && (
-          <form onSubmit={handleAdd} className="rounded-sm border border-border bg-card p-3 space-y-2">
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              borderRadius: 14,
+              maxWidth: 360,
+            }}
+          >
+            <IconSearch size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
             <input
               type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Mould name *"
-              required
-              autoFocus
-              className="input"
+              value={f.search}
+              onChange={(e) => setF("search", e.target.value)}
+              placeholder="Search moulds…"
+              style={{
+                fontSize: 12,
+                border: "none",
+                background: "transparent",
+                outline: "none",
+                flex: 1,
+                color: "var(--ds-text-primary)",
+              }}
             />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={!newName.trim()}
-                className="btn-primary flex-1 py-2"
-              >
-                Create Mould
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowAdd(false); setNewName(""); }}
-                className="btn-secondary px-4 py-2"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
+          </div>
+
+          {allTags.length > 0 && (
+            <PillRow
+              label="Tag"
+              options={[{ id: "", label: "All" }, ...allTags.map((t) => ({ id: t, label: t }))]}
+              isActive={(id) => f.filterTag === id}
+              onSelect={(id) => setF("filterTag", id)}
+            />
+          )}
+          {allBrands.length > 0 && (
+            <PillRow
+              label="Brand"
+              options={[{ id: "", label: "All" }, ...allBrands.map((b) => ({ id: b, label: b }))]}
+              isActive={(id) => f.filterBrand === id}
+              onSelect={(id) => setF("filterBrand", id)}
+            />
+          )}
+        </div>
 
         {filtered.length === 0 ? (
-          <p className="text-muted-foreground text-sm py-8 text-center">
-            {moulds.length === 0
-              ? "No moulds yet. Tap + to add your first."
-              : "No moulds match your search."}
+          <p
+            style={{
+              textAlign: "center",
+              padding: "40px 0",
+              fontFamily: "var(--font-serif)",
+              fontSize: 14,
+              color: "var(--ds-text-muted)",
+            }}
+          >
+            {moulds.length === 0 ? "No moulds yet." : "No moulds match the filters."}
           </p>
         ) : (
-          <ul className="space-y-2">
-            {filtered.map((mould) => (
-              <ListItemCard
-                key={mould.id}
-                href={`/moulds/${encodeURIComponent(mould.id ?? '')}`}
-                archived={mould.archived}
-              >
-                {mould.photo ? (
-                  <img src={mould.photo} alt={mould.name} className="w-10 h-10 rounded-md object-cover shrink-0" />
-                ) : (
-                  <div className="w-10 h-10 rounded-md bg-muted shrink-0 flex items-center justify-center text-muted-foreground text-base font-light">
-                    ◻
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="font-medium text-sm truncate">{mould.name}</h3>
-                    {mould.archived && (
-                      <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                        archived
-                      </span>
-                    )}
-                  </div>
-                  {mould.brand && (
-                    <p className="text-xs text-muted-foreground">{mould.brand}</p>
-                  )}
-                  {mould.cavityWeightG > 0 && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {mould.cavityWeightG} g · {mould.numberOfCavities} cavities
-                    </p>
-                  )}
-                </div>
-              </ListItemCard>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {filtered.map((m) => (
+              <MouldCard
+                key={m.id}
+                href={`/moulds/${encodeURIComponent(m.id ?? "")}`}
+                name={m.name}
+                brand={m.brand}
+                weightG={m.cavityWeightG}
+                cavities={m.numberOfCavities}
+                photoUrl={m.photo}
+                shape={inferMouldShape(m.name, m.tags)}
+                archived={m.archived}
+              />
             ))}
-          </ul>
+            <AddCard label="new mould" onClick={handleAdd} aspect="mould" />
+          </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PillRow({
+  label,
+  options,
+  isActive,
+  onSelect,
+}: {
+  label: string;
+  options: Array<{ id: string; label: string }>;
+  isActive: (id: string) => boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <span
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--ds-text-muted)",
+          fontWeight: 600,
+          marginRight: 4,
+        }}
+      >
+        {label}
+      </span>
+      {options.map((o) => {
+        const active = isActive(o.id);
+        return (
+          <button
+            key={o.id || "all"}
+            type="button"
+            onClick={() => onSelect(o.id)}
+            style={{
+              padding: "3px 10px",
+              fontSize: 11,
+              border: `0.5px solid ${active ? "var(--ds-tier-quarter-focus)" : "var(--ds-border-warm)"}`,
+              background: active ? "var(--ds-tier-quarter-focus)" : "var(--ds-card-bg)",
+              color: active ? "#ffffff" : "var(--ds-text-muted)",
+              borderRadius: 12,
+              cursor: "pointer",
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
