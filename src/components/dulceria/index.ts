@@ -39,3 +39,14 @@ export { Toast, type ToastItem, type ToastKind } from "./toast";
 export { ToastProvider, useToast } from "./toast-provider";
 export { FormError, type FormErrorProps } from "./form-error";
 export { HubCard, type HubCardProps } from "./hub-card";
+export { DsDetailPage, type DsDetailPageProps } from "./detail-page";
+export {
+  DsInlineField,
+  DsInlineTextarea,
+  DsInlineSelect,
+  type DsInlineFieldProps,
+  type DsInlineTextareaProps,
+  type DsInlineSelectProps,
+} from "./inline-field";
+export { DsTagInput, type DsTagInputProps } from "./tag-input";
+export { DsPhotoUpload, type DsPhotoUploadProps } from "./photo-upload";
