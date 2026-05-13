@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { IconPlus as Plus, IconCalendar as CalIcon } from "@tabler/icons-react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { IconPlus, IconCalendar, IconSearch } from "@tabler/icons-react";
 import {
   useProductionOrders,
   useAllProductionOrderItems,
@@ -17,19 +17,59 @@ import {
   type ProductionOrderStatus,
 } from "@/types";
 import { newId } from "@/lib/supabase";
+import {
+  PageHeader,
+  Section,
+  ListRow,
+  StatusTag,
+  DsButton,
+  DsTabNav,
+  type ListRowTier,
+} from "@/components/dulceria";
+import { usePersistedFilters } from "@/lib/use-persisted-filters";
 
-/**
- * Production orders — internal demand sibling of customer orders.
- * Workshop drives these (restocking minimums, market events, campaign
- * runs, launches). Brain reads them alongside customer orders.
- */
+type StatusFilter = "all" | ProductionOrderStatus;
+
+const STATUS_LABEL: Record<ProductionOrderStatus, string> = {
+  pending: "Pending",
+  in_production: "In production",
+  done: "Done",
+  cancelled: "Cancelled",
+};
+
+type DueTone = "urgent" | "warn" | "default";
+
+function relativeDate(iso: string, today: number): { label: string; tone: DueTone } {
+  const dueMs = new Date(iso + "T23:59:59").getTime();
+  const days = Math.ceil((dueMs - today) / 86_400_000);
+  if (days < 0) return { label: `overdue ${Math.abs(days)}d`, tone: "urgent" };
+  if (days === 0) return { label: "today", tone: "urgent" };
+  if (days === 1) return { label: "tomorrow", tone: "warn" };
+  if (days <= 3) return { label: `in ${days}d`, tone: "warn" };
+  if (days <= 14) return { label: `in ${days}d`, tone: "default" };
+  return { label: iso, tone: "default" };
+}
+
+function tierFromTone(tone: DueTone, status: ProductionOrderStatus): ListRowTier {
+  if (status === "done") return "done";
+  if (status === "cancelled") return "parked";
+  if (tone === "urgent") return "urgent";
+  if (tone === "warn") return "active";
+  return "default";
+}
+
 export default function ProductionOrdersPage() {
+  const router = useRouter();
   const orders = useProductionOrders();
   const items = useAllProductionOrderItems();
   const products = useProductsList();
   const campaigns = useCampaigns();
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
+
+  const [f, setF] = usePersistedFilters("production-orders-v2", {
+    search: "",
+    filterStatus: "all" as StatusFilter,
+  });
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
   const campaignMap = useMemo(() => new Map(campaigns.map((c) => [c.id!, c])), [campaigns]);
@@ -44,7 +84,47 @@ export default function ProductionOrdersPage() {
     return m;
   }, [items]);
 
-  const sorted = [...orders].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const todayMs = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = f.search.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (q && !o.name?.toLowerCase().includes(q)) return false;
+      if (f.filterStatus !== "all" && o.status !== f.filterStatus) return false;
+      return true;
+    });
+  }, [orders, f.search, f.filterStatus]);
+
+  const sorted = useMemo(
+    () => [...filtered].sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+    [filtered],
+  );
+
+  const statusGroups = useMemo(() => {
+    const g: Record<ProductionOrderStatus, typeof sorted> = {
+      pending: [],
+      in_production: [],
+      done: [],
+      cancelled: [],
+    };
+    for (const o of sorted) g[o.status].push(o);
+    return g;
+  }, [sorted]);
+
+  const statusCounts = useMemo(() => {
+    const c: Record<ProductionOrderStatus, number> = {
+      pending: 0,
+      in_production: 0,
+      done: 0,
+      cancelled: 0,
+    };
+    for (const o of orders) c[o.status]++;
+    return c;
+  }, [orders]);
 
   async function handleNew() {
     setBusy(true);
@@ -66,55 +146,112 @@ export default function ProductionOrdersPage() {
     }
   }
 
-  const statusGroups: Record<ProductionOrderStatus, typeof sorted> = {
-    pending: [],
-    in_production: [],
-    done: [],
-    cancelled: [],
-  };
-  for (const o of sorted) statusGroups[o.status].push(o);
-
   return (
-    <div className="px-6 sm:px-10 pt-8 pb-12 max-w-[1400px] mx-auto">
-      <div className="flex flex-wrap items-baseline gap-3 mb-4">
-        <h1
-          className="text-[26px] tracking-[-0.025em]"
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 400 }}
-        >
-          Production orders
-        </h1>
-        <span className="text-[12px] text-muted-foreground">
-          Internal demand · {orders.length} total
-        </span>
-        <button
-          onClick={handleNew}
-          disabled={busy}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1 text-[12px] font-medium disabled:opacity-50"
-        >
-          <Plus className="w-3 h-3" /> {busy ? "Creating…" : "New production order"}
-        </button>
-      </div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Production orders"
+        meta={`Internal demand · ${orders.length} total${statusCounts.pending > 0 ? ` · ${statusCounts.pending} pending` : ""}${statusCounts.in_production > 0 ? ` · ${statusCounts.in_production} in production` : ""}`}
+        actions={
+          <DsButton variant="primary" size="md" onClick={handleNew} disabled={busy}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <IconPlus size={14} stroke={1.5} /> {busy ? "Creating…" : "New production order"}
+            </span>
+          </DsButton>
+        }
+      />
 
-      {orders.length === 0 ? (
-        <div className="rounded-[14px] border border-dashed border-border bg-card/60 px-6 py-12 text-center">
-          <CalIcon className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground">
-            No production orders yet. Create one for restocking or to drive a campaign run.
-          </p>
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              borderRadius: 14,
+              maxWidth: 360,
+            }}
+          >
+            <IconSearch size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
+            <input
+              type="text"
+              value={f.search}
+              onChange={(e) => setF("search", e.target.value)}
+              placeholder="Search production orders…"
+              style={{
+                fontSize: 12,
+                border: "none",
+                background: "transparent",
+                outline: "none",
+                flex: 1,
+                color: "var(--ds-text-primary)",
+              }}
+            />
+          </div>
+
+          <DsTabNav
+            variant="pills"
+            tabs={[
+              { id: "all", label: "All", count: orders.length },
+              { id: "pending", label: "Pending", count: statusCounts.pending },
+              { id: "in_production", label: "In production", count: statusCounts.in_production },
+              { id: "done", label: "Done", count: statusCounts.done },
+              { id: "cancelled", label: "Cancelled", count: statusCounts.cancelled },
+            ]}
+            activeTab={f.filterStatus}
+            onChange={(id) => setF("filterStatus", id as StatusFilter)}
+          />
         </div>
-      ) : (
-        <div className="space-y-5">
-          {PRODUCTION_ORDER_STATUSES.map((status) => {
+
+        {orders.length === 0 ? (
+          <div
+            style={{
+              borderRadius: 14,
+              border: "1px dashed var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              padding: "48px 24px",
+              textAlign: "center",
+            }}
+          >
+            <IconCalendar size={28} stroke={1.5} style={{ color: "var(--ds-text-muted)", margin: "0 auto 8px" }} />
+            <p style={{ fontSize: 13, color: "var(--ds-text-muted)" }}>
+              No production orders yet. Create one for restocking or to drive a campaign run.
+            </p>
+          </div>
+        ) : sorted.length === 0 ? (
+          <p
+            style={{
+              textAlign: "center",
+              padding: "32px 0",
+              fontFamily: "var(--font-serif)",
+              fontSize: 14,
+              color: "var(--ds-text-muted)",
+            }}
+          >
+            No orders match the current filter.
+          </p>
+        ) : (
+          PRODUCTION_ORDER_STATUSES.map((status) => {
             const list = statusGroups[status];
             if (list.length === 0) return null;
             return (
-              <section key={status}>
-                <h2
-                  className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-2"
+              <Section
+                key={status}
+                title={STATUS_LABEL[status]}
+                action={`${list.length} order${list.length === 1 ? "" : "s"}`}
+              >
+                <ul
+                  style={{
+                    padding: "0 0 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 0,
+                    listStyle: "none",
+                    margin: 0,
+                  }}
                 >
-                  {status.replace("_", " ")} · {list.length}
-                </h2>
-                <ul className="space-y-1.5">
                   {list.map((o) => {
                     const itemList = itemsByOrder.get(o.id!) ?? [];
                     const totalUnits = itemList.reduce((s, i) => s + i.targetUnits, 0);
@@ -124,48 +261,68 @@ export default function ProductionOrdersPage() {
                       .join(", ");
                     const moreCount = Math.max(0, itemList.length - 3);
                     const camp = o.campaignId ? campaignMap.get(o.campaignId) : null;
+                    const dateMeta = relativeDate(o.dueDate, todayMs);
+                    const tier = tierFromTone(dateMeta.tone, status);
+
                     return (
-                      <li key={o.id}>
+                      <li key={o.id} style={{ listStyle: "none" }}>
                         <Link
                           href={`/production-orders/${encodeURIComponent(o.id!)}`}
-                          className="flex items-center gap-3 rounded-[14px] border border-border bg-card/80 px-4 py-3 hover:border-foreground/30"
+                          style={{ textDecoration: "none", color: "inherit", display: "block" }}
                         >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[14px] font-medium truncate">
-                              {o.name || "Untitled"}
-                              <span className="ml-2 text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-normal">
-                                {o.channel === "restock" ? "Restock" : "Campaign run"}
+                          <ListRow
+                            tier={tier}
+                            title={
+                              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                                <span>{o.name || "Untitled"}</span>
+                                <StatusTag kind="neutral">
+                                  {o.channel === "restock" ? "Restock" : "Campaign run"}
+                                </StatusTag>
+                                {o.targetLocation && (
+                                  <StatusTag kind="neutral">→ {o.targetLocation}</StatusTag>
+                                )}
                               </span>
-                              {o.targetLocation && (
-                                <span className="ml-2 text-[10px] uppercase tracking-[0.06em] text-muted-foreground font-normal">
-                                  → {o.targetLocation}
-                                </span>
-                              )}
-                              {camp && (
-                                <span className="ml-2 text-[10px] uppercase tracking-[0.06em] text-[var(--accent-lilac-ink)] font-normal">
-                                  · {camp.name}
-                                </span>
-                              )}
-                            </p>
-                            <p className="text-[11.5px] text-muted-foreground truncate">
-                              {totalUnits > 0 ? `${totalUnits} pcs` : "no items yet"}
-                              {productNames && ` · ${productNames}`}
-                              {moreCount > 0 && ` · +${moreCount} more`}
-                            </p>
-                          </div>
-                          <span className="text-[11px] tabular-nums text-muted-foreground shrink-0">
-                            {o.dueDate}
-                          </span>
+                            }
+                            meta={
+                              <span>
+                                {totalUnits > 0 ? `${totalUnits} pcs` : "no items yet"}
+                                {productNames && ` · ${productNames}`}
+                                {moreCount > 0 && ` · +${moreCount} more`}
+                                {camp && (
+                                  <span style={{ marginLeft: 6, color: "var(--ds-tier-quarter-focus)" }}>
+                                    · campaign: {camp.name}
+                                  </span>
+                                )}
+                              </span>
+                            }
+                            side={
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontVariantNumeric: "tabular-nums",
+                                  color:
+                                    dateMeta.tone === "urgent"
+                                      ? "var(--ds-tier-urgent)"
+                                      : dateMeta.tone === "warn"
+                                      ? "var(--ds-semantic-warn)"
+                                      : "var(--ds-text-muted)",
+                                  fontWeight: dateMeta.tone === "urgent" ? 600 : 400,
+                                }}
+                              >
+                                {dateMeta.label}
+                              </span>
+                            }
+                          />
                         </Link>
                       </li>
                     );
                   })}
                 </ul>
-              </section>
+              </Section>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
     </div>
   );
 }
