@@ -36,7 +36,7 @@ import {
   IconBuildingWarehouse as Warehouse,
   IconFlame as Flame,
 } from "@tabler/icons-react";
-import { ListRow, StatusTag, type ListRowTier, type StatusTagKind } from "@/components/dulceria";
+import { ListRow, StatusTag, PageHeader, type ListRowTier, type StatusTagKind } from "@/components/dulceria";
 
 /* iOS-glass design tokens — match /dashboard, /plan, /production-brain. */
 const CARD = "bg-[color:var(--ds-card-bg)] border-[0.5px] border-[color:var(--ds-border-warm)] rounded-[8px] p-4";
@@ -209,35 +209,30 @@ export default function OrdersPage() {
   }, [orders, search, filterStatus]);
 
   return (
-    <div className="ds px-4 pt-5 pb-6" style={{ background: "var(--ds-page-bg)", minHeight: "100vh" }}>
-      <div className="flex items-baseline gap-3 mb-4 flex-wrap">
-        <h1
-          className="text-3xl"
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 400, letterSpacing: "-0.02em" }}
-        >
-          Orders
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Customer orders feeding the production scheduler.
-        </p>
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            href="/orders/online"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm font-medium hover:bg-[color:var(--ds-card-bg-hover)] transition"
-          >
-            <ShoppingBag className="w-3.5 h-3.5" /> Online
-          </Link>
-          {!adding && (
-            <button
-              onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--ds-tier-quarter-focus)] text-white px-3 py-1.5 text-sm font-medium hover:opacity-90 transition"
+    <div className="ds" style={{ background: "var(--ds-page-bg)", minHeight: "100vh" }}>
+      <PageHeader
+        title="Orders"
+        meta="Customer orders feeding the production scheduler"
+        actions={
+          <>
+            <Link
+              href="/orders/online"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm font-medium hover:bg-[color:var(--ds-card-bg-hover)] transition"
             >
-              <Plus className="w-3.5 h-3.5" /> New order
-            </button>
-          )}
-        </div>
-      </div>
-
+              <ShoppingBag className="w-3.5 h-3.5" /> Online
+            </Link>
+            {!adding && (
+              <button
+                onClick={() => setAdding(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--ds-tier-quarter-focus)] text-white px-3 py-1.5 text-sm font-medium hover:opacity-90 transition"
+              >
+                <Plus className="w-3.5 h-3.5" /> New order
+              </button>
+            )}
+          </>
+        }
+      />
+      <div className="px-4 pt-3 pb-6">
       <div className={CARD + " mb-4"}>
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
           <div className="relative flex-1 max-w-xs min-w-[200px]">
@@ -461,6 +456,7 @@ export default function OrdersPage() {
             </section>
           ));
         })()}
+      </div>
       </div>
     </div>
   );

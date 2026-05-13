@@ -21,7 +21,7 @@ import {
 import { ORDER_CHANNEL_LABELS } from "@/types";
 import type { StockLocation } from "@/types";
 import { IconPackage as Package, IconAlertTriangle as AlertTriangle, IconCheck as Check, IconExternalLink as ExternalLink, IconBox as Box } from "@tabler/icons-react";
-import { BackButton } from "@/components/back-button";
+import { PageHeader } from "@/components/dulceria";
 
 type Tab = "pack" | "box";
 
@@ -40,22 +40,12 @@ export default function PickingPage() {
   const [tab, setTab] = useState<Tab>("pack");
 
   return (
-    <div className="ds px-6 py-5 max-w-5xl mx-auto" style={{ background: "var(--ds-page-bg)" }}>
-      <div className="mb-2">
-        <BackButton />
-      </div>
-      <div className="flex items-baseline gap-3 mb-4">
-        <h1
-          className="text-3xl"
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 400, letterSpacing: "-0.02em" }}
-        >
-          Picking
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Ship ready orders + assemble boxed inventory.
-        </p>
-      </div>
-
+    <div className="ds" style={{ background: "var(--ds-page-bg)", minHeight: "100vh" }}>
+      <PageHeader
+        title="Picking"
+        meta="Ship ready orders + assemble boxed inventory"
+      />
+      <div className="px-6 pt-3 pb-5 max-w-5xl mx-auto">
       <div className="inline-flex rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden text-sm mb-4">
         <button
           type="button"
@@ -74,6 +64,7 @@ export default function PickingPage() {
       </div>
 
       {tab === "pack" ? <PackTab /> : <BoxTab />}
+      </div>
     </div>
   );
 }
