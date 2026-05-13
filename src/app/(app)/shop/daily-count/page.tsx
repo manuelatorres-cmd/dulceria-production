@@ -340,16 +340,10 @@ export default function DailyCountPage() {
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-4 pb-2">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
-      </div>
-
-      <PageHeader title="Daily count" meta={"Shop" + " · " + "End-of-day reconciliation. Tab 1: bulk-enter variant + single-product sales. Tab 2: count bonbons left on the shelf — variance gets a reason."} />
+      <PageHeader
+        title="Daily count"
+        meta="End-of-day reconciliation · Tab 1 bulk-enter variant + single-product sales · Tab 2 count bonbons left on shelf — variance gets a reason"
+      />
 
       {/* Category chip row — applies to BOTH tabs. Filters variant
           sizes (by composition products) on tab 1 and the bonbon
