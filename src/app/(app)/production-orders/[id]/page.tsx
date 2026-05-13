@@ -28,6 +28,7 @@ import {
   type ProductionOrderStatus,
 } from "@/types";
 import { DetailNav } from "@/components/detail-nav";
+import { PageHeader } from "@/components/dulceria";
 
 export default function ProductionOrderDetailPage({
   params,
