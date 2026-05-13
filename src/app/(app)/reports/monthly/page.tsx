@@ -8,6 +8,7 @@ import {
   useProductsList,
   useProductionPlans,
   useAllPlanProducts,
+  useAllLatestProductCosts,
 } from "@/lib/hooks";
 
 /**
@@ -33,6 +34,7 @@ export default function MonthlyReviewPage() {
   const products = useProductsList();
   const plans = useProductionPlans();
   const planProducts = useAllPlanProducts();
+  const productCosts = useAllLatestProductCosts();
 
   const [year, month] = useMemo(() => {
     const [y, m] = yearMonth.split("-");
@@ -71,8 +73,8 @@ export default function MonthlyReviewPage() {
 
   // Margin per product (top 10)
   const productMargins = useMemo(
-    () => computeProductMargins(ordersThisMonth, orderItems, productsById),
-    [ordersThisMonth, orderItems, productsById],
+    () => computeProductMargins(ordersThisMonth, orderItems, productsById, productCosts),
+    [ordersThisMonth, orderItems, productsById, productCosts],
   );
 
   // Yield % per product
@@ -341,6 +343,7 @@ function computeProductMargins(
   orders: Array<{ id?: string }>,
   items: Array<{ orderId: string; productId: string; unitPrice?: number; quantity: number }>,
   productsById: Map<string, { id?: string; name: string }>,
+  productCosts: Map<string, number>,
 ) {
   const orderIds = new Set(orders.map((o) => o.id).filter(Boolean));
   const byProduct = new Map<string, { qty: number; gross: number }>();
@@ -356,12 +359,21 @@ function computeProductMargins(
   return Array.from(byProduct.entries())
     .map(([productId, stats]) => {
       const product = productsById.get(productId);
+      // Margin requires both a known cost-per-product AND non-zero gross.
+      // If no cost snapshot exists for this product, marginPct is null and
+      // the UI renders `—`. Never invent numbers.
+      const cost = productCosts.get(productId);
+      let marginPct: number | null = null;
+      if (typeof cost === "number" && cost >= 0 && stats.qty > 0 && stats.gross > 0) {
+        const totalCost = cost * stats.qty;
+        marginPct = ((stats.gross - totalCost) / stats.gross) * 100;
+      }
       return {
         productId,
         productName: product?.name ?? productId.slice(0, 8),
         qty: stats.qty,
         gross: stats.gross,
-        marginPct: stats.gross > 0 && stats.qty > 0 ? 45 : null, // placeholder
+        marginPct,
       };
     })
     .sort((a, b) => b.gross - a.gross);

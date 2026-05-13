@@ -3255,6 +3255,36 @@ export function useProductCostSnapshots(productId: string | undefined): ProductC
   return data ?? [];
 }
 
+/**
+ * Latest cost snapshot per product. Returns a Map<productId, costPerProduct>.
+ * Used by monthly margin report and any caller needing all costs at once.
+ * Avoids N+1 per-product queries.
+ */
+export function useAllLatestProductCosts(): Map<string, number> {
+  const { data } = useQuery({
+    queryKey: ["product-cost-snapshots", "all-latest"],
+    queryFn: async () => {
+      const rows = assertOk(
+        await supabase
+          .from("productCostSnapshots")
+          .select("productId, costPerProduct, recordedAt"),
+      ) as Array<{ productId: string; costPerProduct: number; recordedAt: string | Date }>;
+      const latestByProduct = new Map<string, { cost: number; at: number }>();
+      for (const r of rows) {
+        const at = new Date(r.recordedAt).getTime();
+        const existing = latestByProduct.get(r.productId);
+        if (!existing || at > existing.at) {
+          latestByProduct.set(r.productId, { cost: Number(r.costPerProduct) || 0, at });
+        }
+      }
+      const out = new Map<string, number>();
+      for (const [pid, entry] of latestByProduct) out.set(pid, entry.cost);
+      return out;
+    },
+  });
+  return data ?? new Map();
+}
+
 export function useLatestProductCostSnapshot(productId: string | undefined): ProductCostSnapshot | undefined {
   const { data } = useQuery({
     queryKey: ["product-cost-snapshots", productId, "latest"],
