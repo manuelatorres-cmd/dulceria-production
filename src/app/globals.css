@@ -92,6 +92,7 @@
   /* Mint — mockup */
   --accent-mint-bg:       #eaf6ef;
   --accent-mint-ink:      #4a7a5e;
+  --accent-mint-edge:     #d4e0d8;
   /* Terracotta (brick) — kept as signature warm alert accent. */
   --accent-terracotta-bg: #f1d9c9;
   --accent-terracotta-ink:#7a3e24;
@@ -101,6 +102,7 @@
   /* Blush — mockup */
   --accent-blush-bg:      #fbe6e3;
   --accent-blush-ink:     #9b4f48;
+  --accent-blush-edge:    #f0c8c2;
 
   /* ─── Production brain planner block tokens ───────────────────────────
      Semantic names for calendar/planner blocks. Each maps to one of the

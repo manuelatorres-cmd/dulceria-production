@@ -20,7 +20,7 @@ const WEEKDAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "F
 
 /* Same glass card pattern as /plan + /dashboard. */
 const CARD = "bg-[color:var(--ds-card-bg)] border-[0.5px] border-[color:var(--ds-border-warm)] rounded-[8px] p-5";
-const PINK = "bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] hover:bg-[#d4e0d8]";
+const PINK = "bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] hover:bg-[var(--accent-mint-edge)]";
 const PINK_INK = "text-[var(--accent-mint-ink)]";
 
 export default function ShopPage() {
@@ -82,9 +82,9 @@ function LiveStatusInline({ live }: { live: ReturnType<typeof computeLiveShopSta
     <span
       className="inline-flex items-center gap-2 text-[11.5px] px-3 py-1 rounded-full"
       style={{
-        background: open ? "var(--accent-mint-bg)" : "#fdeeea",
+        background: open ? "var(--accent-mint-bg)" : "var(--accent-blush-bg)",
         color: open ? "var(--accent-mint-ink)" : "var(--accent-blush-ink)",
-        border: `1px solid ${open ? "var(--accent-mint-edge)" : "#c8d4cc"}`,
+        border: `1px solid ${open ? "var(--accent-mint-edge)" : "var(--accent-blush-edge)"}`,
       }}
     >
       <span
@@ -266,7 +266,7 @@ function ArrivingCard() {
                   </span>
                   <span className="text-muted-foreground">{more}</span>
                 </span>
-                <span className="text-[11px] tabular-nums shrink-0" style={{ color: o.status === "in_production" ? "var(--accent-butter-ink)" : "#8a8780" }}>
+                <span className="text-[11px] tabular-nums shrink-0" style={{ color: o.status === "in_production" ? "var(--accent-butter-ink)" : "var(--ds-text-muted)" }}>
                   {o.status === "in_production" ? "Producing" : "Planned"} · {new Date(o.deadline).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
                 </span>
               </li>
@@ -393,9 +393,9 @@ function ShopStockGrid() {
       </div>
 
       <div className="flex items-center gap-3 mb-3 text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.06em" }}>
-        <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "#d6ead9" }} />ok {okN}</span>
+        <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "var(--accent-mint-bg)" }} />ok {okN}</span>
         <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "var(--accent-butter-bg)" }} />low {lowN}</span>
-        <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "#fdeeea" }} />out {outN}</span>
+        <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "var(--accent-blush-bg)" }} />out {outN}</span>
       </div>
 
       <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -427,9 +427,9 @@ function ShopStockGrid() {
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
           {visible.map((r) => {
-            const tint = r.status === "out" ? { bg: "#fdeeea", ink: "var(--accent-blush-ink)" }
+            const tint = r.status === "out" ? { bg: "var(--accent-blush-bg)", ink: "var(--accent-blush-ink)" }
               : r.status === "low" ? { bg: "var(--accent-butter-bg)", ink: "var(--accent-butter-ink)" }
-                : r.status === "over" ? { bg: "#f3eef6", ink: "#6a4d89" }
+                : r.status === "over" ? { bg: "var(--accent-lilac-bg)", ink: "var(--accent-lilac-ink)" }
                   : { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)" };
             return (
               <button
@@ -549,7 +549,7 @@ function OpeningHoursCard({
                 <span style={{ fontFamily: "var(--font-serif)", fontSize: 13 }}>
                   {WEEKDAY_FULL[dow]}
                 </span>
-                <span className="text-[11.5px] tabular-nums" style={{ color: open ? "#1c1d1f" : "#8a8780" }}>
+                <span className="text-[11.5px] tabular-nums" style={{ color: open ? "var(--ds-text-primary)" : "var(--ds-text-muted)" }}>
                   {open ? `${row.openAt}–${row.closeAt}` : "Closed"}
                 </span>
               </div>
@@ -684,7 +684,7 @@ function ClosuresEditor({ closures }: {
   return (
     <div className="space-y-1.5">
       {closures.map((c) => (
-        <div key={c.id} className="flex items-center gap-2 rounded-[10px] border border-[#dfe6e0] bg-[#e9efe9] px-2.5 py-1.5">
+        <div key={c.id} className="flex items-center gap-2 rounded-[10px] border border-[color:var(--accent-mint-edge)] bg-[color:var(--accent-mint-bg)] px-2.5 py-1.5">
           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--accent-blush-ink)" }} />
           <span className="flex-1 min-w-0 text-[12px]" style={{ color: "var(--accent-blush-ink)" }}>
             {new Date(c.startDate).toLocaleDateString("de-AT", { day: "numeric", month: "short" })}
