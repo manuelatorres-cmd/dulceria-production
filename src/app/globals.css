@@ -652,3 +652,28 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Sidebar mobile responsive — narrow viewport collapses to icon rail. */
+@media (max-width: 767px) {
+  .sidebar {
+    width: 56px;
+  }
+  .sidebar .sb-logo img:last-child,
+  .sidebar .sb-home span,
+  .sidebar .sb-spaces-label,
+  .sidebar .sb-space-label,
+  .sidebar .sb-space-chevron,
+  .sidebar .sb-subsection,
+  .sidebar .sb-utility-label,
+  .sidebar .sb-utility-badge,
+  .sidebar .sb-user-email {
+    display: none;
+  }
+  .sidebar .sb-home,
+  .sidebar .sb-space,
+  .sidebar .sb-utility {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}

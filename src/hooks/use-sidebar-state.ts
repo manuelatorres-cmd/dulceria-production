@@ -1,21 +1,77 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { SIDEBAR_CONFIG, isInSpace } from "@/lib/layout/sidebar-config";
+
+const STORAGE_KEY = "dulceria.sidebar.v1";
+
+interface PersistedShape {
+  manualOpen: string[];
+  manualClosed: string[];
+}
+
+function loadPersisted(): PersistedShape | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      Array.isArray(parsed.manualOpen) &&
+      Array.isArray(parsed.manualClosed)
+    ) {
+      return parsed as PersistedShape;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function savePersisted(state: PersistedShape): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    /* quota — ignore */
+  }
+}
 
 /**
  * Sidebar expansion state.
  *
- * The active route's parent space is auto-expanded; on top of that, the
- * user can manually toggle other spaces open or closed. Persisted state
- * (localStorage) is honest-deferred to Phase 4 — for now, manually
- * toggled set is in-memory per session.
+ * - The active route's parent space is auto-expanded.
+ * - On top of that, the user can manually toggle any space open or
+ *   closed. Manual choices persist across reloads via localStorage
+ *   under `dulceria.sidebar.v1`.
+ * - Closing an auto-expanded space records a "manual close" override
+ *   so the user's intent wins until they navigate to a different
+ *   space.
  */
 export function useSidebarState() {
   const pathname = usePathname();
   const [manualOpen, setManualOpen] = useState<Set<string>>(new Set());
   const [manualClosed, setManualClosed] = useState<Set<string>>(new Set());
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const persisted = loadPersisted();
+    if (persisted) {
+      setManualOpen(new Set(persisted.manualOpen));
+      setManualClosed(new Set(persisted.manualClosed));
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    savePersisted({
+      manualOpen: Array.from(manualOpen),
+      manualClosed: Array.from(manualClosed),
+    });
+  }, [manualOpen, manualClosed, hydrated]);
 
   const autoExpanded = useMemo(() => {
     const set = new Set<string>();
