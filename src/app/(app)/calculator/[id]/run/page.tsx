@@ -9,7 +9,8 @@ import {
   useFillings,
 } from "@/lib/hooks";
 import { FILL_FACTOR } from "@/lib/production";
-import { IconChevronLeft as ChevronLeft, IconChevronRight as ChevronRight } from "@tabler/icons-react";
+import { IconChevronRight as ChevronRight } from "@tabler/icons-react";
+import { PageHeader } from "@/components/dulceria";
 
 export default function RunBatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);
@@ -56,19 +57,12 @@ export default function RunBatchPage({ params }: { params: Promise<{ id: string 
   }
 
   return (
-    <div className="px-4 pt-6 pb-12 max-w-lg">
-      {/* Back */}
-      <button
-        onClick={() => router.back()}
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ChevronLeft className="w-4 h-4" /> {experiment.name}
-      </button>
-
-      <h1 className="text-xl font-semibold mb-1">Make product</h1>
-      <p className="text-sm text-muted-foreground mb-7">
-        Choose your mould and quantity — we&rsquo;ll scale the formula for you.
-      </p>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Make product"
+        meta={`From experiment: ${experiment.name} · choose mould + quantity, we scale the formula`}
+      />
+      <div className="px-4 pb-12 max-w-lg">
 
       {/* Mould */}
       <section className="mb-5 space-y-4">
@@ -181,6 +175,7 @@ export default function RunBatchPage({ params }: { params: Promise<{ id: string 
       >
         Start batch <ChevronRight className="inline w-4 h-4 -mt-0.5" />
       </button>
+      </div>
     </div>
   );
 }
