@@ -92,6 +92,14 @@ export function DsInlineField({
               if (e.key === "Enter") commit();
               else if (e.key === "Escape") cancel();
             }}
+            onBlur={(e) => {
+              // Save-on-blur. Bail if focus moved to the Cancel button so
+              // the user's cancel intent still works.
+              const next = e.relatedTarget as HTMLElement | null;
+              if (next?.closest('[data-ds-cancel="1"]')) return;
+              if (draft !== value) commit();
+              else setEditing(false);
+            }}
             placeholder={placeholder}
             disabled={saving}
             style={{
@@ -109,9 +117,11 @@ export function DsInlineField({
           <IconButton onClick={commit} title="Save" variant="primary" disabled={saving}>
             <IconCheck size={12} stroke={1.75} />
           </IconButton>
-          <IconButton onClick={cancel} title="Cancel" disabled={saving}>
-            <IconX size={12} stroke={1.75} />
-          </IconButton>
+          <span data-ds-cancel="1">
+            <IconButton onClick={cancel} title="Cancel" disabled={saving}>
+              <IconX size={12} stroke={1.75} />
+            </IconButton>
+          </span>
         </div>
         {error && <FormError>{error}</FormError>}
       </div>
@@ -223,6 +233,12 @@ export function DsInlineTextarea({
           onKeyDown={(e) => {
             if (e.key === "Escape") cancel();
           }}
+          onBlur={(e) => {
+            const next = e.relatedTarget as HTMLElement | null;
+            if (next?.closest('[data-ds-cancel="1"]')) return;
+            if (draft !== value) commit();
+            else setEditing(false);
+          }}
           placeholder={placeholder}
           disabled={saving}
           rows={rows}
@@ -242,9 +258,11 @@ export function DsInlineTextarea({
           <IconButton onClick={commit} title="Save" variant="primary" disabled={saving}>
             <IconCheck size={12} stroke={1.75} />
           </IconButton>
-          <IconButton onClick={cancel} title="Cancel" disabled={saving}>
-            <IconX size={12} stroke={1.75} />
-          </IconButton>
+          <span data-ds-cancel="1">
+            <IconButton onClick={cancel} title="Cancel" disabled={saving}>
+              <IconX size={12} stroke={1.75} />
+            </IconButton>
+          </span>
         </div>
         {error && <FormError>{error}</FormError>}
       </div>

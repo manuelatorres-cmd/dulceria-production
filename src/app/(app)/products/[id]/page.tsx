@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, useCallback, use } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, use, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, saveVariant, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList, useProductLeadTimeSuggestions, useStockLocationMinimums, saveStockLocationMinimum, useFacilityMayContain } from "@/lib/hooks";
+import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, saveVariant, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList, useProductLeadTimeSuggestions, useStockLocationMinimums, saveStockLocationMinimum, useFacilityMayContain, useAllVariantPackagingProducts, useAllVariantPackagings } from "@/lib/hooks";
 import { SHELL_TECHNIQUES, DECORATION_MATERIAL_TYPE_LABELS, DECORATION_APPLY_AT_OPTIONS, normalizeApplyAt, COMPOSITION_FIELDS, type ShellDesignStep, type ShellDesignApplyAt, type ProductCostSnapshot, type BreakdownEntry, type ProductFilling, costPerGram, type DecorationMaterial, allergenLabel, type FillMode, type Ingredient, type Filling, type ProductCategory, type FillingIngredient } from "@/types";
 import { colorToCSS } from "@/lib/colors";
 import { deserializeBreakdown, enrichBreakdownLabels, formatCost, costDelta, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -31,10 +31,14 @@ import {
   DsInlineSelect,
   DsInlineToggle,
   DsTagInput,
-  DsPhotoUpload,
   ListRow,
+  StatCard,
+  DsButton,
+  DsDialog,
+  DsDrawer,
   StatusTag,
   type StatusTagKind,
+  type StatCardVariant,
   useToast,
 } from "@/components/dulceria";
 import type { Product } from "@/types";
@@ -524,31 +528,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   width={80}
                   height={80}
                   className="w-20 h-20 rounded-[4px] object-cover cursor-pointer"
-                  onClick={() => { if (!confirmRemovePhoto) fileInputRef.current?.click(); }}
+                  onClick={() => fileInputRef.current?.click()}
                 />
-                {confirmRemovePhoto ? (
-                  <div className="absolute -top-1.5 -right-1.5 flex gap-1">
-                    <button
-                      onClick={() => { saveProduct({ id: productId, name: product!.name, photo: undefined }); setConfirmRemovePhoto(false); }}
-                      className="h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-medium"
-                    >Remove</button>
-                    <button
-                      onClick={() => setConfirmRemovePhoto(false)}
-                      className="w-5 h-5 rounded-full bg-stone-400 text-white flex items-center justify-center"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setConfirmRemovePhoto(true)}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-stone-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove photo"
-                    aria-label="Remove photo"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
+                <button
+                  onClick={() => setConfirmRemovePhoto(true)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-stone-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove photo"
+                  aria-label="Remove photo"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               </>
             ) : (
               <button
@@ -699,14 +688,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           {/* Column 1 — Identity */}
           <Section title="Identity">
             <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 12 }}>
-              <DsPhotoUpload
-                value={product.photo}
-                aspectRatio={1}
-                onChange={async (url) => {
-                  await patchProduct({ photo: url ?? undefined });
-                  toast.success(url ? "Photo updated" : "Photo removed");
-                }}
-              />
               <DsInlineField
                 label="Name"
                 value={product.name}
@@ -1111,53 +1092,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               }
             >
               <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 12 }}>
-                {showAssign && (
-                  <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={fillingSearch}
-                        onChange={(e) => setFillingSearch(e.target.value)}
-                        placeholder="Search fillings to assign..."
-                        autoFocus
-                        className="input !pl-8"
-                      />
-                    </div>
-                    {filteredAvailable.length > 0 ? (
-                      <ul className="max-h-48 overflow-y-auto space-y-1">
-                        {filteredAvailable.map((filling) => (
-                          <li key={filling.id}>
-                            <button
-                              onClick={() => handleAssignFilling(filling.id!)}
-                              className="w-full text-left rounded-full px-2 py-1.5 hover:bg-muted transition-colors"
-                            >
-                              <span className="text-sm font-medium">{filling.name}</span>
-                              {(filling.category || filling.description) && (
-                                <div className="text-xs text-muted-foreground truncate">
-                                  {[filling.category, filling.description].filter(Boolean).join(" · ")}
-                                </div>
-                              )}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs text-muted-foreground py-2 text-center">
-                        {availableFillings.length === 0
-                          ? "All fillings are already assigned."
-                          : "No fillings match your search."}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => { setShowAssign(false); setFillingSearch(""); }}
-                      className="text-xs text-muted-foreground"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-                {productFillings.length === 0 && !showAssign ? (
+                {productFillings.length === 0 ? (
                   <p className="text-muted-foreground text-sm py-4 text-center">
                     No fillings assigned yet. Assign an existing filling or create a new one.
                   </p>
@@ -1193,72 +1128,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         })()}
       </div>
 
-      {/* Delete / Archive / Duplicate — always visible (was gated on !editing) */}
+      {/* Duplicate / Archive / Delete action rail.
+       *  Duplicate is a DsDrawer (form needs space). Archive + Delete are
+       *  DsDialog confirms (single-tap destructive actions). */}
       <div className="px-4 pb-8 border-t border-[color:var(--ds-border-warm)] pt-4 space-y-4">
-        {/* Duplicate */}
-        {showDuplicatePanel ? (
-          <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Copy className="w-4 h-4 text-muted-foreground shrink-0" />
-              <p className="text-sm font-medium">Duplicate &ldquo;{product?.name}&rdquo;</p>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              A new product will be created with the same type, coating, tags, notes, shell design, and production defaults.
-            </p>
-            {productFillings.length > 0 && (
-              <>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={duplicateFillings}
-                    onChange={(e) => setDuplicateFillings(e.target.checked)}
-                    className="rounded border-[color:var(--ds-border-warm)]"
-                  />
-                  <span className="text-xs">
-                    Also duplicate {productFillings.length === 1 ? "the filling" : `all ${productFillings.length} fillings`} as new copies
-                  </span>
-                </label>
-                <p className="text-xs text-muted-foreground ml-6 -mt-2">
-                  {duplicateFillings
-                    ? "Each filling will be copied as an independent filling you can edit separately."
-                    : "The duplicate will share the same fillings as the original."}
-                </p>
-              </>
-            )}
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={async () => {
-                  setDuplicatingProduct(true);
-                  try {
-                    const newId = await duplicateProduct(productId, { duplicateFillings });
-                    router.push(`/products/${encodeURIComponent(newId)}?new=1`);
-                  } finally {
-                    setDuplicatingProduct(false);
-                  }
-                }}
-                disabled={duplicatingProduct}
-                className="btn-primary px-3 py-1.5 text-sm disabled:opacity-50"
-              >
-                {duplicatingProduct ? "Duplicating…" : "Duplicate product"}
-              </button>
-              <button
-                onClick={() => { setShowDuplicatePanel(false); setDuplicateFillings(false); }}
-                className="btn-secondary px-3 py-1.5 text-sm"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => { setShowDuplicatePanel(true); setConfirmDelete(false); }}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Copy className="w-4 h-4" /> Duplicate product
-          </button>
-        )}
+        <button
+          onClick={() => setShowDuplicatePanel(true)}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Copy className="w-4 h-4" /> Duplicate product
+        </button>
 
-        {/* Unarchive (for archived products) */}
         {product?.archived && (
           <button
             onClick={async () => { await unarchiveProduct(productId); }}
@@ -1268,74 +1148,172 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </button>
         )}
 
-        {/* Archive (for produced products) */}
         {!product?.archived && productProduced && (
-          confirmDelete ? (
-            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
-                <p className="text-sm font-medium">Archive this product?</p>
-              </div>
-              <p className="text-xs text-muted-foreground">This product has been used in production and cannot be deleted. Archiving will hide it from lists but preserve it for production history.</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => { await archiveProduct(productId); router.replace("/products"); }}
-                  className="btn-primary px-4 py-2 text-sm"
-                >
-                  Yes, archive product
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="btn-secondary px-4 py-2"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Archive className="w-4 h-4" /> Archive product
-            </button>
-          )
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Archive className="w-4 h-4" /> Archive product
+          </button>
         )}
 
-        {/* Delete (only for non-archived, non-produced products) */}
         {!product?.archived && !productProduced && (
-          confirmDelete ? (
-            <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
-              <p className="text-sm font-medium text-destructive">Delete this product?</p>
-              <p className="text-xs text-muted-foreground">This will permanently remove the product and all its filling assignments. This cannot be undone.</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => { await deleteProduct(productId); router.replace("/products"); }}
-                  className="inline-flex items-center justify-center rounded-[4px] bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
-                >
-                  Yes, delete product
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="btn-secondary px-4 py-2"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
-            >
-              <Trash2 className="w-4 h-4" /> Delete product
-            </button>
-          )
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> Delete product
+          </button>
         )}
       </div>
 
       </>
       )}
+
+      {/* Drawers + dialogs (mounted once, controlled by ProductDetailPage
+       *  state). Replaces the nested-modal / inline-panel patterns.  */}
+      <DsDialog
+        open={confirmRemovePhoto}
+        title="Remove photo?"
+        description={`The photo for "${product?.name}" will be removed. You can upload a new one any time.`}
+        confirmLabel="Remove"
+        tone="destructive"
+        onCancel={() => setConfirmRemovePhoto(false)}
+        onConfirm={async () => {
+          if (!product) return;
+          await saveProduct({ id: productId, name: product.name, photo: undefined });
+          setConfirmRemovePhoto(false);
+          toast.success("Photo removed");
+        }}
+      />
+
+      <DsDialog
+        open={confirmDelete && !!product && !product.archived}
+        title={productProduced ? "Archive this product?" : "Delete this product?"}
+        description={productProduced
+          ? "This product has been used in production and can't be deleted. Archiving hides it from lists but preserves the production history."
+          : "Permanently removes the product and all its filling assignments. This cannot be undone."}
+        confirmLabel={productProduced ? "Archive" : "Delete"}
+        tone={productProduced ? "default" : "destructive"}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={async () => {
+          if (productProduced) {
+            await archiveProduct(productId);
+          } else {
+            await deleteProduct(productId);
+          }
+          setConfirmDelete(false);
+          router.replace("/products");
+        }}
+      />
+
+      <DsDrawer
+        open={showDuplicatePanel}
+        title={`Duplicate "${product?.name ?? ""}"`}
+        onClose={() => { setShowDuplicatePanel(false); setDuplicateFillings(false); }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <p style={{ fontSize: 12, color: "var(--ds-text-muted)", lineHeight: 1.5 }}>
+            A new product will be created with the same type, coating, tags, notes, shell design, and production defaults.
+          </p>
+          {productFillings.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={duplicateFillings}
+                  onChange={(e) => setDuplicateFillings(e.target.checked)}
+                />
+                <span>
+                  Also duplicate {productFillings.length === 1 ? "the filling" : `all ${productFillings.length} fillings`} as new copies
+                </span>
+              </label>
+              <p style={{ fontSize: 11, color: "var(--ds-text-muted)", marginLeft: 24, lineHeight: 1.4 }}>
+                {duplicateFillings
+                  ? "Each filling will be copied as an independent filling you can edit separately."
+                  : "The duplicate will share the same fillings as the original."}
+              </p>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <DsButton
+              variant="primary"
+              disabled={duplicatingProduct}
+              onClick={async () => {
+                setDuplicatingProduct(true);
+                try {
+                  const newId = await duplicateProduct(productId, { duplicateFillings });
+                  setShowDuplicatePanel(false);
+                  router.push(`/products/${encodeURIComponent(newId)}?new=1`);
+                } finally {
+                  setDuplicatingProduct(false);
+                }
+              }}
+            >
+              {duplicatingProduct ? "Duplicating…" : "Duplicate product"}
+            </DsButton>
+            <DsButton onClick={() => { setShowDuplicatePanel(false); setDuplicateFillings(false); }}>
+              Cancel
+            </DsButton>
+          </div>
+        </div>
+      </DsDrawer>
+
+      <DsDrawer
+        open={showAssign}
+        title="Assign filling"
+        onClose={() => { setShowAssign(false); setFillingSearch(""); }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ position: "relative" }}>
+            <Search style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: "var(--ds-text-muted)" }} />
+            <input
+              type="text"
+              value={fillingSearch}
+              onChange={(e) => setFillingSearch(e.target.value)}
+              placeholder="Search fillings to assign…"
+              autoFocus
+              className="input"
+              style={{ paddingLeft: 32, width: "100%" }}
+            />
+          </div>
+          {filteredAvailable.length > 0 ? (
+            <ul style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: "60vh", overflowY: "auto" }}>
+              {filteredAvailable.map((filling) => (
+                <li key={filling.id}>
+                  <button
+                    onClick={() => handleAssignFilling(filling.id!)}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "8px 12px",
+                      borderRadius: 6,
+                      background: "transparent",
+                      border: "0.5px solid transparent",
+                      cursor: "pointer",
+                      color: "var(--ds-text-primary)",
+                    }}
+                    className="hover:bg-[color:var(--ds-card-bg-hover)]"
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{filling.name}</span>
+                    {(filling.category || filling.description) && (
+                      <div style={{ fontSize: 11, color: "var(--ds-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {[filling.category, filling.description].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ fontSize: 12, color: "var(--ds-text-muted)", fontStyle: "italic", textAlign: "center", padding: "12px 0" }}>
+              {availableFillings.length === 0
+                ? "All fillings are already assigned."
+                : "No fillings match your search."}
+            </p>
+          )}
+        </div>
+      </DsDrawer>
     </div>
   );
 }
@@ -1731,7 +1709,13 @@ function BatchHistoryTab({ productId }: { productId: string }) {
   );
 }
 
-// --- Cost Tab ---
+// --- Cost Tab (Phase A.5) ---
+//
+// Two-column body: StatCard 2x2 + Cost breakdown ListRows + Recompute on the
+// left; Sparkline + Snapshot history ListRows + Export CSV on the right.
+// Margin % is colour-coded (mint ≥30 → caramel 15–30 → rose <15).
+// Engine only emits shell/cap + filling_ingredient breakdown rows today, so
+// Packaging / Labor / Other render as deferred (✗) muted rows.
 
 function ProductCostTab({
   productId,
@@ -1752,13 +1736,10 @@ function ProductCostTab({
   const fillingIds = productFillings.map((rl) => rl.fillingId);
   const fillingIngredientsMap = useFillingIngredientsForFillings(fillingIds);
   const allFillings = useFillings();
+  const variantPackagings = useAllVariantPackagings();
+  const variantPackagingProducts = useAllVariantPackagingProducts();
 
   const [recalculating, setRecalculating] = useState(false);
-  const [showAllHistory, setShowAllHistory] = useState(false);
-  const [sortKey, setSortKey] = useState<"layer" | "ingredient" | "grams" | "costPerGram" | "subtotal" | "pct">("subtotal");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [breakdownView, setBreakdownView] = useState<"grouped" | "flat">("grouped");
-  const [collapsedLayers, setCollapsedLayers] = useState<Set<string>>(new Set());
 
   const mould = allMoulds.find((m) => m.id === product.defaultMouldId);
   const hasMould = !!mould;
@@ -1789,168 +1770,63 @@ function ProductCostTab({
 
   const totalCost = useMemo(() => latestBreakdown.reduce((s, e) => s + e.subtotal, 0), [latestBreakdown]);
 
-  function handleSort(key: "layer" | "ingredient" | "grams" | "costPerGram" | "subtotal" | "pct") {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("desc"); }
-  }
-
-  // Split each breakdown row into layer + ingredient parts so both can be columns.
-  // Shell/cap rows share the synthetic layer id "__shell__"; their ingredient label
-  // is extracted from "Shell (chocolate name)".
-  const enrichedBreakdown = useMemo(() => {
-    return latestBreakdown.map(e => {
-      const pct = totalCost > 0 ? e.subtotal / totalCost : 0;
-      if (e.kind === "shell" || e.kind === "cap") {
-        // Legacy snapshots emit separate shell + cap rows; the current cost engine
-        // combines them into a single "shell" row. Treat both as shell-like here so
-        // old data renders with a real layer/ingredient name instead of "Unknown".
-        const labelPrefix = e.kind === "cap" ? "Cap" : "Shell";
-        const re = new RegExp(`^${labelPrefix}\\s*\\((.+)\\)\\s*$`);
-        const m = re.exec(e.label);
-        const ingredientName = m ? m[1] : e.label.replace(new RegExp(`^${labelPrefix}\\s*`), "") || "chocolate";
-        return { ...e, pct, layerId: "__shell__", layerName: "Shell", ingredientName };
-      }
-      const filling = e.fillingId ? fillingsMap.get(e.fillingId) : undefined;
-      const ingredient = e.ingredientId ? ingredientsMap.get(e.ingredientId) : undefined;
-      return {
-        ...e,
-        pct,
-        layerId: e.fillingId ?? "__unknown__",
-        layerName: filling?.name ?? "Unknown layer",
-        ingredientName: ingredient?.name ?? "Unknown ingredient",
-      };
-    });
-  }, [latestBreakdown, totalCost, fillingsMap, ingredientsMap]);
-
-  // Flat view merges rows by ingredient: if butter is used in multiple layers,
-  // a single row sums the weight + subtotal and lists all source layers.
-  // Shell entries stay separate (no ingredientId) and key on their own name.
-  const mergedBreakdown = useMemo(() => {
-    type Merged = {
-      key: string;
-      ingredientName: string;
-      layerNames: string[];
-      grams: number;
-      subtotal: number;
-      pct: number;
-      costPerGram: number;
-      isShell: boolean;
-    };
-    const merged = new Map<string, Merged>();
-    for (const row of enrichedBreakdown) {
-      const isShellLike = row.kind === "shell" || row.kind === "cap";
-      const key = isShellLike ? `__shell__:${row.ingredientName}` : (row.ingredientId ?? `__ing__:${row.ingredientName}`);
-      const existing = merged.get(key);
-      if (existing) {
-        existing.grams += row.grams;
-        existing.subtotal += row.subtotal;
-        existing.pct += row.pct;
-        if (!existing.layerNames.includes(row.layerName)) existing.layerNames.push(row.layerName);
-      } else {
-        merged.set(key, {
-          key,
-          ingredientName: row.ingredientName,
-          layerNames: [row.layerName],
-          grams: row.grams,
-          subtotal: row.subtotal,
-          pct: row.pct,
-          costPerGram: row.costPerGram,
-          isShell: isShellLike,
-        });
-      }
+  // Buckets the engine populates today vs. those still to land. Packaging /
+  // labor / overhead aren't tracked on snapshots yet — flagged ✗ inline.
+  const buckets = useMemo(() => {
+    let shell = 0;
+    let filling = 0;
+    for (const e of latestBreakdown) {
+      if (e.kind === "shell" || e.kind === "cap") shell += e.subtotal;
+      else if (e.kind === "filling_ingredient") filling += e.subtotal;
     }
-    return Array.from(merged.values());
-  }, [enrichedBreakdown]);
+    return [
+      { key: "shell", label: "Shell", value: shell, tracked: true as const },
+      { key: "filling", label: "Filling", value: filling, tracked: true as const },
+      { key: "packaging", label: "Packaging", value: 0, tracked: false as const },
+      { key: "labor", label: "Labor", value: 0, tracked: false as const },
+      { key: "other", label: "Other", value: 0, tracked: false as const },
+    ];
+  }, [latestBreakdown]);
 
-  const sortedMergedBreakdown = useMemo(() => {
-    return [...mergedBreakdown].sort((a, b) => {
-      const mult = sortDir === "asc" ? 1 : -1;
-      if (sortKey === "layer") {
-        const byLayer = a.layerNames[0].localeCompare(b.layerNames[0]);
-        return mult * (byLayer !== 0 ? byLayer : a.ingredientName.localeCompare(b.ingredientName));
-      }
-      if (sortKey === "ingredient") {
-        const byIng = a.ingredientName.localeCompare(b.ingredientName);
-        return mult * (byIng !== 0 ? byIng : a.layerNames[0].localeCompare(b.layerNames[0]));
-      }
-      const diff: Record<string, number> = {
-        grams: a.grams - b.grams,
-        costPerGram: a.costPerGram - b.costPerGram,
-        subtotal: a.subtotal - b.subtotal,
-        pct: a.pct - b.pct,
-      };
-      return mult * (diff[sortKey] ?? 0);
-    });
-  }, [mergedBreakdown, sortKey, sortDir]);
-
-  // Group by layer for the "Grouped" view. Layer order follows first appearance
-  // in latestBreakdown so the visual order matches the product's filling order,
-  // with Shell floating to the bottom.
-  const groupedBreakdown = useMemo(() => {
-    const groups = new Map<string, {
-      layerId: string;
-      layerName: string;
-      rows: typeof enrichedBreakdown;
-      weight: number;
-      subtotal: number;
-      pct: number;
-    }>();
-    for (const row of enrichedBreakdown) {
-      const existing = groups.get(row.layerId);
-      if (existing) {
-        existing.rows.push(row);
-        existing.weight += row.grams;
-        existing.subtotal += row.subtotal;
-        existing.pct += row.pct;
-      } else {
-        groups.set(row.layerId, {
-          layerId: row.layerId,
-          layerName: row.layerName,
-          rows: [row],
-          weight: row.grams,
-          subtotal: row.subtotal,
-          pct: row.pct,
-        });
-      }
+  // Representative sell price: cheapest single-unit variant size whose product
+  // composition is exactly [{productId, qty: 1}]. Falls back to null when no
+  // single-unit variant exists for this product.
+  const sellPrice = useMemo<number | null>(() => {
+    const byVp = new Map<string, { productId: string; qty: number }[]>();
+    for (const vpp of variantPackagingProducts) {
+      const list = byVp.get(vpp.variantPackagingId) ?? [];
+      list.push({ productId: vpp.productId, qty: vpp.qty });
+      byVp.set(vpp.variantPackagingId, list);
     }
-    // Legacy snapshots emit separate shell + cap rows. Collapse them into a single
-    // row per ingredient so the Shell group matches the current engine's output.
-    const shellGroup = groups.get("__shell__");
-    if (shellGroup && shellGroup.rows.length > 1) {
-      const byIngredient = new Map<string, typeof shellGroup.rows[number]>();
-      for (const row of shellGroup.rows) {
-        const existing = byIngredient.get(row.ingredientName);
-        if (existing) {
-          existing.grams += row.grams;
-          existing.subtotal += row.subtotal;
-          existing.pct += row.pct;
-        } else {
-          byIngredient.set(row.ingredientName, { ...row });
-        }
-      }
-      shellGroup.rows = Array.from(byIngredient.values());
+    let best: number | null = null;
+    for (const vp of variantPackagings) {
+      const entries = byVp.get(vp.id!) ?? [];
+      if (entries.length !== 1) continue;
+      const only = entries[0];
+      if (only.productId !== productId) continue;
+      if (only.qty !== 1) continue;
+      const price = vp.price ?? vp.sellPrice;
+      if (price == null || price <= 0) continue;
+      if (best == null || price < best) best = price;
     }
-    const arr = Array.from(groups.values());
-    // Push Shell to the bottom; preserve filling insertion order for the rest.
-    return arr.sort((a, b) => {
-      if (a.layerId === "__shell__") return 1;
-      if (b.layerId === "__shell__") return -1;
-      return 0;
-    });
-  }, [enrichedBreakdown]);
+    return best;
+  }, [variantPackagings, variantPackagingProducts, productId]);
 
-  function toggleLayer(layerId: string) {
-    setCollapsedLayers(prev => {
-      const next = new Set(prev);
-      if (next.has(layerId)) next.delete(layerId);
-      else next.add(layerId);
-      return next;
-    });
-  }
+  const margin = useMemo<number | null>(() => {
+    if (sellPrice == null || sellPrice <= 0) return null;
+    if (!latest) return null;
+    return ((sellPrice - latest.costPerProduct) / sellPrice) * 100;
+  }, [sellPrice, latest]);
 
-  // Chronological for chart, newest-first for change log
+  const marginVariant: StatCardVariant = margin == null
+    ? "default"
+    : margin >= 30
+      ? "ok"
+      : margin >= 15
+        ? "warn"
+        : "urgent";
+
   const chronological = [...snapshots].reverse();
-  const displayedHistory = showAllHistory ? snapshots : snapshots.slice(0, 10);
 
   async function handleRecalculate() {
     setRecalculating(true);
@@ -1961,427 +1837,305 @@ function ProductCostTab({
     }
   }
 
-  return (
-    <div className="px-4 pb-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          {latest ? (
-            <div>
-              <p className="text-2xl font-bold text-primary">{formatCost(latest.costPerProduct, sym)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">per product · 1 cavity</p>
-            </div>
-          ) : (
-            <div>
-              <p className="text-lg font-medium text-muted-foreground">No cost data yet</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Click Recalculate to compute</p>
-            </div>
-          )}
-          <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-            {mould && <span>Mould: {mould.name} ({mould.cavityWeightG}g)</span>}
-            {shellIngredient && <span>Shell: {shellIngredient.name}</span>}
-          </div>
-        </div>
-        <button
-          onClick={handleRecalculate}
-          disabled={recalculating}
-          className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50 shrink-0"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? "animate-spin" : ""}`} />
-          Recalculate
-        </button>
-      </div>
+  function handleExportCsv() {
+    if (snapshots.length === 0) return;
+    const header = ["recordedAt", "costPerProduct", "trigger", "detail"].join(",");
+    const rows = snapshots.map((s) => [
+      new Date(s.recordedAt).toISOString(),
+      s.costPerProduct.toFixed(4),
+      s.triggerType,
+      `"${(s.triggerDetail ?? "").replace(/"/g, '""')}"`,
+    ].join(","));
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${product.name.replace(/[^a-z0-9-_]+/gi, "_")}-cost-history.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
-      {/* Warnings */}
+  function relativeTime(date: Date | string) {
+    const t = new Date(date).getTime();
+    const diff = Date.now() - t;
+    const sec = Math.floor(diff / 1000);
+    if (sec < 60) return "just now";
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min} min ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} h ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 30) return `${day} d ago`;
+    const mo = Math.floor(day / 30);
+    if (mo < 12) return `${mo} mo ago`;
+    return `${Math.floor(mo / 12)} y ago`;
+  }
+
+  return (
+    <div className="px-4 pb-8" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Warnings ───────────────────────────── */}
       {!hasMould && (
-        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
-          <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
-          <p className="text-xs text-status-warn">
-            Set a <strong>default mould</strong> on this product to enable cost calculation.
-          </p>
-        </div>
+        <CostWarning>
+          Set a <strong>default mould</strong> on this product to enable cost calculation.
+        </CostWarning>
       )}
       {hasMould && !hasShell && (
-        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
-          <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
-          <p className="text-xs text-status-warn">
-            No shell chocolate set — shell and cap costs are excluded. Pick one on the
-            <strong> Shell</strong> tab.
-          </p>
-        </div>
+        <CostWarning>
+          No shell chocolate set — shell and cap costs are excluded. Pick one on the <strong>Shell</strong> tab.
+        </CostWarning>
       )}
       {hasMould && hasShell && !shellPriced && (
-        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
-          <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
-          <p className="text-xs text-status-warn">
-            Shell chocolate <strong>{shellIngredient!.name}</strong> has no pricing data —
-            shell and cap costs are excluded until its pricing is set.
-          </p>
-        </div>
+        <CostWarning>
+          Shell chocolate <strong>{shellIngredient!.name}</strong> has no pricing data — shell and cap costs are excluded until its pricing is set.
+        </CostWarning>
       )}
       {missingPricingIngredients.length > 0 && (
-        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
-          <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
-          <div className="text-xs text-status-warn">
-            <p><strong>{missingPricingIngredients.length} ingredient{missingPricingIngredients.length > 1 ? "s" : ""}</strong> have no pricing data — cost may be understated:</p>
-            <p className="mt-0.5 text-status-warn">{missingPricingIngredients.join(", ")}</p>
-          </div>
-        </div>
+        <CostWarning>
+          <strong>{missingPricingIngredients.length} ingredient{missingPricingIngredients.length > 1 ? "s" : ""}</strong> have no pricing data — cost may be understated: {missingPricingIngredients.join(", ")}
+        </CostWarning>
       )}
 
-      {/* Chart */}
-      {chronological.length >= 2 && (
-        <div>
-          <h2 className="text-sm font-semibold text-primary mb-2">Cost over time</h2>
-          <CostHistoryChart snapshots={chronological} sym={sym} />
-        </div>
-      )}
-
-      {/* Breakdown */}
-      {latestBreakdown.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2 gap-3">
-            <h2 className="text-sm font-semibold text-primary">Current breakdown</h2>
-            <div className="inline-flex rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-0.5 text-xs">
-              <button
-                onClick={() => setBreakdownView("grouped")}
-                className={`px-2.5 py-1 rounded transition-colors ${breakdownView === "grouped" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                By layer
-              </button>
-              <button
-                onClick={() => setBreakdownView("flat")}
-                className={`px-2.5 py-1 rounded transition-colors ${breakdownView === "flat" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                Sortable
-              </button>
-            </div>
+      {/* Two-column body ──────────────────────── */}
+      <div
+        style={{
+          display: "grid",
+          gap: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          alignItems: "start",
+        }}
+      >
+        {/* Left column ─────────────────────── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 12,
+            }}
+          >
+            <StatCard
+              label="Cost / unit"
+              value={latest ? formatCost(latest.costPerProduct, sym) : "—"}
+              meta={latest ? "per piece · 1 cavity" : "no snapshot"}
+              variant="default"
+            />
+            <StatCard
+              label="Margin"
+              value={margin == null ? "—" : `${margin.toFixed(1)}%`}
+              meta={margin == null ? "needs sell price" : margin >= 30 ? "healthy" : margin >= 15 ? "tight" : "below floor"}
+              variant={marginVariant}
+            />
+            <StatCard
+              label="Sell price"
+              value={sellPrice == null ? "—" : formatCost(sellPrice, sym)}
+              meta={sellPrice == null ? "no single-unit variant" : "cheapest single-unit"}
+              variant="default"
+            />
+            <StatCard
+              label="Last computed"
+              value={latest ? relativeTime(latest.recordedAt) : "—"}
+              meta={latest
+                ? new Date(latest.recordedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })
+                : "press Recompute"}
+              variant="default"
+            />
           </div>
 
-          {breakdownView === "grouped" ? (
-            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-              {groupedBreakdown.map((group, gi) => {
-                const collapsed = collapsedLayers.has(group.layerId);
-                return (
-                  <div key={group.layerId} className={gi > 0 ? "border-t border-[color:var(--ds-border-warm)]" : ""}>
-                    <button
-                      onClick={() => toggleLayer(group.layerId)}
-                      className="w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 bg-muted hover:bg-muted transition-colors text-left"
-                    >
-                      <ChevronRight className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${collapsed ? "" : "rotate-90"}`} />
-                      <span className="text-sm font-medium">{group.layerName}</span>
-                      <span className="text-xs text-muted-foreground tabular-nums">{group.weight.toFixed(2)}g</span>
-                      <div className="flex items-center gap-1.5 min-w-[4.5rem] justify-end">
-                        <div className="h-1 w-12 rounded-[4px] bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-status-warn-edge"
-                            style={{ width: `${group.pct * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground tabular-nums w-10 text-right">{(group.pct * 100).toFixed(1)}%</span>
-                      </div>
-                      <span className="text-sm font-semibold text-primary tabular-nums">{formatCost(group.subtotal, sym)}</span>
-                    </button>
-                    {!collapsed && (
-                      <ul className="divide-y divide-border">
-                        {group.rows.map((row, ri) => (
-                          <li key={ri} className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-1.5 pl-9 hover:bg-muted/20 transition-colors">
-                            <span />
-                            <span className="text-xs">{row.ingredientName}</span>
-                            <span className="text-xs text-muted-foreground tabular-nums">{row.grams.toFixed(2)}g</span>
-                            <span className="text-xs text-muted-foreground tabular-nums w-[4.5rem] text-right">{sym}{row.costPerGram.toFixed(4)}/g</span>
-                            <span className="text-xs font-medium tabular-nums">{formatCost(row.subtotal, sym)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                );
-              })}
-              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 border-t border-[color:var(--ds-border-warm)] bg-muted">
-                <span />
-                <span className="text-sm font-semibold">Total</span>
-                <span />
-                <span />
-                <span className="text-sm font-bold text-primary tabular-nums">{formatCost(totalCost, sym)}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted">
-                    <th
-                      className="text-left px-3 py-2 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
-                      onClick={() => handleSort("layer")}
-                    >
-                      Layer{sortKey === "layer" && <span className="ml-0.5 opacity-60">{sortDir === "desc" ? "↓" : "↑"}</span>}
-                    </th>
-                    <th
-                      className="text-left px-3 py-2 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
-                      onClick={() => handleSort("ingredient")}
-                    >
-                      Ingredient{sortKey === "ingredient" && <span className="ml-0.5 opacity-60">{sortDir === "desc" ? "↓" : "↑"}</span>}
-                    </th>
-                    <th
-                      className="text-right px-3 py-2 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
-                      onClick={() => handleSort("grams")}
-                    >
-                      Weight{sortKey === "grams" && <span className="ml-0.5 opacity-60">{sortDir === "desc" ? "↓" : "↑"}</span>}
-                    </th>
-                    <th
-                      className="text-right px-3 py-2 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
-                      onClick={() => handleSort("costPerGram")}
-                    >
-                      {sym}/g{sortKey === "costPerGram" && <span className="ml-0.5 opacity-60">{sortDir === "desc" ? "↓" : "↑"}</span>}
-                    </th>
-                    <th
-                      className="text-right px-3 py-2 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
-                      onClick={() => handleSort("pct")}
-                    >
-                      % cost{sortKey === "pct" && <span className="ml-0.5 opacity-60">{sortDir === "desc" ? "↓" : "↑"}</span>}
-                    </th>
-                    <th
-                      className="text-right px-3 py-2 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
-                      onClick={() => handleSort("subtotal")}
-                    >
-                      Subtotal{sortKey === "subtotal" && <span className="ml-0.5 opacity-60">{sortDir === "desc" ? "↓" : "↑"}</span>}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {sortedMergedBreakdown.map((entry, i) => (
-                    <tr key={i} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-3 py-2 text-xs">
-                        <div className="flex flex-wrap gap-1">
-                          {entry.layerNames.map((name, li) => (
-                            <span key={li} className="inline-flex items-center rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                              {name}
+          <Section title="Cost breakdown" noBody>
+            {latest ? (
+              <>
+                {buckets.map((b) => {
+                  const pct = totalCost > 0 ? (b.value / totalCost) * 100 : 0;
+                  return (
+                    <ListRow
+                      key={b.key}
+                      tier={b.tracked ? "default" : "parked"}
+                      title={
+                        <span style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                          <span>{b.label}</span>
+                          {!b.tracked && (
+                            <span style={{ fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                              not tracked yet
                             </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-xs">{entry.ingredientName}</td>
-                      <td className="px-3 py-2 text-xs text-right text-muted-foreground tabular-nums">{entry.grams.toFixed(2)}g</td>
-                      <td className="px-3 py-2 text-xs text-right text-muted-foreground tabular-nums">{entry.costPerGram.toFixed(4)}</td>
-                      <td className="px-3 py-2 text-xs text-right">
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className="text-muted-foreground tabular-nums">{(entry.pct * 100).toFixed(1)}%</span>
-                          <div className="h-1 w-10 rounded-[4px] bg-muted overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-status-warn-edge"
-                              style={{ width: `${entry.pct * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-right font-medium tabular-nums">{formatCost(entry.subtotal, sym)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-[color:var(--ds-border-warm)] bg-muted">
-                    <td colSpan={5} className="px-3 py-2 text-xs font-semibold">Total</td>
-                    <td className="px-3 py-2 text-xs text-right font-bold text-primary tabular-nums">
-                      {formatCost(totalCost, sym)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                          )}
+                        </span>
+                      }
+                      meta={b.tracked ? `${pct.toFixed(1)}% of total` : "deferred · ✗"}
+                      side={
+                        <span style={{ fontSize: 14, fontVariantNumeric: "tabular-nums", color: b.tracked ? "var(--ds-text-primary)" : "var(--ds-text-muted)" }}>
+                          {formatCost(b.value, sym)}
+                        </span>
+                      }
+                    />
+                  );
+                })}
+                <div style={{ padding: "10px 20px", borderTop: "0.5px solid var(--ds-border-warm)", display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 600 }}>
+                  <span>Total</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCost(totalCost, sym)}</span>
+                </div>
+              </>
+            ) : (
+              <p style={{ padding: "20px", fontSize: 13, color: "var(--ds-text-muted)", textAlign: "center", fontStyle: "italic" }}>
+                No cost data yet — press Recompute now.
+              </p>
+            )}
+          </Section>
+
+          <div>
+            <DsButton onClick={handleRecalculate} disabled={recalculating}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? "animate-spin" : ""}`} />
+                {recalculating ? "Recomputing…" : "Recompute now"}
+              </span>
+            </DsButton>
+          </div>
+        </div>
+
+        {/* Right column ─────────────────────── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Section title="Cost over time">
+            <div style={{ padding: "0 20px 4px" }}>
+              {chronological.length >= 2 ? (
+                <CostSparkline snapshots={chronological} sym={sym} />
+              ) : (
+                <p style={{ fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic", padding: "12px 0", textAlign: "center" }}>
+                  Two or more snapshots needed for a sparkline.
+                </p>
+              )}
+            </div>
+          </Section>
+
+          <Section title="Snapshot history" noBody>
+            {snapshots.length === 0 ? (
+              <p style={{ padding: "20px", fontSize: 13, color: "var(--ds-text-muted)", textAlign: "center", fontStyle: "italic" }}>
+                No history yet — press Recompute now to create the first snapshot.
+              </p>
+            ) : (
+              snapshots.map((snap, i) => {
+                const prev = snapshots[i + 1];
+                const delta = prev ? costDelta(snap.costPerProduct, prev.costPerProduct, sym) : null;
+                const snapMargin = sellPrice != null && sellPrice > 0
+                  ? ((sellPrice - snap.costPerProduct) / sellPrice) * 100
+                  : null;
+                const dateStr = new Date(snap.recordedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" });
+                return (
+                  <ListRow
+                    key={snap.id}
+                    title={
+                      <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                        <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCost(snap.costPerProduct, sym)}</span>
+                        {snapMargin != null && (
+                          <span style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>
+                            margin {snapMargin.toFixed(1)}%
+                          </span>
+                        )}
+                      </span>
+                    }
+                    meta={
+                      <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <span>{dateStr}</span>
+                        <span>·</span>
+                        <span style={{ fontStyle: "italic" }}>{snap.triggerDetail}</span>
+                      </span>
+                    }
+                    side={
+                      delta ? (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background: delta.positive
+                              ? "var(--ds-tint-urgent, rgba(220, 38, 38, 0.08))"
+                              : "var(--ds-tint-positive, rgba(16, 185, 129, 0.08))",
+                            color: delta.positive ? "var(--ds-tier-urgent)" : "var(--ds-tier-positive)",
+                          }}
+                        >
+                          {delta.positive ? "▲" : "▼"} {delta.label}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>initial</span>
+                      )
+                    }
+                  />
+                );
+              })
+            )}
+          </Section>
+
+          {snapshots.length > 0 && (
+            <div>
+              <DsButton onClick={handleExportCsv}>Export CSV</DsButton>
             </div>
           )}
-
-          {latest && (
-            <p className="text-xs text-muted-foreground mt-1.5">
-              Calculated {new Date(latest.recordedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
-              {" · "}{latest.triggerDetail}
-            </p>
-          )}
         </div>
-      )}
-
-      {/* Change log */}
-      {snapshots.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-primary mb-2">Change history</h2>
-          <ul className="space-y-1.5">
-            {displayedHistory.map((snap, i) => {
-              const prev = snapshots[i + 1];
-              const delta = prev ? costDelta(snap.costPerProduct, prev.costPerProduct, sym) : null;
-              return (
-                <li key={snap.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium">{formatCost(snap.costPerProduct, sym)}</span>
-                    <div className="flex items-center gap-2">
-                      {delta && (
-                        <span className={`text-xs font-medium ${delta.positive ? "text-status-alert" : "text-status-ok"}`}>
-                          {delta.label}
-                        </span>
-                      )}
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(snap.recordedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{snap.triggerDetail}</p>
-                  <div className="flex gap-2 mt-0.5 text-xs text-muted-foreground">
-                    {snap.mouldId && snap.mouldId !== product.defaultMouldId && (
-                      <span>Mould: {allMoulds.find((m) => m.id === snap.mouldId)?.name ?? `#${snap.mouldId}`}</span>
-                    )}
-                    {snap.coatingName && <span className="capitalize">{snap.coatingName}</span>}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          {snapshots.length > 10 && !showAllHistory && (
-            <button
-              onClick={() => setShowAllHistory(true)}
-              className="mt-2 text-xs text-primary hover:underline"
-            >
-              Show all {snapshots.length} entries
-            </button>
-          )}
-        </div>
-      )}
-
-      {snapshots.length === 0 && hasMould && (
-        <p className="text-sm text-muted-foreground text-center py-8">
-          No cost history yet. Press Recalculate to create the first entry.
-        </p>
-      )}
+      </div>
     </div>
   );
 }
 
-// Minimal SVG line chart — no external deps
-function CostHistoryChart({ snapshots, sym = "€" }: { snapshots: ProductCostSnapshot[]; sym?: string }) {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; snap: ProductCostSnapshot } | null>(null);
+function CostWarning({ children }: { children: ReactNode }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        padding: "10px 14px",
+        borderRadius: 6,
+        background: "var(--ds-tint-warn, rgba(180, 83, 9, 0.06))",
+        border: "0.5px solid var(--ds-semantic-warn)",
+        color: "var(--ds-semantic-warn)",
+        fontSize: 12,
+        alignItems: "flex-start",
+      }}
+    >
+      <AlertTriangle className="w-4 h-4 shrink-0" style={{ marginTop: 2 }} />
+      <div style={{ flex: 1 }}>{children}</div>
+    </div>
+  );
+}
 
+// Minimal SVG sparkline — no external deps. Replaces the older annotated chart;
+// trigger detail moved into the snapshot list rows beneath it.
+function CostSparkline({ snapshots, sym = "€" }: { snapshots: ProductCostSnapshot[]; sym?: string }) {
   if (snapshots.length < 2) return null;
-
   const W = 320;
-  const H = 100;
-  const PAD = { top: 8, right: 8, bottom: 20, left: 48 };
-  const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
-
+  const H = 64;
+  const PAD = 6;
   const costs = snapshots.map((s) => s.costPerProduct);
-  const times = snapshots.map((s) => new Date(s.recordedAt).getTime());
   const minCost = Math.min(...costs);
   const maxCost = Math.max(...costs);
-  const minTime = Math.min(...times);
-  const maxTime = Math.max(...times);
-
-  // Add vertical padding so data points don't sit flush at the chart edges
-  const dataCostRange = maxCost - minCost || maxCost * 0.1 || 0.01;
-  const vPad = dataCostRange * 0.25;
-  const yMin = Math.max(0, minCost - vPad);
-  const yMax = maxCost + vPad;
-  const yRange = yMax - yMin;
-  const timeRange = maxTime - minTime || 1;
-
-  function toX(t: number) { return PAD.left + ((t - minTime) / timeRange) * innerW; }
-  function toY(c: number) { return PAD.top + (1 - (c - yMin) / yRange) * innerH; }
-
-  const points = snapshots.map((s) => `${toX(new Date(s.recordedAt).getTime())},${toY(s.costPerProduct)}`).join(" ");
-
-  // 3 Y ticks: top data value, midpoint, bottom data value
-  const yTicks = [maxCost, (minCost + maxCost) / 2, minCost];
-
-  const triggerColors: Record<ProductCostSnapshot["triggerType"], string> = {
-    ingredient_price: "#c2410c",  // orange
-    filling_version: "#7c3aed",     // purple
-    mould_change: "#0369a1",      // blue
-    coating_change: "#065f46",    // green
-    shell_change: "#b45309",      // amber
-    manual: "#6b7280",            // grey
-  };
-
-  // Date labels: first and last
-  const dateLabel = (t: number) => new Date(t).toLocaleDateString("de-AT", { day: "numeric", month: "short" });
-
+  const range = maxCost - minCost || maxCost * 0.1 || 0.01;
+  const yMin = Math.max(0, minCost - range * 0.2);
+  const yMax = maxCost + range * 0.2;
+  const span = yMax - yMin || 1;
+  const xStep = snapshots.length > 1 ? (W - PAD * 2) / (snapshots.length - 1) : 0;
+  const pointArr = snapshots.map((s, i) => {
+    const x = PAD + i * xStep;
+    const y = PAD + (1 - (s.costPerProduct - yMin) / span) * (H - PAD * 2);
+    return { x, y };
+  });
+  const polyline = pointArr.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const last = pointArr[pointArr.length - 1];
   return (
-    <div className="relative">
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
-        style={{ height: 120 }}
-        onMouseLeave={() => setTooltip(null)}
-      >
-        {/* Y gridlines + labels */}
-        {yTicks.map((tick, i) => {
-          const y = toY(tick);
-          return (
-            <g key={i}>
-              <line x1={PAD.left} y1={y} x2={W - PAD.right} y2={y} stroke="#e5e7eb" strokeWidth={1} strokeDasharray={tick === minCost || tick === maxCost ? "none" : "3 3"} />
-              <text x={PAD.left - 4} y={y} textAnchor="end" fontSize={9} fill="#9ca3af" dominantBaseline="middle">{formatCost(tick, sym)}</text>
-            </g>
-          );
-        })}
-
-        {/* Vertical axis line */}
-        <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + innerH} stroke="#e5e7eb" strokeWidth={1} />
-
-        {/* X axis date labels */}
-        <text x={PAD.left} y={H - 4} textAnchor="start" fontSize={9} fill="#9ca3af">{dateLabel(minTime)}</text>
-        <text x={W - PAD.right} y={H - 4} textAnchor="end" fontSize={9} fill="#9ca3af">{dateLabel(maxTime)}</text>
-
-        {/* Line */}
-        <polyline points={points} fill="none" stroke="var(--color-primary, #78350f)" strokeWidth={1.5} strokeLinejoin="round" />
-
-        {/* Data points */}
-        {snapshots.map((snap, i) => {
-          const cx = toX(new Date(snap.recordedAt).getTime());
-          const cy = toY(snap.costPerProduct);
-          const color = triggerColors[snap.triggerType];
-          return (
-            <circle
-              key={snap.id}
-              cx={cx}
-              cy={cy}
-              r={4}
-              fill={color}
-              stroke="white"
-              strokeWidth={1.5}
-              className="cursor-pointer"
-              onMouseEnter={(e) => {
-                const svg = (e.target as SVGElement).closest("svg")!;
-                const rect = svg.getBoundingClientRect();
-                setTooltip({ x: cx, y: cy, snap });
-              }}
-            />
-          );
-        })}
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 80 }}>
+        <polyline
+          points={polyline}
+          fill="none"
+          stroke="var(--ds-tier-quarter-focus)"
+          strokeWidth={1.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <circle cx={last.x} cy={last.y} r={3} fill="var(--ds-tier-quarter-focus)" />
       </svg>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-        {(Object.entries(triggerColors) as [ProductCostSnapshot["triggerType"], string][])
-          .filter(([type]) => snapshots.some((s) => s.triggerType === type))
-          .map(([type, color]) => (
-            <span key={type} className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <span className="inline-block w-2 h-2 rounded-full" style={{ background: color }} />
-              {{ ingredient_price: "ingredient price", filling_version: "filling updated", mould_change: "mould changed", coating_change: "coating changed", shell_change: "shell change", manual: "initial" }[type]}
-            </span>
-          ))}
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--ds-text-muted)", marginTop: 4 }}>
+        <span>{formatCost(minCost, sym)}</span>
+        <span>{formatCost(maxCost, sym)}</span>
       </div>
-
-      {/* Tooltip */}
-      {tooltip && (
-        <div
-          className="absolute z-10 pointer-events-none rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-md px-2.5 py-1.5 text-xs"
-          style={{
-            left: Math.min(tooltip.x / W * 100, 70) + "%",
-            top: (tooltip.y / 120 * 100) + "%",
-            transform: "translate(-50%, -120%)",
-          }}
-        >
-          <p className="font-semibold">{formatCost(tooltip.snap.costPerProduct, sym)}</p>
-          <p className="text-muted-foreground">{new Date(tooltip.snap.recordedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}</p>
-          <p className="text-muted-foreground max-w-[160px] truncate">{tooltip.snap.triggerDetail}</p>
-        </div>
-      )}
     </div>
   );
 }
@@ -3041,14 +2795,27 @@ function FillBar({ productFillings }: { productFillings: { id?: string; fillingI
 // Nutrition tab — aggregated per-product and per-100g nutrition data
 // ---------------------------------------------------------------------------
 
+// --- Nutrition Tab (Phase A.6) ---
+//
+// Single column. Section "Per 100g" + Section "Per piece" (computed piece
+// weight at top, ✗ inline-edit deferred — schema has no override field),
+// Section "Allergens" (contains = red border, may contain = caramel border,
+// dietary = default chip), Section "Source breakdown" (collapsed by default,
+// rows per shell + each filling contribution), Section "Ingredient list" for
+// the Shopify label pasting workflow. Italic footer note.
+
 function ProductNutritionTab({ productId, productFillings, market }: { productId: string; productFillings: ProductFilling[]; market: MarketRegion }) {
   const product = useProduct(productId);
   const allIngredients = useIngredients(true);
   const allMoulds = useMouldsList(true);
+  const allFillings = useFillings();
   const fillingIds = useMemo(() => productFillings.map(rl => rl.fillingId), [productFillings]);
   const fillingIngredientsMap = useFillingIngredientsForFillings(fillingIds);
+  const facilityMayContain = useFacilityMayContain();
+  const [sourceOpen, setSourceOpen] = useState(false);
 
   const ingredientMap = useMemo(() => new Map(allIngredients.map(i => [i.id!, i])), [allIngredients]);
+  const fillingMap = useMemo(() => new Map(allFillings.map(f => [f.id!, f])), [allFillings]);
   const mould = allMoulds.find(m => m.id === product?.defaultMouldId);
   const shellIngredient = product?.shellIngredientId ? (ingredientMap.get(product.shellIngredientId) ?? null) : null;
 
@@ -3085,23 +2852,82 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
     [mould, productFillings, fillingIngredientsMap, ingredientMap, shellIngredient, effectiveShellPercentage],
   );
 
+  // Aggregate allergen IDs from shell ingredient + each filling. Filling rows
+  // already carry pre-rolled-up allergens so this is a flat union.
+  const containsAllergens = useMemo(() => {
+    const ids = new Set<string>();
+    if (shellIngredient?.allergens) for (const a of shellIngredient.allergens) ids.add(a);
+    for (const pf of productFillings) {
+      const f = fillingMap.get(pf.fillingId);
+      if (!f?.allergens) continue;
+      for (const a of f.allergens) ids.add(a);
+    }
+    return Array.from(ids).sort((a, b) => a.localeCompare(b));
+  }, [shellIngredient, productFillings, fillingMap]);
+
+  // Facility-may-contain minus those already in `contains` (no duplicates).
+  const mayContainAllergens = useMemo(() => {
+    const contained = new Set(containsAllergens);
+    return facilityMayContain.filter((id) => !contained.has(id)).sort((a, b) => a.localeCompare(b));
+  }, [facilityMayContain, containsAllergens]);
+
+  const dietaryTags = useMemo(() => {
+    const tags: string[] = [];
+    if (product?.vegan) tags.push("vegan");
+    return tags;
+  }, [product?.vegan]);
+
   const { per100g, perProduct, productWeightG, ingredientsWithData, ingredientsTotal, missingIngredients, warnings } = result;
   const nutrients = getNutrientsByMarket(market);
   const panelTitle = getNutritionPanelTitle(market);
   const showDV = market === "US";
-  const showPerProduct = true; // always show per-product column
-  // US also shows per-serving (RACC 30g for candy)
   const showPerServing = market === "US";
   const perServing = showPerServing ? scaleToServing(per100g, 30) : perProduct;
 
   const hasData = Object.keys(per100g).length > 0;
+
+  // Per-source breakdown rows: shell + each filling with grams + contributing
+  // ingredients label. Used by the collapsible Source breakdown section.
+  const sourceRows = useMemo(() => {
+    type Row = { key: string; label: string; grams: number; ingredients: string[] };
+    const rows: Row[] = [];
+    if (mould && shellIngredient) {
+      const shellG = calculateShellWeightG(mould) + calculateCapWeightG(mould);
+      rows.push({
+        key: "__shell__",
+        label: `Shell — ${shellIngredient.name}`,
+        grams: shellG,
+        ingredients: [shellIngredient.name],
+      });
+    }
+    if (mould) {
+      const totalFillG = mould.cavityWeightG - (calculateShellWeightG(mould) + calculateCapWeightG(mould));
+      for (const pf of productFillings) {
+        const f = fillingMap.get(pf.fillingId);
+        if (!f) continue;
+        const grams = product?.fillMode === "grams"
+          ? (pf.fillGrams ?? 0)
+          : totalFillG * ((pf.fillPercentage ?? 0) / 100);
+        const ings = (fillingIngredientsMap.get(pf.fillingId) ?? [])
+          .map((fi) => fi.ingredientId ? ingredientMap.get(fi.ingredientId)?.name : null)
+          .filter((n): n is string => !!n);
+        rows.push({
+          key: pf.id ?? pf.fillingId,
+          label: f.name,
+          grams,
+          ingredients: ings,
+        });
+      }
+    }
+    return rows;
+  }, [mould, shellIngredient, productFillings, fillingMap, fillingIngredientsMap, ingredientMap, product?.fillMode]);
 
   if (!product) return null;
 
   if (productFillings.length === 0 && !shellIngredient) {
     return (
       <div className="px-4 pb-6">
-        <p className="text-sm text-muted-foreground py-8 text-center">
+        <p style={{ fontSize: 13, color: "var(--ds-text-muted)", padding: "32px 0", textAlign: "center" }}>
           Add fillings to this product to see nutrition data.
         </p>
       </div>
@@ -3111,31 +2937,27 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
   if (!mould) {
     return (
       <div className="px-4 pb-6">
-        <p className="text-sm text-muted-foreground py-8 text-center">
-          Set a default mould on this product to calculate per-product nutrition.
-          The mould determines shell, cap, and fill weights.
+        <p style={{ fontSize: 13, color: "var(--ds-text-muted)", padding: "32px 0", textAlign: "center" }}>
+          Set a default mould on this product to calculate per-product nutrition. The mould determines shell, cap, and fill weights.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="px-4 pb-6">
-      <h2 className="text-sm font-medium text-muted-foreground mb-1">{panelTitle}</h2>
-
+    <div className="px-4 pb-8" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Warnings ───────────────────────────── */}
       {warnings.map((w, i) => (
-        <div key={i} className="flex items-start gap-2 text-xs text-[color:var(--ds-semantic-warn)] mb-1">
-          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <div key={i} style={{ fontSize: 12, color: "var(--ds-semantic-warn)", display: "flex", gap: 6, alignItems: "flex-start" }}>
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ marginTop: 2 }} />
           <span>{w}</span>
         </div>
       ))}
-
       {hasData && ingredientsWithData < ingredientsTotal && (
-        <div className="flex items-start gap-2 text-xs text-[color:var(--ds-semantic-warn)] mb-1">
-          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <div style={{ fontSize: 12, color: "var(--ds-semantic-warn)", display: "flex", gap: 6, alignItems: "flex-start" }}>
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ marginTop: 2 }} />
           <span>
-            Nutrition data for {ingredientsWithData} of {ingredientsTotal} ingredients.
-            Values are partial — add data to{" "}
+            Nutrition data for {ingredientsWithData} of {ingredientsTotal} ingredients. Values are partial — add data to{" "}
             {missingIngredients.length > 0 ? (
               <>
                 {missingIngredients.map((name, i) => (
@@ -3153,65 +2975,188 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
         </div>
       )}
 
-      {hasData ? (
-        <>
-          <p className="text-xs text-muted-foreground mb-3 mt-2">
-            Product weight: {productWeightG.toFixed(1)}g
-            {" "}(shell + cap: {mould ? (calculateShellWeightG(mould) + calculateCapWeightG(mould)).toFixed(1) : "?"}g
-            {shellIngredient ? ` of ${shellIngredient.name}` : ""}
-            {", "}fill: {mould ? (productWeightG - calculateShellWeightG(mould) - calculateCapWeightG(mould)).toFixed(1) : "?"}g)
-            {showPerServing && " · FDA serving: 30g"}
+      <div style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>
+        {panelTitle}
+      </div>
+
+      {/* Section · Per 100g ───────────────────── */}
+      <Section title="Per 100g">
+        {hasData ? (
+          <NutrientKeyValueGrid
+            nutrients={nutrients}
+            values={per100g}
+            showDV={false}
+          />
+        ) : (
+          <p style={{ padding: "0 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+            None of the ingredients in this product have nutrition data yet.
           </p>
+        )}
+      </Section>
 
-          {/* Nutrition table */}
-      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-        {/* Header row */}
-        <div className="flex items-center px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
-          <span className="flex-1">Nutrient</span>
-          <span className="w-24 text-right">Per 100g</span>
-          {showPerProduct && (
-            <span className="w-24 text-right">Per product</span>
-          )}
-          {showPerServing && (
-            <span className="w-24 text-right">Per serving</span>
-          )}
-          {showDV && (
-            <span className="w-16 text-right">%DV</span>
-          )}
+      {/* Section · Per piece ───────────────────── */}
+      <Section title="Per piece">
+        <div style={{ padding: "0 20px 12px", borderBottom: "0.5px solid var(--ds-border-warm)", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+            <span className="text-ds-label">Piece weight</span>
+            <span style={{ fontSize: 18, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+              {productWeightG.toFixed(1)} g
+            </span>
+          </div>
+          <p style={{ fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic", marginTop: 4 }}>
+            Shell + cap {(calculateShellWeightG(mould) + calculateCapWeightG(mould)).toFixed(1)} g{shellIngredient ? ` of ${shellIngredient.name}` : ""} · fill {(productWeightG - calculateShellWeightG(mould) - calculateCapWeightG(mould)).toFixed(1)} g
+            {" "}· inline override ✗ deferred (no schema column)
+            {showPerServing && " · FDA serving 30 g"}
+          </p>
         </div>
+        {hasData ? (
+          <NutrientKeyValueGrid
+            nutrients={nutrients}
+            values={showPerServing ? perServing : perProduct}
+            showDV={showDV}
+            dvKey={showPerServing ? "perServing" : undefined}
+          />
+        ) : (
+          <p style={{ padding: "0 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+            Add nutrition data to ingredients to see per-piece values.
+          </p>
+        )}
+      </Section>
 
-        {/* Nutrient rows */}
-        {nutrients.map((n) => {
-          const val100 = per100g[n.key];
-          const valProduct = perProduct[n.key];
-          const valServing = showPerServing ? perServing[n.key] : undefined;
-          const dv = showDV ? percentDailyValue(valServing, n.dailyValue) : undefined;
+      {/* Section · Allergens ─────────────────── */}
+      <Section title="Allergens">
+        <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+          <AllergenChipRow
+            label="Contains"
+            ids={containsAllergens}
+            tone="contains"
+          />
+          <AllergenChipRow
+            label="May contain"
+            ids={mayContainAllergens}
+            tone="may"
+          />
+          <AllergenChipRow
+            label="Dietary"
+            ids={dietaryTags}
+            tone="dietary"
+          />
+        </div>
+      </Section>
 
+      {/* Section · Source breakdown ────────────── */}
+      <Section
+        title={
+          <button
+            type="button"
+            onClick={() => setSourceOpen((o) => !o)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", padding: 0, font: "inherit", color: "inherit" }}
+          >
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${sourceOpen ? "rotate-90" : ""}`} />
+            Source breakdown
+          </button>
+        }
+        noBody
+      >
+        {sourceOpen && (
+          sourceRows.length === 0 ? (
+            <p style={{ padding: "12px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+              Nothing to break down yet.
+            </p>
+          ) : (
+            sourceRows.map((row) => {
+              const pct = productWeightG > 0 ? (row.grams / productWeightG) * 100 : 0;
+              return (
+                <ListRow
+                  key={row.key}
+                  title={<span>{row.label}</span>}
+                  meta={
+                    row.ingredients.length > 0
+                      ? row.ingredients.join(" · ")
+                      : "—"
+                  }
+                  side={
+                    <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 13 }}>
+                      {row.grams.toFixed(1)} g · {pct.toFixed(1)}%
+                    </span>
+                  }
+                />
+              );
+            })
+          )
+        )}
+      </Section>
+
+      {/* Section · Ingredient list (Shopify export) ── */}
+      <Section title="Ingredient list">
+        <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <p style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>
+            Descending by weight. Allergen-bearing ingredients are bold.
+          </p>
+          {ingredientList.length > 0 ? (
+            <p style={{ fontSize: 13, lineHeight: 1.55 }}>
+              {ingredientList.map((entry, i) => (
+                <span key={i}>
+                  {i > 0 ? ", " : ""}
+                  {containsAllergen(entry.label) ? <strong>{entry.label}</strong> : entry.label}
+                </span>
+              ))}
+              .
+            </p>
+          ) : (
+            <p style={{ fontSize: 13, color: "var(--ds-text-muted)" }}>No ingredients yet.</p>
+          )}
+          <ShopifyFormatBlock entries={ingredientList} per100g={per100g} />
+        </div>
+      </Section>
+
+      {/* Footer ────────────────────────────────── */}
+      <p style={{ fontSize: 11, color: "var(--ds-text-muted)", fontStyle: "italic", textAlign: "center", marginTop: 4 }}>
+        Computed from shell + fillings — edit those to change values.
+      </p>
+    </div>
+  );
+}
+
+// Two-column key/value grid used for both Per 100g and Per piece sections.
+function NutrientKeyValueGrid({
+  nutrients,
+  values,
+  showDV,
+  dvKey,
+}: {
+  nutrients: ReturnType<typeof getNutrientsByMarket>;
+  values: Record<string, number | undefined>;
+  showDV: boolean;
+  dvKey?: "perServing";
+}) {
+  return (
+    <div style={{ padding: "0 20px" }}>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {nutrients.map((n, idx) => {
+          const v = values[n.key];
+          const dv = showDV ? percentDailyValue(v, n.dailyValue) : undefined;
+          const indentPx = n.indent === 1 ? 12 : n.indent === 2 ? 24 : 0;
           return (
             <div
               key={n.key}
-              className={`flex items-baseline px-3 py-1.5 text-sm border-b border-[color:var(--ds-border-warm)] last:border-b-0 ${
-                n.indent === 0 ? "font-medium" : "font-normal"
-              }`}
+              style={{
+                display: "grid",
+                gridTemplateColumns: showDV ? "1fr auto auto" : "1fr auto",
+                gap: 12,
+                padding: "6px 0",
+                borderBottom: idx < nutrients.length - 1 ? "0.5px solid var(--ds-border-warm)" : "none",
+                fontSize: 13,
+                fontWeight: n.indent === 0 ? 500 : 400,
+                color: n.indent === 0 ? "var(--ds-text-primary)" : "var(--ds-text-muted)",
+              }}
             >
-              <span className={`flex-1 ${n.indent === 1 ? "ml-4 text-muted-foreground" : n.indent === 2 ? "ml-8 text-muted-foreground" : ""}`}>
-                {n.label}
+              <span style={{ paddingLeft: indentPx }}>{n.label}</span>
+              <span style={{ fontVariantNumeric: "tabular-nums", color: v == null ? "var(--ds-text-muted)" : undefined, opacity: v == null ? 0.5 : 1 }}>
+                {formatNutrientValue(v, n.unit)}
               </span>
-              <span className={`w-24 text-right ${val100 == null ? "text-muted-foreground/50" : ""}`}>
-                {formatNutrientValue(val100, n.unit)}
-              </span>
-              {showPerProduct && (
-                <span className={`w-24 text-right ${valProduct == null ? "text-muted-foreground/50" : ""}`}>
-                  {formatNutrientValue(valProduct, n.unit)}
-                </span>
-              )}
-              {showPerServing && (
-                <span className={`w-24 text-right ${valServing == null ? "text-muted-foreground/50" : ""}`}>
-                  {formatNutrientValue(valServing, n.unit)}
-                </span>
-              )}
               {showDV && (
-                <span className="w-16 text-right text-xs text-muted-foreground">
+                <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 11, color: "var(--ds-text-muted)", minWidth: 36, textAlign: "right" }}>
                   {dv != null ? `${dv}%` : ""}
                 </span>
               )}
@@ -3219,34 +3164,53 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
           );
         })}
       </div>
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground py-4">
-          None of the ingredients in this product have nutrition data.
-          Add nutrition values to your ingredients to see aggregated data here.
-        </p>
-      )}
+    </div>
+  );
+}
 
-      {/* Ingredient list — customer-facing label text */}
-      <div className="mt-6">
-        <h2 className="text-sm font-medium text-muted-foreground mb-1">Ingredients list</h2>
-        <p className="text-xs text-muted-foreground mb-2">
-          Listed in descending order of weight. Allergen-bearing ingredients are shown in bold.
-        </p>
-        {ingredientList.length > 0 ? (
-          <p className="text-sm leading-relaxed">
-            {ingredientList.map((entry, i) => (
-              <span key={i}>
-                {i > 0 ? ", " : ""}
-                {containsAllergen(entry.label) ? <strong>{entry.label}</strong> : entry.label}
-              </span>
-            ))}
-            .
-          </p>
+// Allergen chip rows: contains (red border), may contain (caramel border),
+// dietary (default). Empty rows render a muted "—" placeholder.
+function AllergenChipRow({
+  label,
+  ids,
+  tone,
+}: {
+  label: string;
+  ids: string[];
+  tone: "contains" | "may" | "dietary";
+}) {
+  const borderColor =
+    tone === "contains" ? "var(--ds-tier-urgent)"
+    : tone === "may" ? "var(--ds-tier-confirmed, var(--ds-semantic-warn))"
+    : "var(--ds-border-warm)";
+  return (
+    <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <span className="text-ds-label" style={{ minWidth: 100, paddingTop: 4 }}>
+        {label}
+      </span>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1 }}>
+        {ids.length === 0 ? (
+          <span style={{ fontSize: 12, color: "var(--ds-text-muted)", fontStyle: "italic", paddingTop: 4 }}>
+            none
+          </span>
         ) : (
-          <p className="text-sm text-muted-foreground">No ingredients yet.</p>
+          ids.map((id) => (
+            <span
+              key={id}
+              style={{
+                fontSize: 12,
+                padding: "2px 10px",
+                borderRadius: 999,
+                border: `1px solid ${borderColor}`,
+                background: "var(--ds-card-bg)",
+                color: "var(--ds-text-primary)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {tone === "dietary" ? id : allergenLabel(id)}
+            </span>
+          ))
         )}
-        <ShopifyFormatBlock entries={ingredientList} per100g={per100g} />
       </div>
     </div>
   );
