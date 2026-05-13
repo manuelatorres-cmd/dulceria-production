@@ -465,9 +465,9 @@ Phase A.5   /products/[id] Cost tab                          ✓ shipped
 Phase A.6   /products/[id] Nutrition tab                     ✓ shipped
 Phase A.7   /products/[id] modals/drawers cleanup            ✓ shipped
 
-Phase D.1   /production-brain/daily Right now card
-Phase D.2   /production-brain/daily Phase cards
-Phase D.3   /production-brain/daily Side rail
+Phase D.1   /production-brain/daily Right now card                ✓ shipped
+Phase D.2   /production-brain/daily Phase cards                   ✓ shipped
+Phase D.3   /production-brain/daily Side rail                     ✓ shipped
 
 Phase B.1   /orders/[id] metadata section
 Phase B.2   /orders/[id] line items grid
@@ -534,6 +534,62 @@ Reference all existing components in `src/components/dulceria/`. Read mockups in
 - ✓ Section "Source breakdown" collapsed by default; expands to ListRow per shell + filling with grams + % + ingredients — `src/app/(app)/products/[id]/page.tsx:2338-2378`
 - ✓ Section "Ingredient list" kept (Shopify export workflow) — `src/app/(app)/products/[id]/page.tsx:2381-2402`
 - ✓ Footer italic muted "Computed from shell + fillings — edit those to change values" — `src/app/(app)/products/[id]/page.tsx:2405-2407`
+
+## Phase D — `/production-brain/daily` body refit · evidence
+
+### Layout shell
+
+- ✓ Two-column grid (70/30 desktop, stacked mobile) via `grid-template-columns: minmax(0,7fr) minmax(0,3fr)` — `src/app/(app)/production-brain/daily/page.tsx:1321`
+- ✓ ViewDate picker: chevron buttons + serif date display + Today pill — `src/app/(app)/production-brain/daily/page.tsx:1232-1277`
+- ✓ HACCP strip retained — `src/app/(app)/production-brain/daily/page.tsx:1307-1316`
+- ✓ Old pastel-gradient "Right now" card + dots strip + phase peek grid removed; `PHASE_TINT` map replaced with `PHASE_COLOR` per-phase left-border map matching Phase C.3 spec — `src/app/(app)/production-brain/daily/page.tsx:77-86`
+- ✓ Per-phase detail rows precomputed for all 8 phases (was single-phase) via `phaseDetailsByPhase` memo — `src/app/(app)/production-brain/daily/page.tsx:531-668`
+- ✓ Estimated remaining minutes per phase from `productionStep.activeMinutes` × qty (perBatch-aware) — `src/app/(app)/production-brain/daily/page.tsx:672-691`
+
+### D.1 — Right-now focus card
+
+- ✓ Caramel 3px left border + Section pattern — `src/app/(app)/production-brain/daily/page.tsx:1334-1342`
+- ✓ Header serif 20px: "Right now — {phase name}" — `src/app/(app)/production-brain/daily/page.tsx:1354-1363`
+- ✓ Active step description (first detail line, 16px) — `src/app/(app)/production-brain/daily/page.tsx:1372`
+- ✓ Batch product + qty + mould inline — `src/app/(app)/production-brain/daily/page.tsx:1375-1380`
+- ✗ Assignee chip rendered as `unassigned ✗` (deferred). Migration: add `personId` column on `planStepStatus` so per-step assignment can be written from the wizard + read here — `src/app/(app)/production-brain/daily/page.tsx:1382-1394`
+- ✗ Started-at / elapsed shown as `started — · elapsed —  ✗` (deferred). Migration: add `startedAt` column on `planStepStatus` (set when row first transitions to in-progress) — `src/app/(app)/production-brain/daily/page.tsx:1395-1401`
+- ✓ Progress bar (steps done/total in phase) coloured by phase — `src/app/(app)/production-brain/daily/page.tsx:1403-1416`
+- ✓ Footer "Next up: {step}" italic muted, falls back across phases — `src/app/(app)/production-brain/daily/page.tsx:694-712, 1422-1433`
+- ✓ Empty state: "Workshop quiet — nothing in progress" italic — `src/app/(app)/production-brain/daily/page.tsx:1418-1421`
+
+### D.2 — Phase cards
+
+- ✓ White card + 3px coloured left border per phase via `PHASE_COLOR[ph.id]` — `src/app/(app)/production-brain/daily/page.tsx:1437-1455`
+- ✓ Collapsible — header click toggles, default-expanded = active phase only — `src/app/(app)/production-brain/daily/page.tsx:714-727, 1457-1496`
+- ✓ Header: phase name (serif) + step count `{done}/{total}` + remaining minutes — `src/app/(app)/production-brain/daily/page.tsx:1476-1490`
+- ✓ "active now" caramel chip on active phase only — `src/app/(app)/production-brain/daily/page.tsx:1497-1513`
+- ✓ ListRow per step (DS component) with step description, batch chip, mould, status icon — `src/app/(app)/production-brain/daily/page.tsx:1538-1586`
+- ✓ Status icon component: empty circle (pending) / pulsing caramel dot (in-progress) / mint check (done) — `src/app/(app)/production-brain/daily/page.tsx:1948-1989`, keyframe `daily-pulse` in `src/app/globals.css:15-18`
+- ✓ Row click → DsDrawer with step detail + lines per phase — `src/app/(app)/production-brain/daily/page.tsx:1841-1939`
+- ✓ Drawer "Mark done" / "Undo done" wired to per-pp step key via `toggleRow(phase, row)` — same filling/unmould/packing side-effects as before — `src/app/(app)/production-brain/daily/page.tsx:843-960, 1908-1916`
+- ✗ Drawer Start / Pause / Reassign actions rendered disabled with `✗` suffix (deferred). Same migration as D.1 unblocks them — `src/app/(app)/production-brain/daily/page.tsx:1898-1924`
+
+### D.3 — Side rail
+
+- ✓ Machines panel: ListRow per tempering instance (name + loaded chocolate + remaining/capacity kg + progress bar + aging chip) — `src/app/(app)/production-brain/daily/page.tsx:1601-1671`
+- ✓ Aging chip flips to `urgent` tier once `agingDays >= agingAlertThresholdDays` — `src/app/(app)/production-brain/daily/page.tsx:1620-1665`
+- ✓ Mould pool panel: ListRow per mould type with in-use + free counts + drying count if non-zero — `src/app/(app)/production-brain/daily/page.tsx:1083-1097, 1673-1727`
+- ✗ Mould drying state derived from `MouldPoolInstance.currentState === "sealed"` (closest existing enum value to spec's "drying"). State dot colours: rose if blocked > 0, caramel if drying > 0, mint if free > 0, else neutral. Spec's three-way caramel/mint/rose mapping by drying-state column flagged ✗ deferred — would need a dedicated `dryingState` column on `mouldPoolInstance` for unambiguous classification — `src/app/(app)/production-brain/daily/page.tsx:1083-1097, 1689-1726`
+- ✓ Staff panel: ListRow per on-shift person (terracotta-chip name + clock-in time from `staffShifts.clockInAt`, falls back to declared work window) — `src/app/(app)/production-brain/daily/page.tsx:1100-1140, 1729-1772`
+- ✗ Staff "current task" rendered as `— ✗` (deferred). Same migration as D.1/D.2 (planStepStatus.personId) — `src/app/(app)/production-brain/daily/page.tsx:1755-1761`
+- ✓ Event feed: ListRow per step-tick event (timestamp + actor + description), last 20 from `allPlanStepStatuses` filtered to today — `src/app/(app)/production-brain/daily/page.tsx:1142-1163, 1774-1839`
+- ✓ Filter pills All / Steps / Stock / HACCP / Notes — `src/app/(app)/production-brain/daily/page.tsx:1776-1810`
+- ✗ Stock / HACCP / Notes feed sources rendered as disabled pills with `✗` suffix; only Steps is wired (current schema logs step ticks via planStepStatus.doneAt). Migration: add an append-only `productionEvent` table or per-source feed views before unblocking — `src/app/(app)/production-brain/daily/page.tsx:1790-1810`
+
+### Inline flows preserved
+
+- ✓ Yield modal + allocation split modal still chain on Unmoulding row click — `src/app/(app)/production-brain/daily/page.tsx:920-1000, 1941-1958`
+- ✓ Filling Prep per-mould consumption (FIFO stock deduction) preserved — `src/app/(app)/production-brain/daily/page.tsx:843-911`
+
+### Dropped (subsumed by phase cards)
+
+- Pastel gradient phase strip, phase peek grid, `ProductGroupedChecklist`, colour worklist with switch dividers, bulk Check-all, per-phase category-filter chips — all replaced by D.2 phase cards + per-batch drawer.
 
 ## Phase A.7 — Modal / drawer cleanup · evidence
 
