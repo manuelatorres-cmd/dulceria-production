@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { VolumePlanning } from "@/components/campaign-detail/volume-planning";
+import {
+  NextUpBanner,
+  type NextUpVariant,
+  TimelineStrip,
+  type TimelineMarker,
+} from "@/components/dulceria";
 import { BackButton } from "@/components/back-button";
 import { PageHeader } from "@/components/page-header";
 import { phaseKeyFromStepName } from "@/lib/production";
@@ -298,6 +304,95 @@ function CampaignView({
           <Pencil className="w-3 h-3" /> Edit
         </button>
       </div>
+
+      {/* Next-up banner (Phase 3.2) */}
+      {(() => {
+        if (campaign.status === "done") return null;
+        if (campaign.status === "cancelled") return null;
+        const today = new Date();
+        const todayMs = today.setHours(0, 0, 0, 0);
+        const endTs = endMs;
+        const prodMs = campaign.productionStartDate
+          ? new Date(campaign.productionStartDate + "T00:00:00").getTime()
+          : null;
+        const overdue = endTs != null && endTs < todayMs && overallProgress < 100;
+        let variant: NextUpVariant = "next";
+        let title = `Ramp up ${campaign.name}`;
+        let meta = "";
+        const firstProduct = allItems.find((i) => i.stage !== "done");
+        if (overdue) {
+          variant = "behind";
+          title = `Behind schedule — ${notStartedCount} batch${notStartedCount === 1 ? "" : "es"} not started`;
+          meta = `Launch was ${campaign.endDate} · ${Math.abs(daysLeft ?? 0)} day${Math.abs(daysLeft ?? 0) === 1 ? "" : "s"} overdue`;
+        } else if (inProgressCount > 0 && firstProduct) {
+          variant = "in-progress";
+          title = `Continue ${firstProduct.currentStepName} on ${firstProduct.productName}`;
+          meta = `${doneCount}/${totalProducts} products done · ${overallProgress}% overall`;
+        } else if (firstProduct) {
+          variant = "next";
+          title = `Start ${firstProduct.currentStepName} on ${firstProduct.productName}`;
+          const daysToProd =
+            prodMs != null ? Math.ceil((prodMs - todayMs) / 86_400_000) : null;
+          const rampLabel =
+            daysToProd != null && daysToProd >= 0
+              ? `ramp starts ${campaign.productionStartDate} (${daysToProd} day${daysToProd === 1 ? "" : "s"} from today)`
+              : "no ramp date set";
+          meta = `${totalProducts} product${totalProducts === 1 ? "" : "s"} planned · ${rampLabel}`;
+        } else {
+          return null;
+        }
+        return (
+          <div className="mb-3">
+            <NextUpBanner
+              variant={variant}
+              title={title}
+              meta={meta}
+              action={
+                campaign.name ? (
+                  <Link
+                    href={`/plan?focus=campaign:${encodeURIComponent(campaign.name)}`}
+                    style={{
+                      fontSize: 12,
+                      background: "var(--ds-tier-quarter-focus)",
+                      color: "#fff",
+                      padding: "6px 14px",
+                      borderRadius: 4,
+                      textDecoration: "none",
+                      fontWeight: 500,
+                    }}
+                  >
+                    Start now →
+                  </Link>
+                ) : undefined
+              }
+            />
+          </div>
+        );
+      })()}
+
+      {/* Campaign timeline (Phase 3.2) */}
+      {campaign.startDate && campaign.endDate ? (
+        <div className="mb-3">
+          <TimelineStrip
+            startIso={campaign.startDate}
+            endIso={campaign.endDate}
+            markers={(() => {
+              const todayIsoStr = toIsoDate(new Date());
+              const out: TimelineMarker[] = [{ iso: todayIsoStr, label: "today", tone: "today" }];
+              if (campaign.productionStartDate) {
+                out.push({
+                  iso: campaign.productionStartDate,
+                  label: "production",
+                  tone: "primary",
+                });
+              }
+              out.push({ iso: campaign.endDate, label: "launch", tone: "primary" });
+              return out;
+            })()}
+            statusText={onTimeLabel[onTime]}
+          />
+        </div>
+      ) : null}
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">

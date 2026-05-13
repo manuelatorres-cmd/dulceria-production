@@ -15,3 +15,5 @@ export {
   type CampaignCardVariant,
   type CampaignTypeTag,
 } from "./campaign-card";
+export { NextUpBanner, type NextUpVariant } from "./next-up-banner";
+export { TimelineStrip, type TimelineMarker } from "./timeline-strip";
