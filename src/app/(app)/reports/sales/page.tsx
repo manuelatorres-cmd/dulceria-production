@@ -253,19 +253,14 @@ export default function SalesReportPage() {
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-4 pb-2">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
-      </div>
+      <PageHeader
+        title="Sales report"
+        meta="Weekly roll-up · pieces sold + given + wasted · counter walk-ins + orders + booth events combined"
+      />
 
-      <PageHeader title="Sales report" meta="Weekly roll-up: pieces sold, given away, wasted. Counter walk-ins + orders + booth events combined." />
-
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
       {/* Range picker */}
-      <div className="px-4 mb-5">
+      <div>
         <div className="rounded-[6px] bg-card border border-border p-3 flex items-center flex-wrap gap-3">
           <div className="flex gap-1">
             <button
@@ -436,6 +431,7 @@ export default function SalesReportPage() {
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 }
