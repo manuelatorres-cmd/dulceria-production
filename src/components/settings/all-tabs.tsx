@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/dulceria";
+import { useSettings } from "./settings-provider";
 import { exportBackup, importBackup, clearAllData } from "@/lib/backup";
 import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry, usePeople, savePerson, deletePerson, archivePerson, usePersonUnavailability, savePersonUnavailability, deletePersonUnavailability, useEquipment, saveEquipment, deleteEquipment, archiveEquipment, useProductionSteps, saveProductionStep, deleteProductionStep, reorderProductionSteps } from "@/lib/hooks";
 import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, EQUIPMENT_KINDS, EQUIPMENT_KIND_LABELS, EQUIPMENT_LOCATIONS, EQUIPMENT_LOCATION_LABELS, PRIMARY_ROLES, ABSENCE_TYPES, ABSENCE_TYPE_LABELS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability, type Equipment, type EquipmentKind, type ProductionStep, type PrimaryRole, type AbsenceType } from "@/types";
@@ -560,6 +561,11 @@ const WEEKDAY_LABELS: Record<Weekday, string> = {
   monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu",
   friday: "Fri", saturday: "Sat", sunday: "Sun",
 };
+
+export function CapacitySection() {
+  const { setSectionDirty } = useSettings();
+  return <CapacityTab onDirtyChange={(d) => setSectionDirty("capacity", d)} />;
+}
 
 function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) {
   const config = useCapacityConfig();
@@ -1686,6 +1692,10 @@ function UnavailabilityRow({ entry }: { entry: PersonUnavailability }) {
 // Equipment (§2 of the production planning stack)
 // ---------------------------------------------------------------------------
 
+export function EquipmentSection() {
+  return <EquipmentTab />;
+}
+
 function EquipmentTab() {
   const equipment = useEquipment(true); // include archived; filter per row
   const [adding, setAdding] = useState(false);
@@ -2129,6 +2139,10 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
 // ---------------------------------------------------------------------------
 // Production Steps (§3 of the production planning stack)
 // ---------------------------------------------------------------------------
+
+export function StepsSection() {
+  return <ProductionStepsTab />;
+}
 
 function ProductionStepsTab() {
   const categories = useProductCategories();
@@ -2875,6 +2889,23 @@ function parseNonNegativeFloat(s: string): number | undefined {
   return n;
 }
 
+export function MarketSection() {
+  const s = useSettings();
+  return (
+    <PreferencesTab
+      marketRegion={s.marketRegion}
+      onRegionChange={s.setMarketRegion}
+      currency={s.currency}
+      onCurrencyChange={s.setCurrency}
+      facilityMayContain={s.facilityMayContain}
+      onMayContainChange={s.setFacilityMayContain}
+      defaultFillMode={s.defaultFillMode}
+      onFillModeChange={async (m) => s.setDefaultFillMode(m)}
+      onDirtyChange={(d) => s.setSectionDirty("market", d)}
+    />
+  );
+}
+
 function PreferencesTab({
   marketRegion,
   onRegionChange,
@@ -3179,6 +3210,10 @@ const PRODUCT_PREVIEW_COLUMNS = [
   { key: "fillMode", label: "Fill mode", accessor: (d: ProductImportRow) => d.product.fillMode ?? "percentage" },
   { key: "fillings", label: "Fillings", accessor: (d: ProductImportRow) => `${d.fillings.length} items` },
 ];
+
+export function ImportSection() {
+  return <ImportTab />;
+}
 
 function ImportTab() {
   // Preload lookup data for relational imports (fillings, products).
