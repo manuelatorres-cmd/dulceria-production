@@ -4,7 +4,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BackButton } from "@/components/back-button";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useSubscriptionTemplate,
   saveSubscriptionTemplate,
@@ -103,8 +103,7 @@ export default function SubscriptionTemplateDetail({
 
       <PageHeader
         title={name || "Untitled subscription"}
-        accent={frequency}
-        description={`${pieceCount} pieces per box · ${active ? "active" : "inactive"}`}
+        meta={`${frequency} · ${pieceCount} pieces per box · ${active ? "active" : "inactive"}`}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">

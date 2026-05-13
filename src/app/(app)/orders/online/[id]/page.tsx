@@ -2,7 +2,7 @@
 
 import { use, useMemo, Fragment } from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useOrder, useOrderItems, useProductsList, useProductLocationTotals, shipOnlineOrder,
   useOrderVariantLines, useVariants, useAllVariantPackagings, usePackagingList,
@@ -74,7 +74,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
 
   return (
     <div>
-      <PageHeader title={`Packing slip · ${order.sourceRef ?? order.id}`} description={order.customerName ?? undefined} />
+      <PageHeader title={`Packing slip · ${order.sourceRef ?? order.id}`} meta={order.customerName ?? undefined} />
       <div className="px-4 pb-10 space-y-4 print:pb-0">
         {/* Toolbar — hidden on print */}
         <div className="flex items-center justify-between print:hidden">

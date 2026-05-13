@@ -3,7 +3,7 @@
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useCustomer, useCustomers, saveCustomer, setCustomerArchived,
   useCustomerContacts, saveCustomerContact, deleteCustomerContact,
@@ -208,7 +208,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <div>
-      <PageHeader title={customer.companyName} description={customer.contactName ?? "B2B customer"} />
+      <PageHeader title={customer.companyName} meta={customer.contactName ?? "B2B customer"} />
       <div className="px-4 pb-10 space-y-5">
         <DetailNav
           items={[...allCustomers].sort((a, b) => a.companyName.localeCompare(b.companyName))}

@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useQuote, useCustomer, useProductsList, usePackagingList, saveQuote,
   convertQuoteToOrder, deleteQuote,
@@ -91,7 +91,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div>
-      <PageHeader title={quote.title || "Quote"} description={customer?.companyName ?? (quote.isWhatIf ? "What-If scenario" : "No customer")} />
+      <PageHeader title={quote.title || "Quote"} meta={customer?.companyName ?? (quote.isWhatIf ? "What-If scenario" : "No customer")} />
       <div className="px-4 pb-10 space-y-4 print:pb-0">
         {/* Toolbar — hidden in print view */}
         <div className="flex items-center justify-between print:hidden">
