@@ -6,6 +6,7 @@ import { ServiceWorkerRegister } from "@/components/sw-register";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { GlobalErrorHandler } from "@/components/global-error-handler";
 import { QueryProvider } from "@/components/query-provider";
+import { ToastProvider } from "@/components/dulceria/toast-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -59,14 +60,16 @@ export default function RootLayout({
       </head>
       <body className="bg-background text-foreground font-sans antialiased">
         <QueryProvider>
-          <ErrorBoundary>
-            {/* Suspense boundary is required for static export: any client component
-                using `useSearchParams()` otherwise triggers a CSR bailout and the
-                build fails. Fallback is null — the real render happens client-side. */}
-            <Suspense fallback={null}>{children}</Suspense>
-          </ErrorBoundary>
-          <GlobalErrorHandler />
-          <ServiceWorkerRegister />
+          <ToastProvider>
+            <ErrorBoundary>
+              {/* Suspense boundary is required for static export: any client component
+                  using `useSearchParams()` otherwise triggers a CSR bailout and the
+                  build fails. Fallback is null — the real render happens client-side. */}
+              <Suspense fallback={null}>{children}</Suspense>
+            </ErrorBoundary>
+            <GlobalErrorHandler />
+            <ServiceWorkerRegister />
+          </ToastProvider>
         </QueryProvider>
       </body>
     </html>
