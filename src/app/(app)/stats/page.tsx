@@ -9,7 +9,7 @@ import {
   useVariants,
 } from "@/lib/hooks";
 import { useAllVariantProducts } from "@/lib/hooks";
-import { PageHeader } from "@/components/dulceria";
+import { PageHeader, StatCard } from "@/components/dulceria";
 import type { VariantProduct } from "@/types";
 
 type ProductionEvent = {
@@ -430,7 +430,7 @@ export default function StatsPage() {
                 onClick={() => handlePresetChange(p.value)}
                 className={`px-3 py-1 text-xs rounded-[4px] border transition-colors ${
                   timePreset === p.value
-                    ? "bg-stone-800 text-white border-stone-800"
+                    ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                     : "bg-transparent text-stone-600 border-stone-300 hover:bg-stone-100 hover:border-stone-400"
                 }`}
               >
@@ -510,47 +510,33 @@ export default function StatsPage() {
 
         {hasData && (
           <>
-            {/* KPI cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">To stock</p>
-                <p className="text-2xl font-semibold tabular-nums mt-1">
-                  {kpis.totalProducts.toLocaleString()}
-                </p>
-                {kpis.totalWaste > 0 && (
-                  <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
-                    of {kpis.totalPlanned.toLocaleString()} planned
-                  </p>
-                )}
-              </div>
-              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Yield</p>
-                <p className={`text-2xl font-semibold tabular-nums mt-1 ${
-                  kpis.yieldRate >= 98 ? "text-status-ok" : kpis.yieldRate >= 90 ? "" : "text-status-warn"
-                }`}>
-                  {kpis.totalPlanned > 0 ? `${kpis.yieldRate.toFixed(1)}%` : "—"}
-                </p>
-                {kpis.totalWaste > 0 && (
-                  <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
-                    {kpis.totalWaste.toLocaleString()} set aside
-                  </p>
-                )}
-              </div>
-              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Batches</p>
-                <p className="text-2xl font-semibold tabular-nums mt-1">{kpis.uniquePlans}</p>
-              </div>
-              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Top product</p>
-                <p className="text-sm font-semibold mt-1 truncate" title={kpis.topProduct?.name}>
-                  {kpis.topProduct?.name ?? "—"}
-                </p>
-                {kpis.topProduct && (
-                  <p className="text-xs text-muted-foreground tabular-nums">
-                    {kpis.topProduct.count.toLocaleString()} pcs
-                  </p>
-                )}
-              </div>
+            {/* KPI StatCards */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <StatCard
+                variant="default"
+                label="To stock"
+                value={kpis.totalProducts.toLocaleString()}
+                meta={kpis.totalWaste > 0 ? `of ${kpis.totalPlanned.toLocaleString()} planned` : undefined}
+              />
+              <StatCard
+                variant={kpis.yieldRate >= 98 ? "ok" : kpis.yieldRate >= 90 ? "default" : "warn"}
+                label="Yield"
+                value={kpis.totalPlanned > 0 ? `${kpis.yieldRate.toFixed(1)}%` : "—"}
+                meta={kpis.totalWaste > 0 ? `${kpis.totalWaste.toLocaleString()} set aside` : undefined}
+              />
+              <StatCard variant="default" label="Batches" value={kpis.uniquePlans} />
+              <StatCard
+                variant="active"
+                label="Top product"
+                value={kpis.topProduct?.name ?? "—"}
+                meta={kpis.topProduct ? `${kpis.topProduct.count.toLocaleString()} pcs` : undefined}
+              />
             </div>
 
             {/* Chart */}
@@ -566,7 +552,7 @@ export default function StatsPage() {
                       onClick={() => setGranularity("month")}
                       className={`px-2.5 py-1 transition-colors ${
                         granularity === "month"
-                          ? "bg-stone-800 text-white"
+                          ? "bg-[color:var(--ds-tier-quarter-focus)] text-white"
                           : "text-muted-foreground hover:bg-stone-100"
                       }`}
                     >
@@ -576,7 +562,7 @@ export default function StatsPage() {
                       onClick={() => setGranularity("week")}
                       className={`px-2.5 py-1 border-l border-[color:var(--ds-border-warm)] transition-colors ${
                         granularity === "week"
-                          ? "bg-stone-800 text-white"
+                          ? "bg-[color:var(--ds-tier-quarter-focus)] text-white"
                           : "text-muted-foreground hover:bg-stone-100"
                       }`}
                     >
