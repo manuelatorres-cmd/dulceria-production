@@ -22,6 +22,7 @@ import { DECORATION_MATERIAL_TYPE_LABELS, COCOA_BUTTER_TYPES } from "@/types";
 import type { CocoaButterType } from "@/types";
 import { StockStatusPanel } from "@/components/stock-status-panel";
 import { InlineNameEditor } from "@/components/inline-name-editor";
+import { PageHeader, StatusTag, DsButton } from "@/components/dulceria";
 import { IconArrowLeft as ArrowLeft, IconPencil as Pencil, IconTrash as Trash2, IconArchive as Archive, IconArchiveOff as ArchiveRestore } from "@tabler/icons-react";
 import Link from "next/link";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
@@ -136,55 +137,47 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      {/* Back */}
-      <div className="px-4 pt-6 pb-2">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
-        </button>
-      </div>
-
-      <div className="px-4 pb-6 space-y-6 max-w-lg">
-
-        {/* Name row — always visible, pencil edits name only */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
+      <PageHeader
+        title={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
             <span
-              className="w-5 h-5 rounded-[4px] border border-black/10 shrink-0"
-              style={{ backgroundColor: material.color ?? "#9ca3af" }}
+              aria-hidden
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 4,
+                border: "1px solid rgba(0,0,0,0.1)",
+                background: material.color ?? "#9ca3af",
+                display: "inline-block",
+                flexShrink: 0,
+              }}
             />
             <InlineNameEditor
               name={material.name}
               onSave={async (n) => {
                 await saveDecorationMaterial({ ...material, name: n });
               }}
-              className="text-xl font-bold"
             />
-            {material.archived && (
-              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
-                <Archive className="w-3 h-3" /> Archived
+          </span>
+        }
+        meta={
+          decorationCategories.find((c) => c.slug === material.type)?.name ??
+          DECORATION_MATERIAL_TYPE_LABELS[material.type] ??
+          material.type
+        }
+        badges={material.archived ? <StatusTag kind="done">Archived</StatusTag> : undefined}
+        actions={
+          !editing ? (
+            <DsButton variant="default" size="md" onClick={startEditing}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <Pencil className="w-3.5 h-3.5" /> Edit
               </span>
-            )}
-          </div>
-          {!editing && (
-            <button
-              onClick={startEditing}
-              className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
-              aria-label="Edit decoration material"
-            >
-              <Pencil className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
+            </DsButton>
+          ) : undefined
+        }
+      />
 
-        {/* Type subtitle — shown below name in read-only mode */}
-        {!editing && (
-          <p className="text-sm text-primary -mt-3">
-            {decorationCategories.find((c) => c.slug === material.type)?.name ?? DECORATION_MATERIAL_TYPE_LABELS[material.type] ?? material.type}
-          </p>
-        )}
+      <div className="space-y-6 max-w-lg" style={{ padding: "16px 32px 40px" }}>
 
         {/* Stock status — always at top, hidden while editing */}
         {!editing && (
