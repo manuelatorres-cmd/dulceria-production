@@ -7,10 +7,8 @@ import {
   useAllVariantPackagingComponents, useIngredients, useFillings, useMouldsList,
   usePackagingList, useProductCategories, useAllFillingIngredients,
 } from "@/lib/hooks";
-import { IconAlertTriangle as AlertTriangle, IconCircleCheck as CheckCircle, IconChevronRight as ChevronRight } from "@tabler/icons-react";
-
-const CARD = "bg-white/70 backdrop-blur-2xl border border-white/60 rounded-[18px] p-5 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
-const PINK_INK = "text-[#2e4839]";
+import { IconAlertTriangle as AlertTriangle, IconCircleCheck as CheckCircle, IconChevronRight as ChevronRight, IconChevronDown as ChevronDown } from "@tabler/icons-react";
+import { PageHeader, Section, StatCard } from "@/components/dulceria";
 
 type Issue = {
   entity: string;       // table name e.g. "Product"
@@ -200,111 +198,139 @@ export default function AuditPage() {
 
   const totalIssues = groups.reduce((s, g) => s + g.issues.length, 0);
 
+  const groupsWithIssues = groups.filter((g) => g.issues.length > 0);
+
   return (
-    <div className="px-5 py-6 pb-12 space-y-5">
-      <header>
-        <p className="text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.16em" }}>
-          The Lab
-        </p>
-        <h1
-          className="text-[30px] leading-none mt-1"
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.018em" }}
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Data audit"
+        meta="Every product, variant, ingredient, filling, mould and packaging row checked against required fields · click any row to jump to the fix page"
+      />
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 12,
+          }}
         >
-          Data audit
-        </h1>
-        <p className="text-[12.5px] text-muted-foreground mt-1.5">
-          Every product, variant, ingredient, filling, mould and packaging row checked against required fields. Click any row to jump to the fix page.
-        </p>
-      </header>
-
-      {/* Summary */}
-      <section className={CARD}>
-        <div className="flex items-baseline gap-4 flex-wrap">
-          {totalIssues === 0 ? (
-            <>
-              <CheckCircle className="w-7 h-7 text-[#4a7a5e]" />
-              <span
-                className="text-[24px]"
-                style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em", color: "#4a7a5e" }}
-              >
-                All clean — nothing missing.
-              </span>
-            </>
-          ) : (
-            <>
-              <AlertTriangle className={`w-7 h-7 ${PINK_INK}`} />
-              <span
-                className={`text-[24px] ${PINK_INK}`}
-                style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
-              >
-                {totalIssues} row{totalIssues === 1 ? "" : "s"} need attention
-              </span>
-              <span className="text-[12px] text-muted-foreground">
-                across {groups.filter((g) => g.issues.length > 0).length} table{groups.filter((g) => g.issues.length > 0).length === 1 ? "" : "s"}
-              </span>
-            </>
-          )}
+          <StatCard
+            variant={totalIssues === 0 ? "ok" : "urgent"}
+            label="Rows needing attention"
+            value={totalIssues}
+            meta={
+              totalIssues === 0
+                ? "All clean — nothing missing"
+                : `Across ${groupsWithIssues.length} table${groupsWithIssues.length === 1 ? "" : "s"}`
+            }
+            icon={
+              totalIssues === 0 ? (
+                <CheckCircle size={16} stroke={1.5} />
+              ) : (
+                <AlertTriangle size={16} stroke={1.5} />
+              )
+            }
+          />
         </div>
-      </section>
 
-      {groups.map((g) => (
-        <AuditGroup key={g.title} title={g.title} issues={g.issues} color={g.color} bg={g.bg} />
-      ))}
+        {groups.map((g) => (
+          <AuditGroup key={g.title} title={g.title} issues={g.issues} color={g.color} bg={g.bg} />
+        ))}
+      </div>
     </div>
   );
 }
 
 function AuditGroup({ title, issues, color, bg }: { title: string; issues: Issue[]; color: string; bg: string }) {
   const [expanded, setExpanded] = useState(issues.length > 0 && issues.length <= 8);
+  void color; void bg;
   return (
-    <section className={CARD}>
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-baseline justify-between gap-3 text-left"
-      >
-        <div className="flex items-baseline gap-3">
-          <span className="text-[12px] opacity-70 shrink-0">{expanded ? "▾" : "▸"}</span>
-          <h2
-            className="text-[20px]"
-            style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
-          >
-            {title}
-          </h2>
-        </div>
+    <Section
+      title={title}
+      action={
         <span
-          className="text-[11px] px-2.5 py-0.5 rounded-full"
-          style={{ background: issues.length === 0 ? "#f1faf4" : bg, color: issues.length === 0 ? "#4a7a5e" : color, border: `1px solid ${issues.length === 0 ? "#cfe5d9" : bg}` }}
+          style={{
+            fontSize: 11,
+            padding: "2px 8px",
+            borderRadius: 12,
+            background: issues.length === 0 ? "var(--ds-tint-ok)" : "var(--ds-tint-critical)",
+            color: issues.length === 0 ? "var(--ds-tier-positive)" : "var(--ds-tier-urgent)",
+            border: `0.5px solid ${issues.length === 0 ? "var(--ds-tier-positive)" : "var(--ds-tier-urgent)"}`,
+          }}
         >
           {issues.length === 0 ? "all good" : `${issues.length} issue${issues.length === 1 ? "" : "s"}`}
         </span>
+      }
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        style={{
+          width: "100%",
+          textAlign: "left",
+          padding: "10px 16px",
+          background: "transparent",
+          border: "none",
+          borderTop: "0.5px solid var(--ds-border-warm)",
+          fontSize: 12,
+          color: "var(--ds-text-muted)",
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+        className="hover:bg-[color:var(--ds-card-bg-hover)]"
+      >
+        {expanded ? <ChevronDown size={12} stroke={1.5} /> : <ChevronRight size={12} stroke={1.5} />}
+        {expanded ? "Hide" : "Show"} issues
       </button>
-
       {expanded && issues.length > 0 && (
-        <ul className="mt-3 space-y-1.5">
+        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {issues.map((i, idx) => (
-            <li key={idx}>
+            <li key={idx} style={{ borderTop: "0.5px solid var(--ds-border-warm)" }}>
               <Link
                 href={i.href}
-                className="flex items-center gap-3 px-3 py-2 rounded-[10px] border border-white/60 bg-white/55 hover:bg-white/80 transition"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 16px",
+                  textDecoration: "none",
+                  color: "inherit",
+                }}
+                className="hover:bg-[color:var(--ds-card-bg-hover)]"
               >
-                <div className="flex-1 min-w-0">
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div
-                    className="truncate"
-                    style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 14 }}
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontFamily: "var(--font-serif)",
+                      fontWeight: 500,
+                      fontSize: 13,
+                    }}
                   >
                     {i.name}
                   </div>
-                  <div className="text-[11px] text-muted-foreground truncate">
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--ds-text-muted)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     Missing: {i.missing.join(" · ")}
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                <ChevronRight size={14} stroke={1.5} style={{ color: "var(--ds-text-muted)", flexShrink: 0 }} />
               </Link>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </Section>
   );
 }
