@@ -88,9 +88,13 @@ export default function MonthlyReviewPage() {
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <PageHeader title="Monthly review" meta={"Reports" + " · " + "Auto-generated snapshot. Pick any month to scan key metrics side-by-side with the month before."} />
+      <PageHeader
+        title="Monthly review"
+        meta="Auto-generated snapshot · pick any month to scan key metrics vs month before"
+      />
 
-      <div className="flex items-center gap-3 mb-6">
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+      <div className="flex items-center gap-3">
         <label className="text-[10px] uppercase text-muted-foreground" style={{ letterSpacing: "0.12em" }}>
           Month
         </label>
@@ -286,6 +290,7 @@ export default function MonthlyReviewPage() {
           <li>Year-over-year comparison when 12 months of history exist</li>
         </ul>
       </ReportSection>
+      </div>
     </div>
   );
 }
