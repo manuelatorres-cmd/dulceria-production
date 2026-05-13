@@ -3,16 +3,20 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { IconChevronDown, IconChevronRight, IconPencil } from "@tabler/icons-react";
 import { VolumePlanning } from "@/components/campaign-detail/volume-planning";
 import {
   NextUpBanner,
   type NextUpVariant,
   TimelineStrip,
   type TimelineMarker,
+  PageHeader as DsPageHeader,
+  StatCard,
+  StatusTag,
+  DsButton,
+  type StatCardVariant,
 } from "@/components/dulceria";
 import { BackButton } from "@/components/back-button";
-import { PageHeader } from "@/components/page-header";
 import { phaseKeyFromStepName } from "@/lib/production";
 import {
   useCampaign,
@@ -266,44 +270,73 @@ function CampaignView({
     unknown: "bg-muted text-muted-foreground",
   };
 
+  const onTimeTagKind: Record<string, "ready" | "pending" | "overdue" | "neutral" | "done"> = {
+    done: "done",
+    ok: "ready",
+    behind: "pending",
+    late: "overdue",
+    unknown: "neutral",
+  };
+  void onTimeTone;
+
   return (
-    <>
-      {/* Header */}
-      <div className="flex flex-wrap items-baseline gap-3 mb-4">
-        <h1
-          className="text-[26px] tracking-[-0.025em]"
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 400 }}
-        >
-          {campaign.name || "Untitled campaign"}
-        </h1>
-        <span className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{campaign.type}</span>
-        <span className="text-[12px] text-muted-foreground">
-          {campaign.startDate} → {campaign.endDate}
-        </span>
-        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${onTimeTone[onTime]}`}>
-          {onTimeLabel[onTime]}
-        </span>
-        <Link
-          href={`/campaigns/${encodeURIComponent(campaign.id ?? "")}/production`}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-3 py-1 text-[12px] font-medium hover:opacity-90"
-        >
-          Production schedule →
-        </Link>
-        {campaign.name && (
-          <Link
-            href={`/plan?focus=campaign:${encodeURIComponent(campaign.name)}`}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#e3ebe6] text-[#2e4839] px-3 py-1 text-[12px] font-medium hover:bg-[#d4e0d8]"
-          >
-            Plan this in /plan →
-          </Link>
-        )}
-        <button
-          onClick={onEdit}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[12px] hover:border-foreground/30"
-        >
-          <Pencil className="w-3 h-3" /> Edit
-        </button>
-      </div>
+    <div className="ds">
+      <DsPageHeader
+        title={campaign.name || "Untitled campaign"}
+        meta={
+          <>
+            <span style={{ textTransform: "uppercase", letterSpacing: "0.08em", fontSize: 10 }}>
+              {campaign.type}
+            </span>
+            {(campaign.startDate || campaign.endDate) && (
+              <>
+                {" · "}
+                {campaign.startDate} → {campaign.endDate}
+              </>
+            )}
+          </>
+        }
+        badges={
+          <StatusTag kind={onTimeTagKind[onTime] ?? "neutral"}>
+            {onTimeLabel[onTime]}
+          </StatusTag>
+        }
+        actions={
+          <>
+            <DsButton
+              variant="primary"
+              size="md"
+              onClick={() =>
+                window.location.assign(
+                  `/campaigns/${encodeURIComponent(campaign.id ?? "")}/production`,
+                )
+              }
+            >
+              Production schedule →
+            </DsButton>
+            {campaign.name && (
+              <DsButton
+                variant="default"
+                size="md"
+                onClick={() =>
+                  window.location.assign(
+                    `/plan?focus=campaign:${encodeURIComponent(campaign.name)}`,
+                  )
+                }
+              >
+                Plan in /plan →
+              </DsButton>
+            )}
+            <DsButton variant="default" size="md" onClick={onEdit}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <IconPencil size={12} stroke={1.5} /> Edit
+              </span>
+            </DsButton>
+          </>
+        }
+      />
+
+      <div style={{ padding: "16px 32px 40px" }}>
 
       {/* Next-up banner (Phase 3.2) */}
       {(() => {
@@ -394,16 +427,48 @@ function CampaignView({
         </div>
       ) : null}
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <Tile tint="sky" label="Products in campaign" value={totalProducts} delta={`${blocks.length} categor${blocks.length === 1 ? "y" : "ies"}`} />
-        <Tile tint="mint" label="Done" value={doneCount} delta={totalProducts > 0 ? `${Math.round(doneCount / totalProducts * 100)}% of target` : "—"} />
-        <Tile tint="butter" label="In progress" value={inProgressCount} delta={notStartedCount > 0 ? `${notStartedCount} not started` : "all underway"} />
-        <Tile
-          tint={onTime === "late" ? "blush" : onTime === "behind" ? "peach" : "sage"}
+      {/* KPI strip — DS StatCards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 12,
+          marginBottom: 16,
+        }}
+      >
+        <StatCard
+          variant="default"
+          label="Products in campaign"
+          value={totalProducts}
+          meta={`${blocks.length} categor${blocks.length === 1 ? "y" : "ies"}`}
+        />
+        <StatCard
+          variant="ok"
+          label="Done"
+          value={doneCount}
+          meta={totalProducts > 0 ? `${Math.round((doneCount / totalProducts) * 100)}% of target` : "—"}
+        />
+        <StatCard
+          variant="warn"
+          label="In progress"
+          value={inProgressCount}
+          meta={notStartedCount > 0 ? `${notStartedCount} not started` : "all underway"}
+        />
+        <StatCard
+          variant={
+            onTime === "late" ? "urgent" : onTime === "behind" ? "warn" : "ok"
+          }
           label="Days remaining"
           value={daysLeft ?? "—"}
-          delta={daysLeft != null ? (daysLeft < 0 ? "overdue" : daysLeft === 0 ? "deadline today" : `deadline ${campaign.endDate}`) : undefined}
+          meta={
+            daysLeft != null
+              ? daysLeft < 0
+                ? "overdue"
+                : daysLeft === 0
+                ? "deadline today"
+                : `deadline ${campaign.endDate}`
+              : undefined
+          }
         />
       </div>
 
@@ -460,7 +525,8 @@ function CampaignView({
           <p className="text-sm whitespace-pre-wrap">{campaign.notes}</p>
         </section>
       )}
-    </>
+      </div>
+    </div>
   );
   void stepMap; // kept for future per-step rendering in the expanded view
 }
@@ -505,7 +571,7 @@ function CategoryBlock({
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-3 text-left"
       >
-        {open ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+        {open ? <IconChevronDown size={16} stroke={1.5} className="text-muted-foreground shrink-0" /> : <IconChevronRight size={16} stroke={1.5} className="text-muted-foreground shrink-0" />}
         <div className="flex-1 min-w-0">
           <h3
             className="text-[17px] tracking-[-0.02em]"
@@ -638,40 +704,6 @@ function OrdersInCampaign({
         )}
       </ul>
     </section>
-  );
-}
-
-function Tile({ tint, label, value, delta }: {
-  tint: "mint" | "butter" | "blush" | "peach" | "sky" | "sage" | "lilac";
-  label: string;
-  value: string | number;
-  delta?: string;
-}) {
-  const tintBg = `var(--accent-${tint}-bg)`;
-  const tintInk = `var(--accent-${tint}-ink)`;
-  return (
-    <div
-      className="rounded-[18px] p-4 border shadow-[0_1px_2px_rgba(16,18,24,0.04),0_4px_16px_rgba(16,18,24,0.04)]"
-      style={{ background: tintBg, borderColor: tintBg }}
-    >
-      <p
-        className="text-[10px] tracking-[0.07em] uppercase font-semibold mb-1 opacity-80"
-        style={{ color: tintInk }}
-      >
-        {label}
-      </p>
-      <p
-        className="text-[26px] font-semibold tabular-nums leading-none"
-        style={{ letterSpacing: "-0.02em", color: tintInk }}
-      >
-        {value}
-      </p>
-      {delta && (
-        <p className="mt-1.5 text-[10.5px]" style={{ color: tintInk, opacity: 0.75 }}>
-          {delta}
-        </p>
-      )}
-    </div>
   );
 }
 
@@ -971,8 +1003,8 @@ function CampaignEditor({
                         className="flex items-center gap-1.5 text-left flex-1 min-w-0"
                       >
                         {hidden
-                          ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                          : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+                          ? <IconChevronRight size={14} stroke={1.5} className="text-muted-foreground" />
+                          : <IconChevronDown size={14} stroke={1.5} className="text-muted-foreground" />}
                         <span
                           className="text-[13px] truncate capitalize"
                           style={{ fontFamily: "var(--font-serif)", fontWeight: 500 }}
