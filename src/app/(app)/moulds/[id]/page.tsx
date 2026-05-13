@@ -152,7 +152,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="px-4 pt-6 pb-2 space-y-2">
         <BackButton fallbackHref="/moulds" fallbackLabel="All moulds" onBack={() => safeBack()} />
         <DetailNav

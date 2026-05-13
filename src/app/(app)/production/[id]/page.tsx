@@ -876,7 +876,7 @@ function PlanContent({
     : `Day ${daysSinceCreated + 1} of this batch`;
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="px-4 pt-6 pb-2">
         <div className="mb-3">
           <BackButton fallbackHref={backHref} fallbackLabel={backLabel} />

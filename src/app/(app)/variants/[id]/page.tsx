@@ -659,7 +659,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   const status = getStatus(variant.startDate, variant.endDate);
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       {/* Back */}
       <div className="px-4 pt-6 pb-2 space-y-2">
         <BackButton fallbackHref="/variants" fallbackLabel="All variants" onBack={() => router.back()} />

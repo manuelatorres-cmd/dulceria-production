@@ -92,7 +92,7 @@ export default function SubscriptionTemplateDetail({
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="mb-3">
         <BackButton
           fallbackHref="/subscriptions"

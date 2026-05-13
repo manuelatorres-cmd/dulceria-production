@@ -73,7 +73,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title={`Packing slip · ${order.sourceRef ?? order.id}`} meta={order.customerName ?? undefined} />
       <div className="px-4 pb-10 space-y-4 print:pb-0">
         {/* Toolbar — hidden on print */}

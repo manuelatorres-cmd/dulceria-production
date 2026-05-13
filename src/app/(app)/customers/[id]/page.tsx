@@ -207,7 +207,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title={customer.companyName} meta={customer.contactName ?? "B2B customer"} />
       <div className="px-4 pb-10 space-y-5">
         <DetailNav

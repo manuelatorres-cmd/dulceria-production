@@ -113,7 +113,7 @@ export default function PriceListDetailPage({
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="mb-3">
         <Link
           href="/pricing/lists"

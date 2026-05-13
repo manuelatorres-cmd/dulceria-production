@@ -186,7 +186,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
   const latestOrder = orders[0];
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="px-4 pt-6 pb-2 space-y-2">
         <BackButton fallbackHref="/packaging" fallbackLabel="All packaging" onBack={() => safeBack()} />
         <DetailNav

@@ -461,7 +461,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       {/* Back + prev/next pager */}
       <div className="px-4 pt-6 pb-2 space-y-2">
         <BackButton fallbackHref="/products" fallbackLabel="All products" onBack={() => safeBack()} />

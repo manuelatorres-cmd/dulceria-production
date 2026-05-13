@@ -546,7 +546,7 @@ function LinkedBatches({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <label className="label">{label}</label>
       {children}
     </div>

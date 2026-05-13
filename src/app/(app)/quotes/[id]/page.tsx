@@ -90,7 +90,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
   const expired = !!quote.expiresAt && new Date(quote.expiresAt) < new Date();
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title={quote.title || "Quote"} meta={customer?.companyName ?? (quote.isWhatIf ? "What-If scenario" : "No customer")} />
       <div className="px-4 pb-10 space-y-4 print:pb-0">
         {/* Toolbar — hidden in print view */}

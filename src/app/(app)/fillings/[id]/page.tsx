@@ -236,7 +236,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
   const hasVersionHistory = versionHistory.length > 1 || filling.rootId != null;
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="px-4 pt-6 pb-2 space-y-2">
         <BackButton fallbackHref="/fillings" fallbackLabel="All fillings" onBack={() => safeBack()} />
         <DetailNav

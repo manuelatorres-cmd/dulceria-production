@@ -96,7 +96,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
       : null;
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="px-4 pt-6 pb-2 space-y-2">
         <BackButton fallbackHref="/ingredients" fallbackLabel="All ingredients" onBack={() => safeBack()} />
         <DetailNav

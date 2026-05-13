@@ -135,7 +135,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       {/* Back */}
       <div className="px-4 pt-6 pb-2">
         <button
