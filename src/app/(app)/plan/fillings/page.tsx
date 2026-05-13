@@ -207,7 +207,7 @@ export default function FillingConsolidationPage() {
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Weekly filling cooking list" meta="What to cook across every active order in the window" />
 
       <div className="px-4 pb-8 space-y-5">

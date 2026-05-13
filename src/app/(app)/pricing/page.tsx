@@ -213,7 +213,7 @@ export default function PricingPage() {
   const unpricedCount = variants.length - pricedVariants.length;
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Pricing & Margins" />
 
       <div className="px-4 space-y-6 pb-10">

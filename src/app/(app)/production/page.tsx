@@ -156,7 +156,7 @@ export default function ProductionPage() {
   }, [plans, lineItems]);
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Production" meta="Daily view — today plus upcoming. Click a batch to check off steps." />
 
       <div className="px-4 pb-8 space-y-4">

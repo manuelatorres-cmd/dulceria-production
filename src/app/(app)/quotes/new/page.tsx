@@ -281,7 +281,7 @@ function NewQuotePageInner() {
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title={isWhatIf ? "What-If quote" : "New quote"} meta="B2B pricing calculator with cost breakdown and feasibility check" />
       <div className="px-4 pb-10 space-y-5">
         <Link href="/quotes" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
