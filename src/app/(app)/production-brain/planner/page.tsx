@@ -29,7 +29,6 @@ import {
   dismissProposal,
 } from "@/lib/hooks";
 import type { ReplenishmentProposal } from "@/types";
-import { BackButton } from "@/components/back-button";
 
 /**
  * Production Brain · Planner — drag-drop scheduling.
@@ -127,16 +126,25 @@ export default function ProductionBrainPlannerPage() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div>
-        <div className="px-4 pt-4">
-          <BackButton />
-        </div>
-        <PageHeader title="Planner" meta="Drag a proposal onto a day to schedule it. Campaigns + holidays shown across the top. Brain runs daily + on order changes." />
+      <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+        <PageHeader
+          title="Planner"
+          meta="Drag a proposal onto a day to schedule · campaigns + holidays shown across the top · brain runs daily + on order changes"
+        />
+        <div style={{ padding: "16px 32px 40px" }}>
 
         {err ? (
           <div
-            className="mb-4 border border-status-alert-edge bg-status-alert-bg px-3 py-2 text-[12px] text-status-alert"
-            style={{ borderRadius: 4 }}
+            style={{
+              marginBottom: 16,
+              padding: "8px 12px",
+              fontSize: 12,
+              border: "0.5px solid var(--ds-tier-urgent)",
+              borderLeft: "3px solid var(--ds-tier-urgent)",
+              background: "var(--ds-tint-critical)",
+              color: "var(--ds-tier-urgent)",
+              borderRadius: 4,
+            }}
           >
             Error: {err}
           </div>
@@ -253,6 +261,7 @@ export default function ProductionBrainPlannerPage() {
               </ul>
             )}
           </aside>
+        </div>
         </div>
       </div>
 
