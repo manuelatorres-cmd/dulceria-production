@@ -542,7 +542,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {parentOrder && (
           <Link
             href={`/orders/${encodeURIComponent(parentOrder.id!)}`}
-            className="flex items-center gap-2 rounded-[4px] border border-primary/30 bg-primary/5 px-3 py-2 text-sm hover:bg-primary/10"
+            className="flex items-center gap-2 rounded-[4px] border border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)] px-3 py-2 text-sm hover:bg-[color:var(--ds-tint-info)]"
           >
             <Package className="w-4 h-4 text-primary" />
             <span className="flex-1">
@@ -867,7 +867,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                             key={c.orderItemId}
                             onClick={() => handleReassign(p, c.orderItemId)}
                             disabled={reassignBusy === p.orderPlanLinkId}
-                            className="inline-flex items-center gap-1 rounded-[4px] border border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-[4px] border border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)] hover:bg-[color:var(--ds-tint-info)] text-primary px-2 py-0.5 text-[11px] font-medium disabled:opacity-50"
                             title={`Needs ${c.itemRemainingDemand} pcs · deadline ${c.deadline.slice(0, 10)}`}
                           >
                             → {c.orderLabel} · {c.itemRemainingDemand} pcs needed
@@ -1599,7 +1599,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
     : short ? "bg-status-alert" : "bg-status-ok";
 
   return (
-    <li className={`rounded-[4px] border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
+    <li className={`rounded-[4px] border px-3 py-2.5 ${isBorrow ? "border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)]" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
       <div className="flex items-center gap-3">
         <span
           className={`w-2 h-2 rounded-full shrink-0 ${feasibilityColor}`}

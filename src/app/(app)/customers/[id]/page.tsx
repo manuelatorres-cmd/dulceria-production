@@ -435,7 +435,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               </p>
             )}
             {analytics.seasonalSuggestion && (
-              <div className="mt-3 rounded-md bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-foreground">
+              <div className="mt-3 rounded-md bg-[color:var(--ds-tint-info)] border border-[color:var(--ds-tier-quarter-focus)] px-3 py-2 text-xs text-foreground">
                 <p className="font-medium text-primary">Seasonal reminder</p>
                 <p className="mt-0.5">{analytics.seasonalSuggestion.note}</p>
                 <button

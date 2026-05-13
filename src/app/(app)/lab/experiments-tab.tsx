@@ -89,10 +89,10 @@ export function ExperimentsTab() {
         <button
           onClick={() => setCreateMode("blank")}
           title="New blank experiment (n)"
-          className="w-full text-left group rounded-[4px] border-2 border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all px-5 py-4"
+          className="w-full text-left group rounded-[4px] border-2 border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)] hover:border-[color:var(--ds-tier-quarter-focus)] hover:bg-[color:var(--ds-tint-info)] transition-all px-5 py-4"
         >
           <div className="flex items-start gap-4">
-            <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-[4px] bg-primary/10 group-hover:bg-primary/20 transition-colors flex items-center justify-center">
+            <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-[4px] bg-[color:var(--ds-tint-info)] group-hover:bg-[color:var(--ds-tint-info)] transition-colors flex items-center justify-center">
               <FlaskConical className="w-5 h-5 text-primary" />
             </div>
             <div>
@@ -106,10 +106,10 @@ export function ExperimentsTab() {
         </button>
         <button
           onClick={() => setCreateMode("clone")}
-          className="w-full text-left group rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-primary/30 hover:bg-muted transition-all px-5 py-4"
+          className="w-full text-left group rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-[color:var(--ds-tier-quarter-focus)] hover:bg-muted transition-all px-5 py-4"
         >
           <div className="flex items-start gap-4">
-            <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-[4px] bg-muted group-hover:bg-primary/10 transition-colors flex items-center justify-center">
+            <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-[4px] bg-muted group-hover:bg-[color:var(--ds-tint-info)] transition-colors flex items-center justify-center">
               <Layers className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
             <div>
@@ -428,7 +428,7 @@ function ExperimentCard({
               {needsWork && (
                 <button
                   onClick={() => onNewVersion(id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] border border-primary/30 text-xs text-primary hover:bg-primary/5 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] border border-[color:var(--ds-tier-quarter-focus)] text-xs text-primary hover:bg-[color:var(--ds-tint-info)] transition-colors"
                 >
                   <GitBranch className="w-3.5 h-3.5" />
                   New version

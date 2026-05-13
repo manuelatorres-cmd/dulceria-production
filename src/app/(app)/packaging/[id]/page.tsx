@@ -522,7 +522,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
             <button
               onClick={() => setShowOrderForm(true)}
               disabled={editing}
-              className="w-full rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] py-4 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] py-4 text-sm text-muted-foreground hover:border-[color:var(--ds-tier-quarter-focus)] hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
               Log first purchase

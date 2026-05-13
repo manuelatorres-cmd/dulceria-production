@@ -96,7 +96,7 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
         {/* Header */}
         <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-9 h-9 rounded-[4px] bg-primary/10 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-[4px] bg-[color:var(--ds-tint-info)] flex items-center justify-center">
               <Droplets className="w-5 h-5 text-primary" />
             </div>
             <div>

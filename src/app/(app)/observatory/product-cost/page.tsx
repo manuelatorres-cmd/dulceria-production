@@ -934,10 +934,10 @@ export default function ProductCostPage() {
                     disabled={!isPinned && compareIds.length >= 3}
                     className={`shrink-0 text-xs px-2.5 py-1.5 rounded border transition-colors font-medium ${
                       isPinned
-                        ? "border-primary text-primary bg-primary/5 hover:bg-primary/10"
+                        ? "border-primary text-primary bg-[color:var(--ds-tint-info)] hover:bg-[color:var(--ds-tint-info)]"
                         : compareIds.length >= 3
                         ? "border-[color:var(--ds-border-warm)] text-muted-foreground/40 cursor-not-allowed"
-                        : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:text-foreground hover:border-primary/40"
+                        : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:text-foreground hover:border-[color:var(--ds-tier-quarter-focus)]"
                     }`}
                   >
                     {isPinned ? "Comparing" : "Compare"}
@@ -964,7 +964,7 @@ export default function ProductCostPage() {
                     setCompareSearch("");
                   }
                 }}
-                className="w-full px-3 py-2 text-sm border border-primary/40 rounded-[4px] bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-3 py-2 text-sm border border-[color:var(--ds-tier-quarter-focus)] rounded-[4px] bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               {compareSearchResults.length > 0 && (
                 <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg overflow-hidden">
@@ -995,7 +995,7 @@ export default function ProductCostPage() {
               className={`text-sm px-3 py-1.5 rounded-[4px] border transition-colors ${
                 compareIds.length >= 3
                   ? "border-[color:var(--ds-border-warm)] text-muted-foreground/40 cursor-not-allowed"
-                  : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:text-foreground hover:border-primary/40"
+                  : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:text-foreground hover:border-[color:var(--ds-tier-quarter-focus)]"
               }`}
             >
               + Add any product to compare

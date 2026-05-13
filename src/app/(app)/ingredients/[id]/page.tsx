@@ -481,7 +481,7 @@ function ShellTabReadView({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <span className="rounded-[4px] bg-primary/10 text-primary border border-primary/20 px-3 py-1 text-xs font-medium">
+        <span className="rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary border border-[color:var(--ds-tier-quarter-focus)] px-3 py-1 text-xs font-medium">
           Shell chocolate (couverture)
         </span>
       </div>

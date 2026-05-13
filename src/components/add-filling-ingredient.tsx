@@ -227,7 +227,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
                     ? selectIngredient(item as (typeof ingredients)[0])
                     : selectFilling(item as (typeof fillings)[0])}
                   className={`w-full text-left px-2 py-1.5 text-sm transition-colors ${
-                    idx === highlightedIndex ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                    idx === highlightedIndex ? "bg-[color:var(--ds-tint-info)] text-primary" : "hover:bg-muted"
                   }`}
                 >
                   {item.name}
@@ -243,7 +243,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
                   type="button"
                   onClick={handleCreateNew}
                   className={`w-full text-left px-2 py-1.5 text-sm transition-colors border-t border-[color:var(--ds-border-warm)] ${
-                    highlightedIndex === filtered.length ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"
+                    highlightedIndex === filtered.length ? "bg-[color:var(--ds-tint-info)] text-primary" : "hover:bg-muted text-muted-foreground"
                   }`}
                 >
                   + Create <span className="font-medium text-foreground">"{trimmedSearch}"</span> as new ingredient

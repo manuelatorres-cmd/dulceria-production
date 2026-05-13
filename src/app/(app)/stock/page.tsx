@@ -757,7 +757,7 @@ function ProductStockTab() {
                           const editing = countingProductLocation?.productId === group.productId
                             && countingProductLocation?.location === loc;
                           let cls = "border-[color:var(--ds-border-warm)] bg-background text-foreground";
-                          if (editing) cls = "border-primary bg-primary/5 text-primary";
+                          if (editing) cls = "border-primary bg-[color:var(--ds-tint-info)] text-primary";
                           else if (below) cls = "border-status-warn-edge bg-status-warn-bg text-status-warn";
                           else if (empty) cls = "border-[color:var(--ds-border-warm)] bg-muted text-muted-foreground";
                           if (editing) {

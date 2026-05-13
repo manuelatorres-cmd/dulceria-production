@@ -2412,7 +2412,7 @@ function FilterOptionRow({
       onClick={onToggle}
       className={
         "w-full flex items-center gap-2 px-1.5 py-1 rounded-[6px] text-left transition " +
-        (checked ? "bg-primary/10 text-foreground" : "hover:bg-muted text-foreground")
+        (checked ? "bg-[color:var(--ds-tint-info)] text-foreground" : "hover:bg-muted text-foreground")
       }
     >
       <span className="w-3.5 h-3.5 shrink-0 rounded-[4px] border border-[color:var(--ds-border-warm)] flex items-center justify-center text-[10px]">

@@ -93,9 +93,9 @@ function SurplusChoice({ icon, label, description, onClick, active }: {
     <button
       onClick={onClick}
       disabled={active}
-      className="w-full flex items-center gap-3 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-3 text-left hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-60"
+      className="w-full flex items-center gap-3 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-3 text-left hover:border-primary hover:bg-[color:var(--ds-tint-info)] transition-colors disabled:opacity-60"
     >
-      <div className="w-9 h-9 rounded-[4px] bg-primary/10 text-primary flex items-center justify-center shrink-0">
+      <div className="w-9 h-9 rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary flex items-center justify-center shrink-0">
         {icon}
       </div>
       <div className="flex-1 min-w-0">

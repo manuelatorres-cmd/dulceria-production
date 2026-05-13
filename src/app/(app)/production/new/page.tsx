@@ -364,7 +364,7 @@ function NewPlanContent() {
           {!fromPlanId && (
             <button
               onClick={() => setIsPastBatch((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors ${isPastBatch ? "border-primary bg-primary/5 text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors ${isPastBatch ? "border-primary bg-[color:var(--ds-tint-info)] text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
               title="Log a batch that already happened"
             >
               <History className="w-3.5 h-3.5" aria-hidden="true" />
@@ -388,7 +388,7 @@ function NewPlanContent() {
                 onClick={() => setFilterToActiveVariant((v) => !v)}
                 className={`shrink-0 inline-flex items-center gap-1.5 rounded-[4px] border px-2.5 py-1 text-xs font-medium transition-colors ${
                   filterToActiveVariant
-                    ? "border-primary bg-primary/10 text-primary"
+                    ? "border-primary bg-[color:var(--ds-tint-info)] text-primary"
                     : "border-[color:var(--ds-border-warm)] text-muted-foreground"
                 }`}
               >
@@ -433,7 +433,7 @@ function NewPlanContent() {
                     <div
                       className={`rounded-[4px] border transition-colors ${
                         selected
-                          ? "border-primary bg-primary/5"
+                          ? "border-primary bg-[color:var(--ds-tint-info)]"
                           : stockAlert === "gone"
                           ? "border-status-alert-edge bg-status-alert-bg/60"
                           : stockAlert === "low"
@@ -1009,7 +1009,7 @@ function BatchSizesPhase({
                 const ageWeeks = ageMs / (7 * 24 * 60 * 60 * 1000);
                 const remaining = filling.shelfLifeWeeks != null ? Math.round((filling.shelfLifeWeeks - ageWeeks) * 10) / 10 : null;
                 const expired = remaining !== null && remaining <= 0;
-                const borderCls = expired ? "border-status-alert/30 bg-status-alert/5" : "border-primary/20 bg-primary/5";
+                const borderCls = expired ? "border-status-alert/30 bg-status-alert/5" : "border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)]";
                 return (
                 <div className={`rounded-md border px-2.5 py-1.5 ${borderCls}`}>
                   <p className={`text-xs font-medium ${expired ? "text-status-alert" : "text-primary"}`}>
@@ -1078,7 +1078,7 @@ function BatchSizesPhase({
                 const ageWeeks = ageMs / (7 * 24 * 60 * 60 * 1000);
                 const remaining = filling.shelfLifeWeeks != null ? Math.round((filling.shelfLifeWeeks - ageWeeks) * 10) / 10 : null;
                 const expired = remaining !== null && remaining <= 0;
-                const borderCls = expired ? "border-status-alert/30 bg-status-alert/5" : "border-primary/20 bg-primary/5";
+                const borderCls = expired ? "border-status-alert/30 bg-status-alert/5" : "border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)]";
                 return (
                 <div className="space-y-2">
                   <div className={`rounded-md border px-2.5 py-2 ${borderCls}`}>

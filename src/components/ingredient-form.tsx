@@ -684,7 +684,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
           </div>
 
           {derivedCostPerGram !== null && (
-            <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2 flex items-baseline gap-2">
+            <div className="rounded-md bg-[color:var(--ds-tint-info)] border border-[color:var(--ds-tier-quarter-focus)] px-3 py-2 flex items-baseline gap-2">
               <span className="text-xs text-muted-foreground">Cost per gram:</span>
               <span className="text-sm font-semibold text-primary">
                 {sym}{derivedCostPerGram < 0.01

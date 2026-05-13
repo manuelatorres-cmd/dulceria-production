@@ -362,7 +362,7 @@ export default function FillingConsolidationPage() {
                               <span className="text-[10px] text-muted-foreground">· {need.category}</span>
                             )}
                             {need.shared && (
-                              <span className="inline-flex items-center gap-0.5 rounded-[4px] border border-primary/40 bg-primary/5 text-primary px-1.5 py-0 text-[10px] font-medium">
+                              <span className="inline-flex items-center gap-0.5 rounded-[4px] border border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)] text-primary px-1.5 py-0 text-[10px] font-medium">
                                 <Users className="w-2.5 h-2.5" /> Shared ({need.usedBy.length})
                               </span>
                             )}

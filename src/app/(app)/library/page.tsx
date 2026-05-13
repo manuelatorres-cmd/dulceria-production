@@ -102,7 +102,7 @@ export default function LibraryPage() {
             <Link
               key={card.name}
               href={card.href}
-              className="flex flex-col bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[4px] p-5 transition-shadow hover:shadow-md hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="flex flex-col bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[4px] p-5 transition-shadow hover:shadow-md hover:border-[color:var(--ds-tier-quarter-focus)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {inner}
             </Link>

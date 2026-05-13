@@ -111,7 +111,7 @@ export function AuditTab() {
               onClick={() => setFilter(opt.id)}
               className={`px-3 py-1.5 rounded-[4px] transition-colors ${
                 filter === opt.id
-                  ? "bg-primary/5 text-foreground border border-primary/20"
+                  ? "bg-[color:var(--ds-tint-info)] text-foreground border border-[color:var(--ds-tier-quarter-focus)]"
                   : "text-muted-foreground hover:text-foreground border border-transparent"
               }`}
             >

@@ -94,7 +94,7 @@ export function RecipeCalculatorTab() {
                 onClick={() => changeCategory(t.id)}
                 className={`w-full text-left px-3 py-2 rounded-[4px] text-sm transition-colors ${
                   t.id === categoryId
-                    ? "bg-primary/5 text-foreground border border-primary/20"
+                    ? "bg-[color:var(--ds-tint-info)] text-foreground border border-[color:var(--ds-tier-quarter-focus)]"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
                 }`}
               >

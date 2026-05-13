@@ -208,7 +208,7 @@ function AddIngredientForm({
                   type="button"
                   onClick={() => selectIngredient(ing)}
                   className={`w-full text-left px-2 py-1.5 text-sm transition-colors ${
-                    idx === highlightedIndex ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                    idx === highlightedIndex ? "bg-[color:var(--ds-tint-info)] text-primary" : "hover:bg-muted"
                   }`}
                 >
                   {ing.name}
@@ -222,7 +222,7 @@ function AddIngredientForm({
                   type="button"
                   onClick={handleCreateNew}
                   className={`w-full text-left px-2 py-1.5 text-sm border-t border-[color:var(--ds-border-warm)] transition-colors ${
-                    highlightedIndex === filtered.length ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"
+                    highlightedIndex === filtered.length ? "bg-[color:var(--ds-tint-info)] text-primary" : "hover:bg-muted text-muted-foreground"
                   }`}
                 >
                   + Create <span className="font-medium text-foreground">&ldquo;{trimmed}&rdquo;</span> as new ingredient

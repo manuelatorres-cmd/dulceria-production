@@ -87,7 +87,7 @@ const STATUS_LABEL: Record<VariantStatus, string> = {
 };
 
 const STATUS_CLASS: Record<VariantStatus, string> = {
-  permanent: "text-primary bg-primary/10",
+  permanent: "text-primary bg-[color:var(--ds-tint-info)]",
   active: "text-status-ok bg-status-ok-bg",
   upcoming: "text-status-warn bg-status-warn-bg",
   past: "text-muted-foreground bg-muted",
@@ -780,7 +780,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
             <div>
               <label className="label">Kind</label>
               <div className="flex gap-2">
-                <label className={`flex-1 rounded-[4px] border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "curated" ? "border-primary bg-primary/5 text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
+                <label className={`flex-1 rounded-[4px] border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "curated" ? "border-primary bg-[color:var(--ds-tint-info)] text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
                   <input
                     type="radio"
                     name="variant-kind"
@@ -794,7 +794,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     Fixed products per size. Locked on orders.
                   </span>
                 </label>
-                <label className={`flex-1 rounded-[4px] border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "free-pick" ? "border-primary bg-primary/5 text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
+                <label className={`flex-1 rounded-[4px] border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "free-pick" ? "border-primary bg-[color:var(--ds-tint-info)] text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
                   <input
                     type="radio"
                     name="variant-kind"
@@ -834,7 +834,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 {labels.map((label) => (
                   <span
                     key={label}
-                    className="inline-flex items-center gap-1 rounded-[4px] bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
+                    className="inline-flex items-center gap-1 rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2.5 py-0.5 text-xs font-medium"
                   >
                     {label}
                     <button
@@ -989,7 +989,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                   <Link
                     key={label}
                     href={`/collections/${encodeURIComponent(label.toLowerCase())}`}
-                    className="inline-flex items-center rounded-[4px] bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium hover:bg-primary/20 transition-colors"
+                    className="inline-flex items-center rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2.5 py-0.5 text-xs font-medium hover:bg-[color:var(--ds-tint-info)] transition-colors"
                   >
                     {label}
                   </Link>

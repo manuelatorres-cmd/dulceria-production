@@ -131,7 +131,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         {deadlinePrompt !== null && (
-          <div className="rounded-[4px] border border-primary/40 bg-primary/5 p-3 print:hidden space-y-2">
+          <div className="rounded-[4px] border border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)] p-3 print:hidden space-y-2">
             <p className="text-xs">
               This quote has no delivery date. Set one before creating the order:
             </p>

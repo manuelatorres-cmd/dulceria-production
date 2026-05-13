@@ -1220,7 +1220,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         {roles.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2">
             {roles.map((r) => (
-              <span key={r} className="inline-flex items-center gap-1 rounded-[4px] bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">
+              <span key={r} className="inline-flex items-center gap-1 rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary text-xs font-medium px-2 py-0.5">
                 {r}
                 <button
                   onClick={() => removeRole(r)}
@@ -2410,7 +2410,7 @@ function ProductionStepRow({ step, knownStepNames, index }: {
               <span className="text-muted-foreground mr-1.5">{index + 1}.</span>
               {step.name}
               {step.isPackingStep && (
-                <span className="ml-2 text-[10px] uppercase tracking-wide text-primary bg-primary/10 rounded px-1.5 py-0.5 align-middle">
+                <span className="ml-2 text-[10px] uppercase tracking-wide text-primary bg-[color:var(--ds-tint-info)] rounded px-1.5 py-0.5 align-middle">
                   Packing
                 </span>
               )}

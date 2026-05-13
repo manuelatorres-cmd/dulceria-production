@@ -831,7 +831,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <label className="label">Tags</label>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {localTags.map((tag) => (
-              <span key={tag} className="inline-flex items-center gap-1 rounded-[4px] bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium capitalize">
+              <span key={tag} className="inline-flex items-center gap-1 rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2.5 py-0.5 text-xs font-medium capitalize">
                 {tag}
                 <button onClick={() => handleRemoveTag(tag)} aria-label={`Remove tag ${tag}`}>
                   <X className="w-3 h-3" />
@@ -1282,7 +1282,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         {(productCategory || product.shellIngredientId || product.shellFillingId) && (
           <div className="px-4 pb-4 flex flex-wrap gap-2">
             {productCategory && (
-              <span className="rounded-[4px] bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium capitalize">{productCategory.name}</span>
+              <span className="rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2.5 py-0.5 text-xs font-medium capitalize">{productCategory.name}</span>
             )}
             {product.shellIngredientId && (() => {
               const shellIng = shellCapableIngredients.find((i) => i.id === product.shellIngredientId);
@@ -1307,7 +1307,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         {(product.tags ?? []).length > 0 && (
           <div className="px-4 pb-4 flex flex-wrap gap-1.5">
             {(product.tags ?? []).map((tag) => (
-              <span key={tag} className="rounded-[4px] bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium capitalize">{tag}</span>
+              <span key={tag} className="rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2.5 py-0.5 text-xs font-medium capitalize">{tag}</span>
             ))}
           </div>
         )}
@@ -1696,7 +1696,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
                     ) : pb.stockStatus === "low" ? (
                       <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-status-warn-bg text-status-warn">Low</span>
                     ) : (
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary">In stock</span>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-[color:var(--ds-tint-info)] text-primary">In stock</span>
                     )
                   )}
                   {isDone && partiallyFrozen && (
@@ -2561,7 +2561,7 @@ function MaterialPicker({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => select(m)}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
-                  idx === highlightIdx ? "bg-primary/10" : "hover:bg-muted"
+                  idx === highlightIdx ? "bg-[color:var(--ds-tint-info)]" : "hover:bg-muted"
                 }`}
               >
                 <span
@@ -2579,7 +2579,7 @@ function MaterialPicker({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={handleCreateNew}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors border-t border-[color:var(--ds-border-warm)] ${
-                  highlightIdx === filtered.length ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"
+                  highlightIdx === filtered.length ? "bg-[color:var(--ds-tint-info)] text-primary" : "hover:bg-muted text-muted-foreground"
                 }`}
               >
                 + Create <span className="font-medium text-foreground ml-1">"{trimmed}"</span>
@@ -2711,7 +2711,7 @@ function ShellDesignSection({
                     return (
                       <span
                         key={id}
-                        className="inline-flex items-center gap-1 rounded-[4px] bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
+                        className="inline-flex items-center gap-1 rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2.5 py-0.5 text-xs font-medium"
                       >
                         <span
                           className="inline-block w-2.5 h-2.5 rounded-[4px] border border-black/10 shrink-0"
@@ -2936,7 +2936,7 @@ function ProductFillingRow({
       <Link href={`/fillings/${encodeURIComponent(filling.id ?? '')}?from=products&fromId=${encodeURIComponent(productFilling.productId)}`} className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <h3 className="font-medium text-sm">{filling.name}</h3>
-          <span className="rounded-[4px] bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-semibold shrink-0 tabular-nums">
+          <span className="rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2 py-0.5 text-[10px] font-semibold shrink-0 tabular-nums">
             {isGrams ? `${productFilling.fillGrams ?? 0}g` : `${productFilling.fillPercentage ?? 100}%`}
           </span>
         </div>

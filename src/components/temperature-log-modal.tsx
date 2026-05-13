@@ -107,7 +107,7 @@ export function TemperatureLogModal({
       <div className="relative w-full max-w-xl mx-4 mb-4 sm:mb-0 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden max-h-[85vh] flex flex-col">
         <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-[4px] bg-primary/10 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-[4px] bg-[color:var(--ds-tint-info)] flex items-center justify-center">
               <Thermometer className="w-5 h-5 text-primary" />
             </div>
             <div>

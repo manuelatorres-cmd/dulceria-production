@@ -30,7 +30,7 @@ const DAY_STATUS_LABEL: Record<"draft" | "active" | "done", string> = {
 
 const DAY_STATUS_STYLE: Record<"draft" | "active" | "done", string> = {
   draft: "bg-muted text-muted-foreground",
-  active: "bg-primary/10 text-primary",
+  active: "bg-[color:var(--ds-tint-info)] text-primary",
   done: "bg-status-ok/10 text-status-ok",
 };
 
@@ -186,7 +186,7 @@ export default function ProductionPage() {
                 <section
                   key={day.id ?? day.date}
                   className={`rounded-[4px] border overflow-hidden ${
-                    isToday ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"
+                    isToday ? "border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)]" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"
                   }`}
                 >
                   <header className="px-4 py-3 border-b border-[color:var(--ds-border-warm)] flex items-center justify-between gap-3 flex-wrap">

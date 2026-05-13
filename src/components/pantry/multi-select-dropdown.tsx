@@ -60,7 +60,7 @@ export function MultiSelectDropdown({
         onClick={() => setOpen((v) => !v)}
         className={`inline-flex items-center gap-1.5 rounded-[4px] border px-2.5 py-1.5 text-xs transition-colors ${
           selected.size > 0
-            ? "border-primary bg-primary/5 font-medium text-foreground"
+            ? "border-primary bg-[color:var(--ds-tint-info)] font-medium text-foreground"
             : "border-[color:var(--ds-border-warm)] bg-background text-muted-foreground hover:bg-muted"
         }`}
       >
