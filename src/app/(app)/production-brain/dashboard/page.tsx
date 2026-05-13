@@ -13,7 +13,7 @@ import {
 import { runEngine, type EngineRunSummary } from "@/lib/engineRunner";
 import type { ReplenishmentProposal } from "@/types";
 import { BackButton } from "@/components/back-button";
-import { StatCard } from "@/components/dulceria";
+import { StatCard, Section } from "@/components/dulceria";
 
 /**
  * Production Brain · Dashboard (phase 1 scaffold)
@@ -212,86 +212,95 @@ export default function ProductionBrainDashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Active pipeline */}
-        <section className="lg:col-span-2 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
-          <SectionHeader>Active pipeline</SectionHeader>
-          {plans.length === 0 ? (
-            <Empty>No production plans yet.</Empty>
-          ) : (
-            <ul className="space-y-2">
-              {plans.slice(0, 6).map((plan) => (
-                <li
-                  key={plan.id}
-                  className="rounded-[4px] bg-muted px-3 py-2 text-sm flex items-center justify-between"
-                >
-                  <span className="font-medium">
-                    {plan.name ?? `Batch ${plan.batchNumber ?? plan.id?.slice(0, 6)}`}
-                  </span>
-                  <span className="text-xs text-muted-foreground capitalize">
-                    {plan.status ?? "draft"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <div className="lg:col-span-2">
+          <Section title="Active pipeline" action={`${plans.length} plan${plans.length === 1 ? "" : "s"}`}>
+            <div style={{ padding: 16 }}>
+              {plans.length === 0 ? (
+                <Empty>No production plans yet.</Empty>
+              ) : (
+                <ul className="space-y-2">
+                  {plans.slice(0, 6).map((plan) => (
+                    <li
+                      key={plan.id}
+                      className="rounded-[4px] bg-muted px-3 py-2 text-sm flex items-center justify-between"
+                    >
+                      <span className="font-medium">
+                        {plan.name ?? `Batch ${plan.batchNumber ?? plan.id?.slice(0, 6)}`}
+                      </span>
+                      <span className="text-xs text-muted-foreground capitalize">
+                        {plan.status ?? "draft"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Section>
+        </div>
 
         {/* Replenishment proposals + alerts */}
-        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
-          <SectionHeader>Replenishment proposals</SectionHeader>
-          {proposals.length === 0 ? (
-            <Empty>No proposals from engine. Run replenishment job to populate.</Empty>
-          ) : (
-            <ul className="space-y-1.5">
-              {proposals.slice(0, 8).map((p) => (
-                <ProposalRow key={p.id} proposal={p} productName={productsById.get(p.productId)} />
-              ))}
-            </ul>
-          )}
+        <div className="space-y-3">
+          <Section title="Replenishment proposals" action={`${proposals.length}`}>
+            <div style={{ padding: 16 }}>
+              {proposals.length === 0 ? (
+                <Empty>No proposals from engine. Run replenishment job to populate.</Empty>
+              ) : (
+                <ul className="space-y-1.5">
+                  {proposals.slice(0, 8).map((p) => (
+                    <ProposalRow key={p.id} proposal={p} productName={productsById.get(p.productId)} />
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Section>
 
-          <SectionHeader className="mt-5">Active campaigns</SectionHeader>
-          {campaigns.length === 0 ? (
-            <Empty>No campaigns yet. Create one in /production-brain/planner.</Empty>
-          ) : (
-            <ul className="space-y-1.5">
-              {campaigns.slice(0, 6).map((c) => (
-                <li
-                  key={c.id}
-                  className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted px-2 py-1.5 text-xs flex items-center justify-between"
-                >
-                  <span>
-                    <strong>{c.name}</strong>{" "}
-                    <span className="text-muted-foreground">
-                      {c.startDate} → {c.endDate}
-                    </span>
-                  </span>
-                  <span className="text-[10px] text-muted-foreground capitalize">{c.status}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <Section title="Active campaigns" action={`${campaigns.length}`}>
+            <div style={{ padding: 16 }}>
+              {campaigns.length === 0 ? (
+                <Empty>No campaigns yet. Create one in /production-brain/planner.</Empty>
+              ) : (
+                <ul className="space-y-1.5">
+                  {campaigns.slice(0, 6).map((c) => (
+                    <li
+                      key={c.id}
+                      className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted px-2 py-1.5 text-xs flex items-center justify-between"
+                    >
+                      <span>
+                        <strong>{c.name}</strong>{" "}
+                        <span className="text-muted-foreground">
+                          {c.startDate} → {c.endDate}
+                        </span>
+                      </span>
+                      <span className="text-[10px] text-muted-foreground capitalize">{c.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Section>
 
-          <SectionHeader className="mt-5">Staff today</SectionHeader>
-          {people.length === 0 ? (
-            <Empty>No people configured yet.</Empty>
-          ) : (
-            <ul className="flex flex-wrap gap-2">
-              {people
-                .filter((p) => !p.archived)
-                .slice(0, 8)
-                .map((p) => (
-                  <li
-                    key={p.id}
-                    className="px-2.5 py-1 rounded-full text-xs bg-muted border border-[color:var(--ds-border-warm)]"
-                  >
-                    {p.name}
-                  </li>
-                ))}
-            </ul>
-          )}
-          <p className="text-[10px] text-muted-foreground mt-3">
-            Showing {activeStaff} active people across the team.
-          </p>
-        </section>
+          <Section title="Staff today" action={`${activeStaff}`}>
+            <div style={{ padding: 16 }}>
+              {people.length === 0 ? (
+                <Empty>No people configured yet.</Empty>
+              ) : (
+                <ul className="flex flex-wrap gap-2">
+                  {people
+                    .filter((p) => !p.archived)
+                    .slice(0, 8)
+                    .map((p) => (
+                      <li
+                        key={p.id}
+                        className="px-2.5 py-1 rounded-full text-xs bg-muted border border-[color:var(--ds-border-warm)]"
+                      >
+                        {p.name}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
+          </Section>
+        </div>
       </div>
     </div>
   );
