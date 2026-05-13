@@ -188,12 +188,12 @@ export default function AuditPage() {
   }, [packagings]);
 
   const groups = [
-    { title: "Variants", issues: variantIssues, color: "var(--accent-blush-ink)", bg: "#fdeeea" },
+    { title: "Variants", issues: variantIssues, color: "var(--accent-blush-ink)", bg: "var(--accent-blush-bg)" },
     { title: "Products", issues: productIssues, color: "var(--accent-butter-ink)", bg: "var(--accent-butter-bg)" },
     { title: "Ingredients", issues: ingredientIssues, color: "var(--accent-sky-ink)", bg: "var(--accent-sky-bg)" },
-    { title: "Fillings", issues: fillingIssues, color: "#6a4d89", bg: "#f3eef6" },
-    { title: "Moulds", issues: mouldIssues, color: "#9a6640", bg: "#fdf1e2" },
-    { title: "Packaging", issues: packagingIssues, color: "#5c7050", bg: "#eff3ec" },
+    { title: "Fillings", issues: fillingIssues, color: "var(--accent-lilac-ink)", bg: "var(--accent-lilac-bg)" },
+    { title: "Moulds", issues: mouldIssues, color: "var(--accent-peach-ink)", bg: "var(--accent-peach-bg)" },
+    { title: "Packaging", issues: packagingIssues, color: "var(--accent-sage-ink)", bg: "var(--accent-sage-bg)" },
   ];
 
   const totalIssues = groups.reduce((s, g) => s + g.issues.length, 0);
