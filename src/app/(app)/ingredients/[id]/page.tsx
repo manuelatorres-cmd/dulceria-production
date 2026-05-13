@@ -643,7 +643,7 @@ function IngredientNutritionReadView({ ingredient, market, onEdit }: { ingredien
       </div>
 
       {missing.length > 0 && (
-        <div className="mt-3 flex items-start gap-2 text-xs text-amber-700">
+        <div className="mt-3 flex items-start gap-2 text-xs text-[color:var(--ds-semantic-warn)]">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
             {missing.length} mandatory {missing.length === 1 ? "nutrient" : "nutrients"} missing for {market} labels:{" "}

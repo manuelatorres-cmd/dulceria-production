@@ -689,7 +689,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
             {balance.alcohol > 0 && (
               <div className="flex items-center gap-3 pt-1">
                 <span className="w-28 text-xs text-muted-foreground shrink-0">Alcohol</span>
-                <span className="text-xs font-medium tabular-nums text-stone-600">{balance.alcohol.toFixed(1)}%</span>
+                <span className="text-xs font-medium tabular-nums text-[color:var(--ds-text-muted)]">{balance.alcohol.toFixed(1)}%</span>
                 <span className="text-xs text-muted-foreground">informational — see notes below</span>
               </div>
             )}
@@ -708,7 +708,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
           </h2>
           <ul className="space-y-2">
             {check.warnings.map((w, i) => (
-              <li key={i} className="text-xs text-stone-600 bg-stone-50 border border-stone-200 rounded-[6px] px-3 py-2">
+              <li key={i} className="text-xs text-[color:var(--ds-text-muted)] bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[6px] px-3 py-2">
                 {w}
               </li>
             ))}

@@ -235,7 +235,7 @@ function BackupTab({
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-primary">Backup & Restore</h2>
         {!isCloudConfigured ? (
-          <div className="rounded-[4px] border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+          <div className="rounded-[4px] border border-[color:var(--ds-semantic-warn)] bg-[color:var(--ds-tint-warn)] p-3 text-xs text-[color:var(--ds-semantic-warn)] space-y-1">
             <p>
               <strong>You&apos;re using local-only mode.</strong> All data lives in this browser
               and isn&apos;t synced anywhere.

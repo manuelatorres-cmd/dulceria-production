@@ -493,7 +493,7 @@ function CategoriesTab({ onSwitchToFillings }: { onSwitchToFillings: () => void 
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-sm truncate">{c.name}</span>
                           {c.shelfStable && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--ds-tint-warn)] text-[color:var(--ds-semantic-warn)] border border-[color:var(--ds-semantic-warn)]">
                               Shelf-stable
                             </span>
                           )}

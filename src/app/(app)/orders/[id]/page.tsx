@@ -834,11 +834,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40 " onClick={() => setReassignProposals(null)} />
             <div className="relative w-full max-w-lg rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
-              <div className="px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)] bg-amber-50">
-                <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
+              <div className="px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)] bg-[color:var(--ds-tint-warn)]">
+                <h3 className="text-base font-bold text-[color:var(--ds-semantic-warn)] flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" /> In-flight work — reassign or discard?
                 </h3>
-                <p className="text-xs text-amber-900/80 mt-1">
+                <p className="text-xs text-[color:var(--ds-semantic-warn)]/80 mt-1">
                   One or more batches for this order already have production progress. Reassign
                   them to another open order with the same product, or choose Delete anyway to
                   discard the sunk work.

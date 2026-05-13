@@ -180,8 +180,8 @@ export function AllocationSplitModal({
           )}
           {isOverproduction && (
             <div className="mt-2 rounded-[6px] border border-amber-400 bg-amber-100/80 px-2.5 py-1.5 flex items-start gap-2">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-900 leading-snug">
+              <AlertTriangle className="w-3.5 h-3.5 text-[color:var(--ds-semantic-warn)] shrink-0 mt-0.5" />
+              <p className="text-xs text-[color:var(--ds-semantic-warn)] leading-snug">
                 <span className="font-semibold">Overproduction:</span>{" "}
                 {overproductionAmount} extra piece{overproductionAmount === 1 ? "" : "s"} beyond what's committed
                 ({totalRequested}). Pick a destination for the surplus below — don't leave it silent.
@@ -254,16 +254,16 @@ export function AllocationSplitModal({
 
         <div className={`px-5 py-3 border-t space-y-2 ${
           needsDestination
-            ? "bg-amber-50 border-amber-300"
+            ? "bg-[color:var(--ds-tint-warn)] border-[color:var(--ds-semantic-warn)]"
             : "bg-muted/20 border-[color:var(--ds-border-warm)]"
         }`}>
           <div className="flex items-center justify-between">
-            <span className={`text-sm font-medium flex items-center gap-1.5 ${needsDestination ? "text-amber-900" : ""}`}>
-              {needsDestination && <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />}
+            <span className={`text-sm font-medium flex items-center gap-1.5 ${needsDestination ? "text-[color:var(--ds-semantic-warn)]" : ""}`}>
+              {needsDestination && <AlertTriangle className="w-3.5 h-3.5 text-[color:var(--ds-semantic-warn)]" />}
               Surplus
-              {needsDestination && <span className="text-[10px] uppercase tracking-wide text-amber-700">— decide</span>}
+              {needsDestination && <span className="text-[10px] uppercase tracking-wide text-[color:var(--ds-semantic-warn)]">— decide</span>}
             </span>
-            <span className={`text-sm font-semibold tabular-nums ${needsDestination ? "text-amber-900" : ""}`}>
+            <span className={`text-sm font-semibold tabular-nums ${needsDestination ? "text-[color:var(--ds-semantic-warn)]" : ""}`}>
               {surplus} piece{surplus === 1 ? "" : "s"}
             </span>
           </div>

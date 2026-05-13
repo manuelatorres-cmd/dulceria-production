@@ -2066,7 +2066,7 @@ function VariantNutritionSection({ productIds }: { productIds: string[] }) {
       <h2 className="text-sm font-semibold text-primary mb-3">Nutrition &amp; Ingredients</h2>
 
       {productsWithoutMould > 0 && (
-        <div className="flex items-start gap-2 text-xs text-amber-700 mb-2">
+        <div className="flex items-start gap-2 text-xs text-[color:var(--ds-semantic-warn)] mb-2">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
             {productsWithoutMould} product(s) have no default mould and are excluded from this rollup.
@@ -2075,7 +2075,7 @@ function VariantNutritionSection({ productIds }: { productIds: string[] }) {
       )}
 
       {hasData && productsWithData < productsTotal && (
-        <div className="flex items-start gap-2 text-xs text-amber-700 mb-2">
+        <div className="flex items-start gap-2 text-xs text-[color:var(--ds-semantic-warn)] mb-2">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
             Nutrition data for {productsWithData} of {productsTotal} products. Values are

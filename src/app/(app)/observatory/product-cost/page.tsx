@@ -59,9 +59,9 @@ function getShellColor(coatingName?: string): string | undefined {
 
 const CAT_CHIP_CLASS: Record<string, string> = {
   "Ganaches (Emulsions)": "text-status-warn bg-status-warn-bg border-status-warn-edge",
-  "Pralines & Giandujas (Nut-Based)": "text-stone-600 bg-stone-100 border-stone-200",
+  "Pralines & Giandujas (Nut-Based)": "text-[color:var(--ds-text-muted)] bg-[color:var(--ds-card-bg-hover)] border-[color:var(--ds-border-warm)]",
   "Caramels & Syrups (Sugar-Based)": "text-yellow-700 bg-yellow-50 border-yellow-200",
-  "Fruit-Based (Pectins & Acids)": "text-rose-600 bg-rose-50 border-rose-200",
+  "Fruit-Based (Pectins & Acids)": "text-rose-600 bg-[color:var(--ds-tint-critical)] border-rose-200",
   'Croustillants & Biscuits (The "Crunch" Filling)': "text-orange-600 bg-orange-50 border-orange-200",
 };
 

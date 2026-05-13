@@ -431,7 +431,7 @@ export default function StatsPage() {
                 className={`px-3 py-1 text-xs rounded-[4px] border transition-colors ${
                   timePreset === p.value
                     ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
-                    : "bg-transparent text-stone-600 border-stone-300 hover:bg-stone-100 hover:border-stone-400"
+                    : "bg-transparent text-[color:var(--ds-text-muted)] border-[color:var(--ds-border-warm)] hover:bg-[color:var(--ds-card-bg-hover)] hover:border-[color:var(--ds-border-warm)]"
                 }`}
               >
                 {p.label}
@@ -553,7 +553,7 @@ export default function StatsPage() {
                       className={`px-2.5 py-1 transition-colors ${
                         granularity === "month"
                           ? "bg-[color:var(--ds-tier-quarter-focus)] text-white"
-                          : "text-muted-foreground hover:bg-stone-100"
+                          : "text-muted-foreground hover:bg-[color:var(--ds-card-bg-hover)]"
                       }`}
                     >
                       Monthly
@@ -563,7 +563,7 @@ export default function StatsPage() {
                       className={`px-2.5 py-1 border-l border-[color:var(--ds-border-warm)] transition-colors ${
                         granularity === "week"
                           ? "bg-[color:var(--ds-tier-quarter-focus)] text-white"
-                          : "text-muted-foreground hover:bg-stone-100"
+                          : "text-muted-foreground hover:bg-[color:var(--ds-card-bg-hover)]"
                       }`}
                     >
                       Weekly

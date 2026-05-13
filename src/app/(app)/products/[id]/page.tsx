@@ -1320,7 +1320,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {productAllergens.map((a) => (
                 <span
                   key={a}
-                  className="rounded-[4px] border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-xs"
+                  className="rounded-[4px] border border-[color:var(--ds-semantic-warn)] bg-[color:var(--ds-tint-warn)] text-[color:var(--ds-semantic-warn)] px-2 py-0.5 text-xs"
                 >
                   {allergenLabel(a)}
                 </span>
@@ -3185,14 +3185,14 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
       <h2 className="text-sm font-medium text-muted-foreground mb-1">{panelTitle}</h2>
 
       {warnings.map((w, i) => (
-        <div key={i} className="flex items-start gap-2 text-xs text-amber-700 mb-1">
+        <div key={i} className="flex items-start gap-2 text-xs text-[color:var(--ds-semantic-warn)] mb-1">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>{w}</span>
         </div>
       ))}
 
       {hasData && ingredientsWithData < ingredientsTotal && (
-        <div className="flex items-start gap-2 text-xs text-amber-700 mb-1">
+        <div className="flex items-start gap-2 text-xs text-[color:var(--ds-semantic-warn)] mb-1">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
             Nutrition data for {ingredientsWithData} of {ingredientsTotal} ingredients.
