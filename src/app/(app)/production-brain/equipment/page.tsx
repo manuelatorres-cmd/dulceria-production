@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/dulceria";
+import { PageHeader, Section } from "@/components/dulceria";
 import {
   useEquipmentInstances,
   useMachineLoads,
@@ -14,7 +14,6 @@ import {
 } from "@/lib/hooks";
 import { MachineLoadModal } from "@/components/machine-load-modal";
 import type { EquipmentInstance, MachineLoad, MouldPoolInstance } from "@/types";
-import { BackButton } from "@/components/back-button";
 
 /**
  * Production Brain · Equipment dashboard (phase 2 UI)
@@ -122,17 +121,13 @@ export default function ProductionBrainEquipmentPage() {
   }, [mouldPool]);
 
   return (
-    <div>
-      <div className="px-4 pt-4">
-        <BackButton />
-      </div>
-      <PageHeader title="Equipment" meta="Live workshop snapshot — machines, mould pool, cold storage." />
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader title="Equipment" meta="Live workshop snapshot — machines, mould pool, cold storage" />
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
 
       {/* Tempering + melting pots */}
-      <section className="rounded-sm border border-border bg-card p-4 mb-4">
-        <SectionHeader count={temperingInstances.length}>
-          Tempering machines &amp; melting pots
-        </SectionHeader>
+      <Section title="Tempering machines & melting pots" action={`${temperingInstances.length}`}>
+      <div style={{ padding: 16 }}>
         {temperingInstances.length === 0 ? (
           <EmptyBlock>
             No equipment instances yet. Add one at <code>/production-brain/equipment</code> (coming
@@ -208,11 +203,12 @@ export default function ProductionBrainEquipmentPage() {
             })}
           </ul>
         )}
-      </section>
+      </div>
+      </Section>
 
       {/* Mould pool */}
-      <section className="rounded-sm border border-border bg-card p-4 mb-4">
-        <SectionHeader count={mouldPool.length}>Mould pool · by type</SectionHeader>
+      <Section title="Mould pool · by type" action={`${mouldPool.length}`}>
+      <div style={{ padding: 16 }}>
         {mouldPool.length === 0 ? (
           <EmptyBlock>
             No mould instances tracked yet. Create rows in <code>mouldPool</code> (one per
@@ -256,11 +252,12 @@ export default function ProductionBrainEquipmentPage() {
             })}
           </ul>
         )}
-      </section>
+      </div>
+      </Section>
 
       {/* Cold storage */}
-      <section className="rounded-sm border border-border bg-card p-4 mb-4">
-        <SectionHeader count={storage.length}>Cold storage · HACCP</SectionHeader>
+      <Section title="Cold storage · HACCP" action={`${storage.length}`}>
+      <div style={{ padding: 16 }}>
         {storage.length === 0 ? (
           <EmptyBlock>
             No cold-storage units defined. Insert rows into <code>coldStorageUnits</code> so
@@ -296,12 +293,13 @@ export default function ProductionBrainEquipmentPage() {
             ))}
           </ul>
         )}
-      </section>
+      </div>
+      </Section>
 
       {/* Other equipment */}
       {otherInstances.length > 0 ? (
-        <section className="rounded-sm border border-border bg-card p-4">
-          <SectionHeader count={otherInstances.length}>Other equipment</SectionHeader>
+        <Section title="Other equipment" action={`${otherInstances.length}`}>
+        <div style={{ padding: 16 }}>
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {otherInstances.map((inst) => (
               <li
@@ -318,7 +316,8 @@ export default function ProductionBrainEquipmentPage() {
               </li>
             ))}
           </ul>
-        </section>
+        </div>
+        </Section>
       ) : null}
 
       {loadModal ? (
@@ -328,27 +327,8 @@ export default function ProductionBrainEquipmentPage() {
           onClose={() => setLoadModal(null)}
         />
       ) : null}
+      </div>
     </div>
-  );
-}
-
-function SectionHeader({
-  children,
-  count,
-}: {
-  children: React.ReactNode;
-  count?: number;
-}) {
-  return (
-    <h3 className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold mb-3">
-      {children}
-      {count !== undefined ? (
-        <span className="normal-case font-normal text-muted-foreground">
-          {" "}
-          · {count}
-        </span>
-      ) : null}
-    </h3>
   );
 }
 
