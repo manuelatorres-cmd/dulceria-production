@@ -152,7 +152,7 @@ export default function MonthlyReviewPage() {
                 const prev = revenueByChannelPrev.find((r) => r.channel === row.channel);
                 const delta = prev && prev.gross > 0 ? (row.gross - prev.gross) / prev.gross : undefined;
                 return (
-                  <tr key={row.channel} className="border-t border-border/60">
+                  <tr key={row.channel} className="border-t border-[color:var(--ds-border-warm)]/60">
                     <td className="py-2 capitalize">{row.channel}</td>
                     <td className="py-2 tabular-nums">{row.orderCount}</td>
                     <td className="py-2 tabular-nums">{fmtEur(row.gross)}</td>
@@ -192,7 +192,7 @@ export default function MonthlyReviewPage() {
             </thead>
             <tbody>
               {productMargins.slice(0, 10).map((m) => (
-                <tr key={m.productId} className="border-t border-border/60">
+                <tr key={m.productId} className="border-t border-[color:var(--ds-border-warm)]/60">
                   <td
                     className="py-2"
                     style={{
@@ -250,7 +250,7 @@ export default function MonthlyReviewPage() {
             </thead>
             <tbody>
               {yieldByProduct.map((y) => (
-                <tr key={y.productId} className="border-t border-border/60">
+                <tr key={y.productId} className="border-t border-[color:var(--ds-border-warm)]/60">
                   <td
                     className="py-2"
                     style={{
@@ -449,7 +449,7 @@ function Kpi({
 }) {
   return (
     <div
-      className="border border-border bg-card px-4 py-3"
+      className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-3"
       style={{ borderRadius: 4 }}
     >
       <div
@@ -502,7 +502,7 @@ function ReportSection({
 }) {
   return (
     <section
-      className="mb-5 border border-border bg-card p-4"
+      className="mb-5 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
       style={{ borderRadius: 4 }}
     >
       <h3

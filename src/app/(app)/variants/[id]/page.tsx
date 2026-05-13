@@ -780,7 +780,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
             <div>
               <label className="label">Kind</label>
               <div className="flex gap-2">
-                <label className={`flex-1 rounded-sm border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "curated" ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:bg-muted"}`}>
+                <label className={`flex-1 rounded-sm border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "curated" ? "border-primary bg-primary/5 text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
                   <input
                     type="radio"
                     name="variant-kind"
@@ -794,7 +794,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     Fixed products per size. Locked on orders.
                   </span>
                 </label>
-                <label className={`flex-1 rounded-sm border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "free-pick" ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:bg-muted"}`}>
+                <label className={`flex-1 rounded-sm border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "free-pick" ? "border-primary bg-primary/5 text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
                   <input
                     type="radio"
                     name="variant-kind"
@@ -1017,7 +1017,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {variantProducts.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-border rounded-sm">
+            <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
               {editing ? 'No products yet \u2014 tap "Add product" to start.' : "No products in this variant."}
             </p>
           ) : (
@@ -1025,7 +1025,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               {variantProducts.map((cr) => {
                 const snap = productCostMap.get(cr.productId);
                 return (
-                  <li key={cr.id} className="rounded-sm border border-border bg-card flex items-center gap-2 px-3 py-2.5">
+                  <li key={cr.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] flex items-center gap-2 px-3 py-2.5">
                     <Link
                       href={`/products/${encodeURIComponent(cr.productId)}?from=variants&fromId=${encodeURIComponent(variantId)}`}
                       className="flex-1 min-w-0 text-sm font-medium truncate hover:underline"
@@ -1071,7 +1071,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {editing && showAddProduct && (
-            <div className="rounded-sm border border-border bg-card p-3 mt-3 space-y-2">
+            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 mt-3 space-y-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -1187,7 +1187,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               ? priceGross / (1 + vatN / 100)
               : null;
             return (
-            <div className="rounded-sm border border-border bg-card p-3 mb-3 space-y-3">
+            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 mb-3 space-y-3">
               <div className="text-xs font-semibold text-primary">
                 {isEdit ? `Edit ${pkgForForm?.name ?? "box"}` : "Add a new box"}
               </div>
@@ -1348,7 +1348,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                       Add at least one product to this variant first (use the <strong>Products</strong> section above), then configure the box qty here.
                     </p>
                   ) : (
-                    <div className="rounded-md border border-border/70 bg-background/50 p-2 space-y-1.5">
+                    <div className="rounded-md border border-[color:var(--ds-border-warm)]/70 bg-background/50 p-2 space-y-1.5">
                       {variantProducts.map((vp) => {
                         const name = productMap.get(vp.productId) ?? vp.productId;
                         const qty = newBoxQtys[vp.productId] ?? 0;
@@ -1423,7 +1423,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {variantPackagings.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-sm space-y-1">
+            <div className="text-sm text-muted-foreground py-6 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm space-y-1">
               <p>No box pricing configured yet.</p>
               <p className="text-xs">Add a box to see cost breakdowns and margins.</p>
             </div>
@@ -1433,7 +1433,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
              * card. Still list each saved size with its price and composition
              * so the user can see and manage what they've configured. */
             <div className="space-y-3">
-              <div className="text-xs text-muted-foreground border border-dashed border-border rounded-md px-3 py-2">
+              <div className="text-xs text-muted-foreground border border-dashed border-[color:var(--ds-border-warm)] rounded-md px-3 py-2">
                 Margin details hidden — products need a default mould and costed ingredients for
                 cost/margin math. Box prices and composition still shown below.
               </div>
@@ -1445,7 +1445,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                   <div
                     key={cpId}
                     id={`vp-${cpId}`}
-                    className="rounded-sm border border-border bg-card p-3 scroll-mt-24"
+                    className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 scroll-mt-24"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
@@ -1580,7 +1580,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
         </section>
 
         {/* Delete */}
-        <section className="pt-4 border-t border-border">
+        <section className="pt-4 border-t border-[color:var(--ds-border-warm)]">
           {!showDelete ? (
             <button
               onClick={() => setShowDelete(true)}
@@ -1639,7 +1639,7 @@ function BoxExtras({
   }
 
   return (
-    <div className="mt-1 ml-3 pl-3 border-l border-border/40 space-y-1.5 py-1.5">
+    <div className="mt-1 ml-3 pl-3 border-l border-[color:var(--ds-border-warm)]/40 space-y-1.5 py-1.5">
       {overrides.length > 0 && (
         <div>
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground/80 mb-0.5">
@@ -1759,7 +1759,7 @@ function BoxCard({
   const points = margins.map((m, i) => `${toX(i).toFixed(1)},${toY(m).toFixed(1)}`).join(" ");
 
   return (
-    <div className="rounded-sm border border-border bg-card overflow-hidden">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
       {/* Header */}
       <div className="px-3 pt-3 pb-2 flex items-start justify-between">
         <div>
@@ -1795,14 +1795,14 @@ function BoxCard({
           <span className="text-muted-foreground">Packaging</span>
           <span className="tabular-nums">{formatPrice(packagingUnitCost, sym)}</span>
         </div>
-        <div className="flex justify-between text-xs font-medium border-t border-border/50 pt-1">
+        <div className="flex justify-between text-xs font-medium border-t border-[color:var(--ds-border-warm)]/50 pt-1">
           <span>Total cost</span>
           <span className="tabular-nums">{formatPrice(pricing.totalCost, sym)}</span>
         </div>
       </div>
 
       {/* Sell price + margin */}
-      <div className={`px-3 py-2.5 ${colors.bg} border-t border-border/30`}>
+      <div className={`px-3 py-2.5 ${colors.bg} border-t border-[color:var(--ds-border-warm)]/30`}>
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium">Sell price</span>
@@ -1821,7 +1821,7 @@ function BoxCard({
                     if (e.key === "Escape") onCancelEditSellPrice();
                   }}
                   autoFocus
-                  className="w-20 text-xs px-1.5 py-0.5 rounded border border-border bg-card"
+                  className="w-20 text-xs px-1.5 py-0.5 rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"
                 />
               </span>
             ) : (
@@ -1857,7 +1857,7 @@ function BoxCard({
       </div>
 
       {/* Pricing history */}
-      <div className="border-t border-border/40">
+      <div className="border-t border-[color:var(--ds-border-warm)]/40">
         <div className="flex items-center px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors">
           <button
             onClick={onToggleHistory}
@@ -2090,8 +2090,8 @@ function VariantNutritionSection({ productIds }: { productIds: string[] }) {
           <p className="text-xs text-muted-foreground mb-2">
             {panelTitle} · weighted average across products ({totalWeightG.toFixed(0)}g total)
           </p>
-          <div className="rounded-sm border border-border bg-card overflow-hidden mb-4">
-            <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
+          <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden mb-4">
+            <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
               <span className="flex-1">Nutrient</span>
               <span className="w-24 text-right">Per 100g</span>
             </div>
@@ -2100,7 +2100,7 @@ function VariantNutritionSection({ productIds }: { productIds: string[] }) {
               return (
                 <div
                   key={n.key}
-                  className={`flex items-baseline px-3 py-1.5 text-sm border-b border-border last:border-b-0 ${
+                  className={`flex items-baseline px-3 py-1.5 text-sm border-b border-[color:var(--ds-border-warm)] last:border-b-0 ${
                     n.indent === 0 ? "font-medium" : "font-normal"
                   }`}
                 >
@@ -2198,7 +2198,7 @@ function VariantOnHandRow({ variantPackagingId }: { variantPackagingId: string }
   }
 
   return (
-    <div className="mt-2 px-3 py-2 rounded-sm bg-muted/30 border border-border">
+    <div className="mt-2 px-3 py-2 rounded-sm bg-muted/30 border border-[color:var(--ds-border-warm)]">
       <p className="text-[10.5px] font-medium uppercase text-muted-foreground tracking-wide mb-1.5">
         On hand
       </p>
@@ -2220,7 +2220,7 @@ function VariantOnHandRow({ variantPackagingId }: { variantPackagingId: string }
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
                 disabled={busy[loc.id]}
-                className="w-16 rounded border border-border bg-card px-2 py-0.5 tabular-nums text-right disabled:opacity-50"
+                className="w-16 rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-0.5 tabular-nums text-right disabled:opacity-50"
               />
             </label>
           );

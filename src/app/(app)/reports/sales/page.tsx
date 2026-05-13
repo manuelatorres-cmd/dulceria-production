@@ -261,23 +261,23 @@ export default function SalesReportPage() {
       <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
       {/* Range picker */}
       <div>
-        <div className="rounded-[6px] bg-card border border-border p-3 flex items-center flex-wrap gap-3">
+        <div className="rounded-[6px] bg-card border border-[color:var(--ds-border-warm)] p-3 flex items-center flex-wrap gap-3">
           <div className="flex gap-1">
             <button
               onClick={() => setRange("this-week")}
-              className="text-[11px] px-2.5 py-1 border border-border rounded-full hover:border-foreground"
+              className="text-[11px] px-2.5 py-1 border border-[color:var(--ds-border-warm)] rounded-full hover:border-foreground"
             >
               This week
             </button>
             <button
               onClick={() => setRange("last-week")}
-              className="text-[11px] px-2.5 py-1 border border-border rounded-full hover:border-foreground"
+              className="text-[11px] px-2.5 py-1 border border-[color:var(--ds-border-warm)] rounded-full hover:border-foreground"
             >
               Last week
             </button>
             <button
               onClick={() => setRange("this-month")}
-              className="text-[11px] px-2.5 py-1 border border-border rounded-full hover:border-foreground"
+              className="text-[11px] px-2.5 py-1 border border-[color:var(--ds-border-warm)] rounded-full hover:border-foreground"
             >
               This month
             </button>
@@ -319,11 +319,11 @@ export default function SalesReportPage() {
           By product · sorted by sold
         </h2>
         {productRollup.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-border rounded-[6px]">
+          <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-[color:var(--ds-border-warm)] rounded-[6px]">
             No movement in this window.
           </p>
         ) : (
-          <div className="rounded-[6px] border border-border overflow-hidden">
+          <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] overflow-hidden">
             <table className="w-full text-[12px]">
               <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
                 <tr>
@@ -338,7 +338,7 @@ export default function SalesReportPage() {
               </thead>
               <tbody>
                 {productRollup.map((r) => (
-                  <tr key={r.productId} className="border-t border-border">
+                  <tr key={r.productId} className="border-t border-[color:var(--ds-border-warm)]">
                     <td className="px-3 py-1.5 truncate">{r.productName}</td>
                     <td className="text-right px-2 py-1.5 tabular-nums font-medium">{r.sold || ""}</td>
                     <td className="text-right px-2 py-1.5 tabular-nums text-muted-foreground">{r.tasting || ""}</td>
@@ -359,7 +359,7 @@ export default function SalesReportPage() {
         <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-2">
           By reason
         </h2>
-        <div className="rounded-[6px] border border-border bg-card p-3 flex flex-wrap gap-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 flex flex-wrap gap-3">
           {[...SOLD_REASONS, ...NON_REVENUE_REASONS].map((r) => (
             <div key={r} className="text-[12px]">
               <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
@@ -376,7 +376,7 @@ export default function SalesReportPage() {
         <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-2">
           By channel
         </h2>
-        <div className="rounded-[6px] border border-border bg-card p-3 flex flex-wrap gap-4">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 flex flex-wrap gap-4">
           <div className="text-[12px]">
             <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">Counter / event</div>
             <div className="font-semibold tabular-nums">{channelTotals.counter} pcs</div>
@@ -398,7 +398,7 @@ export default function SalesReportPage() {
           <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-2">
             Packaging consumed (orders)
           </h2>
-          <div className="rounded-[6px] border border-border overflow-hidden">
+          <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] overflow-hidden">
             <table className="w-full text-[12px]">
               <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
                 <tr>
@@ -408,7 +408,7 @@ export default function SalesReportPage() {
               </thead>
               <tbody>
                 {packagingRollup.map((p) => (
-                  <tr key={p.id} className="border-t border-border">
+                  <tr key={p.id} className="border-t border-[color:var(--ds-border-warm)]">
                     <td className="px-3 py-1.5 truncate">{p.name}</td>
                     <td className="text-right px-3 py-1.5 tabular-nums">{p.qty}</td>
                   </tr>
@@ -425,7 +425,7 @@ export default function SalesReportPage() {
           <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-2">
             Slow movers · no movement in window ({slowMovers.length})
           </h2>
-          <div className="rounded-[6px] border border-dashed border-border p-3 text-[12px] text-muted-foreground">
+          <div className="rounded-[6px] border border-dashed border-[color:var(--ds-border-warm)] p-3 text-[12px] text-muted-foreground">
             {slowMovers.slice(0, 30).map((p) => p.name).join(", ")}
             {slowMovers.length > 30 ? ` · +${slowMovers.length - 30} more` : ""}
           </div>
@@ -449,7 +449,7 @@ function Tile({
         "rounded-[6px] border p-3 " +
         (tone === "alert"
           ? "border-status-alert-edge bg-status-alert-bg/40 text-status-alert"
-          : "border-border bg-card")
+          : "border-[color:var(--ds-border-warm)] bg-card")
       }
     >
       <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-1">

@@ -59,7 +59,7 @@ export function FreezeModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
 
-      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-sm border border-border bg-card shadow-xl overflow-hidden">
+      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
         {/* Header — cool icy tint */}
         <div className="bg-gradient-to-b from-sky-50 to-card px-5 pt-5 pb-3">
           <div className="flex items-center gap-3 mb-1">
@@ -89,7 +89,7 @@ export function FreezeModal({
                 value={qtyStr}
                 onChange={(e) => setQtyStr(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleConfirm(); }}
-                className="flex-1 h-9 rounded-sm border border-border bg-card px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500"
+                className="flex-1 h-9 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500"
               />
               <span className="text-xs text-muted-foreground w-10">{unit}</span>
             </div>
@@ -114,7 +114,7 @@ export function FreezeModal({
                 value={daysStr}
                 onChange={(e) => setDaysStr(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleConfirm(); }}
-                className="flex-1 h-9 rounded-sm border border-border bg-card px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500"
+                className="flex-1 h-9 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500"
               />
               <span className="text-xs text-muted-foreground w-10">days</span>
             </div>
@@ -125,10 +125,10 @@ export function FreezeModal({
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-border flex gap-2 justify-end">
+        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="rounded-sm border border-border bg-card px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+            className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
           >
             Cancel
           </button>
@@ -178,7 +178,7 @@ export function DefrostConfirmModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
 
-      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-sm border border-border bg-card shadow-xl overflow-hidden">
+      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
         <div className="px-5 pt-5 pb-3">
           <h3 className="text-base font-bold text-foreground">Defrost {itemName}?</h3>
           <p className="text-xs text-muted-foreground mt-1">
@@ -188,21 +188,21 @@ export function DefrostConfirmModal({
 
         <div className="px-5 pb-3">
           {sellBy ? (
-            <div className="rounded-sm bg-muted/40 border border-border px-3 py-2 text-xs text-foreground">
+            <div className="rounded-sm bg-muted/40 border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-foreground">
               New sell-by date: <span className="font-medium">{sellBy}</span>
               <span className="text-muted-foreground"> ({preservedShelfLifeDays} days from today)</span>
             </div>
           ) : (
-            <div className="rounded-sm bg-muted/40 border border-border px-3 py-2 text-xs text-muted-foreground">
+            <div className="rounded-sm bg-muted/40 border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-muted-foreground">
               No preserved shelf life recorded — defrosting will not set a new sell-by date.
             </div>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-border flex gap-2 justify-end">
+        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="rounded-sm border border-border bg-card px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+            className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
           >
             Cancel
           </button>

@@ -246,7 +246,7 @@ export default function NeededPage() {
       />
       <div style={{ padding: "16px 32px 40px" }}>
       <div className="grid grid-cols-1 lg:grid-cols-[280px,1fr] gap-4">
-        <div className="rounded-lg border border-border bg-card p-3">
+        <div className="rounded-lg border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3">
           <div className="flex items-baseline justify-between mb-2">
             <h2 className="text-sm font-medium">Open orders</h2>
             <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -284,7 +284,7 @@ export default function NeededPage() {
                         "w-full text-left rounded-sm border px-2 py-1.5 flex items-start gap-2 transition " +
                         (checked
                           ? "border-foreground bg-foreground/5"
-                          : "border-border hover:border-foreground/40")
+                          : "border-[color:var(--ds-border-warm)] hover:border-foreground/40")
                       }
                     >
                       {checked ? (
@@ -317,7 +317,7 @@ export default function NeededPage() {
 
         <div className="space-y-5">
           {selected.size === 0 ? (
-            <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center text-sm text-muted-foreground">
               Pick one or more orders on the left to see what's needed.
             </div>
           ) : (
@@ -416,7 +416,7 @@ function RowCard(p: RowCardProps) {
     <div
       className={
         "rounded-lg border p-3 " +
-        (ok ? "border-status-ok-bg bg-status-ok-bg/20" : "border-border bg-card")
+        (ok ? "border-status-ok-bg bg-status-ok-bg/20" : "border-[color:var(--ds-border-warm)] bg-card")
       }
     >
       <div className="flex items-baseline justify-between gap-3 mb-1.5">

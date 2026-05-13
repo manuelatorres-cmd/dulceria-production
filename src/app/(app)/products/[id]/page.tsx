@@ -601,7 +601,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Tab strip */}
-      <div className="flex border-b border-border mb-4 px-4 overflow-x-auto">
+      <div className="flex border-b border-[color:var(--ds-border-warm)] mb-4 px-4 overflow-x-auto">
         {(["product", "shell", "fillingHistory", "batches", "cost", "nutrition"] as const).map((tab) => (
           <button
             key={tab}
@@ -996,7 +996,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     className={`rounded-sm border px-2.5 py-1 text-xs font-medium transition-colors ${
                       localPriorityTier === t
                         ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                        : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                     }`}
                     title={t === 1 ? "Top seller — never displaced" : t === 2 ? "Normal" : "Nice-to-have — displaced first when tight"}
                   >
@@ -1100,14 +1100,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             <button
               type="button"
               onClick={() => setLocalFillMode("percentage")}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${localFillMode === "percentage" ? "bg-accent text-accent-foreground" : "border border-border"}`}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${localFillMode === "percentage" ? "bg-accent text-accent-foreground" : "border border-[color:var(--ds-border-warm)]"}`}
             >
               By percentage
             </button>
             <button
               type="button"
               onClick={() => setLocalFillMode("grams")}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${localFillMode === "grams" ? "bg-accent text-accent-foreground" : "border border-border"}`}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${localFillMode === "grams" ? "bg-accent text-accent-foreground" : "border border-[color:var(--ds-border-warm)]"}`}
             >
               By grams
             </button>
@@ -1136,7 +1136,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Assign existing filling picker */}
           {showAssign && (
-            <div className="rounded-sm border border-border bg-card p-3 space-y-2">
+            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -1218,7 +1218,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         )}
 
         {/* Production defaults */}
-        <div className="px-4 pb-6 space-y-3 border-t border-border pt-4">
+        <div className="px-4 pb-6 space-y-3 border-t border-[color:var(--ds-border-warm)] pt-4">
           <h2 className="text-sm font-medium text-muted-foreground">Production defaults</h2>
           <div className="space-y-2">
             <div>
@@ -1401,7 +1401,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Production defaults — read-only */}
         {(product.defaultMouldId || (product.defaultBatchQty && product.defaultBatchQty > 1)) && (
-          <div className="px-4 pb-6 space-y-2 border-t border-border pt-4">
+          <div className="px-4 pb-6 space-y-2 border-t border-[color:var(--ds-border-warm)] pt-4">
             <h2 className="text-sm font-medium text-muted-foreground">Production defaults</h2>
             {product.defaultMouldId && (
               <p className="text-sm">
@@ -1421,10 +1421,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Delete product — always accessible */}
       {!editing && (
-      <div className="px-4 pb-8 border-t border-border pt-4 space-y-4">
+      <div className="px-4 pb-8 border-t border-[color:var(--ds-border-warm)] pt-4 space-y-4">
         {/* Duplicate */}
         {showDuplicatePanel ? (
-          <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+          <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
             <div className="flex items-center gap-2">
               <Copy className="w-4 h-4 text-muted-foreground shrink-0" />
               <p className="text-sm font-medium">Duplicate &ldquo;{product?.name}&rdquo;</p>
@@ -1439,7 +1439,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     type="checkbox"
                     checked={duplicateFillings}
                     onChange={(e) => setDuplicateFillings(e.target.checked)}
-                    className="rounded border-border"
+                    className="rounded border-[color:var(--ds-border-warm)]"
                   />
                   <span className="text-xs">
                     Also duplicate {productFillings.length === 1 ? "the filling" : `all ${productFillings.length} fillings`} as new copies
@@ -1498,7 +1498,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         {/* Archive (for produced products) */}
         {!product?.archived && productProduced && (
           confirmDelete ? (
-            <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                 <p className="text-sm font-medium">Archive this product?</p>
@@ -1589,7 +1589,7 @@ function ProductFillingHistorySection({ productId }: { productId: string }) {
         const newVersion = entry.newFilling?.version ?? 1;
         const fillingName = entry.newFilling?.name ?? entry.oldFilling?.name ?? "Unknown filling";
         return (
-          <li key={entry.id} className="rounded-sm border border-border bg-card p-3">
+          <li key={entry.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3">
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-medium">{fillingName}</p>
               <span className="text-xs text-muted-foreground shrink-0">{dateStr}</span>
@@ -1672,7 +1672,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
         const isDone = plan.status === "done";
 
         return (
-          <li key={pb.id} className="rounded-sm border border-border bg-card overflow-hidden">
+          <li key={pb.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
             {/* Header row */}
             <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-2">
               <div className="min-w-0">
@@ -1731,7 +1731,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
 
             {/* Notes */}
             {(plan.notes || pb.notes) && (
-              <div className="px-3 pb-2 space-y-1 border-t border-border pt-2">
+              <div className="px-3 pb-2 space-y-1 border-t border-[color:var(--ds-border-warm)] pt-2">
                 {plan.notes && (
                   <p className="text-xs text-muted-foreground flex items-start gap-1.5">
                     <StickyNote className="w-3 h-3 shrink-0 mt-px text-muted-foreground/60" />
@@ -1750,7 +1750,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
             {/* Restore from "gone" — inline confirmation (mirrors Stock page pattern) */}
             {isDone && pb.stockStatus === "gone" && (
               pendingRestore === pb.id ? (
-                <div className="px-3 py-2 border-t border-border bg-muted/40 flex items-center gap-3">
+                <div className="px-3 py-2 border-t border-[color:var(--ds-border-warm)] bg-muted/40 flex items-center gap-3">
                   <p className="text-xs text-muted-foreground flex-1">Restore to in stock?</p>
                   <button
                     onClick={() => { setPlanProductStockStatus(pb.id!, undefined); setPendingRestore(null); }}
@@ -1768,7 +1768,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
               ) : (
                 <button
                   onClick={() => setPendingRestore(pb.id!)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground px-3 py-2 border-t border-border hover:bg-muted hover:text-foreground transition-colors w-full"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground px-3 py-2 border-t border-[color:var(--ds-border-warm)] hover:bg-muted hover:text-foreground transition-colors w-full"
                 >
                   <Undo2 className="w-3 h-3" />
                   Restore to stock
@@ -1781,7 +1781,7 @@ function BatchHistoryTab({ productId }: { productId: string }) {
               href={plan.status === "done"
                 ? `/production/${plan.id}/summary?from=${encodeURIComponent(`/products/${productId}?tab=history`)}`
                 : `/production/${plan.id}?from=${encodeURIComponent(`/products/${productId}?tab=history`)}`}
-              className="flex items-center gap-1 text-xs text-primary px-3 py-2 border-t border-border hover:bg-muted transition-colors"
+              className="flex items-center gap-1 text-xs text-primary px-3 py-2 border-t border-[color:var(--ds-border-warm)] hover:bg-muted transition-colors"
             >
               View batch <ChevronRight className="w-3 h-3" />
             </Link>
@@ -2046,7 +2046,7 @@ function ProductCostTab({
         <button
           onClick={handleRecalculate}
           disabled={recalculating}
-          className="flex items-center gap-1.5 rounded-sm border border-border px-3 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50 shrink-0"
+          className="flex items-center gap-1.5 rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50 shrink-0"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? "animate-spin" : ""}`} />
           Recalculate
@@ -2103,7 +2103,7 @@ function ProductCostTab({
         <div>
           <div className="flex items-center justify-between mb-2 gap-3">
             <h2 className="text-sm font-semibold text-primary">Current breakdown</h2>
-            <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
+            <div className="inline-flex rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-0.5 text-xs">
               <button
                 onClick={() => setBreakdownView("grouped")}
                 className={`px-2.5 py-1 rounded transition-colors ${breakdownView === "grouped" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
@@ -2120,11 +2120,11 @@ function ProductCostTab({
           </div>
 
           {breakdownView === "grouped" ? (
-            <div className="rounded-sm border border-border bg-card overflow-hidden">
+            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
               {groupedBreakdown.map((group, gi) => {
                 const collapsed = collapsedLayers.has(group.layerId);
                 return (
-                  <div key={group.layerId} className={gi > 0 ? "border-t border-border" : ""}>
+                  <div key={group.layerId} className={gi > 0 ? "border-t border-[color:var(--ds-border-warm)]" : ""}>
                     <button
                       onClick={() => toggleLayer(group.layerId)}
                       className="w-full grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 bg-muted/40 hover:bg-muted/60 transition-colors text-left"
@@ -2159,7 +2159,7 @@ function ProductCostTab({
                   </div>
                 );
               })}
-              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 border-t border-border bg-muted/40">
+              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 border-t border-[color:var(--ds-border-warm)] bg-muted/40">
                 <span />
                 <span className="text-sm font-semibold">Total</span>
                 <span />
@@ -2168,10 +2168,10 @@ function ProductCostTab({
               </div>
             </div>
           ) : (
-            <div className="rounded-sm border border-border bg-card overflow-hidden">
+            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40">
+                  <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted/40">
                     <th
                       className="text-left px-3 py-2 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
                       onClick={() => handleSort("layer")}
@@ -2216,7 +2216,7 @@ function ProductCostTab({
                       <td className="px-3 py-2 text-xs">
                         <div className="flex flex-wrap gap-1">
                           {entry.layerNames.map((name, li) => (
-                            <span key={li} className="inline-flex items-center rounded-sm border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                            <span key={li} className="inline-flex items-center rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground">
                               {name}
                             </span>
                           ))}
@@ -2241,7 +2241,7 @@ function ProductCostTab({
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-border bg-muted/40">
+                  <tr className="border-t border-[color:var(--ds-border-warm)] bg-muted/40">
                     <td colSpan={5} className="px-3 py-2 text-xs font-semibold">Total</td>
                     <td className="px-3 py-2 text-xs text-right font-bold text-primary tabular-nums">
                       {formatCost(totalCost, sym)}
@@ -2270,7 +2270,7 @@ function ProductCostTab({
               const prev = snapshots[i + 1];
               const delta = prev ? costDelta(snap.costPerProduct, prev.costPerProduct, sym) : null;
               return (
-                <li key={snap.id} className="rounded-sm border border-border bg-card px-3 py-2.5">
+                <li key={snap.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-sm font-medium">{formatCost(snap.costPerProduct, sym)}</span>
                     <div className="flex items-center gap-2">
@@ -2431,7 +2431,7 @@ function CostHistoryChart({ snapshots, sym = "€" }: { snapshots: ProductCostSn
       {/* Tooltip */}
       {tooltip && (
         <div
-          className="absolute z-10 pointer-events-none rounded-md border border-border bg-card shadow-md px-2.5 py-1.5 text-xs"
+          className="absolute z-10 pointer-events-none rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-md px-2.5 py-1.5 text-xs"
           style={{
             left: Math.min(tooltip.x / W * 100, 70) + "%",
             top: (tooltip.y / 120 * 100) + "%",
@@ -2553,7 +2553,7 @@ function MaterialPicker({
         className="input"
       />
       {open && (filtered.length > 0 || showCreate) && (
-        <ul className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-sm border border-border bg-card shadow-lg">
+        <ul className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg">
           {filtered.map((m, idx) => (
             <li key={m.id}>
               <button
@@ -2578,7 +2578,7 @@ function MaterialPicker({
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={handleCreateNew}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors border-t border-border ${
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors border-t border-[color:var(--ds-border-warm)] ${
                   highlightIdx === filtered.length ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"
                 }`}
               >
@@ -2652,13 +2652,13 @@ function ShellDesignSection({
   }
 
   return (
-    <div className="px-4 pb-6 border-t border-border pt-4 space-y-3">
+    <div className="px-4 pb-6 border-t border-[color:var(--ds-border-warm)] pt-4 space-y-3">
       <h2 className="text-sm font-medium text-muted-foreground">Shell design</h2>
 
       {steps.length > 0 && (
         <ol className="space-y-3">
           {steps.map((step, i) => (
-            <li key={i} className="rounded-sm border border-border bg-card p-3 space-y-3">
+            <li key={i} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-3">
               {/* Technique row */}
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-sm bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 select-none">
@@ -2920,7 +2920,7 @@ function ProductFillingRow({
   }
 
   return (
-    <li className={`rounded-sm border border-border bg-card p-3 flex items-start gap-2 ${isDragging ? "opacity-50" : ""}`}>
+    <li className={`rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 flex items-start gap-2 ${isDragging ? "opacity-50" : ""}`}>
       {!readonly && (
         <button
           type="button"
@@ -3225,9 +3225,9 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
           </p>
 
           {/* Nutrition table */}
-      <div className="rounded-sm border border-border bg-card overflow-hidden">
+      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
         {/* Header row */}
-        <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
+        <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
           <span className="flex-1">Nutrient</span>
           <span className="w-24 text-right">Per 100g</span>
           {showPerProduct && (
@@ -3251,7 +3251,7 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
           return (
             <div
               key={n.key}
-              className={`flex items-baseline px-3 py-1.5 text-sm border-b border-border last:border-b-0 ${
+              className={`flex items-baseline px-3 py-1.5 text-sm border-b border-[color:var(--ds-border-warm)] last:border-b-0 ${
                 n.indent === 0 ? "font-medium" : "font-normal"
               }`}
             >

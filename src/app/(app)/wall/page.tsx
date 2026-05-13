@@ -118,7 +118,7 @@ export default function WallDisplayPage() {
               {active.map((plan) => (
                 <li
                   key={plan.id}
-                  className="border border-border bg-card px-6 py-4"
+                  className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-6 py-4"
                   style={{ borderRadius: 4 }}
                 >
                   <div
@@ -147,7 +147,7 @@ export default function WallDisplayPage() {
         <aside className="col-span-4 space-y-6">
           {/* On-shift staff */}
           <div
-            className="border border-border bg-card p-5"
+            className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-5"
             style={{ borderRadius: 4 }}
           >
             <h2
@@ -187,7 +187,7 @@ export default function WallDisplayPage() {
 
           {/* Proposals counter */}
           <div
-            className="border border-border bg-card p-5"
+            className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-5"
             style={{ borderRadius: 4 }}
           >
             <h2
@@ -210,7 +210,7 @@ export default function WallDisplayPage() {
 
           {/* HACCP + alerts */}
           <div
-            className="border border-border bg-card p-5"
+            className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-5"
             style={{ borderRadius: 4 }}
           >
             <h2

@@ -84,7 +84,7 @@ export function FilterChipGroup(props: FilterChipGroupProps) {
             className={`px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
               isActive(opt.value)
                 ? "bg-foreground text-background border border-foreground"
-                : "border border-border bg-card hover:border-foreground/40 hover:bg-muted"
+                : "border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-foreground/40 hover:bg-muted"
             }`}
             style={{ borderRadius: 3 }}
           >

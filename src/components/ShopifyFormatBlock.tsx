@@ -33,7 +33,7 @@ export function ShopifyFormatBlock({ entries, per100g }: Props) {
   if (!ingredientHtml && !hasNutrition) return null;
 
   return (
-    <div className="mt-4 rounded-sm border border-dashed border-border bg-muted/20 p-3">
+    <div className="mt-4 rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-muted/20 p-3">
       <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
         Shopify-Format
       </h3>
@@ -99,7 +99,7 @@ function CopyRow({ label, previewHtml, previewText, copyHtml, copyText }: CopyRo
             <button
               type="button"
               onClick={() => handleCopy("html")}
-              className="inline-flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
+              className="inline-flex items-center gap-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
               title="Copy formatted (with bold allergens)"
             >
               {copied === "html" ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
@@ -109,7 +109,7 @@ function CopyRow({ label, previewHtml, previewText, copyHtml, copyText }: CopyRo
           <button
             type="button"
             onClick={() => handleCopy("text")}
-            className="inline-flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
+            className="inline-flex items-center gap-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
             title="Copy plain text"
           >
             {copied === "text" ? <Check className="w-3 h-3 text-primary" /> : <Copy className="w-3 h-3" />}
@@ -117,7 +117,7 @@ function CopyRow({ label, previewHtml, previewText, copyHtml, copyText }: CopyRo
           </button>
         </div>
       </div>
-      <div className="rounded-sm bg-card border border-border px-2 py-1.5 text-xs leading-relaxed font-mono break-words">
+      <div className="rounded-sm bg-card border border-[color:var(--ds-border-warm)] px-2 py-1.5 text-xs leading-relaxed font-mono break-words">
         {previewHtml ? (
           <span dangerouslySetInnerHTML={{ __html: previewHtml }} />
         ) : (

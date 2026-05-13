@@ -176,7 +176,7 @@ export default function ProductionBrainDashboardPage() {
             {datelessAging.map(({ order, ageDays }) => (
               <li
                 key={order.id}
-                className="bg-card border border-border px-3 py-2 text-[12px]"
+                className="bg-card border border-[color:var(--ds-border-warm)] px-3 py-2 text-[12px]"
                 style={{ borderRadius: 3 }}
               >
                 <div className="flex items-baseline justify-between">
@@ -212,7 +212,7 @@ export default function ProductionBrainDashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Active pipeline */}
-        <section className="lg:col-span-2 rounded-sm border border-border bg-card p-4">
+        <section className="lg:col-span-2 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
           <SectionHeader>Active pipeline</SectionHeader>
           {plans.length === 0 ? (
             <Empty>No production plans yet.</Empty>
@@ -236,7 +236,7 @@ export default function ProductionBrainDashboardPage() {
         </section>
 
         {/* Replenishment proposals + alerts */}
-        <section className="rounded-sm border border-border bg-card p-4">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
           <SectionHeader>Replenishment proposals</SectionHeader>
           {proposals.length === 0 ? (
             <Empty>No proposals from engine. Run replenishment job to populate.</Empty>
@@ -256,7 +256,7 @@ export default function ProductionBrainDashboardPage() {
               {campaigns.slice(0, 6).map((c) => (
                 <li
                   key={c.id}
-                  className="rounded-md border border-border bg-muted px-2 py-1.5 text-xs flex items-center justify-between"
+                  className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted px-2 py-1.5 text-xs flex items-center justify-between"
                 >
                   <span>
                     <strong>{c.name}</strong>{" "}
@@ -281,7 +281,7 @@ export default function ProductionBrainDashboardPage() {
                 .map((p) => (
                   <li
                     key={p.id}
-                    className="px-2.5 py-1 rounded-full text-xs bg-muted border border-border"
+                    className="px-2.5 py-1 rounded-full text-xs bg-muted border border-[color:var(--ds-border-warm)]"
                   >
                     {p.name}
                   </li>
@@ -318,7 +318,7 @@ function SectionHeader({
 
 function KPI({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-sm border border-border bg-card px-4 py-3">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-3">
       <div className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold">
         {label}
       </div>
@@ -346,7 +346,7 @@ function ProposalRow({
         ? "bg-status-warn-bg text-status-warn"
         : "bg-muted text-muted-foreground";
   return (
-    <li className="rounded-md border border-border bg-muted/60 px-2 py-1.5 text-xs flex items-center justify-between">
+    <li className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted/60 px-2 py-1.5 text-xs flex items-center justify-between">
       <span className="truncate">
         <strong>{productName ?? proposal.productId.slice(0, 8)}</strong>{" "}
         <span className="text-muted-foreground">

@@ -63,7 +63,7 @@ export default function BatchSummaryPage({ params }: { params: Promise<{ id: str
           </div>
           <button
             onClick={handleCopy}
-            className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors shrink-0"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? "Copied" : "Copy"}
@@ -72,7 +72,7 @@ export default function BatchSummaryPage({ params }: { params: Promise<{ id: str
       </div>
 
       <div className="px-4 pb-8">
-        <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed bg-muted/50 rounded-sm border border-border p-4 text-foreground">
+        <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed bg-muted/50 rounded-sm border border-[color:var(--ds-border-warm)] p-4 text-foreground">
           {plan.batchSummary}
         </pre>
       </div>

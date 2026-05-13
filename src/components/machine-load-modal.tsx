@@ -92,10 +92,10 @@ export function MachineLoadModal({
         onClick={onClose}
       />
       <div
-        className="relative w-full max-w-md mx-4 border border-border bg-card shadow-xl"
+        className="relative w-full max-w-md mx-4 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl"
         style={{ borderRadius: 4 }}
       >
-        <header className="px-5 pt-4 pb-3 border-b border-border">
+        <header className="px-5 pt-4 pb-3 border-b border-[color:var(--ds-border-warm)]">
           <h3
             className="text-[16px]"
             style={{
@@ -126,7 +126,7 @@ export function MachineLoadModal({
                   "flex-1 border px-3 py-1.5 text-[12px] capitalize disabled:opacity-40 " +
                   (action === a
                     ? "bg-foreground text-background border-foreground"
-                    : "bg-card border-border hover:border-foreground")
+                    : "bg-card border-[color:var(--ds-border-warm)] hover:border-foreground")
                 }
                 style={{ borderRadius: 3 }}
               >
@@ -173,7 +173,7 @@ export function MachineLoadModal({
           )}
         </div>
 
-        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
+        <footer className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn-secondary">
             Cancel
           </button>

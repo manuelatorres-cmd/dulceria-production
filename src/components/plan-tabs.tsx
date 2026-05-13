@@ -36,7 +36,7 @@ export function PlanTabs({ focusParam }: { focusParam?: string | null } = {}) {
   ];
 
   return (
-    <div className="mb-3 inline-flex rounded-full border border-border bg-card overflow-hidden text-[12px]">
+    <div className="mb-3 inline-flex rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden text-[12px]">
       {tabs.map((t) => {
         const active = view === t.key;
         return (

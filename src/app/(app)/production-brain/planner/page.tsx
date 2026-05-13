@@ -156,7 +156,7 @@ export default function ProductionBrainPlannerPage() {
             {campaigns.map((c) => (
               <div
                 key={c.id}
-                className="border border-border bg-card p-3 text-sm"
+                className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 text-sm"
                 style={{ borderRadius: 4 }}
               >
                 <div className="flex items-center justify-between">
@@ -189,7 +189,7 @@ export default function ProductionBrainPlannerPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4">
           {/* Calendar */}
           <section
-            className="border border-border bg-card p-4"
+            className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
             style={{ borderRadius: 4 }}
           >
             <header className="flex items-center justify-between mb-3">
@@ -233,7 +233,7 @@ export default function ProductionBrainPlannerPage() {
 
           {/* Sidebar — replenishment proposals */}
           <aside
-            className="border border-border bg-card p-3"
+            className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3"
             style={{ borderRadius: 4 }}
           >
             <h3
@@ -306,7 +306,7 @@ function ProposalCard({
       {...attributes}
       {...listeners}
       className={
-        "border border-border bg-muted px-2.5 py-2 text-xs flex flex-col gap-0.5 cursor-grab select-none transition-opacity " +
+        "border border-[color:var(--ds-border-warm)] bg-muted px-2.5 py-2 text-xs flex flex-col gap-0.5 cursor-grab select-none transition-opacity " +
         (isDragging ? "opacity-40" : "hover:border-foreground")
       }
       style={{ borderRadius: 3 }}
@@ -373,8 +373,8 @@ function DayCell({
         (day.inMonth
           ? isOver
             ? "bg-accent-terracotta-bg border-[color:var(--accent-terracotta-ink)]"
-            : "bg-muted border-border"
-          : "bg-card border-border opacity-40")
+            : "bg-muted border-[color:var(--ds-border-warm)]"
+          : "bg-card border-[color:var(--ds-border-warm)] opacity-40")
       }
       style={{ borderRadius: 3 }}
     >
@@ -388,7 +388,7 @@ function DayCell({
         {plans.slice(0, 3).map((plan) => (
           <li
             key={plan.id}
-            className="px-1.5 py-0.5 text-[10px] truncate bg-card border border-border"
+            className="px-1.5 py-0.5 text-[10px] truncate bg-card border border-[color:var(--ds-border-warm)]"
             title={plan.name ?? ""}
             style={{ borderRadius: 2 }}
           >

@@ -227,7 +227,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             </Link>
             <button
               onClick={() => setCustomerArchived(customer.id!, !customer.archived)}
-              className="inline-flex items-center gap-1 rounded-sm border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+              className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <Archive className="w-3 h-3" /> {customer.archived ? "Restore" : "Archive"}
             </button>
@@ -250,7 +250,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         )}
 
         {/* Profile */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary flex items-center gap-2">
               Profile
@@ -320,7 +320,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 <input value={form.invoiceAddress} onChange={(e) => setForm({ ...form, invoiceAddress: e.target.value })} className="input text-sm" />
               </div>
 
-              <div className="col-span-2 pt-2 border-t border-border">
+              <div className="col-span-2 pt-2 border-t border-[color:var(--ds-border-warm)]">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Pricing</p>
               </div>
               <div>
@@ -346,7 +346,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 </p>
               </div>
 
-              <div className="col-span-2 pt-2 border-t border-border">
+              <div className="col-span-2 pt-2 border-t border-[color:var(--ds-border-warm)]">
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Preferences</p>
               </div>
               <div className="col-span-2">
@@ -395,7 +395,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               {customer.tags?.length ? (
                 <><dt className="text-muted-foreground text-xs">Tags</dt>
                 <dd className="flex gap-1 flex-wrap">
-                  {customer.tags.map((t) => (<span key={t} className="rounded-sm border border-border px-1.5 py-0 text-[10px]">{t}</span>))}
+                  {customer.tags.map((t) => (<span key={t} className="rounded-sm border border-[color:var(--ds-border-warm)] px-1.5 py-0 text-[10px]">{t}</span>))}
                 </dd></>
               ) : null}
               {customer.notes && <><dt className="text-muted-foreground text-xs col-span-2">Notes</dt><dd className="col-span-2 text-xs text-foreground whitespace-pre-line">{customer.notes}</dd></>}
@@ -412,7 +412,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
         {/* Analytics */}
         {analytics && (
-          <section className="rounded-sm border border-border bg-card p-4">
+          <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
             <h2 className="text-sm font-semibold text-primary mb-3">Performance</h2>
             <div className="grid grid-cols-4 gap-3">
               <Metric label="Orders" value={`${analytics.orderCount}`} />
@@ -459,18 +459,18 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         )}
 
         {/* Contact log */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5"><Users className="w-4 h-4" /> Contact log</h2>
             <span className="text-xs text-muted-foreground">{contacts.length} {contacts.length === 1 ? "entry" : "entries"}</span>
           </div>
-          <div className="rounded-md border border-border p-3 space-y-2">
+          <div className="rounded-md border border-[color:var(--ds-border-warm)] p-3 space-y-2">
             <div className="flex gap-2 flex-wrap">
               {CUSTOMER_CONTACT_KINDS.map((k) => (
                 <button
                   key={k}
                   onClick={() => setNewContactKind(k)}
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${newContactKind === k ? "bg-accent text-accent-foreground" : "border border-border text-muted-foreground"}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${newContactKind === k ? "bg-accent text-accent-foreground" : "border border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
                 >
                   {CUSTOMER_CONTACT_LABELS[k]}
                 </button>
@@ -502,7 +502,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {contacts.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No contact log entries yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-md border border-border">
+            <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
               {contacts.map((c) => (
                 <li key={c.id} className="px-3 py-2 text-sm">
                   <div className="flex items-start justify-between gap-2">
@@ -532,14 +532,14 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </section>
 
         {/* Follow-ups */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5"><ClipboardList className="w-4 h-4" /> Follow-ups</h2>
             <span className="text-xs text-muted-foreground">
               {followups.filter((f) => !f.completedAt).length} open
             </span>
           </div>
-          <div className="rounded-md border border-border p-3 space-y-2">
+          <div className="rounded-md border border-[color:var(--ds-border-warm)] p-3 space-y-2">
             <div className="flex gap-2 flex-wrap">
               <input
                 type="date"
@@ -565,7 +565,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {followups.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No follow-ups yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-md border border-border">
+            <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
               {followups.map((f) => {
                 const overdue = !f.completedAt && new Date(f.dueDate) < new Date(new Date().toISOString().slice(0, 10));
                 return (
@@ -577,7 +577,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                           ? "bg-status-ok border-status-ok text-white"
                           : overdue
                             ? "border-status-alert"
-                            : "border-border"
+                            : "border-[color:var(--ds-border-warm)]"
                       }`}
                       aria-label="Toggle complete"
                     >
@@ -605,7 +605,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </section>
 
         {/* Order history */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary">Order history</h2>
             <span className="text-xs text-muted-foreground">{customerOrders.length} {customerOrders.length === 1 ? "order" : "orders"}</span>
@@ -613,7 +613,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {customerOrders.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No orders linked to this customer yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-md border border-border">
+            <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
               {customerOrders.map((o) => {
                 const items = itemsByOrder.get(o.id!) ?? [];
                 const value = items.reduce((acc, it) => acc + (it.unitPrice ?? 0) * it.quantity, 0);
@@ -642,7 +642,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </section>
 
         {/* Quotes */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5"><FileText className="w-4 h-4" /> Quotes</h2>
             <Link
@@ -655,7 +655,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {quotes.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No quotes yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-md border border-border">
+            <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
               {quotes.map((q) => (
                 <li key={q.id}>
                   <Link href={`/quotes/${encodeURIComponent(q.id!)}`} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/30 text-sm">
@@ -736,7 +736,7 @@ function CustomerProductPricesSection({
   }
 
   return (
-    <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+    <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
           <Tag className="w-4 h-4" /> Custom product prices ({prices.length})
@@ -749,7 +749,7 @@ function CustomerProductPricesSection({
       </div>
 
       {adding && (
-        <div className="rounded-md border border-border p-3 space-y-2">
+        <div className="rounded-md border border-[color:var(--ds-border-warm)] p-3 space-y-2">
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
               <select value={productId} onChange={(e) => setProductId(e.target.value)} className="input text-sm">
@@ -787,7 +787,7 @@ function CustomerProductPricesSection({
           No custom prices. The customer pays the price list / default.
         </p>
       ) : (
-        <ul className="divide-y divide-border rounded-md border border-border">
+        <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
           {prices.map((p) => (
             <li key={p.id} className="flex items-center gap-3 px-3 py-2">
               <div className="flex-1 min-w-0">

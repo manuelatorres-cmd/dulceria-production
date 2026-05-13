@@ -9,7 +9,7 @@ export function PageHeader({
   accent?: string;
 }) {
   return (
-    <header className="px-1 sm:px-2 pt-10 pb-6 border-b border-border/60 mb-6">
+    <header className="px-1 sm:px-2 pt-10 pb-6 border-b border-[color:var(--ds-border-warm)]/60 mb-6">
       {accent ? (
         <div
           className="text-[10px] text-muted-foreground font-medium mb-2"

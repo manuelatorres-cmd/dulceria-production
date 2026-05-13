@@ -73,7 +73,7 @@ export function StockStatusPanel({
         </span>
         <button
           onClick={onMarkOrdered}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-full px-2.5 py-1.5 transition-colors"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 transition-colors"
         >
           <Check className="w-3 h-3" /> Mark ordered
         </button>
@@ -98,7 +98,7 @@ export function StockStatusPanel({
           <>
             <button
               onClick={onMarkOrdered}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-full px-2.5 py-1.5 transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 transition-colors"
             >
               <Check className="w-3 h-3" /> Mark ordered
             </button>
@@ -124,13 +124,13 @@ export function StockStatusPanel({
     <div className="flex items-center gap-2 flex-wrap">
       <button
         onClick={() => setPendingAction("low")}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-status-warn border border-border hover:border-status-warn-edge rounded-full px-3 py-1.5 transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-status-warn border border-[color:var(--ds-border-warm)] hover:border-status-warn-edge rounded-full px-3 py-1.5 transition-colors"
       >
         <ShoppingCart className="w-3.5 h-3.5" /> Flag as low stock
       </button>
       <button
         onClick={() => setPendingAction("out")}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-status-alert border border-border hover:border-status-alert-edge rounded-full px-3 py-1.5 transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-status-alert border border-[color:var(--ds-border-warm)] hover:border-status-alert-edge rounded-full px-3 py-1.5 transition-colors"
       >
         <ShoppingCart className="w-3.5 h-3.5" /> Mark out of stock
       </button>

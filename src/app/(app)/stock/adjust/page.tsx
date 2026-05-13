@@ -281,7 +281,7 @@ export default function StockAdjustPage() {
         </button>
 
         {/* Common settings */}
-        <section className="rounded-[6px] border border-border bg-card p-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="label">Type</label>
@@ -369,7 +369,7 @@ export default function StockAdjustPage() {
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors capitalize ${
                       active
                         ? "bg-accent text-accent-foreground"
-                        : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                        : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
                     }`}
                   >
                     {tag}
@@ -394,7 +394,7 @@ export default function StockAdjustPage() {
         </section>
 
         {/* Item list — like monthly count */}
-        <section className="rounded-[6px] border border-border overflow-hidden">
+        <section className="rounded-[6px] border border-[color:var(--ds-border-warm)] overflow-hidden">
           {visibleRows.length === 0 ? (
             <p className="px-4 py-6 text-sm text-muted-foreground italic text-center">
               No items match. Adjust filters or change type.
@@ -416,7 +416,7 @@ export default function StockAdjustPage() {
                   const valid = raw !== "" && Number.isFinite(parsed);
                   const after = valid ? r.current + parsed : null;
                   return (
-                    <tr key={r.id} className="border-t border-border">
+                    <tr key={r.id} className="border-t border-[color:var(--ds-border-warm)]">
                       <td className="px-3 py-1.5">
                         <span className="truncate">{r.name}</span>
                         {r.isVariant && (
@@ -496,7 +496,7 @@ export default function StockAdjustPage() {
           {recent.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No adjustments logged yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-sm border border-border bg-card">
+            <ul className="divide-y divide-border rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
               {recent.map((adj) => {
                 const delta = Number(adj.deltaQty);
                 return (

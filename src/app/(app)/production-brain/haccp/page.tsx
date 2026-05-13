@@ -139,7 +139,7 @@ function UnitCard({ unit }: { unit: ColdStorageUnit }) {
   }
 
   return (
-    <li className="rounded-sm border border-border bg-card p-4">
+    <li className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
       <header className="flex items-baseline justify-between">
         <div>
           <strong className="tracking-tight text-sm">{unit.name}</strong>
@@ -260,7 +260,7 @@ function UnitCard({ unit }: { unit: ColdStorageUnit }) {
             {readings.slice(0, 20).map((r) => (
               <li
                 key={r.id}
-                className="flex items-center justify-between border-b border-border/60 py-1 last:border-b-0"
+                className="flex items-center justify-between border-b border-[color:var(--ds-border-warm)]/60 py-1 last:border-b-0"
               >
                 <span className="text-muted-foreground">
                   {new Date(r.loggedAt).toLocaleString()}
@@ -471,7 +471,7 @@ function NewUnitForm({ hasAny }: { hasAny: boolean }) {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="text-[12px] px-3 py-1.5 rounded-sm border border-border hover:bg-muted/40"
+            className="text-[12px] px-3 py-1.5 rounded-sm border border-[color:var(--ds-border-warm)] hover:bg-muted/40"
           >
             Cancel
           </button>

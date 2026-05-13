@@ -173,13 +173,13 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
         className="flex items-center gap-1 text-xs text-primary font-medium mt-1"
       >
         <Plus className="w-3.5 h-3.5" /> Add component
-        <kbd className="ml-1 rounded border border-border bg-muted px-1 py-0.5 font-sans text-muted-foreground" style={{fontSize: "0.65rem"}}>n</kbd>
+        <kbd className="ml-1 rounded border border-[color:var(--ds-border-warm)] bg-muted px-1 py-0.5 font-sans text-muted-foreground" style={{fontSize: "0.65rem"}}>n</kbd>
       </button>
     );
   }
 
   return (
-    <form onSubmit={handleAdd} className="mt-2 p-2 rounded-md border border-border bg-muted/50 space-y-2">
+    <form onSubmit={handleAdd} className="mt-2 p-2 rounded-md border border-[color:var(--ds-border-warm)] bg-muted/50 space-y-2">
       {/* Kind toggle — ingredient OR an existing filling used as a
           sub-component. Flipping resets the current selection so the
           search behaves sensibly for the new source. */}
@@ -199,7 +199,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
             className={`rounded-full px-3 py-0.5 text-xs font-medium transition-colors ${
               kind === k
                 ? "bg-accent text-accent-foreground"
-                : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
             }`}
           >
             {k === "ingredient" ? "Ingredient" : "Another filling"}
@@ -218,7 +218,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
           className="input"
         />
         {trimmedSearch && !selectedId && (filtered.length > 0 || showCreateOption) && (
-          <ul ref={listRef} className="mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-card">
+          <ul ref={listRef} className="mt-1 max-h-40 overflow-y-auto rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
             {filtered.map((item, idx) => (
               <li key={item.id}>
                 <button
@@ -242,7 +242,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
                 <button
                   type="button"
                   onClick={handleCreateNew}
-                  className={`w-full text-left px-2 py-1.5 text-sm transition-colors border-t border-border ${
+                  className={`w-full text-left px-2 py-1.5 text-sm transition-colors border-t border-[color:var(--ds-border-warm)] ${
                     highlightedIndex === filtered.length ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"
                   }`}
                 >

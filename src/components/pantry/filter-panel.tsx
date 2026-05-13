@@ -25,7 +25,7 @@ export function FilterPanel({
 }) {
   return (
     <div
-      className="border border-border bg-card p-4 space-y-3.5"
+      className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3.5"
       style={{ borderRadius: 4 }}
     >
       {children}

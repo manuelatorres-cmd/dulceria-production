@@ -891,7 +891,7 @@ function PlanContent({
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleRenamePlan(); if (e.key === "Escape") setEditingName(false); }}
-                  className="flex-1 rounded-md border border-border bg-card px-2 py-1 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <button onClick={handleRenamePlan} className="p-1 rounded-full hover:bg-muted"><Check className="w-4 h-4 text-primary" /></button>
                 <button onClick={() => setEditingName(false)} className="p-1 rounded-full hover:bg-muted"><X className="w-4 h-4 text-muted-foreground" /></button>
@@ -934,14 +934,14 @@ function PlanContent({
                   <Link
                     key={lo.orderId}
                     href={`/orders/${encodeURIComponent(lo.orderId)}`}
-                    className="inline-flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-0.5 hover:border-primary hover:text-primary"
+                    className="inline-flex items-center gap-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-0.5 hover:border-primary hover:text-primary"
                   >
                     <span className="truncate max-w-[14ch]">{lo.label}</span>
                     <span className="text-muted-foreground tabular-nums">· {lo.allocatedQuantity} pcs</span>
                   </Link>
                 ))}
                 {surplusPlanned > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-sm border border-border bg-muted/40 px-2 py-0.5 text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/40 px-2 py-0.5 text-muted-foreground">
                     Surplus · {surplusPlanned} pcs
                   </span>
                 )}
@@ -986,7 +986,7 @@ function PlanContent({
               onKeyDown={(e) => { if (e.key === "Escape") setEditingBatchNote(false); }}
               placeholder="Note for this batch…"
               rows={3}
-              className="w-full rounded-sm border border-border bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              className="w-full rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
           </div>
         ) : plan.notes ? (
@@ -1122,7 +1122,7 @@ function PlanContent({
             {/* Materials needed — Colour tab: on-mould steps only; Cap tab: transfer sheets + after-cap steps */}
             {((activePhase === "colour" && colouringMaterialIds.length > 0) ||
               (activePhase === "cap" && cappingMaterialIds.length > 0)) && (
-              <div className="rounded-sm border border-border bg-card p-3 mb-1">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 mb-1">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Materials needed for this step</p>
                 <ul className="space-y-1.5">
                   {(activePhase === "colour" ? colouringMaterialIds : cappingMaterialIds).map((id) => {
@@ -1330,14 +1330,14 @@ function PlanContent({
 
       {/* Per-product notes */}
       {planProducts.length > 0 && (
-        <div className="px-4 mt-2 pb-8 border-t border-border pt-4">
+        <div className="px-4 mt-2 pb-8 border-t border-[color:var(--ds-border-warm)] pt-4">
           <h2 className="text-sm font-semibold text-muted-foreground mb-3">Product notes</h2>
           <div className="space-y-2">
             {planProducts.map((pb) => {
               const productName = productNames.get(pb.productId) ?? "Unknown";
               const isEditing = editingProductNoteId === pb.id;
               return (
-                <div key={pb.id} className="rounded-sm border border-border bg-card px-3 py-2.5">
+                <div key={pb.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
                   <p className="text-xs font-medium text-foreground mb-1.5">{productName}</p>
                   {isEditing ? (
                     <textarea
@@ -1348,7 +1348,7 @@ function PlanContent({
                       onKeyDown={(e) => { if (e.key === "Escape") setEditingProductNoteId(null); }}
                       placeholder="What happened with this product…"
                       rows={3}
-                      className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                      className="w-full rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                     />
                   ) : pb.notes ? (
                     <button
@@ -1375,7 +1375,7 @@ function PlanContent({
 
       {/* Mark batch as done — placed at the bottom so it's reached only after reviewing all steps */}
       {plan.status !== "done" && (
-        <div className="px-4 pt-4 pb-8 border-t border-border mt-2">
+        <div className="px-4 pt-4 pb-8 border-t border-[color:var(--ds-border-warm)] mt-2">
           {confirmMarkDone ? (
             <div className="rounded-sm border border-status-ok-edge bg-status-ok-bg px-3 py-2.5">
               <p className="text-sm font-medium text-status-ok mb-0.5">Mark entire batch as done?</p>
@@ -1391,7 +1391,7 @@ function PlanContent({
                 </button>
                 <button
                   onClick={() => setConfirmMarkDone(false)}
-                  className="rounded-sm border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground"
+                  className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm text-muted-foreground"
                 >
                   Cancel
                 </button>
@@ -1400,7 +1400,7 @@ function PlanContent({
           ) : (
             <button
               onClick={() => setConfirmMarkDone(true)}
-              className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
             >
               <Check className="w-3.5 h-3.5" />
               Mark batch as done
@@ -1529,11 +1529,11 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
     <button
       onClick={() => onToggle(step.key)}
       className={`w-full flex items-center gap-3 p-3 rounded-sm border text-left transition-colors ${
-        done ? "border-status-ok-edge bg-status-ok-bg" : "border-border bg-card"
+        done ? "border-status-ok-edge bg-status-ok-bg" : "border-[color:var(--ds-border-warm)] bg-card"
       }`}
     >
       <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-        done ? "bg-status-ok border-status-ok" : "border-border"
+        done ? "bg-status-ok border-status-ok" : "border-[color:var(--ds-border-warm)]"
       }`}>
         {done && (
           <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>

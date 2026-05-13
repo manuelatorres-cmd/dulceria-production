@@ -66,7 +66,7 @@ const CAT_CHIP_CLASS: Record<string, string> = {
 };
 
 function catChipClass(cat: string): string {
-  return CAT_CHIP_CLASS[cat] ?? "text-muted-foreground bg-muted border-border";
+  return CAT_CHIP_CLASS[cat] ?? "text-muted-foreground bg-muted border-[color:var(--ds-border-warm)]";
 }
 
 function catBarColor(cat: string): string {
@@ -539,14 +539,14 @@ export default function ProductCostPage() {
                 placeholder="Search products…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 min-w-[12rem] sm:flex-initial sm:w-72 px-3 py-2 text-sm border border-border rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="flex-1 min-w-[12rem] sm:flex-initial sm:w-72 px-3 py-2 text-sm border border-[color:var(--ds-border-warm)] rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="whitespace-nowrap">Sort by</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortMode)}
-                  className="px-2 py-2 text-sm border border-border rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="px-2 py-2 text-sm border border-[color:var(--ds-border-warm)] rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="cost-asc">Cost/product — low→high</option>
                   <option value="cost-desc">Cost/product — high→low</option>
@@ -559,7 +559,7 @@ export default function ProductCostPage() {
                 <select
                   value={productCatFilter}
                   onChange={(e) => setProductCatFilter(e.target.value)}
-                  className="px-2 py-2 text-sm border border-border rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 capitalize"
+                  className="px-2 py-2 text-sm border border-[color:var(--ds-border-warm)] rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 capitalize"
                 >
                   <option value="">All kinds</option>
                   {availableProductCategories.map((c) => (
@@ -590,7 +590,7 @@ export default function ProductCostPage() {
                     className={`text-[11px] px-2 py-0.5 rounded-sm border font-medium transition-colors ${
                       active
                         ? catChipClass(cat) + " ring-1 ring-current/40"
-                        : "text-muted-foreground bg-background border-border hover:bg-muted/60"
+                        : "text-muted-foreground bg-background border-[color:var(--ds-border-warm)] hover:bg-muted/60"
                     }`}
                     aria-pressed={active}
                   >
@@ -603,14 +603,14 @@ export default function ProductCostPage() {
         )}
 
         {productsWithCost.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-border p-8 text-center">
+          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] p-8 text-center">
             <p className="text-muted-foreground text-sm mb-1">No cost data yet</p>
             <p className="text-xs text-muted-foreground/70">
               Open a product and trigger a cost calculation from the Cost tab to get started.
             </p>
           </div>
         ) : (
-          <div className="space-y-px rounded-sm border border-border overflow-hidden">
+          <div className="space-y-px rounded-sm border border-[color:var(--ds-border-warm)] overflow-hidden">
             {/* Header row */}
             <div className="grid grid-cols-[2rem_1fr_auto_auto] gap-3 items-center px-4 py-2 bg-muted/50 text-xs font-medium text-muted-foreground uppercase tracking-wide">
               <span>#</span>
@@ -643,7 +643,7 @@ export default function ProductCostPage() {
                   <button
                     key={product.id}
                     onClick={() => setFocusId(product.id!)}
-                    className="grid grid-cols-[2rem_1fr_auto_auto] gap-3 items-center w-full px-4 py-3 text-left hover:bg-muted/40 transition-colors border-t border-border first:border-t-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+                    className="grid grid-cols-[2rem_1fr_auto_auto] gap-3 items-center w-full px-4 py-3 text-left hover:bg-muted/40 transition-colors border-t border-[color:var(--ds-border-warm)] first:border-t-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
                   >
                     {/* Rank */}
                     <span className="text-xs font-mono text-muted-foreground tabular-nums">
@@ -742,7 +742,7 @@ export default function ProductCostPage() {
       </button>
 
       {/* ---- Focus card ---- */}
-      <div className="rounded-sm border border-border bg-card p-5 mb-6">
+      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-5 mb-6">
         {/* Name + type */}
         <div className="flex items-start gap-3 mb-4">
           <div className="flex-1 min-w-0">
@@ -751,7 +751,7 @@ export default function ProductCostPage() {
             </h2>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {focusProduct.productCategoryId && productCategoryMap.get(focusProduct.productCategoryId) && (
-                <span className="text-xs text-muted-foreground border border-border rounded px-1.5 py-0.5 capitalize">
+                <span className="text-xs text-muted-foreground border border-[color:var(--ds-border-warm)] rounded px-1.5 py-0.5 capitalize">
                   {productCategoryMap.get(focusProduct.productCategoryId)!.name}
                 </span>
               )}
@@ -841,7 +841,7 @@ export default function ProductCostPage() {
 
         {/* Category chips */}
         {focusCategories.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border">
+          <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-[color:var(--ds-border-warm)]">
             {[...new Set(focusCategories)].map((cat) => (
               <span
                 key={cat}
@@ -875,7 +875,7 @@ export default function ProductCostPage() {
               return (
                 <div
                   key={productId}
-                  className="flex items-center gap-3 rounded-sm border border-border bg-card p-3"
+                  className="flex items-center gap-3 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3"
                 >
                   {/* Similarity score */}
                   <div className="shrink-0 w-10 text-center">
@@ -936,8 +936,8 @@ export default function ProductCostPage() {
                       isPinned
                         ? "border-primary text-primary bg-primary/5 hover:bg-primary/10"
                         : compareIds.length >= 3
-                        ? "border-border text-muted-foreground/40 cursor-not-allowed"
-                        : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+                        ? "border-[color:var(--ds-border-warm)] text-muted-foreground/40 cursor-not-allowed"
+                        : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:text-foreground hover:border-primary/40"
                     }`}
                   >
                     {isPinned ? "Comparing" : "Compare"}
@@ -967,14 +967,14 @@ export default function ProductCostPage() {
                 className="w-full px-3 py-2 text-sm border border-primary/40 rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               {compareSearchResults.length > 0 && (
-                <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-sm border border-border bg-card shadow-lg overflow-hidden">
+                <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg overflow-hidden">
                   {compareSearchResults.map((r) => {
                     const snap = latestSnapshotByProduct.get(r.id!);
                     return (
                       <button
                         key={r.id}
                         onClick={() => addToCompare(r.id!)}
-                        className="flex items-center justify-between w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors border-b border-border last:border-b-0"
+                        className="flex items-center justify-between w-full px-3 py-2.5 text-left hover:bg-muted/50 transition-colors border-b border-[color:var(--ds-border-warm)] last:border-b-0"
                       >
                         <span className="text-sm">{r.name}</span>
                         {snap && (
@@ -994,8 +994,8 @@ export default function ProductCostPage() {
               disabled={compareIds.length >= 3}
               className={`text-sm px-3 py-1.5 rounded-sm border transition-colors ${
                 compareIds.length >= 3
-                  ? "border-border text-muted-foreground/40 cursor-not-allowed"
-                  : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+                  ? "border-[color:var(--ds-border-warm)] text-muted-foreground/40 cursor-not-allowed"
+                  : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:text-foreground hover:border-primary/40"
               }`}
             >
               + Add any product to compare
@@ -1011,10 +1011,10 @@ export default function ProductCostPage() {
             Comparison
           </h3>
 
-          <div className="overflow-x-auto rounded-sm border border-border">
+          <div className="overflow-x-auto rounded-sm border border-[color:var(--ds-border-warm)]">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
+                <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted/40">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide w-36 sm:w-44">
                     Metric
                   </th>
@@ -1083,7 +1083,7 @@ export default function ProductCostPage() {
                 />
 
                 {/* Cost structure bars */}
-                <tr className="border-t border-border">
+                <tr className="border-t border-[color:var(--ds-border-warm)]">
                   <td className="px-4 py-2.5 text-xs text-muted-foreground font-medium">Structure</td>
                   {allCompareIds.map((id) => {
                     const snap = latestSnapshotByProduct.get(id);
@@ -1130,7 +1130,7 @@ export default function ProductCostPage() {
                     <tr>
                       <td
                         colSpan={allCompareIds.length + 1}
-                        className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted/30 border-t border-border"
+                        className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-muted/30 border-t border-[color:var(--ds-border-warm)]"
                       >
                         Shared ingredients
                       </td>
@@ -1173,7 +1173,7 @@ function CompareRow({ label, values, numericValues, highlightMin, dimEmpty }: Co
   const minVal = validNums.length > 0 ? Math.min(...validNums) : null;
 
   return (
-    <tr className="border-t border-border hover:bg-muted/20 transition-colors">
+    <tr className="border-t border-[color:var(--ds-border-warm)] hover:bg-muted/20 transition-colors">
       <td className="px-4 py-2.5 text-xs text-muted-foreground font-medium">{label}</td>
       {values.map((val, i) => {
         const num = numericValues[i];

@@ -138,7 +138,7 @@ export function AuditTab() {
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="rounded-sm border border-border bg-card px-4 py-8 text-sm text-muted-foreground text-center">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-8 text-sm text-muted-foreground text-center">
           No fillings match this filter.
         </div>
       ) : (
@@ -226,7 +226,7 @@ function Tile({ label, value, tone }: { label: string; value: number; tone: "ok"
       ? "border-status-warn-edge bg-status-warn-bg/30 text-status-warn"
       : tone === "bad"
       ? "border-status-alert-edge bg-status-alert-bg/30 text-status-alert"
-      : "border-border bg-card text-muted-foreground";
+      : "border-[color:var(--ds-border-warm)] bg-card text-muted-foreground";
   return (
     <div className={`rounded-sm border ${cls} px-4 py-3`}>
       <div className="text-2xl font-medium tabular-nums">{value}</div>
@@ -273,7 +273,7 @@ function AuditCard({
       : "";
 
   return (
-    <li className="rounded-sm border border-border bg-card overflow-hidden">
+    <li className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
       <button onClick={onToggle} className="w-full text-left px-4 py-3 hover:bg-muted/30 transition-colors flex items-start gap-3">
         <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${iconTone}`} />
         <div className="min-w-0 flex-1">
@@ -303,7 +303,7 @@ function AuditCard({
       </button>
 
       {expanded && (
-        <div className="border-t border-border bg-muted/20 px-4 py-3 space-y-3 text-sm">
+        <div className="border-t border-[color:var(--ds-border-warm)] bg-muted/20 px-4 py-3 space-y-3 text-sm">
           {missingCompositionNames.length > 0 && (
             <div className="rounded-sm border border-status-alert-edge bg-status-alert-bg/20 px-3 py-2 text-xs">
               <strong className="text-status-alert">Missing composition:</strong>{" "}

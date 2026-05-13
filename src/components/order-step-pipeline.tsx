@@ -135,7 +135,7 @@ export function OrderStepPipeline({ orderId, needByDate }: Props) {
 
   if (linkedPlans.length === 0) {
     return (
-      <div className="border border-border bg-card p-4" style={{ borderRadius: 4 }}>
+      <div className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4" style={{ borderRadius: 4 }}>
         <p
           className="text-muted-foreground text-[12.5px] italic"
           style={{ fontFamily: "var(--font-serif)" }}
@@ -151,7 +151,7 @@ export function OrderStepPipeline({ orderId, needByDate }: Props) {
 
   return (
     <section
-      className="border border-border bg-card p-4"
+      className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
       style={{ borderRadius: 4 }}
     >
       <header className="flex items-baseline justify-between mb-3">
@@ -242,7 +242,7 @@ function rollupClasses(roll: "done" | "in-progress" | "pending"): string {
     return "bg-status-ok-bg border-status-ok-edge text-status-ok";
   if (roll === "in-progress")
     return "bg-status-warn-bg border-status-warn-edge text-status-warn";
-  return "bg-muted border-border text-muted-foreground";
+  return "bg-muted border-[color:var(--ds-border-warm)] text-muted-foreground";
 }
 
 function readyVsNeed(ready: string, needBy: string): React.ReactNode {

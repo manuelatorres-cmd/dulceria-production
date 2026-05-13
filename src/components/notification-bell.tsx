@@ -111,10 +111,10 @@ export function NotificationBell() {
 
       {open ? (
         <div
-          className="absolute right-0 top-12 w-[360px] max-h-[520px] overflow-hidden bg-card border border-border shadow-lg z-50 flex flex-col"
+          className="absolute right-0 top-12 w-[360px] max-h-[520px] overflow-hidden bg-card border border-[color:var(--ds-border-warm)] shadow-lg z-50 flex flex-col"
           style={{ borderRadius: 4 }}
         >
-          <header className="flex items-baseline justify-between px-4 pt-4 pb-2 border-b border-border">
+          <header className="flex items-baseline justify-between px-4 pt-4 pb-2 border-b border-[color:var(--ds-border-warm)]">
             <span
               className="text-[10px] text-muted-foreground uppercase font-medium"
               style={{ letterSpacing: "0.12em" }}
@@ -152,7 +152,7 @@ export function NotificationBell() {
           )}
 
           <footer
-            className="px-4 py-2 border-t border-border text-[10px] text-muted-foreground flex gap-3"
+            className="px-4 py-2 border-t border-[color:var(--ds-border-warm)] text-[10px] text-muted-foreground flex gap-3"
             style={{ letterSpacing: "0.06em" }}
           >
             <span><kbd>y</kbd> approve</span>

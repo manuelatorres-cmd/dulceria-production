@@ -607,7 +607,7 @@ function CategoryBlock({
             <li key={i.productId}>
               <Link
                 href={i.planId ? `/production/${encodeURIComponent(i.planId)}?from=campaigns&fromId=${encodeURIComponent(campaignId)}` : `/products/${encodeURIComponent(i.productId)}?from=campaigns&fromId=${encodeURIComponent(campaignId)}`}
-                className="flex items-center gap-3 rounded-[10px] border border-border bg-card px-3 py-2 hover:border-foreground/30 transition-colors"
+                className="flex items-center gap-3 rounded-[10px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 hover:border-foreground/30 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium truncate">
@@ -683,7 +683,7 @@ function OrdersInCampaign({
             <li key={o.id}>
               <Link
                 href={`/orders/${encodeURIComponent(o.id!)}?from=campaigns&fromId=${encodeURIComponent(campaign.id!)}`}
-                className="flex items-center gap-3 rounded-[10px] border border-border bg-card/80 px-3 py-2 hover:border-foreground/30"
+                className="flex items-center gap-3 rounded-[10px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]/80 px-3 py-2 hover:border-foreground/30"
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium truncate">

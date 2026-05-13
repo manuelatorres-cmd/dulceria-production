@@ -106,7 +106,7 @@ export default function CampaignProductionPage({ params }: { params: Promise<{ i
       </p>
 
       {linkedPlans.length === 0 ? (
-        <div className="rounded-[6px] border border-dashed border-border bg-card/60 p-8 text-center">
+        <div className="rounded-[6px] border border-dashed border-[color:var(--ds-border-warm)] bg-card/60 p-8 text-center">
           <p className="text-sm text-muted-foreground">
             No batches scheduled. Run <Link href="/plan" className="text-primary hover:underline">Regenerate plan</Link> on /plan.
           </p>
@@ -117,7 +117,7 @@ export default function CampaignProductionPage({ params }: { params: Promise<{ i
             <li key={plan.id}>
               <Link
                 href={`/production/${encodeURIComponent(plan.id!)}`}
-                className="flex items-center gap-3 rounded-[6px] border border-border bg-card/80 px-4 py-3 hover:border-foreground/30 transition"
+                className="flex items-center gap-3 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]/80 px-4 py-3 hover:border-foreground/30 transition"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">

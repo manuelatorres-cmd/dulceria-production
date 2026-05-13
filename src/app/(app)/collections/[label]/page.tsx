@@ -99,7 +99,7 @@ export default function CollectionDetailPage({
             {matches.map((v) => {
               const status = getStatus(v);
               return (
-                <li key={v.id} className="rounded-sm border border-border bg-card">
+                <li key={v.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
                   <Link
                     href={`/variants/${encodeURIComponent(v.id ?? "")}`}
                     className="flex items-center gap-3 p-3 min-w-0"

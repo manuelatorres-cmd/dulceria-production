@@ -10,7 +10,7 @@ export default function MarketingLayout({
       className="min-h-screen flex flex-col"
       style={{ ["--nav-w" as string]: "0px" }}
     >
-      <header className="border-b border-border">
+      <header className="border-b border-[color:var(--ds-border-warm)]">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center gap-4">
           <Link href="/" className="flex items-center gap-2 text-foreground hover:opacity-80 transition-opacity">
             <img src="/logo.png" alt="" className="w-7 h-7 rounded object-contain" />
@@ -33,7 +33,7 @@ export default function MarketingLayout({
         </div>
       </header>
       <main className="flex-1">{children}</main>
-      <footer className="border-t border-border mt-16">
+      <footer className="border-t border-[color:var(--ds-border-warm)] mt-16">
         <div className="max-w-5xl mx-auto px-6 py-8 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <div>Dulceria · Fine vegan chocolates · Lilienbrunngasse 5/1A, 1020 Wien</div>
           <div>Made with ❤️ for you. The world needs more kindness (and more chocolate!)</div>

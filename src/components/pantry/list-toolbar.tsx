@@ -85,7 +85,7 @@ export function ListToolbar({
           className={`relative border px-3 h-[38px] transition-colors ${
             filterPanelOpen
               ? "bg-foreground text-background border-foreground"
-              : "border-border bg-card hover:border-foreground"
+              : "border-[color:var(--ds-border-warm)] bg-card hover:border-foreground"
           }`}
           style={{ borderRadius: 4 }}
           aria-label="Filters"

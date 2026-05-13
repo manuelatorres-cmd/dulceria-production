@@ -127,7 +127,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="w-full rounded-sm border border-border py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full rounded-sm border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             <span className="flex items-center justify-center gap-2">
               <Upload className="w-4 h-4" />
@@ -159,7 +159,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
       {/* Phase: preview — table + confirm */}
       {phase === "preview" && parseResult && (
         <div className="space-y-4">
-          <div className="rounded-md border border-border bg-card px-3 py-2 space-y-2">
+          <div className="rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">{fileName}</p>
               <button onClick={handleReset} className="text-muted-foreground hover:text-foreground" title="Cancel">
@@ -191,10 +191,10 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
             )}
           </div>
 
-          <div className="overflow-x-auto rounded-md border border-border">
+          <div className="overflow-x-auto rounded-md border border-[color:var(--ds-border-warm)]">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-border bg-muted/50">
+                <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted/50">
                   <th className="px-2 py-1.5 text-left font-medium text-muted-foreground w-8">#</th>
                   {previewColumns.map((col) => (
                     <th key={col.key} className="px-2 py-1.5 text-left font-medium text-muted-foreground">
@@ -231,7 +231,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
             )}
             <button
               onClick={handleReset}
-              className="rounded-sm border border-border px-4 py-2 text-sm"
+              className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
             >
               Cancel
             </button>
@@ -261,7 +261,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
           </div>
           <button
             onClick={handleReset}
-            className="w-full rounded-sm border border-border py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full rounded-sm border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             Import more
           </button>
@@ -276,7 +276,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
           </div>
           <button
             onClick={handleReset}
-            className="w-full rounded-sm border border-border py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full rounded-sm border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             Try again
           </button>

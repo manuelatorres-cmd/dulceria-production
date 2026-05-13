@@ -199,7 +199,7 @@ export default function SetupWizardPage() {
       />
 
       <section
-        className="mb-6 border border-border bg-card p-4"
+        className="mb-6 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
         style={{ borderRadius: 4 }}
       >
         <div className="flex items-baseline justify-between">
@@ -236,7 +236,7 @@ export default function SetupWizardPage() {
       </div>
 
       <footer
-        className="mt-8 border-t border-border pt-5 text-[11px] text-muted-foreground max-w-2xl"
+        className="mt-8 border-t border-[color:var(--ds-border-warm)] pt-5 text-[11px] text-muted-foreground max-w-2xl"
         style={{ letterSpacing: "0.01em" }}
       >
         You can always come back to this page — it stays accurate as you
@@ -254,8 +254,8 @@ function Section({ section }: { section: SetupSection }) {
       className={
         "border p-4 " +
         (done
-          ? "bg-card border-border opacity-70"
-          : "bg-card border-border")
+          ? "bg-card border-[color:var(--ds-border-warm)] opacity-70"
+          : "bg-card border-[color:var(--ds-border-warm)]")
       }
       style={{ borderRadius: 4 }}
     >
@@ -288,7 +288,7 @@ function Section({ section }: { section: SetupSection }) {
           {section.items.map((it) => (
             <li
               key={it.href + it.label}
-              className="flex items-center justify-between gap-3 text-[12.5px] px-3 py-1.5 bg-[color:var(--color-muted)] border border-border"
+              className="flex items-center justify-between gap-3 text-[12.5px] px-3 py-1.5 bg-[color:var(--color-muted)] border border-[color:var(--ds-border-warm)]"
               style={{ borderRadius: 3 }}
             >
               <span

@@ -92,7 +92,7 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onSkip} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-sm border border-border bg-card shadow-xl overflow-hidden">
+      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3">
           <div className="flex items-center gap-3 mb-1">
@@ -157,7 +157,7 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
                         if (entries.length === 1) handleConfirm();
                       }
                     }}
-                    className="flex-1 h-8 rounded-sm border border-border bg-card text-center text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="flex-1 h-8 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-center text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="text-xs text-muted-foreground w-4">g</span>
                 </div>
@@ -172,10 +172,10 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
         </div>
 
         {/* Actions */}
-        <div className="px-5 py-4 border-t border-border flex flex-wrap gap-2 justify-end">
+        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex flex-wrap gap-2 justify-end">
           <button
             onClick={onSkip}
-            className="rounded-sm border border-border bg-card px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+            className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
           >
             No leftover
           </button>

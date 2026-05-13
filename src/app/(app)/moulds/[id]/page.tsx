@@ -396,7 +396,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
                     if (v && !tags.includes(v)) setTags([...tags, v]);
                     setTagDraft("");
                   }}
-                  className="rounded-sm border border-border px-3 text-sm"
+                  className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 text-sm"
                 >
                   Add
                 </button>
@@ -434,7 +434,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
           /* ── Read-only view ── */
           <>
             {mould.cavityWeightG > 0 && (
-              <div className="rounded-sm border border-border bg-card divide-y divide-border">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
                 <div className="flex justify-between px-3 py-2 text-sm">
                   <span className="text-muted-foreground">Cavity weight</span>
                   <span className="font-medium">{mould.cavityWeightG} g</span>
@@ -485,7 +485,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {!editing && (
-        <div className="px-4 pb-8 border-t border-border pt-4 space-y-4">
+        <div className="px-4 pb-8 border-t border-[color:var(--ds-border-warm)] pt-4 space-y-4">
           {mould.archived && (
             <button
               onClick={async () => { await unarchiveMould(mouldId); }}
@@ -497,7 +497,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
           {confirmDelete ? (
             inUse ? (
               /* In use by products or plans — archive only */
-              <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                   <p className="text-sm font-medium">Archive this mould?</p>

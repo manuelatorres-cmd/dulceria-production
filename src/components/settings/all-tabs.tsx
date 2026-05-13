@@ -125,7 +125,7 @@ export function SettingsAllTabs({ initialTab = "capacity" }: { initialTab?: Tab 
           Manuela): capacity/steps/equipment are the daily/weekly knobs,
           market/printing change rarely, import/backup are maintenance,
           demo mode is development-only. */}
-      <div className="flex border-b border-border px-4 mb-6">
+      <div className="flex border-b border-[color:var(--ds-border-warm)] px-4 mb-6">
         <button
           onClick={() => switchTab("capacity")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "capacity" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
@@ -254,7 +254,7 @@ function BackupTab({
         )}
 
         {/* Export */}
-        <div className="rounded-sm border border-border bg-card p-4 space-y-2">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-2">
           <div className="flex items-start gap-3">
             <Download className="w-5 h-5 text-primary shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
@@ -284,7 +284,7 @@ function BackupTab({
       {/* About */}
       <section className="space-y-1">
         <h2 className="text-sm font-semibold text-primary">About</h2>
-        <div className="rounded-sm border border-border bg-card px-4 py-3 space-y-1">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-3 space-y-1">
           <p className="text-sm font-medium">Dulceria{isCloudConfigured ? "" : " — local only"}</p>
           {isCloudConfigured ? (
             <>
@@ -328,7 +328,7 @@ function LabelPrinterSection() {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-primary">Label Printer</h2>
-      <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
         <div className="flex items-center gap-3">
           <Printer className="w-5 h-5 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
@@ -368,7 +368,7 @@ function DemoModeSection() {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-primary">Demo Mode</h2>
-      <div className="rounded-sm border border-border bg-card p-4">
+      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
         <div className="flex items-center gap-3">
           <Video className="w-5 h-5 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
@@ -421,7 +421,7 @@ function DemoDataSection() {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-primary">Demo Data</h2>
-      <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
         <div className="flex items-start gap-3">
           <FlaskConical className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
@@ -440,7 +440,7 @@ function DemoDataSection() {
         {state === "idle" && (
           <button
             onClick={handleLoad}
-            className="w-full rounded-sm border border-border py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full rounded-sm border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             Load demo data
           </button>
@@ -525,7 +525,7 @@ function ClearAllDataSection() {
               </button>
               <button
                 onClick={() => setState("idle")}
-                className="rounded-sm border border-border px-4 py-2 text-sm"
+                className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
               >
                 Cancel
               </button>
@@ -670,7 +670,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
       {/* Buffers */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-primary">Buffers</h2>
-        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Capacity buffer (%)</label>
@@ -730,7 +730,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
       {/* Thresholds */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-primary">Dashboard thresholds</h2>
-        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Warn threshold (%)</label>
@@ -865,7 +865,7 @@ function PeopleSection({ people, unavailability, knownRoles }: {
       )}
 
       {sorted.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
           No people added yet.
         </p>
       ) : (
@@ -926,7 +926,7 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
   const missing = missingPersonFields(person);
 
   return (
-    <li className={`rounded-sm border bg-card overflow-hidden ${person.archived ? "border-border opacity-70" : "border-border"}`}>
+    <li className={`rounded-sm border bg-card overflow-hidden ${person.archived ? "border-[color:var(--ds-border-warm)] opacity-70" : "border-[color:var(--ds-border-warm)]"}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button
           onClick={onToggle}
@@ -961,7 +961,7 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
       </div>
 
       {expanded && (
-        <div className="border-t border-border px-3 py-3 space-y-3">
+        <div className="border-t border-[color:var(--ds-border-warm)] px-3 py-3 space-y-3">
           {editing ? (
             <>
               <div className="flex items-center justify-between">
@@ -985,7 +985,7 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
                 <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Details</p>
                 <button
                   onClick={() => setEditing(true)}
-                  className="flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1 text-xs hover:border-foreground/30"
+                  className="flex items-center gap-1.5 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1 text-xs hover:border-foreground/30"
                 >
                   <Pencil className="w-3 h-3" /> Edit
                 </button>
@@ -996,7 +996,7 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
 
           <PersonUnavailabilityEditor personId={person.id!} unavailability={unavailability} />
 
-          <div className="border-t border-border pt-3 flex items-center gap-4">
+          <div className="border-t border-[color:var(--ds-border-warm)] pt-3 flex items-center gap-4">
             {!person.archived ? (
               <button
                 onClick={() => handleArchive(true)}
@@ -1202,7 +1202,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
   );
 
   return (
-    <div className={`rounded-sm ${isNew ? "border border-border bg-card p-4" : ""} space-y-3`}>
+    <div className={`rounded-sm ${isNew ? "border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4" : ""} space-y-3`}>
       <div>
         <label className="label">Name</label>
         <input
@@ -1251,7 +1251,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
             type="button"
             onClick={() => addRole(roleDraft)}
             disabled={!roleDraft.trim()}
-            className="rounded-sm border border-border px-3 py-1.5 text-sm disabled:opacity-50"
+            className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-sm disabled:opacity-50"
           >
             Add role
           </button>
@@ -1321,7 +1321,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {WEEKDAY_LABELS[day]}
@@ -1361,7 +1361,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {skill}
@@ -1387,7 +1387,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {PRIMARY_ROLE_LABELS[pr]}
@@ -1431,7 +1431,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {CONTRACT_TYPE_LABELS[c]}
@@ -1469,7 +1469,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
           type="checkbox"
           checked={isAdmin}
           onChange={(e) => setIsAdmin(e.target.checked)}
-          className="w-4 h-4 rounded-sm border-border"
+          className="w-4 h-4 rounded-sm border-[color:var(--ds-border-warm)]"
         />
         <span>Admin — unlocks analytics, full cost breakdown, HACCP incident writes</span>
       </label>
@@ -1485,7 +1485,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         {onCancel && (
           <button
             onClick={onCancel}
-            className="rounded-sm border border-border px-4 py-2 text-sm"
+            className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
           >
             Cancel
           </button>
@@ -1575,7 +1575,7 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
       </div>
 
       {adding && (
-        <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+        <div className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted/30 p-3 space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="label">Start</label>
@@ -1599,7 +1599,7 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
                     className={`rounded-sm border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                       active
                         ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card text-muted-foreground border-border hover:bg-muted"
+                        : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
                     }`}
                   >
                     {ABSENCE_TYPE_LABELS[t]}
@@ -1622,7 +1622,7 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
             </button>
             <button
               onClick={() => { setAdding(false); setStartDate(""); setEndDate(""); setAbsenceType(""); setNotes(""); }}
-              className="rounded-sm border border-border px-3 py-1 text-xs"
+              className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs"
             >
               Cancel
             </button>
@@ -1653,7 +1653,7 @@ function UnavailabilityRow({ entry }: { entry: PersonUnavailability }) {
   }
 
   return (
-    <li className="flex items-center gap-2 text-xs px-2 py-1 rounded border border-border bg-card">
+    <li className="flex items-center gap-2 text-xs px-2 py-1 rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
       <Clock className="w-3 h-3 text-muted-foreground shrink-0" />
       <span className="flex-1 min-w-0 truncate">
         {formatIsoDate(entry.startDate)}
@@ -1756,7 +1756,7 @@ function EquipmentTab() {
       )}
 
       {sorted.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
           No equipment added yet.
         </p>
       ) : (
@@ -1801,10 +1801,10 @@ function EquipmentCard({ equipment: eq, expanded, onToggle }: {
   const availColor =
     avail === "available" ? "text-status-ok bg-status-ok-bg border-status-ok-edge" :
     avail === "in_use" ? "text-status-warn bg-status-warn-bg border-status-warn-edge" :
-    "text-muted-foreground bg-muted border-border";
+    "text-muted-foreground bg-muted border-[color:var(--ds-border-warm)]";
 
   return (
-    <li className={`rounded-sm border bg-card overflow-hidden ${eq.archived ? "opacity-70 border-border" : "border-border"}`}>
+    <li className={`rounded-sm border bg-card overflow-hidden ${eq.archived ? "opacity-70 border-[color:var(--ds-border-warm)]" : "border-[color:var(--ds-border-warm)]"}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button
           onClick={onToggle}
@@ -1828,10 +1828,10 @@ function EquipmentCard({ equipment: eq, expanded, onToggle }: {
       </div>
 
       {expanded && (
-        <div className="border-t border-border px-3 py-3 space-y-3">
+        <div className="border-t border-[color:var(--ds-border-warm)] px-3 py-3 space-y-3">
           <EquipmentEditor equipment={eq} onSaved={() => { /* stays expanded */ }} />
 
-          <div className="border-t border-border pt-3 flex items-center gap-4">
+          <div className="border-t border-[color:var(--ds-border-warm)] pt-3 flex items-center gap-4">
             {!eq.archived ? (
               <button
                 onClick={() => handleArchive(true)}
@@ -1948,7 +1948,7 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
   }
 
   return (
-    <div className={`space-y-3 ${isNew ? "rounded-sm border border-border bg-card p-4" : ""}`}>
+    <div className={`space-y-3 ${isNew ? "rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4" : ""}`}>
       <div>
         <label className="label">Name</label>
         <input
@@ -2054,7 +2054,7 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
 
       {/* HACCP temperature tracking — applies to fridges, freezers, chocolate
           storage, and any other device that needs a daily temperature check. */}
-      <div className="rounded-md bg-muted/30 border border-border p-3 space-y-2">
+      <div className="rounded-md bg-muted/30 border border-[color:var(--ds-border-warm)] p-3 space-y-2">
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
             type="checkbox"
@@ -2116,7 +2116,7 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
         {onCancel && (
           <button
             onClick={onCancel}
-            className="rounded-sm border border-border px-4 py-2 text-sm"
+            className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
           >
             Cancel
           </button>
@@ -2208,12 +2208,12 @@ function ProductionStepsTab() {
       </section>
 
       {categories.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
           No product categories yet. Add one under Products → Categories first.
         </p>
       ) : (
         <>
-          <div className="rounded-sm border border-border bg-card p-4">
+          <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
             <label className="label">Product type</label>
             <select
               value={selectedType}
@@ -2240,7 +2240,7 @@ function ProductionStepsTab() {
                         value={copyFrom}
                         onChange={(e) => setCopyFrom(e.target.value)}
                         disabled={copyBusy}
-                        className="rounded-sm border border-border bg-card px-2 py-1 text-xs disabled:opacity-50"
+                        className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-xs disabled:opacity-50"
                       >
                         <option value="">choose type…</option>
                         {typesWithSteps.map((t) => (
@@ -2250,7 +2250,7 @@ function ProductionStepsTab() {
                       <button
                         onClick={handleCopyFrom}
                         disabled={!copyFrom || copyBusy}
-                        className="flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-1 text-xs hover:border-foreground/30 disabled:opacity-50"
+                        className="flex items-center gap-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-xs hover:border-foreground/30 disabled:opacity-50"
                         title="Append every step from the chosen type into this one. You can then edit times here without touching the source."
                       >
                         <Copy className="w-3 h-3" /> {copyBusy ? "Copying…" : "Copy"}
@@ -2279,7 +2279,7 @@ function ProductionStepsTab() {
               )}
 
               {stepsForType.length === 0 && !adding ? (
-                <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
+                <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
                   No steps yet for {selectedType}. Click Add step to start.
                 </p>
               ) : (
@@ -2388,7 +2388,7 @@ function ProductionStepRow({ step, knownStepNames, index }: {
   }
 
   return (
-    <li ref={setNodeRef} style={style} className="rounded-sm border border-border bg-card overflow-hidden">
+    <li ref={setNodeRef} style={style} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button
           {...attributes}
@@ -2428,14 +2428,14 @@ function ProductionStepRow({ step, knownStepNames, index }: {
       </div>
 
       {expanded && (
-        <div className="border-t border-border px-3 py-3 space-y-3">
+        <div className="border-t border-[color:var(--ds-border-warm)] px-3 py-3 space-y-3">
           <ProductionStepEditor
             step={step}
             productType={step.productType}
             knownStepNames={knownStepNames}
             onSaved={() => { /* stays expanded */ }}
           />
-          <div className="border-t border-border pt-3 flex items-center gap-4">
+          <div className="border-t border-[color:var(--ds-border-warm)] pt-3 flex items-center gap-4">
             <button
               onClick={handleDuplicate}
               disabled={busy}
@@ -2537,7 +2537,7 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
   }
 
   return (
-    <div className={`space-y-3 ${isNew ? "rounded-sm border border-border bg-card p-4" : ""}`}>
+    <div className={`space-y-3 ${isNew ? "rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4" : ""}`}>
       <div>
         <label className="label">Step name</label>
         <input
@@ -2656,7 +2656,7 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
         {onCancel && (
           <button
             onClick={onCancel}
-            className="rounded-sm border border-border px-4 py-2 text-sm"
+            className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
           >
             Cancel
           </button>
@@ -2716,7 +2716,7 @@ function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
       </div>
 
       {adding && (
-        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div>
             <label className="label">Reason</label>
             <input
@@ -2759,7 +2759,7 @@ function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
             </button>
             <button
               onClick={() => { setAdding(false); setName(""); setStartDate(""); setEndDate(""); }}
-              className="rounded-sm border border-border px-4 py-2 text-sm"
+              className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
             >
               Cancel
             </button>
@@ -2768,7 +2768,7 @@ function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
       )}
 
       {blocked.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2 text-center border border-dashed border-border rounded-sm">
+        <p className="text-sm text-muted-foreground py-2 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
           No blocked periods.
         </p>
       ) : (
@@ -2798,7 +2798,7 @@ function BlockedDayRow({ entry }: { entry: EventCalendarEntry }) {
   }
 
   return (
-    <li className="rounded-sm border border-border bg-card flex items-center gap-3 px-3 py-2.5">
+    <li className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] flex items-center gap-3 px-3 py-2.5">
       <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{entry.name}</p>
@@ -2966,7 +2966,7 @@ function PreferencesTab({
           <div />
           <button
             onClick={startEditing}
-            className="flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Pencil className="w-3.5 h-3.5" />
             Edit
@@ -2974,7 +2974,7 @@ function PreferencesTab({
         </div>
 
         {/* Key-value card */}
-        <div className="rounded-sm border border-border bg-card divide-y divide-border">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
           <div className="flex justify-between px-4 py-3">
             <span className="text-sm text-muted-foreground">Currency</span>
             <span className="text-sm font-medium">{currencyInfo?.label ?? activeCurrency}</span>
@@ -2994,7 +2994,7 @@ function PreferencesTab({
         </div>
 
         {/* May Contain summary */}
-        <div className="rounded-sm border border-border bg-card px-4 py-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-3">
           <p className="text-sm text-muted-foreground mb-1.5">Facility &ldquo;may contain&rdquo; advisories</p>
           {activeMayContain.length > 0 ? (
             <div className="flex flex-wrap gap-1">
@@ -3022,12 +3022,12 @@ function PreferencesTab({
           All prices, costs, and margins throughout the app are displayed in this currency.
           Changing currency does not convert existing values — it only changes the symbol shown.
         </p>
-        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <label className="block text-sm font-medium">Display currency</label>
           <select
             value={draftCurrency}
             onChange={(e) => setDraftCurrency(e.target.value as CurrencyCode)}
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+            className="w-full rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm"
           >
             {CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>{c.label}</option>
@@ -3043,12 +3043,12 @@ function PreferencesTab({
           Controls which allergen checklist appears when editing ingredients.
           You are responsible for understanding and complying with your region&rsquo;s labelling regulations.
         </p>
-        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <label className="block text-sm font-medium">Target market</label>
           <select
             value={draftRegion}
             onChange={(e) => setDraftRegion(e.target.value as MarketRegion)}
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+            className="w-full rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm"
           >
             {(Object.entries(MARKET_LABEL_RULES) as [MarketRegion, typeof MARKET_LABEL_RULES["EU"]][]).map(([code, r]) => (
               <option key={code} value={code}>{r.label}</option>
@@ -3067,12 +3067,12 @@ function PreferencesTab({
           Controls how filling amounts are entered by default when assigning fillings to products.
           Individual products can still override this.
         </p>
-        <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <label className="block text-sm font-medium">Default fill mode</label>
           <select
             value={draftFillMode}
             onChange={(e) => setDraftFillMode(e.target.value as FillMode)}
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+            className="w-full rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm"
           >
             <option value="percentage">By percentage</option>
             <option value="grams">By grams</option>
@@ -3087,7 +3087,7 @@ function PreferencesTab({
           Cross-contamination risk from shared equipment or production environment. This applies to your
           entire facility — not to individual products.
         </p>
-        <div className="rounded-sm border border-border bg-card p-4 space-y-1">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-1">
           {activeAllergens.filter(a => !a.group).map((a) => (
             <label key={a.id} className="flex items-center gap-2.5 cursor-pointer py-1">
               <input
@@ -3135,7 +3135,7 @@ function PreferencesTab({
         </button>
         <button
           onClick={handleCancel}
-          className="rounded-sm border border-border px-4 py-2 text-sm"
+          className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
         >
           Cancel
         </button>
@@ -3216,7 +3216,7 @@ function ImportTab() {
         </p>
       </section>
 
-      <section className="rounded-sm border border-border bg-card p-4">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
         <SpreadsheetImport
           config={ingredientImportConfig}
           getExistingKeys={getExistingIngredientKeys}
@@ -3225,7 +3225,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-sm border border-border bg-card p-4">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
         <SpreadsheetImport
           config={mouldImportConfig}
           getExistingKeys={getExistingMouldKeys}
@@ -3234,7 +3234,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-sm border border-border bg-card p-4">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
         <SpreadsheetImport
           config={packagingImportConfig}
           getExistingKeys={getExistingPackagingKeys}
@@ -3243,7 +3243,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-sm border border-border bg-card p-4">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
         <SpreadsheetImport
           config={decorationImportConfig}
           getExistingKeys={getExistingDecorationKeys}
@@ -3252,7 +3252,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-sm border border-border bg-card p-4">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
         <SpreadsheetImport
           config={fillingImportConfig}
           getExistingKeys={getExistingFillingKeys}
@@ -3261,7 +3261,7 @@ function ImportTab() {
         />
       </section>
 
-      <section className="rounded-sm border border-border bg-card p-4">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
         <SpreadsheetImport
           config={productImportConfig}
           getExistingKeys={getExistingProductKeys}

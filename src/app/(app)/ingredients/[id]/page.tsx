@@ -180,7 +180,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
           Previously gated on `category === "Chocolate"`, which hid the tab
           after reload for any ingredient whose category string didn't match
           that exact casing. */}
-      <div className="flex border-b border-border mb-4 px-4 overflow-x-auto">
+      <div className="flex border-b border-[color:var(--ds-border-warm)] mb-4 px-4 overflow-x-auto">
         {(
           (editing || ingredient.shellCapable)
             ? ["details", "shell", "composition", "ingredients", "allergens", "pricing", "nutrition", "stock"] as const
@@ -245,7 +245,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
             {activeTab === "composition" && (
               <div>
                 {COMPOSITION_FIELDS.some((f) => (ingredient[f.key] ?? 0) > 0) ? (
-                  <div className="rounded-sm border border-border bg-card divide-y divide-border">
+                  <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
                     {COMPOSITION_FIELDS.filter((f) => (ingredient[f.key] ?? 0) > 0).map((f) => (
                       <div key={f.key} className="flex justify-between px-3 py-2 text-sm">
                         <span className="text-muted-foreground">{f.label}</span>
@@ -263,7 +263,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
             {activeTab === "ingredients" && (
               <div>
                 {ingredient.subIngredients && ingredient.subIngredients.length > 0 ? (
-                  <div className="rounded-sm border border-border bg-card divide-y divide-border">
+                  <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
                     {ingredient.subIngredients.map((s, i) => (
                       <div key={i} className="px-3 py-2 text-sm text-foreground">
                         {s.name}
@@ -305,7 +305,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
               <div>
                 {ingredient.purchaseCost != null ? (
                   <div className="mb-4">
-                    <div className="rounded-sm border border-border bg-card px-3 py-2 space-y-1.5">
+                    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 space-y-1.5">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Purchase cost</span>
                         <span className="font-medium">{sym}{ingredient.purchaseCost}</span>
@@ -355,7 +355,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
                     {priceHistoryExpanded && (
                       <ul className="space-y-1 ml-6">
                         {priceHistory.map((entry) => (
-                          <li key={entry.id} className="rounded-md border border-border bg-card px-3 py-2">
+                          <li key={entry.id} className="rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2">
                             <div className="flex justify-between items-baseline gap-2">
                               <span className="text-sm font-medium text-primary">
                                 {sym}{entry.costPerGram < 0.01 ? entry.costPerGram.toFixed(4) : entry.costPerGram.toFixed(3)}/g
@@ -424,7 +424,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
               <IngredientStockPanel ingredientId={ingredientId} />
             )}
 
-            <div className="mt-8 border-t border-border pt-4 space-y-4">
+            <div className="mt-8 border-t border-[color:var(--ds-border-warm)] pt-4 space-y-4">
               {ingredient.archived && (
                 <button
                   onClick={async () => { await unarchiveIngredient(ingredientId); }}
@@ -620,7 +620,7 @@ function IngredientNutritionReadView({ ingredient, market, onEdit }: { ingredien
       <h2 className="text-sm font-medium text-muted-foreground mb-2">{panelTitle}</h2>
       <p className="text-xs text-muted-foreground mb-3">Values per 100g</p>
 
-      <div className="rounded-sm border border-border bg-card divide-y divide-border">
+      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
         {nutrients.map((n) => {
           const val = nutrition?.[n.key];
           const dv = showDV ? percentDailyValue(val, n.dailyValue) : undefined;
@@ -759,7 +759,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
           comma-thousands separator doesn't get misread as a decimal
           (Austrian convention reads "25,000" as 25.000 = 25). Below
           1kg we keep grams. */}
-      <div className={`rounded-sm border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-border bg-card"}`}>
+      <div className={`rounded-sm border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-[color:var(--ds-border-warm)] bg-card"}`}>
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">On hand</p>
         <p className={`text-3xl font-bold tabular-nums ${belowThreshold ? "text-status-warn" : "text-foreground"}`}>
           {currentG >= 1000
@@ -781,7 +781,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       )}
 
       {/* Receive stock */}
-      <section className="rounded-sm border border-border bg-card p-4 space-y-2">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-2">
         <h3 className="text-sm font-semibold text-primary">Receive stock</h3>
         <p className="text-xs text-muted-foreground">Just bought more of this ingredient? Enter grams here.</p>
         <div className="flex gap-2 items-center">
@@ -813,7 +813,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       </section>
 
       {/* Manual adjust (recount) */}
-      <section className="rounded-sm border border-border bg-card p-4 space-y-2">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-2">
         <h3 className="text-sm font-semibold text-primary">Adjust (recount / waste)</h3>
         <p className="text-xs text-muted-foreground">For corrections after a count, or writing off waste.</p>
         <div className="flex gap-2 items-center">
@@ -828,7 +828,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
           <button
             onClick={() => handleAdjust(+1)}
             disabled={busy || !adjustInput}
-            className="rounded-sm border border-border bg-card px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
           >
             + Add
           </button>
@@ -843,7 +843,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       </section>
 
       {/* Low-stock threshold */}
-      <section className="rounded-sm border border-border bg-card p-4 space-y-2">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-2">
         <h3 className="text-sm font-semibold text-primary">Low-stock alert threshold</h3>
         <p className="text-xs text-muted-foreground">Empty to disable alerts for this ingredient.</p>
         <div className="flex gap-2 items-center">
@@ -859,7 +859,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
           <button
             onClick={handleThreshold}
             disabled={busy}
-            className="rounded-sm border border-border bg-card px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
           >
             Save
           </button>
@@ -867,8 +867,8 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       </section>
 
       {/* Movement history */}
-      <section className="rounded-sm border border-border bg-card overflow-hidden">
-        <div className="px-4 py-2 border-b border-border bg-muted/40">
+      <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
+        <div className="px-4 py-2 border-b border-[color:var(--ds-border-warm)] bg-muted/40">
           <h3 className="text-sm font-semibold text-primary">Recent movements</h3>
         </div>
         {movements.length === 0 ? (

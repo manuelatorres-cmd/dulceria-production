@@ -161,8 +161,8 @@ export function AllocationSplitModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
-      <div className="relative w-full max-w-lg rounded-sm border border-border bg-card shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3 border-b border-border">
+      <div className="relative w-full max-w-lg rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
+        <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)]">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-foreground">
               Split yield across orders
@@ -218,7 +218,7 @@ export function AllocationSplitModal({
                   <button
                     type="button"
                     onClick={() => setFor(r.key, v - 1)}
-                    className="w-7 h-7 rounded-sm border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
+                    className="w-7 h-7 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
                   >
                     &minus;
                   </button>
@@ -231,12 +231,12 @@ export function AllocationSplitModal({
                       const n = parseInt(e.target.value, 10);
                       setFor(r.key, isNaN(n) ? 0 : n);
                     }}
-                    className="flex-1 h-8 rounded-md border border-border bg-card text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="flex-1 h-8 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
                     type="button"
                     onClick={() => setFor(r.key, v + 1)}
-                    className="w-7 h-7 rounded-sm border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
+                    className="w-7 h-7 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] flex items-center justify-center text-muted-foreground hover:text-foreground text-sm"
                   >
                     +
                   </button>
@@ -255,7 +255,7 @@ export function AllocationSplitModal({
         <div className={`px-5 py-3 border-t space-y-2 ${
           needsDestination
             ? "bg-amber-50 border-amber-300"
-            : "bg-muted/20 border-border"
+            : "bg-muted/20 border-[color:var(--ds-border-warm)]"
         }`}>
           <div className="flex items-center justify-between">
             <span className={`text-sm font-medium flex items-center gap-1.5 ${needsDestination ? "text-amber-900" : ""}`}>
@@ -297,11 +297,11 @@ export function AllocationSplitModal({
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-border flex justify-end gap-2">
+        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-sm border border-border px-4 py-2 text-sm"
+            className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
           >
             Back
           </button>
@@ -332,7 +332,7 @@ function DestinationChoice({ icon, label, active, onClick }: {
       className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-xs ${
         active
           ? "bg-primary text-primary-foreground border-primary"
-          : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+          : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary"
       }`}
     >
       {icon}

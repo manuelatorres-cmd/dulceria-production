@@ -28,7 +28,7 @@ export function WorkshopActions() {
   return (
     <>
       <div
-        className="border border-border bg-card p-4"
+        className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
         style={{ borderRadius: 4 }}
       >
         <h3
@@ -62,7 +62,7 @@ function ActionBtn({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="border border-border bg-muted hover:bg-card hover:border-foreground px-2 py-2 text-[11.5px] text-left"
+      className="border border-[color:var(--ds-border-warm)] bg-muted hover:bg-card hover:border-foreground px-2 py-2 text-[11.5px] text-left"
       style={{
         borderRadius: 3,
         fontFamily: "var(--font-serif)",
@@ -90,10 +90,10 @@ function ModalShell({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
       <div
-        className="relative w-full max-w-md mx-4 border border-border bg-card shadow-xl"
+        className="relative w-full max-w-md mx-4 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl"
         style={{ borderRadius: 4 }}
       >
-        <header className="px-5 pt-4 pb-3 border-b border-border">
+        <header className="px-5 pt-4 pb-3 border-b border-[color:var(--ds-border-warm)]">
           <h3
             className="text-[16px]"
             style={{
@@ -106,7 +106,7 @@ function ModalShell({
           </h3>
         </header>
         <div className="px-5 py-4 space-y-3">{children}</div>
-        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
+        <footer className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2">
           {footer ?? (
             <button type="button" onClick={onClose} className="btn-secondary">
               Close
@@ -372,7 +372,7 @@ function ContaminateModal({ onClose }: { onClose: () => void }) {
               "flex-1 border px-3 py-1.5 text-[12px] capitalize " +
               (decision === d
                 ? "bg-foreground text-background border-foreground"
-                : "bg-card border-border hover:border-foreground")
+                : "bg-card border-[color:var(--ds-border-warm)] hover:border-foreground")
             }
             style={{ borderRadius: 3 }}
           >

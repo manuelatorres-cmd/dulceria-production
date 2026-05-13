@@ -71,7 +71,7 @@ export function ClockInWidget({ date, linkedPlanId, defaultLocation = "productio
   ).length;
 
   return (
-    <div className="rounded-sm border border-border bg-card px-4 py-3">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-3">
       <div className="flex items-baseline justify-between mb-2">
         <span className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold">
           On shift
@@ -108,7 +108,7 @@ export function ClockInWidget({ date, linkedPlanId, defaultLocation = "productio
                 <button
                   type="button"
                   onClick={() => shift.id && stopShift(shift.id)}
-                  className="text-xs px-2.5 py-0.5 rounded-sm border border-border bg-card hover:bg-muted"
+                  className="text-xs px-2.5 py-0.5 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:bg-muted"
                 >
                   Stop
                 </button>
@@ -116,7 +116,7 @@ export function ClockInWidget({ date, linkedPlanId, defaultLocation = "productio
                 <button
                   type="button"
                   onClick={() => person.id && startShift(person.id)}
-                  className="text-xs px-2.5 py-0.5 rounded-sm border border-border bg-accent/20 hover:bg-accent/40"
+                  className="text-xs px-2.5 py-0.5 rounded-sm border border-[color:var(--ds-border-warm)] bg-accent/20 hover:bg-accent/40"
                 >
                   Start
                 </button>

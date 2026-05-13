@@ -165,14 +165,14 @@ export default function ProductionOrderDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4">
         {/* Main fields */}
-        <section className="space-y-3 rounded-[6px] border border-border bg-card/80 p-4">
+        <section className="space-y-3 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]/80 p-4">
           <div className="flex justify-end items-center gap-1.5 -mb-1">
             {editing ? (
               <>
                 <button onClick={save} disabled={saving} className="rounded-full bg-foreground text-background px-3 py-1 text-[11.5px] font-medium disabled:opacity-50">
                   {saving ? "Saving…" : "Save"}
                 </button>
-                <button onClick={cancelEdit} className="rounded-full border border-border px-3 py-1 text-[11.5px]">
+                <button onClick={cancelEdit} className="rounded-full border border-[color:var(--ds-border-warm)] px-3 py-1 text-[11.5px]">
                   Cancel
                 </button>
               </>
@@ -190,7 +190,7 @@ export default function ProductionOrderDetailPage({
                     Mark done
                   </button>
                 )}
-                <button onClick={() => setEditing(true)} className="rounded-full border border-border px-3 py-1 text-[11.5px] hover:border-foreground">
+                <button onClick={() => setEditing(true)} className="rounded-full border border-[color:var(--ds-border-warm)] px-3 py-1 text-[11.5px] hover:border-foreground">
                   Edit
                 </button>
               </>
@@ -295,7 +295,7 @@ export default function ProductionOrderDetailPage({
             )}
           </Field>
 
-          <div className="flex justify-between items-center pt-2 border-t border-border">
+          <div className="flex justify-between items-center pt-2 border-t border-[color:var(--ds-border-warm)]">
             <span />
             {confirmDelete ? (
               <span className="flex items-center gap-2 text-[11.5px]">
@@ -323,7 +323,7 @@ export default function ProductionOrderDetailPage({
         </section>
 
         {/* Items */}
-        <aside className="rounded-[6px] border border-border bg-card/80 p-4">
+        <aside className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]/80 p-4">
           <h3
             className="text-[13px] mb-2"
             style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
@@ -346,7 +346,7 @@ export default function ProductionOrderDetailPage({
                 return (
                   <li
                     key={it.id}
-                    className="flex items-baseline justify-between gap-2 rounded-[10px] border border-border bg-muted/30 px-3 py-1.5"
+                    className="flex items-baseline justify-between gap-2 rounded-[10px] border border-[color:var(--ds-border-warm)] bg-muted/30 px-3 py-1.5"
                   >
                     <span style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 13.5 }}>
                       {product?.name ?? "—"}
@@ -363,7 +363,7 @@ export default function ProductionOrderDetailPage({
               {items.map((it) => (
                 <li
                   key={it.id}
-                  className="grid items-center gap-2 rounded-[10px] border border-border bg-muted/30 px-3 py-2"
+                  className="grid items-center gap-2 rounded-[10px] border border-[color:var(--ds-border-warm)] bg-muted/30 px-3 py-2"
                   style={{ gridTemplateColumns: "1fr 110px 32px" }}
                 >
                   <select
@@ -447,7 +447,7 @@ function LinkedBatches({
   );
   if (linked.length === 0) {
     return (
-      <section className="mt-4 rounded-[6px] border border-border bg-card/80 p-4">
+      <section className="mt-4 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]/80 p-4">
         <h3
           className="text-[13px] mb-1.5"
           style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
@@ -481,7 +481,7 @@ function LinkedBatches({
   }
 
   return (
-    <section className="mt-4 rounded-[6px] border border-border bg-card/80 p-4">
+    <section className="mt-4 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]/80 p-4">
       <div className="flex items-baseline justify-between mb-2">
         <h3
           className="text-[13px]"
@@ -605,7 +605,7 @@ function ProductPicker({
   }
 
   return (
-    <div className="rounded-[10px] border border-border bg-card/60 p-3 space-y-2">
+    <div className="rounded-[10px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]/60 p-3 space-y-2">
       <div className="flex items-center gap-2">
         <input
           type="search"
@@ -630,7 +630,7 @@ function ProductPicker({
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize transition-colors ${
                   active
                     ? "bg-accent text-accent-foreground"
-                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {c.name}
@@ -654,7 +654,7 @@ function ProductPicker({
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                   active
                     ? "bg-[var(--accent-lilac-bg)] text-[var(--accent-lilac-ink)]"
-                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {t}
@@ -663,7 +663,7 @@ function ProductPicker({
           })}
         </div>
       )}
-      <ul className="max-h-[40vh] overflow-y-auto rounded-[8px] border border-border bg-card divide-y divide-border">
+      <ul className="max-h-[40vh] overflow-y-auto rounded-[8px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
         {visible.length === 0 ? (
           <li className="px-3 py-2 text-sm text-muted-foreground italic">No products match.</li>
         ) : (

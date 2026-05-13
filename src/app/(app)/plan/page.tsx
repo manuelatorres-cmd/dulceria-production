@@ -36,7 +36,7 @@ import {
    /plan and /dashboard read as one family. See feedback_design_direction
    (dashboard exception, 2026-04-24). */
 const CARD = "bg-[color:var(--ds-card-bg)] border-[0.5px] border-[color:var(--ds-border-warm)] rounded-[8px] p-4";
-const INNER = "rounded-[12px] border border-border";
+const INNER = "rounded-[12px] border border-[color:var(--ds-border-warm)]";
 
 /** Render Error / Supabase / unknown into a single human-readable line.
  *  PostgREST errors aren't Error instances; rendering them via err.message
@@ -1581,7 +1581,7 @@ function WeekView(props: {
           </div>
           <DayDrop date={d.date}>
             <div
-              className="rounded-[12px] border border-dashed border-border text-center py-4 text-[10.5px] text-muted-foreground"
+              className="rounded-[12px] border border-dashed border-[color:var(--ds-border-warm)] text-center py-4 text-[10.5px] text-muted-foreground"
               style={{
                 backgroundImage: "repeating-linear-gradient(45deg, rgba(0,0,0,0.02), rgba(0,0,0,0.02) 6px, rgba(0,0,0,0.04) 6px, rgba(0,0,0,0.04) 12px)",
               }}
@@ -1788,7 +1788,7 @@ function WeekView(props: {
               </button>
               <button
                 onClick={() => setPendingDrop(null)}
-                className="rounded-full border border-border px-4 py-1.5 text-[12px]"
+                className="rounded-full border border-[color:var(--ds-border-warm)] px-4 py-1.5 text-[12px]"
               >
                 Cancel
               </button>
@@ -2882,7 +2882,7 @@ function DemandByUrgency({
                 "text-[11px] px-2.5 py-0.5 rounded-full border transition " +
                 (active
                   ? "bg-foreground text-background border-foreground"
-                  : "bg-card border-border text-foreground hover:border-foreground")
+                  : "bg-card border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
               }
               style={!active && tint ? { background: tint.bg, color: tint.ink, borderColor: tint.bg } : undefined}
             >
@@ -3116,7 +3116,7 @@ function GroupedWarnings({ warnings }: { warnings: string[] }) {
               {g.names.slice(0, 12).map((n) => (
                 <span
                   key={n}
-                  className="rounded-full bg-card border border-border px-2 py-0.5 text-[10.5px] text-foreground"
+                  className="rounded-full bg-card border border-[color:var(--ds-border-warm)] px-2 py-0.5 text-[10.5px] text-foreground"
                 >
                   {n}
                 </span>
@@ -4606,21 +4606,21 @@ function MonthView(props: {
           <button
             type="button"
             onClick={() => setMonthOffset((m) => m - 1)}
-            className="text-[11px] px-2 py-0.5 rounded-full border border-border hover:bg-muted/40"
+            className="text-[11px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] hover:bg-muted/40"
           >
             ‹ prev
           </button>
           <button
             type="button"
             onClick={() => setMonthOffset(0)}
-            className="text-[11px] px-2 py-0.5 rounded-full border border-border hover:bg-muted/40"
+            className="text-[11px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] hover:bg-muted/40"
           >
             today
           </button>
           <button
             type="button"
             onClick={() => setMonthOffset((m) => m + 1)}
-            className="text-[11px] px-2 py-0.5 rounded-full border border-border hover:bg-muted/40"
+            className="text-[11px] px-2 py-0.5 rounded-full border border-[color:var(--ds-border-warm)] hover:bg-muted/40"
           >
             next ›
           </button>

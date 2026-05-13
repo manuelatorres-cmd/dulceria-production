@@ -139,7 +139,7 @@ export default function ShopCounterPage() {
                       ? "bg-foreground text-background border-foreground"
                       : done
                         ? "bg-[color:var(--accent-terracotta-bg)] border-[color:var(--accent-terracotta-ink)] text-[color:var(--accent-terracotta-ink)]"
-                        : "bg-card text-muted-foreground border-border")
+                        : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)]")
                   }
                   style={{ borderRadius: 999 }}
                 >
@@ -171,7 +171,7 @@ export default function ShopCounterPage() {
       {/* Step 1 — size */}
       {step === 1 ? (
         <section
-          className="border border-border bg-card p-6"
+          className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6"
           style={{ borderRadius: 4 }}
         >
           <h2
@@ -194,7 +194,7 @@ export default function ShopCounterPage() {
                   "text-center border transition-colors " +
                   (boxSize === size
                     ? "bg-foreground text-background border-foreground"
-                    : "bg-card text-foreground border-border hover:border-foreground")
+                    : "bg-card text-foreground border-[color:var(--ds-border-warm)] hover:border-foreground")
                 }
                 style={{
                   borderRadius: 4,
@@ -247,7 +247,7 @@ export default function ShopCounterPage() {
       {/* Step 2 — bonbons */}
       {step === 2 ? (
         <section
-          className="border border-border bg-card p-6"
+          className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6"
           style={{ borderRadius: 4 }}
         >
           <div className="flex items-baseline justify-between mb-4">
@@ -316,7 +316,7 @@ export default function ShopCounterPage() {
       {/* Step 3 — review */}
       {step === 3 ? (
         <section
-          className="border border-border bg-card p-6"
+          className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6"
           style={{ borderRadius: 4 }}
         >
           <h2
@@ -352,7 +352,7 @@ export default function ShopCounterPage() {
       {/* Step 4 — print */}
       {step === 4 ? (
         <section
-          className="border border-border bg-card p-6 text-center"
+          className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6 text-center"
           style={{ borderRadius: 4 }}
         >
           <h2
@@ -417,8 +417,8 @@ function BonbonCard({
         (picked > 0
           ? "border-foreground bg-card"
           : outOfStock
-            ? "border-border bg-card opacity-50"
-            : "border-border bg-card hover:border-foreground")
+            ? "border-[color:var(--ds-border-warm)] bg-card opacity-50"
+            : "border-[color:var(--ds-border-warm)] bg-card hover:border-foreground")
       }
       style={{ borderRadius: 4 }}
     >
@@ -450,7 +450,7 @@ function BonbonCard({
           type="button"
           onClick={onRemove}
           disabled={picked === 0}
-          className="w-7 h-7 border border-border disabled:opacity-30 hover:border-foreground text-foreground"
+          className="w-7 h-7 border border-[color:var(--ds-border-warm)] disabled:opacity-30 hover:border-foreground text-foreground"
           style={{ borderRadius: 2 }}
         >
           −
@@ -459,7 +459,7 @@ function BonbonCard({
           type="button"
           onClick={onAdd}
           disabled={disabled || atLimit || outOfStock}
-          className="w-7 h-7 border border-border disabled:opacity-30 hover:border-foreground text-foreground"
+          className="w-7 h-7 border border-[color:var(--ds-border-warm)] disabled:opacity-30 hover:border-foreground text-foreground"
           style={{ borderRadius: 2 }}
         >
           +
@@ -540,7 +540,7 @@ function ReviewPanel({
       <div>
         <h4 className="label">Label preview</h4>
         <div
-          className="border border-border bg-[color:var(--color-muted)] px-4 py-3 text-[10.5px] leading-relaxed"
+          className="border border-[color:var(--ds-border-warm)] bg-[color:var(--color-muted)] px-4 py-3 text-[10.5px] leading-relaxed"
           style={{ fontFamily: '"Courier New",monospace', borderRadius: 3 }}
         >
           <div
@@ -554,14 +554,14 @@ function ReviewPanel({
             Dulceria · Pralinenauswahl
           </div>
           <div>Dulceria GmbH · 1010 Wien · Austria</div>
-          <div className="border-t border-dashed my-2 border-border" />
+          <div className="border-t border-dashed my-2 border-[color:var(--ds-border-warm)]" />
           <div>
             <strong>Inhalt:</strong>{" "}
             {entries
               .map((e) => `${e.qty}× ${e.product?.name ?? ""}`)
               .join(", ")}
           </div>
-          <div className="border-t border-dashed my-2 border-border" />
+          <div className="border-t border-dashed my-2 border-[color:var(--ds-border-warm)]" />
           {allergens.size > 0 ? (
             <div>
               <strong>Allergene:</strong>{" "}
@@ -575,7 +575,7 @@ function ReviewPanel({
               übernommen.
             </div>
           )}
-          <div className="border-t border-dashed my-2 border-border" />
+          <div className="border-t border-dashed my-2 border-[color:var(--ds-border-warm)]" />
           <div>MHD: {futureDate(28)} · Charge: C-{batchStamp()}</div>
           <div>Nettogewicht: {totalWeight} g · kühl &amp; trocken lagern</div>
         </div>

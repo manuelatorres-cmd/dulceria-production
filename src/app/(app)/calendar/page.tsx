@@ -23,7 +23,7 @@ import { BackButton } from "@/components/back-button";
  */
 
 const CARD = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[8px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
-const INNER = "rounded-[12px] border border-border";
+const INNER = "rounded-[12px] border border-[color:var(--ds-border-warm)]";
 
 type MarkerKind = "campaign" | "closure" | "holiday" | "production" | "order";
 interface Marker {
@@ -170,20 +170,20 @@ export default function CalendarPage() {
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={() => shiftMonth(-1)}
-            className="rounded-full border border-border bg-card w-8 h-8 flex items-center justify-center hover:border-foreground/30"
+            className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] w-8 h-8 flex items-center justify-center hover:border-foreground/30"
             aria-label="Previous month"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={() => { setFocusYear(today.getFullYear()); setFocusMonth(today.getMonth()); setSelectedIso(todayIso); }}
-            className="rounded-full border border-border bg-card px-3 h-8 text-[12px] hover:border-foreground/30"
+            className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 h-8 text-[12px] hover:border-foreground/30"
           >
             Today
           </button>
           <button
             onClick={() => shiftMonth(1)}
-            className="rounded-full border border-border bg-card w-8 h-8 flex items-center justify-center hover:border-foreground/30"
+            className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] w-8 h-8 flex items-center justify-center hover:border-foreground/30"
             aria-label="Next month"
           >
             <ChevronRight className="w-4 h-4" />
@@ -341,7 +341,7 @@ function MonthGrid({
                   ? "border-foreground bg-card"
                   : isToday
                   ? "border-[var(--accent-terracotta-ink)]/60 bg-card"
-                  : "border-border bg-muted/30 hover:bg-muted/50"
+                  : "border-[color:var(--ds-border-warm)] bg-muted/30 hover:bg-muted/50"
               }`}
               title={list.map((m) => `${MARKER_LABEL[m.kind]}: ${m.label}`).join(" · ") || undefined}
             >

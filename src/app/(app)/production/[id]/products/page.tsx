@@ -196,7 +196,7 @@ function FillingProductCard({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   return (
-    <div className="rounded-sm border border-border bg-card overflow-hidden">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
       {/* Header */}
       <div className="flex justify-between items-start px-3 pt-3 pb-2 bg-primary/8">
         <div>
@@ -213,7 +213,7 @@ function FillingProductCard({
 
       {/* Shared breakdown — which products use this filling */}
       {cl.shared && (
-        <div className="border-t border-border px-3 py-2 bg-muted/30">
+        <div className="border-t border-[color:var(--ds-border-warm)] px-3 py-2 bg-muted/30">
           <p className="text-xs font-medium text-muted-foreground mb-1">Used in</p>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5">
             {cl.usedBy.map((u) => (
@@ -227,7 +227,7 @@ function FillingProductCard({
 
       {/* Ingredient list */}
       {cl.scaledIngredients.length > 0 ? (
-        <ul className="border-t border-border">
+        <ul className="border-t border-[color:var(--ds-border-warm)]">
           {cl.scaledIngredients.map((si, idx) => {
             const ing = ingredientsMap.get(si.ingredientId);
             const active = hoveredId === si.ingredientId;
@@ -236,7 +236,7 @@ function FillingProductCard({
                 key={idx}
                 onMouseEnter={() => setHoveredId(si.ingredientId)}
                 onMouseLeave={() => setHoveredId(null)}
-                className={`flex items-baseline gap-2 px-3 py-2 border-b border-border last:border-b-0 transition-colors ${
+                className={`flex items-baseline gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)] last:border-b-0 transition-colors ${
                   active ? "bg-muted" : ""
                 }`}
               >
@@ -262,14 +262,14 @@ function FillingProductCard({
           })}
         </ul>
       ) : (
-        <p className="px-3 pb-3 text-xs text-muted-foreground border-t border-border pt-2">
+        <p className="px-3 pb-3 text-xs text-muted-foreground border-t border-[color:var(--ds-border-warm)] pt-2">
           No ingredients recorded for this filling.
         </p>
       )}
 
       {/* Instructions — always visible if present */}
       {filling?.instructions?.trim() && (
-        <div className="border-t border-border px-3 py-3">
+        <div className="border-t border-[color:var(--ds-border-warm)] px-3 py-3">
           <p className="text-xs font-medium text-muted-foreground mb-1">Instructions</p>
           <StepList text={filling.instructions} className="text-foreground leading-relaxed" />
         </div>

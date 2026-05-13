@@ -289,7 +289,7 @@ function NewQuotePageInner() {
         </Link>
 
         {/* Header */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="label">Title</label>
@@ -361,19 +361,19 @@ function NewQuotePageInner() {
         </section>
 
         {/* Line items */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-primary">Line items</h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={addProductLine}
-                className="inline-flex items-center gap-1 rounded-sm border border-border px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
+                className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
               >
                 <Plus className="w-3 h-3" /> Product
               </button>
               <button
                 onClick={addBoxLine}
-                className="inline-flex items-center gap-1 rounded-sm border border-border px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
+                className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
               >
                 <Package className="w-3 h-3" /> Box
               </button>
@@ -386,7 +386,7 @@ function NewQuotePageInner() {
           ) : (
             <ul className="space-y-2">
               {lines.map((line, i) => (
-                <li key={i} className="rounded-md border border-border bg-background p-3 space-y-2">
+                <li key={i} className="rounded-md border border-[color:var(--ds-border-warm)] bg-background p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-medium text-muted-foreground uppercase">
                       {line.kind === "box" ? "Box line" : "Product line"}
@@ -512,18 +512,18 @@ function NewQuotePageInner() {
         </section>
 
         {/* Pricing */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <h2 className="text-sm font-semibold text-primary">Pricing</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPriceMode("margin")}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${priceMode === "margin" ? "bg-accent text-accent-foreground" : "border border-border text-muted-foreground"}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${priceMode === "margin" ? "bg-accent text-accent-foreground" : "border border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
             >
               Target margin %
             </button>
             <button
               onClick={() => setPriceMode("price")}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${priceMode === "price" ? "bg-accent text-accent-foreground" : "border border-border text-muted-foreground"}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${priceMode === "price" ? "bg-accent text-accent-foreground" : "border border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
             >
               Total sell price
             </button>
@@ -555,7 +555,7 @@ function NewQuotePageInner() {
           )}
 
           {/* Breakdown */}
-          <div className="rounded-md border border-border bg-background p-3 space-y-1.5 text-sm">
+          <div className="rounded-md border border-[color:var(--ds-border-warm)] bg-background p-3 space-y-1.5 text-sm">
             <Row label="Ingredients + decoration" value={`€${pricing.breakdown.ingredientsCost.toFixed(2)}`} />
             {pricing.breakdown.packagingCost > 0 && (
               <Row label="Packaging" value={`€${pricing.breakdown.packagingCost.toFixed(2)}`} />
@@ -563,10 +563,10 @@ function NewQuotePageInner() {
             {pricing.breakdown.labourCost > 0 && (
               <Row label={`Labour (${labourHoursNum}h × €${labourRate.toFixed(2)})`} value={`€${pricing.breakdown.labourCost.toFixed(2)}`} />
             )}
-            <div className="border-t border-border pt-1.5">
+            <div className="border-t border-[color:var(--ds-border-warm)] pt-1.5">
               <Row label="Total cost" value={`€${pricing.breakdown.totalCost.toFixed(2)}`} strong />
             </div>
-            <div className="border-t border-border pt-1.5">
+            <div className="border-t border-[color:var(--ds-border-warm)] pt-1.5">
               <Row label="Sell price" value={`€${pricing.sellPrice.toFixed(2)}`} strong />
               <Row
                 label="Margin"
@@ -607,7 +607,7 @@ function NewQuotePageInner() {
         )}
 
         {/* Notes + save */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div>
             <label className="label">Internal notes (not shown to the customer)</label>
             <textarea
@@ -621,7 +621,7 @@ function NewQuotePageInner() {
             <button
               onClick={() => handleSave("draft")}
               disabled={!canSave}
-              className="rounded-sm border border-border bg-card px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               Save as draft
             </button>

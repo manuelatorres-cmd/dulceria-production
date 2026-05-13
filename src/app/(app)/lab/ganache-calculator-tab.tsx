@@ -92,7 +92,7 @@ export function GanacheCalculatorTab() {
 
   if (ingredients.length === 0) {
     return (
-      <div className="rounded-sm border border-border bg-card px-4 py-6 max-w-md">
+      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-6 max-w-md">
         <p className="text-sm text-muted-foreground">
           No ingredients in your pantry yet. Add ingredients (with composition % filled in) on the{" "}
           <Link href="/ingredients" className="text-primary underline">Ingredients</Link> page first, then come back here.
@@ -115,8 +115,8 @@ export function GanacheCalculatorTab() {
             </button>
           </div>
 
-          <div className="rounded-sm border border-border bg-card overflow-hidden">
-            <div className="grid grid-cols-[1fr_88px_72px_88px_28px] gap-2 px-3 py-2 border-b border-border bg-muted/40 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+          <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
+            <div className="grid grid-cols-[1fr_88px_72px_88px_28px] gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)] bg-muted/40 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
               <div>Ingredient</div>
               <div className="text-right">Grams</div>
               <div className="text-right">% of mix</div>
@@ -131,7 +131,7 @@ export function GanacheCalculatorTab() {
               return (
                 <div
                   key={idx}
-                  className={`grid grid-cols-[1fr_88px_72px_88px_28px] gap-2 px-3 py-2 border-b border-border/50 last:border-b-0 items-center ${missing ? "bg-status-alert-bg/15" : ""}`}
+                  className={`grid grid-cols-[1fr_88px_72px_88px_28px] gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)]/50 last:border-b-0 items-center ${missing ? "bg-status-alert-bg/15" : ""}`}
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
                     <select
@@ -194,7 +194,7 @@ export function GanacheCalculatorTab() {
           <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
             Composition
           </h2>
-          <div className="rounded-sm border border-border bg-card divide-y divide-border/60">
+          <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border/60">
             {COMPONENT_ORDER.map((comp) => (
               <ComponentRow key={comp} comp={comp} value={breakdown.percent[comp]} />
             ))}
@@ -229,7 +229,7 @@ export function GanacheCalculatorTab() {
               recipe = {breakdown.totalGrams.toFixed(0)} g
             </span>
           </div>
-          <div className="rounded-sm border border-border bg-card p-4 space-y-2">
+          <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-2">
             <label className="label">Make today</label>
             <div className="flex items-center gap-2">
               <input
@@ -281,7 +281,7 @@ export function GanacheCalculatorTab() {
               <span>All bands within ideal range. Good balance.</span>
             </div>
           ) : issues.length === 0 ? (
-            <div className="rounded-sm border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-3 text-sm text-muted-foreground">
               Add ingredients with weights to see issues.
             </div>
           ) : (
@@ -370,7 +370,7 @@ function BandBar({
 function VerdictCard({ severity, totalG, hint }: { severity: Severity; totalG: number; hint: ReturnType<typeof shelfHint> }) {
   if (totalG === 0) {
     return (
-      <div className="rounded-sm border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-3 text-sm text-muted-foreground">
         Add ingredients to start balancing.
       </div>
     );
@@ -410,7 +410,7 @@ function SuggestionRow({ suggestion, onApply }: { suggestion: Suggestion; onAppl
   const sign = adding ? "+" : "−";
   const magnitude = Math.abs(suggestion.deltaG);
   return (
-    <li className="rounded-sm border border-border bg-card px-3 py-2.5 flex items-start gap-2">
+    <li className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5 flex items-start gap-2">
       <Wand2 className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
       <div className="min-w-0 flex-1">
         <p className="text-sm">
@@ -423,7 +423,7 @@ function SuggestionRow({ suggestion, onApply }: { suggestion: Suggestion; onAppl
       </div>
       <button
         onClick={onApply}
-        className="flex-shrink-0 text-xs px-2 py-1 rounded-sm border border-border hover:bg-muted transition-colors"
+        className="flex-shrink-0 text-xs px-2 py-1 rounded-sm border border-[color:var(--ds-border-warm)] hover:bg-muted transition-colors"
       >
         Apply
       </button>
@@ -437,7 +437,7 @@ function IssueRow({ issue }: { issue: ReturnType<typeof validateGanache>[number]
       ? "border-status-alert-edge bg-status-alert-bg/30"
       : issue.severity === "warn"
       ? "border-status-warn-edge bg-status-warn-bg/30"
-      : "border-border bg-card";
+      : "border-[color:var(--ds-border-warm)] bg-card";
   const Icon = issue.severity === "bad" ? AlertCircle : issue.severity === "warn" ? AlertTriangle : CheckCircle2;
   const iconTone = issue.severity === "bad" ? "text-status-alert" : issue.severity === "warn" ? "text-status-warn" : "text-status-ok";
 

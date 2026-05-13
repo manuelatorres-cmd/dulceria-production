@@ -99,7 +99,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1 rounded-sm border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
+              className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
             >
               <Printer className="w-3.5 h-3.5" /> Print / PDF
             </button>
@@ -115,7 +115,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             {quote.convertedToOrderId && (
               <Link
                 href={`/orders/${encodeURIComponent(quote.convertedToOrderId)}?from=quotes&fromId=${encodeURIComponent(id)}`}
-                className="inline-flex items-center gap-1 rounded-sm border border-border px-3 py-1.5 text-xs text-primary hover:border-primary"
+                className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-xs text-primary hover:border-primary"
               >
                 View order →
               </Link>
@@ -183,7 +183,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               className={`rounded-full px-3 py-1 text-xs font-medium ${
                 quote.status === s
                   ? "bg-primary text-primary-foreground"
-                  : "border border-border text-muted-foreground"
+                  : "border border-[color:var(--ds-border-warm)] text-muted-foreground"
               }`}
             >
               {QUOTE_STATUS_LABELS[s]}
@@ -192,7 +192,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
         </section>
 
         {/* Printable sheet — everything below prints */}
-        <div id="quote-sheet" className="rounded-sm border border-border bg-card p-6 space-y-5 print:border-0 print:shadow-none print:p-0">
+        <div id="quote-sheet" className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6 space-y-5 print:border-0 print:shadow-none print:p-0">
           {/* Letterhead */}
           <div className="flex items-start justify-between">
             <div>
@@ -229,7 +229,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
             <h2 className="text-sm font-semibold text-primary mb-2">Line items</h2>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-[color:var(--ds-border-warm)] text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                   <th className="py-1.5">Item</th>
                   <th className="py-1.5 text-right w-20">Qty</th>
                   <th className="py-1.5 text-right w-28">Unit cost</th>
@@ -238,7 +238,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               </thead>
               <tbody>
                 {(quote.costBreakdown?.perLine ?? []).map((row, i) => (
-                  <tr key={i} className="border-b border-border/50">
+                  <tr key={i} className="border-b border-[color:var(--ds-border-warm)]/50">
                     <td className="py-1.5">
                       {row.productId
                         ? (productById.get(row.productId)?.name ?? row.label)
@@ -283,7 +283,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               {quote.marginPercent != null && (
                 <TotalRow label={`Margin (${quote.marginPercent.toFixed(0)}%)`} value={`€${((quote.sellPrice ?? 0) - quote.costBreakdown.totalCost).toFixed(2)}`} />
               )}
-              <div className="border-t border-border pt-1.5">
+              <div className="border-t border-[color:var(--ds-border-warm)] pt-1.5">
                 <TotalRow label="Total" value={`€${(quote.sellPrice ?? 0).toFixed(2)}`} strong />
               </div>
             </div>
@@ -306,7 +306,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           {/* Footer */}
-          <div className="pt-3 border-t border-border text-[11px] text-muted-foreground">
+          <div className="pt-3 border-t border-[color:var(--ds-border-warm)] text-[11px] text-muted-foreground">
             <p>Prices exclude VAT unless stated otherwise. Production capacity reserved only on acceptance.</p>
           </div>
         </div>

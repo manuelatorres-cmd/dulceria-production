@@ -403,7 +403,7 @@ export default function ShoppingPage() {
 
             {/* Add item */}
             {showAddForm ? (
-              <form onSubmit={handleAddItem} className="rounded-sm border border-border bg-card p-3 space-y-2">
+              <form onSubmit={handleAddItem} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2">
                 <div>
                   <input
                     type="text"
@@ -479,7 +479,7 @@ export default function ShoppingPage() {
                 {orderedExpanded && (
                   <ul className="space-y-1.5 ml-6">
                     {orderedIngredients.map((ing) => (
-                      <li key={ing.id} className="flex items-center gap-3 rounded-sm border border-border bg-card px-3 py-2.5">
+                      <li key={ing.id} className="flex items-center gap-3 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
                         <div className="w-2 h-2 rounded-full bg-status-ok-edge shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{ing.name}</p>
@@ -488,14 +488,14 @@ export default function ShoppingPage() {
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => unorderIngredient(ing.id!)}
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-full px-2.5 py-1.5 transition-colors"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 transition-colors"
                             title="Move back to needs ordering"
                           >
                             Undo order
                           </button>
                           <button
                             onClick={() => setIngredientLowStock(ing.id!, false)}
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-full px-2.5 py-1.5 transition-colors"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 transition-colors"
                             title="Mark as restocked — remove from list"
                           >
                             <Check className="w-3 h-3" /> Restocked
@@ -504,7 +504,7 @@ export default function ShoppingPage() {
                       </li>
                     ))}
                     {orderedPackaging.map((pkg) => (
-                      <li key={pkg.id} className="flex items-center gap-3 rounded-sm border border-border bg-card px-3 py-2.5">
+                      <li key={pkg.id} className="flex items-center gap-3 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
                         <div className="w-2 h-2 rounded-full bg-status-ok-edge shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{pkg.name}</p>
@@ -513,14 +513,14 @@ export default function ShoppingPage() {
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => unorderPackaging(pkg.id!)}
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-full px-2.5 py-1.5 transition-colors"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 transition-colors"
                             title="Move back to needs ordering"
                           >
                             Undo order
                           </button>
                           <button
                             onClick={() => setPackagingLowStock(pkg.id!, false)}
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-full px-2.5 py-1.5 transition-colors"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 transition-colors"
                             title="Mark as restocked — remove from list"
                           >
                             <Check className="w-3 h-3" /> Restocked
@@ -529,7 +529,7 @@ export default function ShoppingPage() {
                       </li>
                     ))}
                     {orderedMaterials.map((m) => (
-                      <li key={m.id} className="flex items-center gap-3 rounded-sm border border-border bg-card px-3 py-2.5">
+                      <li key={m.id} className="flex items-center gap-3 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
                         <span
                           className="w-2 h-2 rounded-full shrink-0 border border-black/10"
                           style={{ backgroundColor: m.color ?? "#86efac" }}
@@ -541,14 +541,14 @@ export default function ShoppingPage() {
                         <div className="flex items-center gap-1.5 shrink-0">
                           <button
                             onClick={() => unorderDecorationMaterial(m.id!)}
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-full px-2.5 py-1.5 transition-colors"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 transition-colors"
                             title="Move back to needs ordering"
                           >
                             Undo order
                           </button>
                           <button
                             onClick={() => setDecorationMaterialLowStock(m.id!, false)}
-                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-full px-2.5 py-1.5 transition-colors"
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 transition-colors"
                             title="Mark as restocked — remove from list"
                           >
                             <Check className="w-3 h-3" /> Restocked
@@ -557,7 +557,7 @@ export default function ShoppingPage() {
                       </li>
                     ))}
                     {orderedItems.map((item) => (
-                      <li key={item.id} className="flex items-center gap-3 rounded-sm border border-border bg-card px-3 py-2.5">
+                      <li key={item.id} className="flex items-center gap-3 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
                         <div className="w-2 h-2 rounded-full bg-status-ok-edge shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{item.name}</p>
@@ -686,7 +686,7 @@ function PlannedDemandSection() {
       )}
 
       {shortfalls.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
           You have enough stock for every open order.
         </p>
       ) : (
@@ -760,8 +760,8 @@ function ShortageBySupplier({
       {groups.map(([vendor, rows]) => {
         const vendorTotal = rows.reduce((s, r) => s + (r.subtotal ?? 0), 0);
         return (
-          <div key={vendor} className="rounded-sm border border-border bg-card overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border">
+          <div key={vendor} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)]">
               <h3
                 className="text-[13px]"
                 style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
@@ -773,7 +773,7 @@ function ShortageBySupplier({
               </h3>
               <span className="text-[11px] tabular-nums font-medium">≈ {fmt(vendorTotal)}</span>
             </div>
-            <div className="hidden sm:flex items-center px-3 py-1 text-[10px] uppercase tracking-[0.06em] text-muted-foreground bg-muted/20 border-b border-border">
+            <div className="hidden sm:flex items-center px-3 py-1 text-[10px] uppercase tracking-[0.06em] text-muted-foreground bg-muted/20 border-b border-[color:var(--ds-border-warm)]">
               <span className="flex-1">Ingredient</span>
               <span className="w-20 text-right">Short</span>
               <span className="w-24 text-right">Buy</span>
@@ -787,7 +787,7 @@ function ShortageBySupplier({
           </div>
         );
       })}
-      <div className="flex items-center justify-between px-3 py-2 rounded-sm border border-border bg-muted/30">
+      <div className="flex items-center justify-between px-3 py-2 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/30">
         <span className="text-[12px] uppercase tracking-[0.08em] text-muted-foreground font-medium">Approx. total to buy</span>
         <span className="text-[14px] tabular-nums font-semibold">≈ {fmt(grandTotal)}</span>
       </div>
@@ -814,7 +814,7 @@ function BuyRowWithBreakdown({ r }: {
   return (
     <>
       <div
-        className="flex items-center px-3 py-1.5 text-sm border-b border-border last:border-b-0 cursor-pointer hover:bg-muted/20"
+        className="flex items-center px-3 py-1.5 text-sm border-b border-[color:var(--ds-border-warm)] last:border-b-0 cursor-pointer hover:bg-muted/20"
         onClick={() => setOpen((o) => !o)}
       >
         <span className="flex-1 flex items-baseline gap-1.5 min-w-0">
@@ -848,7 +848,7 @@ function BuyRowWithBreakdown({ r }: {
         </span>
       </div>
       {open && hasBreakdown && (
-        <div className="px-3 py-2 bg-muted/20 border-b border-border text-[11.5px]">
+        <div className="px-3 py-2 bg-muted/20 border-b border-[color:var(--ds-border-warm)] text-[11.5px]">
           <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground mb-1.5">
             Where does this demand come from?
           </p>
@@ -967,7 +967,7 @@ function ReceiveCell({ ingredientId, purchaseUnit, gramsPerUnit }: {
         type="button"
         onClick={cycleUnit}
         title="Click to switch unit"
-        className="text-[10px] px-1.5 py-0.5 rounded-sm border border-border bg-muted/40 hover:bg-muted/70 min-w-[28px]"
+        className="text-[10px] px-1.5 py-0.5 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/40 hover:bg-muted/70 min-w-[28px]"
       >
         {unitLabel(unitMode)}
       </button>
@@ -1009,7 +1009,7 @@ function ShortageRow({ row, ingredients }: {
   }
 
   return (
-    <div className="flex items-center px-3 py-1.5 text-sm border-b border-border last:border-b-0">
+    <div className="flex items-center px-3 py-1.5 text-sm border-b border-[color:var(--ds-border-warm)] last:border-b-0">
       <Link
         href={`/ingredients/${encodeURIComponent(row.ingredientId)}`}
         className="flex-1 truncate hover:underline"
@@ -1088,7 +1088,7 @@ function IngredientStockBelowThresholdSection() {
         Open the ingredient to Receive more.
       </p>
       <div className="rounded-sm border border-status-warn/40 bg-status-warn-bg/20 overflow-hidden">
-        <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-border text-xs font-semibold text-muted-foreground">
+        <div className="flex items-center px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
           <span className="flex-1">Ingredient</span>
           <span className="w-24 text-right">On hand</span>
           <span className="w-28 text-right">Threshold</span>
@@ -1098,7 +1098,7 @@ function IngredientStockBelowThresholdSection() {
         {rows.map((row) => (
           <div
             key={row.ingredientId}
-            className="flex items-center px-3 py-2 text-sm border-b border-border last:border-b-0 hover:bg-muted/20"
+            className="flex items-center px-3 py-2 text-sm border-b border-[color:var(--ds-border-warm)] last:border-b-0 hover:bg-muted/20"
           >
             <Link
               href={`/ingredients/${encodeURIComponent(row.ingredientId)}?tab=stock`}

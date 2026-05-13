@@ -189,7 +189,7 @@ function AddIngredientForm({
   }
 
   return (
-    <form onSubmit={handleAdd} className="mt-2 p-3 rounded-sm border border-border bg-muted/50 space-y-2">
+    <form onSubmit={handleAdd} className="mt-2 p-3 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/50 space-y-2">
       <div>
         <input
           type="text"
@@ -201,7 +201,7 @@ function AddIngredientForm({
           className="input w-full"
         />
         {trimmed && !selectedId && (filtered.length > 0 || showCreate) && (
-          <ul className="mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-card">
+          <ul className="mt-1 max-h-40 overflow-y-auto rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
             {filtered.map((ing, idx) => (
               <li key={ing.id}>
                 <button
@@ -221,7 +221,7 @@ function AddIngredientForm({
                 <button
                   type="button"
                   onClick={handleCreateNew}
-                  className={`w-full text-left px-2 py-1.5 text-sm border-t border-border transition-colors ${
+                  className={`w-full text-left px-2 py-1.5 text-sm border-t border-[color:var(--ds-border-warm)] transition-colors ${
                     highlightedIndex === filtered.length ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"
                   }`}
                 >
@@ -485,7 +485,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
 
       {/* Promote to filling confirmation — inline, below header */}
       {showSaveAsFilling && (
-        <div className="mb-4 p-3 rounded-sm border border-border bg-muted/40 space-y-2 text-sm">
+        <div className="mb-4 p-3 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/40 space-y-2 text-sm">
           <p>
             Creates a new filling <strong>&ldquo;{experiment.name}&rdquo;</strong> in{" "}
             <strong>Ganaches (Emulsions)</strong> with all {experimentIngredients.length} ingredient
@@ -550,7 +550,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <table className="w-full text-xs border-collapse" style={{ minWidth: 540 }}>
                 <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
+                  <tr className="border-b border-[color:var(--ds-border-warm)] text-left text-muted-foreground">
                     <th className="pb-1.5 w-6" />
                     <th className="pb-1.5 px-2 font-medium">Ingredient</th>
                     <th className="pb-1.5 px-2 font-medium text-right">g</th>
@@ -589,7 +589,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
                   </tbody>
                 </SortableContext>
                 <tfoot>
-                  <tr className="border-t-2 border-border font-semibold">
+                  <tr className="border-t-2 border-[color:var(--ds-border-warm)] font-semibold">
                     <td />
                     <td className="pt-2 px-2 text-xs">Total</td>
                     <td className="pt-2 px-2">
@@ -600,7 +600,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
                         value={totalStr ?? totalWeight.toFixed(0)}
                         onChange={(e) => setTotalStr(e.target.value)}
                         onBlur={(e) => handleTotalBlur(e.target.value)}
-                        className="w-24 rounded border border-border bg-card px-2 py-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary tabular-nums font-normal"
+                        className="w-24 rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary tabular-nums font-normal"
                         aria-label="Total weight in grams"
                       />
                     </td>
@@ -727,7 +727,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
       {(experiment.tasteFeedback || experiment.textureFeedback || experiment.batchNotes) && (
         <section className="mb-6">
           <h2 className="text-sm font-semibold text-primary mb-2">Last batch feedback</h2>
-          <div className="bg-muted/40 rounded-sm border border-border px-3 py-3 text-xs space-y-1">
+          <div className="bg-muted/40 rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-3 text-xs space-y-1">
             {experiment.tasteFeedback ? <p>Taste: {experiment.tasteFeedback}/5</p> : null}
             {experiment.textureFeedback ? <p>Texture/mouthfeel: {experiment.textureFeedback}/5</p> : null}
             {experiment.batchNotes && <p className="text-muted-foreground">{experiment.batchNotes}</p>}
@@ -799,7 +799,7 @@ function ExperimentIngredientRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className={`border-b border-border/40 ${isDragging ? "opacity-50 bg-muted" : ""}`}
+      className={`border-b border-[color:var(--ds-border-warm)]/40 ${isDragging ? "opacity-50 bg-muted" : ""}`}
       suppressHydrationWarning
     >
       <td className="py-1.5 pl-1 pr-0 w-6">
@@ -847,7 +847,7 @@ function ExperimentIngredientRow({
             setAmountStr(undefined);
           }}
           aria-label="Amount in grams"
-          className="w-24 rounded border border-border bg-card px-2 py-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary tabular-nums"
+          className="w-24 rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary tabular-nums"
         />
       </td>
       <td className="py-1.5 px-2 text-right text-xs text-muted-foreground tabular-nums w-12">

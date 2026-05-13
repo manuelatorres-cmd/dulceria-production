@@ -135,7 +135,7 @@ export default function StockPage() {
         </div>
         <Link
           href="/stock/adjust"
-          className="ml-auto inline-flex items-center gap-1 rounded-sm border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary"
+          className="ml-auto inline-flex items-center gap-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary"
           title="Opening balance, recounts, breakage"
         >
           Adjust stock →
@@ -238,7 +238,7 @@ function BoxStockTab() {
   return (
     <div className="px-4 space-y-3">
       <div className="flex flex-wrap gap-2 text-xs">
-        <span className="rounded-full border border-border bg-card px-2.5 py-1">
+        <span className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2.5 py-1">
           Total · <span className="tabular-nums font-medium">{totalBoxes}</span>
         </span>
         <span className="rounded-full border border-status-ok-edge bg-status-ok-bg/30 px-2.5 py-1 text-status-ok">
@@ -248,7 +248,7 @@ function BoxStockTab() {
           Allocated · <span className="tabular-nums font-medium">{allocated}</span>
         </span>
       </div>
-      <ul className="rounded-sm border border-border bg-card divide-y divide-border">
+      <ul className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
         {grouped.map((r) => (
           <li key={r.key} className="px-3 py-2 flex items-center gap-2 text-sm">
             <span className="font-medium truncate flex-1">{r.variantName}</span>
@@ -256,7 +256,7 @@ function BoxStockTab() {
             <span className={`text-[10.5px] rounded-full border px-1.5 py-[1px] capitalize ${
               r.location === "allocated"
                 ? "border-status-warn-edge bg-status-warn-bg/30 text-status-warn"
-                : "border-border bg-card/70 text-muted-foreground"
+                : "border-[color:var(--ds-border-warm)] bg-card/70 text-muted-foreground"
             }`}>
               {r.location}
             </span>
@@ -537,7 +537,7 @@ function ProductStockTab() {
         </div>
         <button
           onClick={() => setShowFilters((v) => !v)}
-          className={`relative rounded-sm border p-2 transition-colors ${showFilters ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}
+          className={`relative rounded-sm border p-2 transition-colors ${showFilters ? "bg-primary text-primary-foreground border-primary" : "border-[color:var(--ds-border-warm)] bg-background"}`}
           aria-label="Filters"
         >
           <SlidersHorizontal className="w-5 h-5" />
@@ -558,7 +558,7 @@ function ProductStockTab() {
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
               filterLowOnly
                 ? "bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)]"
-                : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
             }`}
           >
             Low only
@@ -573,7 +573,7 @@ function ProductStockTab() {
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                   active
                     ? "bg-accent text-accent-foreground"
-                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {label}
@@ -593,7 +593,7 @@ function ProductStockTab() {
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                   active
                     ? "bg-[var(--accent-blush-bg)] text-[var(--accent-blush-ink)]"
-                    : "bg-card text-muted-foreground border border-border hover:bg-muted"
+                    : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-muted"
                 }`}
               >
                 {label}
@@ -604,12 +604,12 @@ function ProductStockTab() {
       </div>
 
       {showFilters && (
-        <div className="rounded-sm border border-border bg-card p-3 space-y-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-3">
           <div>
             <p className="text-xs text-muted-foreground mb-1.5">Stock level</p>
             <button
               onClick={() => setFilterLowOnly((v) => !v)}
-              className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${filterLowOnly ? "bg-status-warn-bg text-status-warn" : "border border-border text-muted-foreground"}`}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${filterLowOnly ? "bg-status-warn-bg text-status-warn" : "border border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
             >
               Low stock only
             </button>
@@ -623,7 +623,7 @@ function ProductStockTab() {
                   <button
                     key={opt}
                     onClick={() => setFilterSellBy(filterSellBy === opt ? "" : opt)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${filterSellBy === opt ? "bg-accent text-accent-foreground" : "border border-border text-muted-foreground"}`}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${filterSellBy === opt ? "bg-accent text-accent-foreground" : "border border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
                   >
                     {label}
                   </button>
@@ -644,7 +644,7 @@ function ProductStockTab() {
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors inline-flex items-center gap-1 ${
                       filterFreezer === opt
                         ? isFrozenOpt ? "bg-sky-600 text-white" : "bg-accent text-accent-foreground"
-                        : "border border-border text-muted-foreground"
+                        : "border border-[color:var(--ds-border-warm)] text-muted-foreground"
                     }`}
                   >
                     {isFrozenOpt && <Snowflake className="w-3 h-3" />}
@@ -658,7 +658,7 @@ function ProductStockTab() {
             <p className="text-xs text-muted-foreground mb-1.5">Notes</p>
             <button
               onClick={() => setFilterHasNotes((v) => !v)}
-              className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${filterHasNotes ? "bg-accent text-accent-foreground" : "border border-border text-muted-foreground"}`}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${filterHasNotes ? "bg-accent text-accent-foreground" : "border border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
             >
               Has notes
             </button>
@@ -685,10 +685,10 @@ function ProductStockTab() {
           <div
             key={group.productId}
             className={`rounded-sm border bg-card overflow-hidden ${
-              group.isLow ? "border-status-warn-edge border-l-4" : "border-border"
+              group.isLow ? "border-status-warn-edge border-l-4" : "border-[color:var(--ds-border-warm)]"
             }`}
           >
-            <div className={`px-3 py-2 border-b border-border ${group.isLow ? "bg-status-warn-bg" : "bg-muted/30"}`}>
+            <div className={`px-3 py-2 border-b border-[color:var(--ds-border-warm)] ${group.isLow ? "bg-status-warn-bg" : "bg-muted/30"}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-sm truncate flex items-center gap-1.5 flex-wrap">
@@ -708,7 +708,7 @@ function ProductStockTab() {
                       const belowThreshold = typeof minSum === "number" && minSum > 0 && group.totalProducts < minSum;
                       const pillCls = belowThreshold
                         ? "border-status-warn-edge bg-status-warn-bg text-status-warn"
-                        : "border-border bg-background text-foreground";
+                        : "border-[color:var(--ds-border-warm)] bg-background text-foreground";
                       return (
                         <span className={`shrink-0 rounded-sm border ${pillCls} px-1.5 py-0 text-[10px] font-semibold tabular-nums inline-flex items-center gap-0.5`}>
                           {group.totalProducts} pcs
@@ -756,10 +756,10 @@ function ProductStockTab() {
                           const empty = qty === 0;
                           const editing = countingProductLocation?.productId === group.productId
                             && countingProductLocation?.location === loc;
-                          let cls = "border-border bg-background text-foreground";
+                          let cls = "border-[color:var(--ds-border-warm)] bg-background text-foreground";
                           if (editing) cls = "border-primary bg-primary/5 text-primary";
                           else if (below) cls = "border-status-warn-edge bg-status-warn-bg text-status-warn";
-                          else if (empty) cls = "border-border/50 bg-muted/30 text-muted-foreground";
+                          else if (empty) cls = "border-[color:var(--ds-border-warm)]/50 bg-muted/30 text-muted-foreground";
                           if (editing) {
                             return (
                               <span key={loc} className={`rounded-sm border px-1.5 py-0 text-[10px] font-medium inline-flex items-center gap-1 ${cls}`}>
@@ -837,7 +837,7 @@ function ProductStockTab() {
                 {countingProductId !== group.productId && (
                   <button
                     onClick={() => { setCountingProductId(group.productId); setCountInput(String(group.totalProducts)); }}
-                    className="shrink-0 inline-flex items-center gap-1 rounded-sm border border-border bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                    className="shrink-0 inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] bg-background px-2 py-1 text-[11px] font-medium text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                     title="Record the latest stock count for this product"
                   >
                     <ClipboardList className="w-3 h-3" /> Latest stock count
@@ -896,7 +896,7 @@ function ProductStockTab() {
 
               if (confirmGone === pb.id) {
                 return (
-                  <div key={pb.id} className={`px-3 py-2 bg-muted/40 flex items-center gap-3 ${!isLast ? "border-b border-border" : ""}`}>
+                  <div key={pb.id} className={`px-3 py-2 bg-muted/40 flex items-center gap-3 ${!isLast ? "border-b border-[color:var(--ds-border-warm)]" : ""}`}>
                     <p className="text-xs text-muted-foreground flex-1">Mark as gone?</p>
                     <button onClick={() => handleSetStatus(pb.id!, "gone")} className="text-xs font-medium text-foreground">Yes</button>
                     <button onClick={() => setConfirmGone(null)} className="text-xs text-muted-foreground">Cancel</button>
@@ -905,7 +905,7 @@ function ProductStockTab() {
               }
 
               return (
-                <div key={pb.id} className={!isLast ? "border-b border-border" : ""}>
+                <div key={pb.id} className={!isLast ? "border-b border-[color:var(--ds-border-warm)]" : ""}>
                   {/* Available row — hidden when all pieces are in the freezer */}
                   {availableCount > 0 && (
                     <div className="px-3 py-2.5 flex items-start justify-between gap-2">
@@ -932,21 +932,21 @@ function ProductStockTab() {
                       <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
                         <button
                           onClick={() => setTransferPbId(pb.id!)}
-                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors inline-flex items-center gap-0.5"
+                          className="rounded-sm border border-[color:var(--ds-border-warm)] px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors inline-flex items-center gap-0.5"
                           title="Move pieces between Store / Production / Freezer / Allocated"
                         >
                           <Move className="w-3 h-3" /> Move
                         </button>
                         <button
                           onClick={() => setFreezingPbId(pb.id!)}
-                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:border-sky-500 hover:bg-sky-50 transition-colors inline-flex items-center gap-0.5"
+                          className="rounded-sm border border-[color:var(--ds-border-warm)] px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:border-sky-500 hover:bg-sky-50 transition-colors inline-flex items-center gap-0.5"
                           title="Move pieces to the freezer"
                         >
                           <Snowflake className="w-3 h-3" /> Freeze
                         </button>
                         <button
                           onClick={() => setConfirmGone(pb.id!)}
-                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+                          className="rounded-sm border border-[color:var(--ds-border-warm)] px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
                         >
                           Gone
                         </button>
@@ -956,7 +956,7 @@ function ProductStockTab() {
 
                   {/* Freezer sub-row */}
                   {frozenCount > 0 && (
-                    <div className={`px-3 py-2.5 flex items-start justify-between gap-2 bg-sky-50/40 ${availableCount > 0 ? "border-t border-border/60" : ""}`}>
+                    <div className={`px-3 py-2.5 flex items-start justify-between gap-2 bg-sky-50/40 ${availableCount > 0 ? "border-t border-[color:var(--ds-border-warm)]/60" : ""}`}>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <Snowflake className="w-3 h-3 text-sky-600" />
@@ -1255,7 +1255,7 @@ function FillingStockTab() {
         </div>
         <button
           onClick={() => setShowFilters((v) => !v)}
-          className={`relative rounded-sm border p-2 transition-colors ${showFilters ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}
+          className={`relative rounded-sm border p-2 transition-colors ${showFilters ? "bg-primary text-primary-foreground border-primary" : "border-[color:var(--ds-border-warm)] bg-background"}`}
           aria-label="Filters"
         >
           <SlidersHorizontal className="w-5 h-5" />
@@ -1267,7 +1267,7 @@ function FillingStockTab() {
         </button>
         <button
           onClick={() => setShowAdd((v) => !v)}
-          className="rounded-sm border border-border bg-background p-2 transition-colors hover:bg-muted"
+          className="rounded-sm border border-[color:var(--ds-border-warm)] bg-background p-2 transition-colors hover:bg-muted"
           aria-label="Add filling stock"
           title="Add filling stock manually"
         >
@@ -1276,7 +1276,7 @@ function FillingStockTab() {
       </div>
 
       {showFilters && (
-        <div className="rounded-sm border border-border bg-card p-3 space-y-3">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-3">
           <div>
             <p className="text-xs text-muted-foreground mb-1.5">Freezer</p>
             <div className="flex flex-wrap gap-1">
@@ -1290,7 +1290,7 @@ function FillingStockTab() {
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors inline-flex items-center gap-1 ${
                       filterFreezer === opt
                         ? isFrozenOpt ? "bg-sky-600 text-white" : "bg-accent text-accent-foreground"
-                        : "border border-border text-muted-foreground"
+                        : "border border-[color:var(--ds-border-warm)] text-muted-foreground"
                     }`}
                   >
                     {isFrozenOpt && <Snowflake className="w-3 h-3" />}
@@ -1305,7 +1305,7 @@ function FillingStockTab() {
 
       {/* Manual add form */}
       {showAdd && (
-        <div className="rounded-sm border border-border bg-card p-3 space-y-2">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Add leftover filling manually</p>
           <select
             value={addFillingId}
@@ -1362,9 +1362,9 @@ function FillingStockTab() {
         <p className="text-sm text-muted-foreground py-6 text-center">No fillings match your search.</p>
       ) : (
         groups.map((group) => (
-          <div key={group.fillingId} className="rounded-sm border border-border bg-card overflow-hidden">
+          <div key={group.fillingId} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
             {/* Group header */}
-            <div className="px-3 py-2 bg-muted/30 border-b border-border flex justify-between items-baseline">
+            <div className="px-3 py-2 bg-muted/30 border-b border-[color:var(--ds-border-warm)] flex justify-between items-baseline">
               <div>
                 <p className="font-semibold text-sm">{group.fillingName}</p>
                 <p className="text-[10px] text-muted-foreground">
@@ -1414,7 +1414,7 @@ function FillingStockTab() {
 
               if (confirmDiscard === entry.id) {
                 return (
-                  <div key={entry.id} className={`px-3 py-2 bg-muted/40 flex items-center gap-3 ${!isLast ? "border-b border-border" : ""}`}>
+                  <div key={entry.id} className={`px-3 py-2 bg-muted/40 flex items-center gap-3 ${!isLast ? "border-b border-[color:var(--ds-border-warm)]" : ""}`}>
                     <p className="text-xs text-muted-foreground flex-1">Discard this stock?</p>
                     <button onClick={() => handleDiscard(entry.id!)} className="text-xs font-medium text-status-alert">Yes</button>
                     <button onClick={() => setConfirmDiscard(null)} className="text-xs text-muted-foreground">Cancel</button>
@@ -1424,7 +1424,7 @@ function FillingStockTab() {
 
               if (adjustingId === entry.id) {
                 return (
-                  <div key={entry.id} className={`px-3 py-2 flex items-center gap-2 ${!isLast ? "border-b border-border" : ""}`}>
+                  <div key={entry.id} className={`px-3 py-2 flex items-center gap-2 ${!isLast ? "border-b border-[color:var(--ds-border-warm)]" : ""}`}>
                     <input
                       type="number"
                       min={0}
@@ -1444,7 +1444,7 @@ function FillingStockTab() {
               return (
                 <div
                   key={entry.id}
-                  className={`px-3 py-2.5 flex items-start justify-between gap-2 ${!isLast ? "border-b border-border" : ""} ${entry.frozen ? "bg-sky-50/40" : ""}`}
+                  className={`px-3 py-2.5 flex items-start justify-between gap-2 ${!isLast ? "border-b border-[color:var(--ds-border-warm)]" : ""} ${entry.frozen ? "bg-sky-50/40" : ""}`}
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -1484,20 +1484,20 @@ function FillingStockTab() {
                       <>
                         <button
                           onClick={() => setFreezingId(entry.id!)}
-                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:border-sky-500 hover:bg-sky-50 transition-colors inline-flex items-center gap-0.5"
+                          className="rounded-sm border border-[color:var(--ds-border-warm)] px-2 py-0.5 text-[10px] font-medium text-sky-700 hover:border-sky-500 hover:bg-sky-50 transition-colors inline-flex items-center gap-0.5"
                           title="Move to freezer"
                         >
                           <Snowflake className="w-3 h-3" /> Freeze
                         </button>
                         <button
                           onClick={() => { setAdjustingId(entry.id!); setAdjustInput(String(Math.round(entry.remainingG))); }}
-                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+                          className="rounded-sm border border-[color:var(--ds-border-warm)] px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
                         >
                           Adjust
                         </button>
                         <button
                           onClick={() => setConfirmDiscard(entry.id!)}
-                          className="rounded-sm border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-status-alert hover:text-status-alert transition-colors"
+                          className="rounded-sm border border-[color:var(--ds-border-warm)] px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-status-alert hover:text-status-alert transition-colors"
                         >
                           Discard
                         </button>
@@ -1650,13 +1650,13 @@ function MovementsTab() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Filter by product / variant / note…"
-            className="w-64 rounded border border-border bg-card px-2 py-1"
+            className="w-64 rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1"
           />
         </div>
         <select
           value={locationFilter}
           onChange={(e) => setLocationFilter(e.target.value as typeof locationFilter)}
-          className="rounded border border-border bg-card px-2 py-1 text-xs"
+          className="rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-xs"
         >
           <option value="all">All locations</option>
           {STOCK_LOCATIONS.map((loc) => (
@@ -1666,7 +1666,7 @@ function MovementsTab() {
         <select
           value={reasonFilter}
           onChange={(e) => setReasonFilter(e.target.value)}
-          className="rounded border border-border bg-card px-2 py-1 text-xs"
+          className="rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-xs"
         >
           <option value="all">All reasons</option>
           {allReasons.map((r) => (
@@ -1678,8 +1678,8 @@ function MovementsTab() {
         </span>
       </div>
 
-      <div className="rounded-sm border border-border bg-card overflow-hidden">
-        <div className="grid grid-cols-[150px_1fr_140px_60px_120px_1fr] gap-2 px-3 py-2 bg-muted/40 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+      <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
+        <div className="grid grid-cols-[150px_1fr_140px_60px_120px_1fr] gap-2 px-3 py-2 bg-muted/40 border-b border-[color:var(--ds-border-warm)] text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
           <span>When</span>
           <span>Item</span>
           <span>Move</span>
@@ -1695,7 +1695,7 @@ function MovementsTab() {
           filtered.map((m, i) => (
             <div
               key={m.id ?? i}
-              className="grid grid-cols-[150px_1fr_140px_60px_120px_1fr] gap-2 px-3 py-1.5 text-xs border-b border-border last:border-b-0"
+              className="grid grid-cols-[150px_1fr_140px_60px_120px_1fr] gap-2 px-3 py-1.5 text-xs border-b border-[color:var(--ds-border-warm)] last:border-b-0"
             >
               <span className="text-muted-foreground tabular-nums">
                 {new Date(m.movedAt).toLocaleString("de-AT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}

@@ -265,7 +265,7 @@ export default function ProductCategoryDetailPage({ params }: { params: Promise<
         ) : (
           /* ── Read-only view ── */
           <>
-            <div className="rounded-sm border border-border bg-card divide-y divide-border">
+            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
               <div className="flex justify-between items-center px-3 py-2 text-sm">
                 <span className="text-muted-foreground">Shell % range</span>
                 <span className="font-mono">{formatCategoryRange(category)}</span>
@@ -295,7 +295,7 @@ export default function ProductCategoryDetailPage({ params }: { params: Promise<
             />
 
             {/* Archive / Delete */}
-            <section className="pt-4 border-t border-border">
+            <section className="pt-4 border-t border-[color:var(--ds-border-warm)]">
               {category.archived ? (
                 <button
                   onClick={() => unarchiveProductCategory(categoryId)}
@@ -306,7 +306,7 @@ export default function ProductCategoryDetailPage({ params }: { params: Promise<
               ) : inUseCount > 0 ? (
                 /* In use — archive only, no delete */
                 confirmDelete ? (
-                  <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+                  <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                       <p className="text-sm font-medium">Archive this category?</p>

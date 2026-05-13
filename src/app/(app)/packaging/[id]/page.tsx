@@ -386,7 +386,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
           </div>
 
           {showOrderForm && (
-            <form onSubmit={handleLogOrder} className="rounded-sm border border-border bg-card p-3 space-y-2">
+            <form onSubmit={handleLogOrder} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="label">Date *</label>
@@ -493,7 +493,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                   type="checkbox"
                   checked={orderUpdateDefault}
                   onChange={(e) => setOrderUpdateDefault(e.target.checked)}
-                  className="rounded border-border"
+                  className="rounded border-[color:var(--ds-border-warm)]"
                 />
                 <span className="text-xs text-muted-foreground">
                   Treat as the new default unit cost (cost calculations use the latest purchase).
@@ -522,7 +522,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
             <button
               onClick={() => setShowOrderForm(true)}
               disabled={editing}
-              className="w-full rounded-sm border border-dashed border-border py-4 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full rounded-sm border border-dashed border-[color:var(--ds-border-warm)] py-4 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
               Log first purchase
@@ -530,7 +530,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
           ) : (
             <ul className="space-y-2">
               {orders.map((order) => (
-                <li key={order.id} className="rounded-sm border border-border bg-card">
+                <li key={order.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
                   {deletingOrderId === order.id ? (
                     <div className="p-3 space-y-2">
                       <p className="text-sm font-medium text-destructive">Delete this entry?</p>
@@ -592,7 +592,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
       </div>
 
       {!editing && (
-        <div className="px-4 pb-8 border-t border-border pt-4 space-y-4">
+        <div className="px-4 pb-8 border-t border-[color:var(--ds-border-warm)] pt-4 space-y-4">
           {pkg.archived && (
             <button
               onClick={async () => { await unarchivePackaging(packagingId); }}
@@ -604,7 +604,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
           {confirmDelete ? (
             inUse ? (
               /* In use by variants — archive only */
-              <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Archive className="w-4 h-4 text-muted-foreground shrink-0" />
                   <p className="text-sm font-medium">Archive this packaging?</p>

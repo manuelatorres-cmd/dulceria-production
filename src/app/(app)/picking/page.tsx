@@ -56,7 +56,7 @@ export default function PickingPage() {
         </p>
       </div>
 
-      <div className="inline-flex rounded-full border border-border bg-card overflow-hidden text-sm mb-4">
+      <div className="inline-flex rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden text-sm mb-4">
         <button
           type="button"
           onClick={() => setTab("pack")}
@@ -131,7 +131,7 @@ function PackTab() {
 
   if (ready.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-8 text-center">
+      <div className="rounded-lg border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
         <Package className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
           No orders ready to pack. New online imports + B2B / event orders with allocated
@@ -158,7 +158,7 @@ function PackTab() {
                 ? "border-status-ok-bg bg-status-ok-bg/30"
                 : err
                 ? "border-status-blush-bg bg-status-blush-bg/30"
-                : "border-border bg-card")
+                : "border-[color:var(--ds-border-warm)] bg-card")
             }
           >
             <div className="flex-1 min-w-0">
@@ -437,7 +437,7 @@ function BoxTab() {
 
   if (boxableVps.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-8 text-center">
+      <div className="rounded-lg border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
         <Box className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
           No boxed variants defined. Add a variant size with packaging + product composition on /variants/[id] to enable box-up here.
@@ -475,7 +475,7 @@ function BoxTab() {
                 ? "border-status-blush-bg bg-status-blush-bg/30"
                 : succ > 0
                 ? "border-status-ok-bg bg-status-ok-bg/30"
-                : "border-border bg-card")
+                : "border-[color:var(--ds-border-warm)] bg-card")
             }
           >
             <div className="flex items-baseline gap-2 flex-wrap mb-1">
@@ -534,13 +534,13 @@ function BoxTab() {
                 value={count || ""}
                 onChange={(e) => setCounts((c) => ({ ...c, [vp.id!]: Math.max(0, Math.min(max, Number(e.target.value) || 0)) }))}
                 placeholder="0"
-                className="w-20 rounded border border-border bg-card px-2 py-1 text-sm tabular-nums"
+                className="w-20 rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-sm tabular-nums"
               />
               <span className="text-[11px] text-muted-foreground">→</span>
               <select
                 value={dest}
                 onChange={(e) => setDestinations((d) => ({ ...d, [vp.id!]: e.target.value as StockLocation }))}
-                className="rounded border border-border bg-card px-2 py-1 text-sm"
+                className="rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-sm"
               >
                 {BOX_DESTINATIONS.map((d) => (
                   <option key={d.id} value={d.id}>{d.label}</option>

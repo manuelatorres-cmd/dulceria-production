@@ -382,7 +382,7 @@ export default function DailyCountPage() {
                     "rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors capitalize " +
                     (active
                       ? "bg-foreground text-background"
-                      : "bg-card text-muted-foreground border border-border hover:border-foreground")
+                      : "bg-card text-muted-foreground border border-[color:var(--ds-border-warm)] hover:border-foreground")
                   }
                 >
                   {c.name}
@@ -409,7 +409,7 @@ export default function DailyCountPage() {
             "rounded-full px-3 py-1 text-[12px] font-medium border " +
             (tab === "variants"
               ? "bg-foreground text-background border-foreground"
-              : "bg-card border-border hover:border-foreground")
+              : "bg-card border-[color:var(--ds-border-warm)] hover:border-foreground")
           }
         >
           1 · Variants & singles · {variantPiecesSold} pcs · €{variantRevenue.toFixed(2)}
@@ -420,7 +420,7 @@ export default function DailyCountPage() {
             "rounded-full px-3 py-1 text-[12px] font-medium border " +
             (tab === "count"
               ? "bg-foreground text-background border-foreground"
-              : "bg-card border-border hover:border-foreground")
+              : "bg-card border-[color:var(--ds-border-warm)] hover:border-foreground")
           }
         >
           2 · Bonbon count
@@ -448,13 +448,13 @@ export default function DailyCountPage() {
               Variant sizes ({visibleSizeRows.length}{activeCategories.size > 0 ? ` of ${sizeRows.length}` : ""})
             </h2>
             {visibleSizeRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-border rounded-[6px]">
+              <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-[color:var(--ds-border-warm)] rounded-[6px]">
                 {activeCategories.size > 0
                   ? "No variant sizes match the selected category filter."
                   : "No variants set up. Create one at /variants first."}
               </p>
             ) : (
-              <ul className="rounded-[6px] border border-border divide-y divide-border bg-card">
+              <ul className="rounded-[6px] border border-[color:var(--ds-border-warm)] divide-y divide-border bg-card">
                 {visibleSizeRows.map((row) => {
                   const qty = variantQty[row.id] ?? 0;
                   const overrideStr = variantPriceOverride[row.id] ?? "";
@@ -511,7 +511,7 @@ export default function DailyCountPage() {
               </h2>
               <button
                 onClick={() => setSingleProductSales((p) => [...p, { productId: "", qty: 0, unitPrice: 0 }])}
-                className="text-[11px] px-2 py-0.5 border border-border rounded-full hover:border-foreground"
+                className="text-[11px] px-2 py-0.5 border border-[color:var(--ds-border-warm)] rounded-full hover:border-foreground"
               >
                 + Add line
               </button>
@@ -519,7 +519,7 @@ export default function DailyCountPage() {
             {singleProductSales.length === 0 ? (
               <p className="text-[12px] text-muted-foreground italic">No singles. Click "+ Add line" if any bars sold individually.</p>
             ) : (
-              <ul className="rounded-[6px] border border-border divide-y divide-border bg-card">
+              <ul className="rounded-[6px] border border-[color:var(--ds-border-warm)] divide-y divide-border bg-card">
                 {singleProductSales.map((sp, i) => (
                   <li key={i} className="px-3 py-2 flex items-center gap-2 flex-wrap">
                     <select
@@ -589,11 +589,11 @@ export default function DailyCountPage() {
               </div>
             )}
             {countableProducts.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-border rounded-[6px]">
+              <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-[color:var(--ds-border-warm)] rounded-[6px]">
                 Nothing to count. Add some shop stock or variant sales first.
               </p>
             ) : (
-              <div className="rounded-[6px] border border-border overflow-hidden">
+              <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] overflow-hidden">
                 <table className="w-full text-[12px]">
                   <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
                     <tr>
@@ -625,7 +625,7 @@ export default function DailyCountPage() {
                       const needsReason = v != null && v !== 0;
                       const reason = varianceReason[p.id!] ?? "custom_box";
                       return (
-                        <tr key={p.id} className="border-t border-border">
+                        <tr key={p.id} className="border-t border-[color:var(--ds-border-warm)]">
                           <td className="px-3 py-1.5 truncate">{p.name}</td>
                           <td className="text-right px-2 py-1.5 tabular-nums">{start}</td>
                           <td className="text-right px-2 py-1.5 tabular-nums text-muted-foreground">{sold || ""}</td>

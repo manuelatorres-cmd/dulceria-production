@@ -161,7 +161,7 @@ export default function ProductionPage() {
 
       <div className="px-4 pb-8 space-y-4">
         {visibleDays.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-border bg-card p-6 text-center">
+          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-card p-6 text-center">
             <Calendar className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">
               Nothing scheduled yet. Head to <Link href="/plan" className="text-primary hover:underline">/plan</Link> and click <span className="font-medium">Regenerate plan</span> once you have open orders.
@@ -186,10 +186,10 @@ export default function ProductionPage() {
                 <section
                   key={day.id ?? day.date}
                   className={`rounded-sm border overflow-hidden ${
-                    isToday ? "border-primary/40 bg-primary/5" : "border-border bg-card"
+                    isToday ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-card"
                   }`}
                 >
-                  <header className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+                  <header className="px-4 py-3 border-b border-[color:var(--ds-border-warm)] flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h2 className="text-sm font-semibold">
                         {formatDayLabel(day.date, todayIso)}
@@ -286,7 +286,7 @@ export default function ProductionPage() {
                                         className={`rounded-sm border px-1.5 py-0.5 flex items-center gap-1 ${
                                           done
                                             ? "border-status-ok/40 bg-status-ok/10 text-status-ok"
-                                            : "border-border bg-card text-muted-foreground"
+                                            : "border-[color:var(--ds-border-warm)] bg-card text-muted-foreground"
                                         }`}
                                       >
                                         {done && <CheckCircle className="w-2.5 h-2.5" />}
@@ -357,7 +357,7 @@ export default function ProductionPage() {
         {confirmDeleteId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDeleteId(null)} />
-            <div className="relative w-full max-w-sm rounded border border-border bg-card shadow-xl p-5 space-y-3">
+            <div className="relative w-full max-w-sm rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl p-5 space-y-3">
               <h3 className="text-base font-bold">Delete batch?</h3>
               <p className="text-sm text-muted-foreground">
                 This removes the batch and its scheduling. Step progress and stock movements remain. Deleting does NOT touch the orders it was serving.
@@ -365,7 +365,7 @@ export default function ProductionPage() {
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => setConfirmDeleteId(null)}
-                  className="text-sm rounded-sm border border-border px-3 py-1.5 hover:bg-muted"
+                  className="text-sm rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 hover:bg-muted"
                 >
                   Cancel
                 </button>

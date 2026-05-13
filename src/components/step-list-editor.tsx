@@ -261,8 +261,8 @@ export function StepListEditor({
         Add step
       </button>
       <p className="text-xs text-muted-foreground mt-1.5">
-        Press <kbd className="px-1 py-0.5 rounded border border-border bg-muted font-mono text-[10px]">Enter</kbd> to add another step,{" "}
-        <kbd className="px-1 py-0.5 rounded border border-border bg-muted font-mono text-[10px]">Shift+Enter</kbd> for a line break inside a step.
+        Press <kbd className="px-1 py-0.5 rounded border border-[color:var(--ds-border-warm)] bg-muted font-mono text-[10px]">Enter</kbd> to add another step,{" "}
+        <kbd className="px-1 py-0.5 rounded border border-[color:var(--ds-border-warm)] bg-muted font-mono text-[10px]">Shift+Enter</kbd> for a line break inside a step.
       </p>
     </div>
   );
@@ -327,7 +327,7 @@ function StepRow({
       style={style}
       suppressHydrationWarning
       className={`group flex items-start gap-2 rounded-md border border-transparent px-1 py-1 transition-colors ${
-        isDragging ? "bg-muted/50 border-border" : "hover:bg-muted/30"
+        isDragging ? "bg-muted/50 border-[color:var(--ds-border-warm)]" : "hover:bg-muted/30"
       }`}
     >
       <button

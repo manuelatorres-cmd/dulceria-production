@@ -112,7 +112,7 @@ export default function ImportsPage() {
       <div style={{ padding: "16px 32px 40px" }}>
 
       <section
-        className="border border-border bg-card p-4 mb-6"
+        className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 mb-6"
         style={{ borderRadius: 4 }}
       >
         <h3
@@ -158,7 +158,7 @@ export default function ImportsPage() {
 
       {preview ? (
         <section
-          className="border border-border bg-card p-4 mb-6"
+          className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 mb-6"
           style={{ borderRadius: 4 }}
         >
           <h3
@@ -188,7 +188,7 @@ export default function ImportsPage() {
               </thead>
               <tbody>
                 {preview.map((row, idx) => (
-                  <tr key={idx} className="border-t border-border/60">
+                  <tr key={idx} className="border-t border-[color:var(--ds-border-warm)]/60">
                     <td className="py-2 pr-4">{row.sku ?? "—"}</td>
                     <td className="py-2 pr-4">{row.quantity ?? 0}</td>
                     <td className="py-2 pr-4">
@@ -216,7 +216,7 @@ export default function ImportsPage() {
               <ul className="space-y-1.5">
                 {unmapped.map((sku) => (
                   <li key={sku} className="flex items-center gap-2 text-[12px]">
-                    <code className="px-1.5 py-0.5 bg-card border border-border">
+                    <code className="px-1.5 py-0.5 bg-card border border-[color:var(--ds-border-warm)]">
                       {sku}
                     </code>
                     <span className="text-muted-foreground">→</span>
@@ -265,7 +265,7 @@ export default function ImportsPage() {
       ) : null}
 
       <section
-        className="border border-border bg-card p-4"
+        className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
         style={{ borderRadius: 4 }}
       >
         <h3
@@ -296,7 +296,7 @@ export default function ImportsPage() {
             {imports.map((imp) => (
               <li
                 key={imp.id}
-                className="flex items-center justify-between gap-3 text-[12.5px] px-3 py-2 bg-muted border border-border"
+                className="flex items-center justify-between gap-3 text-[12.5px] px-3 py-2 bg-muted border border-[color:var(--ds-border-warm)]"
                 style={{ borderRadius: 3 }}
               >
                 <div>

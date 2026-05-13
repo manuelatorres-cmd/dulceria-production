@@ -84,13 +84,13 @@ export function YieldModal({ entries, mode = "batch", onConfirm, onCancel, cance
       />
 
       <div
-        className="relative w-full max-w-lg mx-4 mb-4 sm:mb-0 border border-border bg-card shadow-xl overflow-hidden"
+        className="relative w-full max-w-lg mx-4 mb-4 sm:mb-0 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden"
         style={{ borderRadius: 4 }}
       >
-        <div className="bg-[color:var(--accent-peach-bg)] px-5 pt-5 pb-3 border-b border-border">
+        <div className="bg-[color:var(--accent-peach-bg)] px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)]">
           <div className="flex items-center gap-3 mb-1">
             <div
-              className="w-9 h-9 bg-card flex items-center justify-center border border-border"
+              className="w-9 h-9 bg-card flex items-center justify-center border border-[color:var(--ds-border-warm)]"
               style={{ borderRadius: 3 }}
             >
               <Package className="w-5 h-5 text-foreground" />
@@ -217,7 +217,7 @@ export function YieldModal({ entries, mode = "batch", onConfirm, onCancel, cance
           })}
         </div>
 
-        <div className="px-5 py-3 border-t border-border grid grid-cols-3 gap-3 text-[11px] text-muted-foreground">
+        <div className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] grid grid-cols-3 gap-3 text-[11px] text-muted-foreground">
           <div>
             <span
               className="uppercase"
@@ -260,7 +260,7 @@ export function YieldModal({ entries, mode = "batch", onConfirm, onCancel, cance
           ) : null}
         </div>
 
-        <div className="px-5 py-4 border-t border-border flex gap-2 justify-end">
+        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex gap-2 justify-end">
           <button onClick={onCancel} className="btn-secondary">
             {cancelLabel ?? "Cancel"}
           </button>
@@ -321,7 +321,7 @@ function YieldField({
         <button
           type="button"
           onClick={() => onChange(Math.max(0, value - 1))}
-          className="w-7 h-7 border border-border bg-card hover:border-foreground text-foreground"
+          className="w-7 h-7 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-foreground text-foreground"
           style={{ borderRadius: 2 }}
         >
           −
@@ -350,13 +350,13 @@ function YieldField({
               (e.target as HTMLInputElement).blur();
             }
           }}
-          className="w-14 h-7 border border-border bg-card text-center text-sm font-medium focus:outline-none focus:ring-1 focus:ring-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-14 h-7 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-center text-sm font-medium focus:outline-none focus:ring-1 focus:ring-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           style={{ borderRadius: 2 }}
         />
         <button
           type="button"
           onClick={() => onChange(value + 1)}
-          className="w-7 h-7 border border-border bg-card hover:border-foreground text-foreground"
+          className="w-7 h-7 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-foreground text-foreground"
           style={{ borderRadius: 2 }}
         >
           +

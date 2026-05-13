@@ -407,7 +407,7 @@ function ShopStockGrid() {
               "text-[11px] px-2.5 py-0.5 rounded-full border transition " +
               (filter === k
                 ? "bg-foreground text-background border-foreground"
-                : "bg-[color:var(--ds-card-bg)] border-border text-foreground hover:border-foreground")
+                : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
             }
           >
             {k === "all" ? "All" : k === "low" ? `Low (${lowN + outN})` : "OK"}
@@ -628,7 +628,7 @@ function WeekdayRow({ dow, row }: {
           "text-[10.5px] px-2 py-0.5 rounded-full border transition " +
           (isOpen
             ? "bg-[#f1faf4] text-[#4a7a5e] border-[#cfe5d9]"
-            : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-border hover:border-foreground")
+            : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:border-foreground")
         }
       >
         {isOpen ? "Open" : "Closed"}
@@ -711,7 +711,7 @@ function ClosuresEditor({ closures }: {
             <button onClick={add} disabled={saving} className={`${PINK} rounded-full px-3 py-1 text-[11.5px] font-medium disabled:opacity-50`}>
               {saving ? "…" : "Add"}
             </button>
-            <button onClick={() => setAdding(false)} className="rounded-full border border-border px-3 py-1 text-[11.5px]">
+            <button onClick={() => setAdding(false)} className="rounded-full border border-[color:var(--ds-border-warm)] px-3 py-1 text-[11.5px]">
               Cancel
             </button>
           </div>
@@ -742,7 +742,7 @@ function LabelPlaceholder() {
           Coming soon
         </span>
       </div>
-      <div className="rounded-[12px] border border-dashed border-border bg-white/40 p-4 text-center">
+      <div className="rounded-[12px] border border-dashed border-[color:var(--ds-border-warm)] bg-white/40 p-4 text-center">
         <Printer className="w-6 h-6 mx-auto text-muted-foreground/60 mb-1.5" />
         <p className="text-[11.5px] text-muted-foreground">
           Printer model + label layout pending a decision.

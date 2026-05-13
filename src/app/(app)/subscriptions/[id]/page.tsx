@@ -175,7 +175,7 @@ export default function SubscriptionTemplateDetail({
             />
             Active — brain tracks upcoming cycles
           </label>
-          <div className="flex justify-between items-center pt-3 border-t border-border">
+          <div className="flex justify-between items-center pt-3 border-t border-[color:var(--ds-border-warm)]">
             <button
               type="button"
               onClick={save}
@@ -215,7 +215,7 @@ export default function SubscriptionTemplateDetail({
 
         {/* Runs panel */}
         <aside
-          className="border border-border bg-card p-4"
+          className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
           style={{ borderRadius: 4 }}
         >
           <RunsPanel
@@ -303,7 +303,7 @@ function RunsPanel({
 
       {/* Add form */}
       <div
-        className="mb-4 p-3 border border-border bg-muted/40 space-y-2"
+        className="mb-4 p-3 border border-[color:var(--ds-border-warm)] bg-muted/40 space-y-2"
         style={{ borderRadius: 3 }}
       >
         <Field label="Ship date">
@@ -327,7 +327,7 @@ function RunsPanel({
         </Field>
         <div>
           <label className="label">Contents ({pieceCount} total)</label>
-          <div className="max-h-48 overflow-y-auto border border-border" style={{ borderRadius: 3 }}>
+          <div className="max-h-48 overflow-y-auto border border-[color:var(--ds-border-warm)]" style={{ borderRadius: 3 }}>
             {products
               .filter((p) => !p.archived)
               .map((p) => (
@@ -375,7 +375,7 @@ function RunsPanel({
           {runs.map((r) => (
             <li
               key={r.id}
-              className="border border-border bg-muted px-3 py-2 text-[12px]"
+              className="border border-[color:var(--ds-border-warm)] bg-muted px-3 py-2 text-[12px]"
               style={{ borderRadius: 3 }}
             >
               <div className="flex items-baseline justify-between">
@@ -409,7 +409,7 @@ function RunsPanel({
                     r.id &&
                     setRunStatus(r.id, e.target.value as SubscriptionRunStatus)
                   }
-                  className="text-[10.5px] border border-border bg-card px-1 py-0.5"
+                  className="text-[10.5px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-1 py-0.5"
                   style={{ borderRadius: 2 }}
                 >
                   {SUBSCRIPTION_RUN_STATUSES.map((s) => (

@@ -104,7 +104,7 @@ export function TemperatureLogModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
-      <div className="relative w-full max-w-xl mx-4 mb-4 sm:mb-0 rounded-sm border border-border bg-card shadow-xl overflow-hidden max-h-[85vh] flex flex-col">
+      <div className="relative w-full max-w-xl mx-4 mb-4 sm:mb-0 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden max-h-[85vh] flex flex-col">
         <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-sm bg-primary/10 flex items-center justify-center">
@@ -142,7 +142,7 @@ export function TemperatureLogModal({
                       ? "border-status-alert-edge bg-status-alert-bg"
                       : hasReading && !inRange
                         ? "border-status-warn-edge bg-status-warn-bg"
-                        : "border-border bg-background"
+                        : "border-[color:var(--ds-border-warm)] bg-background"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -180,7 +180,7 @@ export function TemperatureLogModal({
 
         {error && <p className="px-5 text-[11px] text-status-alert">{error}</p>}
 
-        <div className="px-5 py-4 border-t border-border shrink-0 space-y-2">
+        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] shrink-0 space-y-2">
           {!snoozing ? (
             <div className="flex items-center justify-between gap-2">
               <button

@@ -216,7 +216,7 @@ export default function FillingConsolidationPage() {
         </button>
 
         {/* Window selector + summary */}
-        <section className="rounded-sm border border-border bg-card p-4 space-y-3">
+        <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-1.5">
               {WINDOW_OPTIONS.map((opt) => (
@@ -226,7 +226,7 @@ export default function FillingConsolidationPage() {
                   className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                     windowDays === opt.days
                       ? "bg-accent text-accent-foreground"
-                      : "border border-border text-muted-foreground"
+                      : "border border-[color:var(--ds-border-warm)] text-muted-foreground"
                   }`}
                 >
                   {opt.label}
@@ -286,7 +286,7 @@ export default function FillingConsolidationPage() {
 
         {/* Cooking list */}
         {result.needs.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-border bg-card p-8 text-center">
+          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-card p-8 text-center">
             <p className="text-sm text-muted-foreground">
               No fillings needed in the next {windowDays} days.
             </p>
@@ -330,7 +330,7 @@ export default function FillingConsolidationPage() {
                         ? "border-status-alert/40"
                         : cookable === "ready"
                         ? "border-status-ok/50"
-                        : "border-border"
+                        : "border-[color:var(--ds-border-warm)]"
                     }`}
                     style={
                       cookable === "short"
@@ -429,14 +429,14 @@ export default function FillingConsolidationPage() {
                       </div>
                     </button>
                     {isOpen && (
-                      <div className="px-3 pb-3 border-t border-border/60 bg-muted/10 space-y-3 pt-3">
+                      <div className="px-3 pb-3 border-t border-[color:var(--ds-border-warm)]/60 bg-muted/10 space-y-3 pt-3">
                         {/* Ingredients */}
                         {need.scaledIngredients.length > 0 && !nothingToCook && (
                           <div>
                             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
                               <ClipboardList className="w-3 h-3" /> Ingredients for this batch
                             </p>
-                            <ul className="divide-y divide-border rounded-md border border-border bg-card">
+                            <ul className="divide-y divide-border rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
                               {need.scaledIngredients.map((si, i) => {
                                 const ing = ingredientById.get(si.ingredientId);
                                 const st = ingStatusById.get(si.ingredientId);
@@ -471,7 +471,7 @@ export default function FillingConsolidationPage() {
                           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
                             Needed for
                           </p>
-                          <ul className="divide-y divide-border rounded-md border border-border bg-card">
+                          <ul className="divide-y divide-border rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
                             {need.usedBy.map((u, i) => (
                               <li key={`${u.orderId}-${i}`} className="flex items-center justify-between px-2.5 py-1.5 text-xs gap-2">
                                 <div className="min-w-0">
@@ -512,7 +512,7 @@ export default function FillingConsolidationPage() {
           onClick={() => !cookedSaving && setCookedModal(null)}
         >
           <div
-            className="bg-card rounded-sm border border-border p-5 max-w-[420px] w-[92vw] shadow-xl"
+            className="bg-card rounded-sm border border-[color:var(--ds-border-warm)] p-5 max-w-[420px] w-[92vw] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold mb-1">
@@ -545,7 +545,7 @@ export default function FillingConsolidationPage() {
                 type="button"
                 onClick={() => setCookedModal(null)}
                 disabled={cookedSaving}
-                className="text-[12px] px-3 py-1.5 rounded-sm border border-border hover:bg-muted/40"
+                className="text-[12px] px-3 py-1.5 rounded-sm border border-[color:var(--ds-border-warm)] hover:bg-muted/40"
               >
                 Cancel
               </button>

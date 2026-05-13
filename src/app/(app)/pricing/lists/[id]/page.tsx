@@ -191,7 +191,7 @@ export default function PriceListDetailPage({
               />
               Archived — hide from customer dropdowns
             </label>
-            <div className="flex justify-between items-center pt-3 border-t border-border">
+            <div className="flex justify-between items-center pt-3 border-t border-[color:var(--ds-border-warm)]">
               <button
                 type="button"
                 onClick={saveHeader}
@@ -241,7 +241,7 @@ export default function PriceListDetailPage({
         {/* Side rail */}
         <aside className="space-y-4">
           <div
-            className="border border-border bg-card p-4"
+            className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
             style={{ borderRadius: 4 }}
           >
             <h3
@@ -285,7 +285,7 @@ export default function PriceListDetailPage({
           </div>
 
           <div
-            className="border border-border bg-card p-4"
+            className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
             style={{ borderRadius: 4 }}
           >
             <h3
@@ -361,7 +361,7 @@ function RulesPanel({
 
   return (
     <section
-      className="border border-border bg-card p-4"
+      className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
       style={{ borderRadius: 4 }}
     >
       <h3
@@ -383,7 +383,7 @@ function RulesPanel({
 
       {/* Add form */}
       <div
-        className="mb-4 p-3 border border-border bg-muted/40"
+        className="mb-4 p-3 border border-[color:var(--ds-border-warm)] bg-muted/40"
         style={{ borderRadius: 3 }}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
@@ -484,7 +484,7 @@ function RulesPanel({
           {items.map((it) => (
             <li
               key={it.id}
-              className="flex items-center gap-3 px-3 py-1.5 border border-border bg-muted text-[12px]"
+              className="flex items-center gap-3 px-3 py-1.5 border border-[color:var(--ds-border-warm)] bg-muted text-[12px]"
               style={{ borderRadius: 3 }}
             >
               <span

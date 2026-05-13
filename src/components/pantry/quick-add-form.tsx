@@ -39,7 +39,7 @@ export function QuickAddForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="border border-border bg-card p-4 space-y-2.5"
+      className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-2.5"
       style={{ borderRadius: 4 }}
     >
       {children}

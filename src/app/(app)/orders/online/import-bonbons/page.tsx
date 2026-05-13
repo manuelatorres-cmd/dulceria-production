@@ -166,7 +166,7 @@ export default function BoxContentsImportPage() {
 
       <div className="px-4 pb-10 space-y-5">
         {!parsed && !result && (
-          <section className="rounded-sm border border-dashed border-border bg-card p-8 text-center space-y-3">
+          <section className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-card p-8 text-center space-y-3">
             <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
             <div>
               <p className="text-sm">Drop your box-builder CSV here or</p>
@@ -231,7 +231,7 @@ export default function BoxContentsImportPage() {
 
         {parsed && parsed.missingRequiredColumns.length === 0 && !result && (
           <>
-            <section className="rounded-sm border border-border bg-card p-4">
+            <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <h2 className="text-sm font-semibold text-primary">Preview</h2>
@@ -264,7 +264,7 @@ export default function BoxContentsImportPage() {
                 return (
                   <li
                     key={o.orderRef}
-                    className={`rounded-sm border bg-card p-3 space-y-2 ${matched ? "border-border" : "border-status-warn-edge bg-status-warn-bg/30"}`}
+                    className={`rounded-sm border bg-card p-3 space-y-2 ${matched ? "border-[color:var(--ds-border-warm)]" : "border-status-warn-edge bg-status-warn-bg/30"}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -280,7 +280,7 @@ export default function BoxContentsImportPage() {
                         {o.lines.length} chocolate{o.lines.length === 1 ? "" : "s"} · {o.lines.reduce((s, l) => s + l.quantity, 0)} pcs
                       </span>
                     </div>
-                    <ul className="divide-y divide-border rounded-md border border-border">
+                    <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
                       {o.lines.map((li, i) => {
                         const skipped = isSkipped(o.orderRef, i);
                         const resolved = getResolved(o.orderRef, i, li.resolvedProductId);
@@ -321,7 +321,7 @@ export default function BoxContentsImportPage() {
                                   className={`text-[11px] px-2 py-1 rounded-sm border transition ${
                                     skipped
                                       ? "bg-foreground text-background border-foreground"
-                                      : "bg-card border-border text-muted-foreground hover:border-foreground"
+                                      : "bg-card border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-foreground"
                                   }`}
                                 >
                                   {skipped ? "Skipped" : "Skip"}

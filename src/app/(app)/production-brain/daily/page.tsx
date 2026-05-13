@@ -1679,7 +1679,7 @@ export default function DailyV2Page() {
           <button
             type="button"
             onClick={() => setViewDate((d) => addDaysIso(d, -1))}
-            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted text-sm leading-none"
+            className="w-7 h-7 rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:bg-muted text-sm leading-none"
             title="Previous day"
           >
             ‹
@@ -1696,7 +1696,7 @@ export default function DailyV2Page() {
           <button
             type="button"
             onClick={() => setViewDate((d) => addDaysIso(d, 1))}
-            className="w-7 h-7 rounded-full border border-border bg-card hover:bg-muted text-sm leading-none"
+            className="w-7 h-7 rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:bg-muted text-sm leading-none"
             title="Next day"
           >
             ›
@@ -1705,7 +1705,7 @@ export default function DailyV2Page() {
             <button
               type="button"
               onClick={() => setViewDate(today)}
-              className="ml-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium border border-border bg-card hover:bg-muted"
+              className="ml-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:bg-muted"
               title="Jump back to today"
             >
               today
@@ -1718,7 +1718,7 @@ export default function DailyV2Page() {
               <button
                 type="button"
                 onClick={() => setFilterOpen((v) => !v)}
-                className="rounded-full px-3 py-1.5 text-xs font-medium border border-border bg-card hover:bg-muted inline-flex items-center gap-1.5"
+                className="rounded-full px-3 py-1.5 text-xs font-medium border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:bg-muted inline-flex items-center gap-1.5"
                 title="Scope today's checklist to selected sources"
               >
                 {sourceFilter.size === 0
@@ -1732,7 +1732,7 @@ export default function DailyV2Page() {
                     className="fixed inset-0 z-30"
                     onClick={() => setFilterOpen(false)}
                   />
-                  <div className="absolute right-0 mt-1 z-40 w-[280px] max-h-[60vh] overflow-y-auto rounded-[12px] border border-border bg-card shadow-lg p-2 text-xs">
+                  <div className="absolute right-0 mt-1 z-40 w-[280px] max-h-[60vh] overflow-y-auto rounded-[12px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg p-2 text-xs">
                     <div className="flex items-center justify-between px-1.5 py-1">
                       <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
                         Filter sources
@@ -1796,7 +1796,7 @@ export default function DailyV2Page() {
             onClick={handleClose}
             disabled={closing || !isViewingToday}
             title={isViewingToday ? "Close today's production day" : "Switch to today to close the day"}
-            className="rounded-full px-3 py-1.5 text-xs font-medium border border-border bg-card hover:bg-muted disabled:opacity-50 inline-flex items-center gap-1.5"
+            className="rounded-full px-3 py-1.5 text-xs font-medium border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:bg-muted disabled:opacity-50 inline-flex items-center gap-1.5"
           >
             <X className="w-3.5 h-3.5" /> {closing ? "Closing…" : "Close production day"}
           </button>
@@ -1807,7 +1807,7 @@ export default function DailyV2Page() {
           active/upcoming colour-coded. Replaces the heavy tinted strip
           (layout C migration). Phases with no batches today are still
           shown as upcoming so total day shape stays consistent. */}
-      <div className="mb-3 flex gap-1.5 items-center bg-card/60 border border-border rounded-full px-2.5 py-1.5 overflow-x-auto">
+      <div className="mb-3 flex gap-1.5 items-center bg-card/60 border border-[color:var(--ds-border-warm)] rounded-full px-2.5 py-1.5 overflow-x-auto">
         {PHASES.map((ph) => {
           const r = rollups[ph.id];
           const total = r.totalBatches;
@@ -2415,12 +2415,12 @@ function FilterOptionRow({
         (checked ? "bg-primary/10 text-foreground" : "hover:bg-muted text-foreground")
       }
     >
-      <span className="w-3.5 h-3.5 shrink-0 rounded-sm border border-border flex items-center justify-center text-[10px]">
+      <span className="w-3.5 h-3.5 shrink-0 rounded-sm border border-[color:var(--ds-border-warm)] flex items-center justify-center text-[10px]">
         {checked ? "✓" : ""}
       </span>
       <span className="flex-1 truncate">{label}</span>
       {tag && (
-        <span className="rounded-full border border-border bg-card/70 px-1.5 py-[1px] text-[9.5px] text-muted-foreground capitalize shrink-0">
+        <span className="rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]/70 px-1.5 py-[1px] text-[9.5px] text-muted-foreground capitalize shrink-0">
           {tag}
         </span>
       )}

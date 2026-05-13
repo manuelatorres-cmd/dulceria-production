@@ -82,7 +82,7 @@ export default function SkillsPage() {
       />
 
       <section
-        className="border border-border bg-card p-4 mb-5"
+        className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 mb-5"
         style={{ borderRadius: 4 }}
       >
         <h3
@@ -111,7 +111,7 @@ export default function SkillsPage() {
       </section>
 
       <section
-        className="border border-border bg-card p-4"
+        className="border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4"
         style={{ borderRadius: 4 }}
       >
         <h3
@@ -163,7 +163,7 @@ export default function SkillsPage() {
                 {people
                   .filter((p) => !p.archived)
                   .map((p) => (
-                    <tr key={p.id} className="border-t border-border/60">
+                    <tr key={p.id} className="border-t border-[color:var(--ds-border-warm)]/60">
                       <td
                         className="sticky left-0 bg-card py-2 pr-4"
                         style={{

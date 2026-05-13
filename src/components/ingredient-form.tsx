@@ -418,7 +418,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
               type="checkbox"
               checked={shellCapable}
               onChange={(e) => { setShellCapable(e.target.checked); onDirtyChange?.(true); }}
-              className="rounded border-border"
+              className="rounded border-[color:var(--ds-border-warm)]"
             />
             Can be used as shell chocolate
             <span className="text-xs text-muted-foreground">(couverture)</span>
@@ -565,7 +565,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
             ))}
           </div>
 
-          <div className="border border-border rounded-sm overflow-hidden">
+          <div className="border border-[color:var(--ds-border-warm)] rounded-sm overflow-hidden">
             <div className="px-3 py-2 bg-muted/50 flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-foreground uppercase tracking-wide">Tree nuts</span>
               <div className="flex gap-3">
@@ -701,7 +701,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
           )}
 
           {/* Purchase log extras (Phase 8) */}
-          <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border">
+          <div className="grid grid-cols-3 gap-3 pt-2 border-t border-[color:var(--ds-border-warm)]">
             <div>
               <label className="label">Supplier</label>
               <input
@@ -752,12 +752,12 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
             </p>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer pt-1 border-t border-border">
+          <label className="flex items-center gap-2 cursor-pointer pt-1 border-t border-[color:var(--ds-border-warm)]">
             <input
               type="checkbox"
               checked={updateDefault}
               onChange={(e) => setUpdateDefault(e.target.checked)}
-              className="rounded border-border"
+              className="rounded border-[color:var(--ds-border-warm)]"
             />
             <span className="text-xs">
               <span className="font-medium">Update default price</span>
@@ -773,7 +773,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
               type="checkbox"
               checked={pricingIrrelevant}
               onChange={(e) => setPricingIrrelevant(e.target.checked)}
-              className="rounded border-border"
+              className="rounded border-[color:var(--ds-border-warm)]"
             />
             <span className="text-xs text-muted-foreground">Not relevant for pricing (e.g. water, salt) — treated as zero cost</span>
           </label>

@@ -286,7 +286,7 @@ export default function ShopifyImportPage() {
         </Link>
 
         {!parsed && !result && (
-          <section className="rounded-sm border border-dashed border-border bg-card p-8 text-center space-y-3">
+          <section className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-card p-8 text-center space-y-3">
             <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
             <div>
               <p className="text-sm">Drop your Shopify orders CSV here or</p>
@@ -356,7 +356,7 @@ export default function ShopifyImportPage() {
 
         {parsed && parsed.missingRequiredColumns.length === 0 && !result && (
           <>
-            <section className="rounded-sm border border-border bg-card p-4">
+            <section className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <h2 className="text-sm font-semibold text-primary">Preview</h2>
@@ -420,7 +420,7 @@ export default function ShopifyImportPage() {
                 return (
                   <li
                     key={o.name}
-                    className={`rounded-sm border bg-card p-3 space-y-2 ${isDup ? "border-border/60 opacity-60" : excluded.has(o.name) ? "border-border/60 opacity-50" : "border-border"}`}
+                    className={`rounded-sm border bg-card p-3 space-y-2 ${isDup ? "border-[color:var(--ds-border-warm)]/60 opacity-60" : excluded.has(o.name) ? "border-[color:var(--ds-border-warm)]/60 opacity-50" : "border-[color:var(--ds-border-warm)]"}`}
                   >
                     <div className="flex items-start gap-2">
                       <input
@@ -456,7 +456,7 @@ export default function ShopifyImportPage() {
                         {o.lineItems.length} item{o.lineItems.length === 1 ? "" : "s"}
                       </span>
                     </div>
-                    <ul className="divide-y divide-border rounded-md border border-border">
+                    <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
                       {o.lineItems.map((li, i) => {
                         const pick = getPick(o.name, i, li);
                         const dec = pick ? decodePicker(pick) : null;
@@ -612,7 +612,7 @@ export default function ShopifyImportPage() {
                                   <span className={`text-[10.5px] tabular-nums ${stockClass}`}>
                                     {stockLabel}
                                   </span>
-                                  <div className="ml-auto inline-flex rounded-full border border-border bg-card overflow-hidden text-[10.5px]">
+                                  <div className="ml-auto inline-flex rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden text-[10.5px]">
                                     <button
                                       type="button"
                                       onClick={() => setProduceSet((p) => { const n = new Set(p); n.add(lk); return n; })}

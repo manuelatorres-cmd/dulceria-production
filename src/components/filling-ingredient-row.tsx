@@ -115,7 +115,7 @@ export function FillingIngredientRow({
               onChange={(e) => setAmount(e.target.value)}
               onBlur={handleBlur}
               aria-label="Amount in grams"
-              className="w-20 rounded-md border border-border bg-card px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-20 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <span className="text-sm text-muted-foreground">g</span>
           </div>
@@ -126,7 +126,7 @@ export function FillingIngredientRow({
             onBlur={handleNoteBlur}
             placeholder="note…"
             aria-label="Note"
-            className="w-28 rounded-md border border-transparent bg-transparent px-2 py-1 text-xs text-muted-foreground placeholder:text-muted-foreground/40 hover:border-border focus:border-border focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-28 rounded-md border border-transparent bg-transparent px-2 py-1 text-xs text-muted-foreground placeholder:text-muted-foreground/40 hover:border-[color:var(--ds-border-warm)] focus:border-[color:var(--ds-border-warm)] focus:outline-none focus:ring-2 focus:ring-primary"
           />
           {pendingRemove ? (
             <span className="flex items-center gap-1.5 text-xs">

@@ -84,7 +84,7 @@ export default function OnlineOrdersPage() {
             </Link>
             <Link
               href="/orders/online/import-bonbons"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-foreground/30"
+              className="inline-flex items-center gap-1.5 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm font-medium hover:border-foreground/30"
             >
               <Upload className="w-4 h-4" /> Import box contents
             </Link>
@@ -99,8 +99,8 @@ export default function OnlineOrdersPage() {
                 <ShoppingCart className="w-4 h-4" /> What needs producing
               </h2>
             </div>
-            <div className="rounded-sm border border-border bg-card overflow-hidden">
-              <div className="flex items-center px-3 py-1.5 bg-muted/30 border-b border-border text-[10px] uppercase tracking-wide text-muted-foreground">
+            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
+              <div className="flex items-center px-3 py-1.5 bg-muted/30 border-b border-[color:var(--ds-border-warm)] text-[10px] uppercase tracking-wide text-muted-foreground">
                 <span className="flex-1">Product</span>
                 <span className="w-20 text-right">Ordered</span>
                 <span className="w-24 text-right">In production</span>
@@ -110,7 +110,7 @@ export default function OnlineOrdersPage() {
                 const product = productMap.get(row.productId);
                 const cls = row.short > 0 ? "text-status-warn" : "text-status-ok";
                 return (
-                  <div key={row.productId} className="flex items-center px-3 py-1.5 border-b border-border last:border-b-0 text-sm">
+                  <div key={row.productId} className="flex items-center px-3 py-1.5 border-b border-[color:var(--ds-border-warm)] last:border-b-0 text-sm">
                     <span className="flex-1 truncate">{product?.name ?? row.productId}</span>
                     <span className="w-20 text-right tabular-nums">{row.needed}</span>
                     <span className="w-24 text-right tabular-nums">{row.available}</span>
@@ -135,7 +135,7 @@ export default function OnlineOrdersPage() {
                     "text-[11.5px] px-2.5 py-0.5 rounded-full border transition " +
                     (deliveryFilter === k
                       ? "bg-foreground text-background border-foreground"
-                      : "bg-card border-border text-foreground hover:border-foreground")
+                      : "bg-card border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
                   }
                 >
                   {k === "all" ? `All (${allOnline.length})`
@@ -146,7 +146,7 @@ export default function OnlineOrdersPage() {
             </div>
           </div>
           {onlineOrders.length === 0 ? (
-            <div className="rounded-sm border border-dashed border-border bg-card p-8 text-center">
+            <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-card p-8 text-center">
               <p className="text-sm text-muted-foreground">
                 No open online orders. Import a Shopify CSV to get started.
               </p>
@@ -167,7 +167,7 @@ export default function OnlineOrdersPage() {
                   return it.quantity > avail;
                 });
                 return (
-                  <li key={o.id} className="rounded-sm border border-border bg-card p-3">
+                  <li key={o.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -188,14 +188,14 @@ export default function OnlineOrdersPage() {
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/orders/online/${encodeURIComponent(o.id!)}`}
-                          className="inline-flex items-center gap-1 rounded-sm border border-border px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
+                          className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
                         >
                           <FileText className="w-3 h-3" /> Packing slip
                         </Link>
                         <ShipButton orderId={o.id!} disabled={lineShortfall} />
                       </div>
                     </div>
-                    <ul className="mt-2 divide-y divide-border rounded-md border border-border">
+                    <ul className="mt-2 divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
                       {lines.map((it) => {
                         const avail = locationTotals.get(it.productId)?.production ?? 0;
                         const short = Math.max(0, it.quantity - avail);

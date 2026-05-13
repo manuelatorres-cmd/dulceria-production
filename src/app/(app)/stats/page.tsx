@@ -447,14 +447,14 @@ export default function StatsPage() {
                 type="date"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="text-sm border border-border rounded px-2 py-1 bg-background"
+                className="text-sm border border-[color:var(--ds-border-warm)] rounded px-2 py-1 bg-background"
               />
               <span className="text-xs text-muted-foreground">to</span>
               <input
                 type="date"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="text-sm border border-border rounded px-2 py-1 bg-background"
+                className="text-sm border border-[color:var(--ds-border-warm)] rounded px-2 py-1 bg-background"
               />
             </div>
           )}
@@ -466,7 +466,7 @@ export default function StatsPage() {
                 <select
                   value={variantFilter}
                   onChange={(e) => setVariantFilter(e.target.value)}
-                  className="text-sm border border-border rounded-md px-2 py-1.5 bg-background"
+                  className="text-sm border border-[color:var(--ds-border-warm)] rounded-md px-2 py-1.5 bg-background"
                 >
                   <option value="">All variants</option>
                   {variants.map((c) => (
@@ -478,7 +478,7 @@ export default function StatsPage() {
                 <select
                   value={productFilter}
                   onChange={(e) => setProductFilter(e.target.value)}
-                  className="text-sm border border-border rounded-md px-2 py-1.5 bg-background max-w-[14rem]"
+                  className="text-sm border border-[color:var(--ds-border-warm)] rounded-md px-2 py-1.5 bg-background max-w-[14rem]"
                 >
                   <option value="">All products</option>
                   {producedProducts.map((p) => (
@@ -512,7 +512,7 @@ export default function StatsPage() {
           <>
             {/* KPI cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="rounded-sm border border-border bg-card p-4">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">To stock</p>
                 <p className="text-2xl font-semibold tabular-nums mt-1">
                   {kpis.totalProducts.toLocaleString()}
@@ -523,7 +523,7 @@ export default function StatsPage() {
                   </p>
                 )}
               </div>
-              <div className="rounded-sm border border-border bg-card p-4">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Yield</p>
                 <p className={`text-2xl font-semibold tabular-nums mt-1 ${
                   kpis.yieldRate >= 98 ? "text-status-ok" : kpis.yieldRate >= 90 ? "" : "text-status-warn"
@@ -536,11 +536,11 @@ export default function StatsPage() {
                   </p>
                 )}
               </div>
-              <div className="rounded-sm border border-border bg-card p-4">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Batches</p>
                 <p className="text-2xl font-semibold tabular-nums mt-1">{kpis.uniquePlans}</p>
               </div>
-              <div className="rounded-sm border border-border bg-card p-4">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Top product</p>
                 <p className="text-sm font-semibold mt-1 truncate" title={kpis.topProduct?.name}>
                   {kpis.topProduct?.name ?? "—"}
@@ -555,13 +555,13 @@ export default function StatsPage() {
 
             {/* Chart */}
             {filteredEvents.length > 0 && (
-              <div className="rounded-sm border border-border bg-card p-4">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Products per {granularity === "month" ? "month" : "week"}
                   </p>
                   {/* Granularity toggle */}
-                  <div className="flex text-xs border border-border rounded overflow-hidden">
+                  <div className="flex text-xs border border-[color:var(--ds-border-warm)] rounded overflow-hidden">
                     <button
                       onClick={() => setGranularity("month")}
                       className={`px-2.5 py-1 transition-colors ${
@@ -574,7 +574,7 @@ export default function StatsPage() {
                     </button>
                     <button
                       onClick={() => setGranularity("week")}
-                      className={`px-2.5 py-1 border-l border-border transition-colors ${
+                      className={`px-2.5 py-1 border-l border-[color:var(--ds-border-warm)] transition-colors ${
                         granularity === "week"
                           ? "bg-stone-800 text-white"
                           : "text-muted-foreground hover:bg-stone-100"
@@ -657,7 +657,7 @@ export default function StatsPage() {
                   </div>
                 </div>
                 {(productColorList.length > 1 || chartData.some((d) => d.waste > 0)) && (
-                  <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-border/40">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-[color:var(--ds-border-warm)]/40">
                     {productColorList.map((r) => (
                       <div
                         key={r.id}
@@ -703,8 +703,8 @@ export default function StatsPage() {
 
             {/* Product leaderboard */}
             {leaderboard.length > 0 && (
-              <div className="rounded-sm border border-border bg-card overflow-hidden">
-                <div className="px-4 py-3 border-b border-border/50">
+              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
+                <div className="px-4 py-3 border-b border-[color:var(--ds-border-warm)]/50">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Product breakdown
                   </p>

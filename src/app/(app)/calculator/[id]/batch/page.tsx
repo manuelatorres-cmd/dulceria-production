@@ -201,7 +201,7 @@ export default function BatchPage({ params }: { params: Promise<{ id: string }> 
           <div className="flex gap-2">
             <button
               onClick={() => handleFeedbackDecision("to_improve")}
-              className="flex-1 text-sm border border-border rounded-full py-2 font-medium hover:bg-muted transition-colors"
+              className="flex-1 text-sm border border-[color:var(--ds-border-warm)] rounded-full py-2 font-medium hover:bg-muted transition-colors"
             >
               Needs improvement
             </button>
@@ -281,14 +281,14 @@ function ScaledProductCard({ title, subtitle, rows }: { title: string; subtitle:
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   return (
-    <div className="rounded-sm border border-border bg-card overflow-hidden">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
       <div className="flex justify-between items-start px-3 pt-3 pb-2 bg-primary/8">
         <div>
           <h3 className="font-medium text-sm">{title}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
         </div>
       </div>
-      <ul className="border-t border-border">
+      <ul className="border-t border-[color:var(--ds-border-warm)]">
         {rows.map((row) => {
           const active = hoveredId === row.id;
           return (
@@ -296,7 +296,7 @@ function ScaledProductCard({ title, subtitle, rows }: { title: string; subtitle:
               key={row.id}
               onMouseEnter={() => setHoveredId(row.id)}
               onMouseLeave={() => setHoveredId(null)}
-              className={`flex items-baseline gap-2 px-3 py-2 border-b border-border last:border-b-0 transition-colors ${active ? "bg-primary/8" : ""}`}
+              className={`flex items-baseline gap-2 px-3 py-2 border-b border-[color:var(--ds-border-warm)] last:border-b-0 transition-colors ${active ? "bg-primary/8" : ""}`}
             >
               <span className={`text-sm flex-1 min-w-0 truncate ${active ? "font-medium" : ""}`}>{row.name}</span>
               <span className="text-xs text-muted-foreground tabular-nums shrink-0">{row.originalAmount}g →</span>
@@ -331,7 +331,7 @@ function RatingRow({ label, value, onChange }: { label: string; value: number; o
             className={`w-9 h-9 rounded text-sm font-medium border transition-colors ${
               n <= value
                 ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card border-border hover:border-primary/50"
+                : "bg-card border-[color:var(--ds-border-warm)] hover:border-primary/50"
             }`}
           >
             {n}

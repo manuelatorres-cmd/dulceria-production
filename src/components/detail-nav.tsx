@@ -38,7 +38,7 @@ export function DetailNav<T extends { id?: string }>({
     <div className="flex items-center justify-between gap-2 mb-3 text-[11px] text-muted-foreground">
       <Link
         href={prev ? hrefFor(prev) : "#"}
-        className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 max-w-[40%] ${
+        className={`inline-flex items-center gap-1.5 rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2.5 py-1 max-w-[40%] ${
           prev ? "hover:border-foreground/30 hover:text-foreground" : "opacity-30 pointer-events-none"
         }`}
         aria-label="Previous item"
@@ -54,7 +54,7 @@ export function DetailNav<T extends { id?: string }>({
       </span>
       <Link
         href={next ? hrefFor(next) : "#"}
-        className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 max-w-[40%] ${
+        className={`inline-flex items-center gap-1.5 rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2.5 py-1 max-w-[40%] ${
           next ? "hover:border-foreground/30 hover:text-foreground" : "opacity-30 pointer-events-none"
         }`}
         aria-label="Next item"

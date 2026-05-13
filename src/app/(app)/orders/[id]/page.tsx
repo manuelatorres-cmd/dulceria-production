@@ -498,7 +498,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           || linkedCustomer.language
           || linkedCustomer.paymentTerms
         ) && (
-          <div className="rounded-sm border border-border bg-muted/30 px-3 py-2 text-xs space-y-1">
+          <div className="rounded-sm border border-[color:var(--ds-border-warm)] bg-muted/30 px-3 py-2 text-xs space-y-1">
             <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
               <User className="w-3.5 h-3.5" /> Customer preferences
             </div>
@@ -578,7 +578,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
                 order.status === s
                   ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card text-muted-foreground border-border hover:bg-muted"
+                  : "bg-card text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
               }`}
             >
               {ORDER_STATUS_LABELS[s]}
@@ -596,7 +596,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             const pct = Math.round((totalProgress / planIds.length) * 100);
             return (
               <span
-                className="ml-auto rounded-sm border border-border bg-card px-3 py-1 text-xs text-muted-foreground tabular-nums"
+                className="ml-auto rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1 text-xs text-muted-foreground tabular-nums"
                 title="Average phases completed across linked batches"
               >
                 {pct}% complete
@@ -616,7 +616,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
         {/* Priority + notes + delivery */}
         {!editing && (
-          <div className="rounded-sm border border-border bg-card p-4 space-y-2">
+          <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Priority</span>
               <span className="font-medium">{ORDER_PRIORITY_LABELS[order.priority]}</span>
@@ -638,19 +638,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             )}
             {order.deliveryAddress && (
-              <div className="pt-2 border-t border-border">
+              <div className="pt-2 border-t border-[color:var(--ds-border-warm)]">
                 <p className="text-xs text-muted-foreground mb-1">Address</p>
                 <p className="text-sm whitespace-pre-wrap">{order.deliveryAddress}</p>
               </div>
             )}
             {order.deliveryNotes && (
-              <div className="pt-2 border-t border-border">
+              <div className="pt-2 border-t border-[color:var(--ds-border-warm)]">
                 <p className="text-xs text-muted-foreground mb-1">Delivery notes</p>
                 <p className="text-sm whitespace-pre-wrap">{order.deliveryNotes}</p>
               </div>
             )}
             {order.notes && (
-              <div className="pt-2 border-t border-border">
+              <div className="pt-2 border-t border-[color:var(--ds-border-warm)]">
                 <p className="text-xs text-muted-foreground mb-1">Notes</p>
                 <p className="text-sm whitespace-pre-wrap">{order.notes}</p>
               </div>
@@ -712,7 +712,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             if (!anyUnlinked) return null;
             if (order.status !== "pending" && order.status !== "in_production") return null;
             return (
-              <div className="mb-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              <div className="mb-2 rounded-md border border-dashed border-[color:var(--ds-border-warm)] bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                 Pending — not yet scheduled.{" "}
                 <Link href="/plan" className="text-primary hover:underline">Regenerate plan</Link>{" "}
                 to schedule the produce-fresh lines.
@@ -736,7 +736,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
+            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
               No products yet.
             </p>
           ) : (
@@ -777,7 +777,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             scoped view. Linked from the Production schedule button up top. */}
 
         {/* Replace + Delete */}
-        <section className="pt-4 border-t border-border flex items-center gap-5">
+        <section className="pt-4 border-t border-[color:var(--ds-border-warm)] flex items-center gap-5">
           {!confirmDelete ? (
             <button
               onClick={() => setConfirmDelete(true)}
@@ -795,7 +795,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <button onClick={handleDelete} className="rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium">
                   Yes, delete
                 </button>
-                <button onClick={() => setConfirmDelete(false)} className="rounded-sm border border-border px-4 py-2 text-sm">
+                <button onClick={() => setConfirmDelete(false)} className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm">
                   Cancel
                 </button>
               </div>
@@ -833,8 +833,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {reassignProposals && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40 " onClick={() => setReassignProposals(null)} />
-            <div className="relative w-full max-w-lg rounded border border-border bg-card shadow-xl overflow-hidden">
-              <div className="px-5 pt-5 pb-3 border-b border-border bg-amber-50">
+            <div className="relative w-full max-w-lg rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
+              <div className="px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)] bg-amber-50">
                 <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" /> In-flight work — reassign or discard?
                 </h3>
@@ -846,7 +846,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
               <ul className="px-5 py-3 space-y-3 max-h-80 overflow-y-auto">
                 {reassignProposals.map((p) => (
-                  <li key={p.orderPlanLinkId} className="rounded-sm border border-border p-3 space-y-2">
+                  <li key={p.orderPlanLinkId} className="rounded-sm border border-[color:var(--ds-border-warm)] p-3 space-y-2">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="text-sm font-semibold">{p.productName}</p>
                       <span className="text-[11px] tabular-nums text-muted-foreground">
@@ -878,10 +878,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </li>
                 ))}
               </ul>
-              <div className="px-5 py-3 border-t border-border flex justify-end gap-2 bg-muted/20">
+              <div className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2 bg-muted/20">
                 <button
                   onClick={() => setReassignProposals(null)}
-                  className="rounded-sm border border-border px-4 py-2 text-sm"
+                  className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
                 >
                   Keep order
                 </button>
@@ -1008,7 +1008,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
   }
 
   return (
-    <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Type</label>
@@ -1043,7 +1043,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         </label>
         {customerId ? (
           <div className="flex items-center gap-2">
-            <div className="flex-1 rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm">
+            <div className="flex-1 rounded-md border border-[color:var(--ds-border-warm)] bg-muted/30 px-3 py-1.5 text-sm">
               {customerName || "(linked)"}
             </div>
             <button
@@ -1069,7 +1069,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
               autoComplete="off"
             />
             {customerListOpen && (
-              <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border border-border bg-card shadow-lg max-h-64 overflow-y-auto">
+              <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-64 overflow-y-auto">
                 {customerMatches.map((c) => {
                   const miss = computeMissingRequiredCustomerFields(c);
                   return (
@@ -1111,7 +1111,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
                       setCustomerListOpen(false);
                     }
                   }}
-                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm border-t border-border bg-muted/40 hover:bg-muted text-primary font-medium"
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm border-t border-[color:var(--ds-border-warm)] bg-muted/40 hover:bg-muted text-primary font-medium"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   {customerQuery.trim() ? `+ Add "${customerQuery.trim()}" as customer` : "+ New customer with details…"}
@@ -1159,7 +1159,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="input resize-none" />
       </div>
 
-      <div className="pt-2 border-t border-border space-y-3">
+      <div className="pt-2 border-t border-[color:var(--ds-border-warm)] space-y-3">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fulfilment</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -1210,7 +1210,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         )}
       </div>
 
-      <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-[10px] border border-border bg-card px-3 py-2.5">
+      <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-[10px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
         <input
           type="checkbox"
           checked={isolated}
@@ -1233,7 +1233,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         >
           {saving ? "Saving…" : "Save"}
         </button>
-        <button onClick={onCancel} className="rounded-sm border border-border px-4 py-2 text-sm">
+        <button onClick={onCancel} className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm">
           Cancel
         </button>
       </div>
@@ -1324,7 +1324,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
   }
 
   return (
-    <div className="rounded-sm border border-border bg-card p-3 space-y-2 mb-2">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2 mb-2">
       <div className="grid grid-cols-6 gap-2">
         <div className="col-span-3 relative">
           <input
@@ -1343,7 +1343,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
             autoComplete="off"
           />
           {pickerOpen && matches.length > 0 && (
-            <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border border-border bg-card shadow-lg max-h-56 overflow-y-auto">
+            <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
               {matches.map((p) => {
                 const r = resolveProductPrice(p.id!);
                 return (
@@ -1412,7 +1412,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
               className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 font-medium ${
                 fulfilmentMode === "borrow"
                   ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                  : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
               }`}
             >
               Take from stock
@@ -1423,7 +1423,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
               className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 font-medium ${
                 fulfilmentMode === "produce"
                   ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                  : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary"
               }`}
             >
               Produce fresh
@@ -1444,7 +1444,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
         <button onClick={handleAdd} disabled={!canSave} className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
           {saving ? "Adding…" : "Add"}
         </button>
-        <button onClick={onCancel} className="rounded-sm border border-border px-3 py-1 text-xs">
+        <button onClick={onCancel} className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs">
           Cancel
         </button>
       </div>
@@ -1599,7 +1599,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
     : short ? "bg-status-alert" : "bg-status-ok";
 
   return (
-    <li className={`rounded-sm border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+    <li className={`rounded-sm border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-card"}`}>
       <div className="flex items-center gap-3">
         <span
           className={`w-2 h-2 rounded-full shrink-0 ${feasibilityColor}`}
@@ -1740,7 +1740,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
           Shell/Fill on 28 Apr") so the user can see the batch's
           lifecycle without opening it. */}
       {links.length > 0 && (
-        <ul className="mt-2 space-y-1.5 pl-3 border-l-2 border-border">
+        <ul className="mt-2 space-y-1.5 pl-3 border-l-2 border-[color:var(--ds-border-warm)]">
           {links.map((lk) => {
             const plan = plansById.get(lk.planId);
             const status = plan?.status ?? "draft";
@@ -1818,7 +1818,7 @@ const PLAN_STATUS_LABEL: Record<ProductionPlan["status"], string> = {
 };
 
 const PLAN_STATUS_STYLE: Record<ProductionPlan["status"], string> = {
-  draft: "bg-muted text-muted-foreground border-border",
+  draft: "bg-muted text-muted-foreground border-[color:var(--ds-border-warm)]",
   active: "bg-status-warn-bg text-status-warn border-status-warn-edge",
   done: "bg-status-ok-bg text-status-ok border-status-ok-edge",
   cancelled: "bg-destructive/10 text-destructive border-destructive/20",
@@ -1860,7 +1860,7 @@ function OrderPackagingSection({ orderId, packaging, packagingUnitCost }: {
         />
       )}
       {lines.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
           No packaging lines. Add ribbons, gift bags, outer boxes, etc.
         </p>
       ) : (
@@ -1947,7 +1947,7 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, packagingUni
   }
 
   return (
-    <div className="rounded-sm border border-border bg-card p-3 space-y-2 mb-2">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2 mb-2">
       <div className="grid grid-cols-6 gap-2">
         <div className="col-span-3 relative">
           <input
@@ -1962,7 +1962,7 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, packagingUni
             autoComplete="off"
           />
           {pickerOpen && matches.length > 0 && (
-            <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border border-border bg-card shadow-lg max-h-56 overflow-y-auto">
+            <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
               {matches.map((p) => {
                 const cost = packagingUnitCost.get(p.id!);
                 return (
@@ -2015,7 +2015,7 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, packagingUni
         <button onClick={handleAdd} disabled={!canSave} className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
           {saving ? "Adding…" : "Add"}
         </button>
-        <button onClick={onCancel} className="rounded-sm border border-border px-3 py-1 text-xs">
+        <button onClick={onCancel} className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs">
           Done
         </button>
         {addedCount > 0 && (
@@ -2108,7 +2108,7 @@ function OrderPackagingLineRow({ line, packagingItem, latestCost }: {
   }
 
   return (
-    <li className="rounded-sm border border-border bg-card px-3 py-2.5">
+    <li className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{packagingName}</p>
@@ -2251,7 +2251,7 @@ function OrderSummaryCard({
         : "border-status-alert/40 bg-status-alert/5 text-status-alert";
 
   return (
-    <div className="rounded-sm border border-border bg-card p-4 space-y-3">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
       {/* Customer-facing totals */}
       <div className="space-y-1.5">
         <TotalLine label="Products (net)" value={productsSubtotalNet} />
@@ -2264,13 +2264,13 @@ function OrderSummaryCard({
             <TotalLine key={b.rate} label={`VAT ${b.rate}%`} value={b.vat} muted />
           ))
         )}
-        <div className="border-t border-border pt-1.5">
+        <div className="border-t border-[color:var(--ds-border-warm)] pt-1.5">
           <TotalLine label="Total (gross)" value={totalGross} emphasis />
         </div>
       </div>
 
       {/* Price paid — toggles net / gross */}
-      <div className="pt-2 border-t border-border">
+      <div className="pt-2 border-t border-[color:var(--ds-border-warm)]">
         <PricePaidField
           order={order}
           suggestedNet={totalNet > 0 ? totalNet : undefined}
@@ -2280,7 +2280,7 @@ function OrderSummaryCard({
       </div>
 
       {/* Internal cost + labour + margin (never shown to customer) */}
-      <div className="pt-2 border-t border-border space-y-1.5">
+      <div className="pt-2 border-t border-[color:var(--ds-border-warm)] space-y-1.5">
         <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
           Internal (not on invoice)
         </p>
@@ -2291,7 +2291,7 @@ function OrderSummaryCard({
           muted
         />
         <TotalLine label="Total cost (ingredients + packaging + labour)" value={calculatedCost.totalCost} muted />
-        <div className="border-t border-border pt-1.5 flex items-center justify-between text-sm">
+        <div className="border-t border-[color:var(--ds-border-warm)] pt-1.5 flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Margin</span>
           <span className={`tabular-nums font-semibold ${
             margin.marginPercent == null
@@ -2443,7 +2443,7 @@ function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
     <div>
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Price paid</p>
-        <div className="flex gap-0.5 text-[10px] rounded-sm border border-border p-0.5">
+        <div className="flex gap-0.5 text-[10px] rounded-sm border border-[color:var(--ds-border-warm)] p-0.5">
           {(["net", "gross"] as const).map((m) => (
             <button
               key={m}
@@ -2555,7 +2555,7 @@ function OrderReadyToPackSection({ orderId }: { orderId: string }) {
       </h2>
 
       {rows.length > 0 ? (
-        <div className="rounded-sm border border-border bg-card overflow-hidden">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
           <ul className="divide-y divide-border">
             {[...byProduct.values()].map((g) => (
               <li key={g.productName} className="px-3 py-2 text-sm">
@@ -2576,7 +2576,7 @@ function OrderReadyToPackSection({ orderId }: { orderId: string }) {
               </li>
             ))}
           </ul>
-          <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-muted/30">
+          <div className="flex items-center justify-between px-3 py-2 border-t border-[color:var(--ds-border-warm)] bg-muted/30">
             <p className="text-xs text-muted-foreground">
               Drains allocated stock + deducts this order's packaging.
             </p>
@@ -2635,7 +2635,7 @@ function OrderScheduleSection({
         <Calendar className="w-4 h-4" /> Production schedule
       </h2>
       {!hasAnySchedule ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-border rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
           Not scheduled yet. Open the <Link href="/plan" className="text-primary hover:underline">Plan</Link> to generate production steps for this order.
         </p>
       ) : (
@@ -2643,7 +2643,7 @@ function OrderScheduleSection({
           {Array.from(scheduleByDay.entries()).map(([day, steps]) => {
             const totalMin = steps.reduce((a, s) => a + s.durationMinutes, 0);
             return (
-              <div key={day} className="rounded-sm border border-border bg-card p-3">
+              <div key={day} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium">
                     {new Date(day + "T12:00:00").toLocaleDateString("de-AT", {
@@ -2731,7 +2731,7 @@ function InlineNewCustomer({
   }
 
   return (
-    <div className="mt-2 rounded-sm border border-border bg-card p-3 space-y-2">
+    <div className="mt-2 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2">
       <p className="text-xs font-semibold text-muted-foreground">New customer (quick)</p>
       <input
         value={companyName}
@@ -2871,10 +2871,10 @@ function ReplaceAndCreditModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40 " onClick={onClose} />
       <div
-        className="relative w-full max-w-md mx-4 border border-border bg-card shadow-xl"
+        className="relative w-full max-w-md mx-4 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl"
         style={{ borderRadius: 4 }}
       >
-        <header className="px-5 pt-4 pb-3 border-b border-border">
+        <header className="px-5 pt-4 pb-3 border-b border-[color:var(--ds-border-warm)]">
           <h3
             className="text-[16px]"
             style={{
@@ -2932,7 +2932,7 @@ function ReplaceAndCreditModal({
           </p>
         </div>
 
-        <footer className="px-5 py-3 border-t border-border flex justify-end gap-2">
+        <footer className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn-secondary">
             Cancel
           </button>
@@ -2983,7 +2983,7 @@ function VariantLinesSection({
         />
       )}
       {variantLines.length > 0 && (
-        <ul className="rounded-sm border border-border bg-card divide-y divide-border">
+        <ul className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
           {variantLines.map((line) => (
             <VariantLineRow key={line.id} line={line} allVariants={allVariants} />
           ))}
@@ -3103,7 +3103,7 @@ function AddVariantForm({
   }
 
   return (
-    <div className="rounded-sm border border-border bg-card p-3 mb-2 space-y-2">
+    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 mb-2 space-y-2">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="label">Variant</label>
@@ -3173,7 +3173,7 @@ function AddVariantForm({
         </button>
         <button
           onClick={onDone}
-          className="rounded-sm border border-border px-3 py-1.5 text-xs"
+          className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-xs"
         >
           Cancel
         </button>

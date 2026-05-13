@@ -84,7 +84,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1 rounded-sm border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
+              className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
             >
               <Printer className="w-3.5 h-3.5" /> Print
             </button>
@@ -102,7 +102,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
         </div>
 
         {/* The sheet — everything below is the packing slip */}
-        <div className="rounded-sm border border-border bg-card p-6 space-y-5 print:border-0 print:p-0 print:shadow-none">
+        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6 space-y-5 print:border-0 print:p-0 print:shadow-none">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Packing slip</p>
@@ -133,7 +133,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <tr className="border-b border-[color:var(--ds-border-warm)] text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                     <th className="py-1.5">Product</th>
                     <th className="py-1.5 text-right w-20">Qty</th>
                     <th className="py-1.5 text-right w-28 print:hidden">In production</th>
@@ -152,7 +152,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
                     const composition = itemsByVariantLine.byLine.get(vl.id ?? "") ?? [];
                     return (
                       <Fragment key={vl.id}>
-                        <tr className="border-b border-border/50">
+                        <tr className="border-b border-[color:var(--ds-border-warm)]/50">
                           <td className="py-1.5 font-medium">
                             {v?.name ?? "Variant"}
                             {sizeLabel && <span className="text-muted-foreground"> · {sizeLabel}</span>}
@@ -167,7 +167,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
                           const avail = locationTotals.get(it.productId)?.production ?? 0;
                           const short = Math.max(0, it.quantity - avail);
                           return (
-                            <tr key={it.id} className="border-b border-border/30 text-[12px]">
+                            <tr key={it.id} className="border-b border-[color:var(--ds-border-warm)]/30 text-[12px]">
                               <td className="py-1 pl-4 text-muted-foreground">↳ {product?.name ?? it.productId}</td>
                               <td className="py-1 text-right tabular-nums text-muted-foreground">{it.quantity}</td>
                               <td className={`py-1 text-right tabular-nums print:hidden text-[11px] ${short > 0 ? "text-status-warn" : "text-muted-foreground"}`}>
@@ -186,7 +186,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
                     const avail = locationTotals.get(it.productId)?.production ?? 0;
                     const short = Math.max(0, it.quantity - avail);
                     return (
-                      <tr key={it.id} className="border-b border-border/50">
+                      <tr key={it.id} className="border-b border-[color:var(--ds-border-warm)]/50">
                         <td className="py-1.5">{product?.name ?? it.productId}</td>
                         <td className="py-1.5 text-right tabular-nums">{it.quantity}</td>
                         <td className={`py-1.5 text-right tabular-nums print:hidden ${short > 0 ? "text-status-warn" : "text-muted-foreground"}`}>
@@ -200,7 +200,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
             )}
           </div>
 
-          <div className="pt-3 border-t border-border text-[11px] text-muted-foreground">
+          <div className="pt-3 border-t border-[color:var(--ds-border-warm)] text-[11px] text-muted-foreground">
             <p>Thanks for your order. Questions? manuela.torres@dulceria-gmbh.com</p>
           </div>
         </div>
