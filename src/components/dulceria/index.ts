@@ -17,3 +17,20 @@ export {
 } from "./campaign-card";
 export { NextUpBanner, type NextUpVariant } from "./next-up-banner";
 export { TimelineStrip, type TimelineMarker } from "./timeline-strip";
+export { AllergenDot, AllergenDots } from "./allergen-dot";
+export { CategorySection, AddCard } from "./category-section";
+export { ProductCard, type ProductStockVariant } from "./product-card";
+export {
+  FillingCard,
+  normalizeFillingStatus,
+  type FillingStatus,
+} from "./filling-card";
+export {
+  MouldCard,
+  MouldSvg,
+  inferMouldShape,
+  type MouldShape,
+} from "./mould-card";
+export { VariantRow, type VariantRowStatus } from "./variant-row";
+export { CollectionCard } from "./collection-card";
+export { DecoSwatch, type DecoStockVariant } from "./deco-swatch";
