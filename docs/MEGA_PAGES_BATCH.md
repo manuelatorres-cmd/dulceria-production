@@ -469,10 +469,10 @@ Phase D.1   /production-brain/daily Right now card                ✓ shipped
 Phase D.2   /production-brain/daily Phase cards                   ✓ shipped
 Phase D.3   /production-brain/daily Side rail                     ✓ shipped
 
-Phase B.1   /orders/[id] metadata section
-Phase B.2   /orders/[id] line items grid
-Phase B.3   /orders/[id] history section
-Phase B.4   /orders/[id] related section
+Phase B.1   /orders/[id] metadata section                       ✓ shipped
+Phase B.2   /orders/[id] line items grid                       ✓ shipped
+Phase B.3   /orders/[id] history section                       ✓ shipped
+Phase B.4   /orders/[id] related section                       ✓ shipped
 
 Phase C.1   /production/[id] wizard chrome (DsTabNav step pills)
 Phase C.2   /production/[id] Plan step
@@ -534,6 +534,77 @@ Reference all existing components in `src/components/dulceria/`. Read mockups in
 - ✓ Section "Source breakdown" collapsed by default; expands to ListRow per shell + filling with grams + % + ingredients — `src/app/(app)/products/[id]/page.tsx:2338-2378`
 - ✓ Section "Ingredient list" kept (Shopify export workflow) — `src/app/(app)/products/[id]/page.tsx:2381-2402`
 - ✓ Footer italic muted "Computed from shell + fillings — edit those to change values" — `src/app/(app)/products/[id]/page.tsx:2405-2407`
+
+## Phase B — `/orders/[id]` body refit · evidence
+
+### Shell + header
+
+- ✓ Wrapped in `<DsDetailPage>` — `src/app/(app)/orders/[id]/page.tsx:461`
+- ✓ Title = customer/event name; meta = `Order #{sourceRef|id.slice(0,8)} · {totalQty} pc · €{totalGross}` — `src/app/(app)/orders/[id]/page.tsx:457-459`
+- ✓ Status badge via `StatusTag` mapped from order.status (pending → pending, in_production → scheduled, done → done, cancelled → neutral) — `src/app/(app)/orders/[id]/page.tsx:357-365, 465`
+- ✓ Breadcrumb back to `/orders` — `src/app/(app)/orders/[id]/page.tsx:464`
+- ✓ prev/next via `navAdjacent`, sorted by `createdAt` desc across `useOrders()` — `src/app/(app)/orders/[id]/page.tsx:340-355, 466-469`
+- ✓ Header actions: Duplicate (Replace+Credit), Cancel (sets status), Delete (with DsDialog confirm) — `src/app/(app)/orders/[id]/page.tsx:471-487`
+- ✗ "Edit" action dropped per non-negotiable spec rule ("No 'Edit mode' toggle anywhere — inline-edit only")
+
+### B.1 — Metadata two-column inline-edit
+
+- ✓ Two-column grid (`auto-fit minmax(280px, 1fr)`) wrapping inline fields — `src/app/(app)/orders/[id]/page.tsx:620-789`
+- ✓ Left col: customer (drawer-driven picker), order date, due date, channel, status, notes
+- ✓ Right col: PO / invoice ref, shipping address, delivery method, requested delivery, gift wrap toggle, customer note
+- ✓ Customer picker: replaces `<select>` with a `DsDrawer` (`CustomerPickerDrawerBody`) that supports search + "+ Add new" inline — `src/app/(app)/orders/[id]/page.tsx:637-688, 984-997, 1801-1888`
+- ✓ Due date wired via `DsInlineField type="date"` → patches `order.deadline` ISO while preserving time-of-day — `src/app/(app)/orders/[id]/page.tsx:690-703`
+- ✓ Channel + Status via `DsInlineSelect` against `ORDER_CHANNELS` / `ORDER_STATUSES` enums — `src/app/(app)/orders/[id]/page.tsx:705-718`
+- ✓ Notes + customer note via `DsInlineTextarea`; delivery address via `DsInlineTextarea` — `src/app/(app)/orders/[id]/page.tsx:720-731, 738-744, 781-787`
+- ✓ Delivery method via `DsInlineSelect` including `— none —` option — `src/app/(app)/orders/[id]/page.tsx:746-755`
+- ✗ "Order date" rendered read-only from `createdAt` (no editable `orderDate` column on Order). Flag ✗ with tooltip — `src/app/(app)/orders/[id]/page.tsx:680-689`
+- ✗ "PO number" surfaced as `invoiceExternalRef` (closest existing column on Order). Migration: add `poNumber` if a distinct PO field is desired — `src/app/(app)/orders/[id]/page.tsx:733-737`
+- ✗ "Gift wrap" toggle rendered disabled with `✗`. Migration: add `giftWrap` boolean on Order — `src/app/(app)/orders/[id]/page.tsx:768-779`
+- ✗ "Requested delivery time" only persists the date portion (no time-picker in `DsInlineField`). Migration: add `DsInlineField type="datetime-local"` or a dedicated time inline editor — `src/app/(app)/orders/[id]/page.tsx:757-766`
+
+### B.2 — Unified lines grid
+
+- ✓ Single `OrderLinesGrid` Section replaces the prior three sections (`VariantLinesSection`, products, `OrderPackagingSection`) — `src/app/(app)/orders/[id]/page.tsx:792-808, 1128-1426`
+- ✓ Toolbar: search input + filter pills (All / Variants / Singles / Decoration) + "+ Add line" primary button — `src/app/(app)/orders/[id]/page.tsx:1244-1300`
+- ✓ Sticky-header `<table>` with `position: sticky; top: 0` on `<thead>` — `src/app/(app)/orders/[id]/page.tsx:1306-1335`
+- ✓ Columns: Product/Variant · Qty · Unit price (+ source line) · Disc.% ✗ · VAT % · Subtotal · × remove
+- ✓ Unit-price cell shows price source below in 10px muted (`from customer price` / `from price list` / `retail fallback` / `per-line override` / `latest purchase cost` / `no price set`) via `priceSourceLabel()` — `src/app/(app)/orders/[id]/page.tsx:1429-1437, 1639-1681`
+- ✓ Inline-edit cells: `NumberCell` (qty), `PriceCell` (unit price), `VatCell` (vat %) — `src/app/(app)/orders/[id]/page.tsx:1561-1781`
+- ✓ Footer: Subtotal (net) · per-rate VAT lines · Total (gross), all tabular-nums, sticky-style stacked under `<tbody>` — `src/app/(app)/orders/[id]/page.tsx:1383-1424`
+- ✓ "+ Add line" opens `DsDrawer` (`AddLineDrawerBody`) with kind toggle Product / Variant / Decoration — `src/app/(app)/orders/[id]/page.tsx:1010-1029, 1892-1969`
+- ✓ × remove triggers `DsDialog` destructive confirm; dispatched by kind to `deleteOrderItem` / `removeVariantFromOrder` / `deleteOrderPackagingLine` — `src/app/(app)/orders/[id]/page.tsx:325-336, 977-985, 1531-1548`
+- ✗ Discount % column rendered as `—` muted with `✗` in header tooltip. Migration: add `discountPercent` numeric column on OrderItem / OrderPackagingLine to unblock — `src/app/(app)/orders/[id]/page.tsx:1335-1338, 1740-1745`
+- ✗ Variant-line unit price flagged `variant set ✗` — `addVariantToOrder` does not currently expose a partial-update path; price is set at variant-pack save time. Migration: expose `updateOrderVariantLine` to allow inline edit — `src/app/(app)/orders/[id]/page.tsx:1648-1655`
+
+### B.3 — History section
+
+- ✓ Section rendered with `ListRow` per event + relative time (with absolute on hover) — `src/app/(app)/orders/[id]/page.tsx:833-872, 1971-2025`
+- ✓ Event chip via `HistoryChip` (Created / Status changed / Batch linked / Note) — `src/app/(app)/orders/[id]/page.tsx:1971-2002`
+- ✓ Default 10 visible + "Show all" / "Show last 10" toggle action in section header — `src/app/(app)/orders/[id]/page.tsx:432-435, 836-845`
+- ✗ Full audit log deferred — no `orderEvent` table exists. Currently surfacing only order-creation (`order.createdAt`) and batch-link creation (`plan.createdAt`); status changes / note edits / line edits can't be replayed without history rows. Migration: add append-only `orderEvent { orderId, eventType, actor, detail, occurredAt }` and write rows from `saveOrder` / `saveOrderItem` / batch-link wiring — `src/app/(app)/orders/[id]/page.tsx:419-454, 866-872`
+
+### B.4 — Related section
+
+- ✓ Linked production batches — `ListRow` per `orderPlanLink` with batch label / allocation qty / step progress / status pill, row click jumps to `/production/[planId]?from=orders` — `src/app/(app)/orders/[id]/page.tsx:874-925`
+- ✓ Plan-status pill colour/ink/bg via `PLAN_STATUS_*` maps — `src/app/(app)/orders/[id]/page.tsx:2027-2052`
+- ✗ Linked invoices — no `invoices` table. Section shows existing `invoiceExternalRef` + `creditReference` strings as a fallback. Migration: add `invoices` table or model a `paymentEvents` table linked to orders — `src/app/(app)/orders/[id]/page.tsx:928-944`
+- ✗ Linked picking jobs — no `pickingJob` table. Section points operator at "Ready to pack" below (which surfaces borrow-line allocations). Migration: add `pickingJob` table or repurpose the readyToPack flow as the canonical picking record — `src/app/(app)/orders/[id]/page.tsx:946-953`
+
+### Preserved supporting flows
+
+- ✓ Reassignment-proposals modal (fires from Delete when batches have ≥Shelling progress) — `src/app/(app)/orders/[id]/page.tsx:1031-1093`
+- ✓ Inline yield → allocation flow indirectly via batch-link rows opening `/production/[planId]`
+- ✓ `OrderStepPipeline`, `OrderSummaryCard`, `OrderReadyToPackSection`, `ReplaceAndCreditModal`, `InlineNewCustomer`, `AddOrderLine`, `AddOrderPackagingLine`, `AddVariantForm`, `PricePaidField` all kept (now wrapped by `Section` / used inside the new drawers).
+
+### Dropped
+
+- `OrderEditForm` (replaced by inline-edit metadata section)
+- `OrderLineRow`, `OrderPackagingLineRow`, `VariantLineRow` (replaced by unified `GridLineRow`)
+- `VariantLinesSection`, `OrderPackagingSection`, separate Products section (replaced by unified `OrderLinesGrid`)
+- `OrderScheduleSection` (was defined but never rendered)
+- Old fixed Replace + Delete footer section (moved into header actions)
+- Old status-pill row + priority/notes/delivery summary card (subsumed by B.1 metadata + status badge)
+- `BackButton` import (`DsDetailPage` provides the breadcrumb)
 
 ## Phase D — `/production-brain/daily` body refit · evidence
 

@@ -19,10 +19,10 @@ import {
   useAllProductionDayLineItems, useProductionDays, useProductionSteps,
   useAllocatedForOrder, markOrderAsPacked,
   computeReassignmentProposals, reassignBatchLink,
+  useOrders,
   type ReassignmentProposal,
 } from "@/lib/hooks";
 import { batchPhaseProgress } from "@/lib/batch-progress";
-import { planStepDoneById } from "@/lib/production";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import { latestPackagingUnitCost } from "@/lib/variantPricing";
@@ -40,21 +40,39 @@ import {
 } from "@/lib/pricing";
 import {
   ORDER_CHANNELS, ORDER_CHANNEL_LABELS,
-  ORDER_PRIORITIES, ORDER_PRIORITY_LABELS,
   ORDER_STATUSES, ORDER_STATUS_LABELS,
   DELIVERY_TYPES, DELIVERY_TYPE_LABELS,
   CUSTOMER_TYPES, CUSTOMER_TYPE_LABELS,
-  type OrderChannel, type OrderPriority, type OrderStatus,
+  type OrderChannel, type OrderStatus,
   type DeliveryType,
   type Packaging, type OrderPackagingLine,
   type ProductCostSnapshot, type PackagingOrder,
   type OrderItem, type Customer, type CustomerType,
-  type OrderPlanLink, type ProductionPlan,
+  type ProductionPlan,
   type Order,
 } from "@/types";
-import { IconPlus as Plus, IconTrash as Trash2, IconX as X, IconPencil as Pencil, IconAlertTriangle as AlertTriangle, IconCheck as Check, IconCalendar as Calendar, IconPackage as Package, IconUserPlus as UserPlus, IconUser as User, IconCopy as Copy } from "@tabler/icons-react";
-import { BackButton } from "@/components/back-button";
+import {
+  IconPlus as Plus, IconTrash as Trash2, IconX as X,
+  IconAlertTriangle as AlertTriangle, IconCheck as Check,
+  IconPackage as Package, IconUserPlus as UserPlus,
+  IconUser as User, IconCopy as Copy, IconSearch as Search,
+  IconCalendar as Calendar,
+} from "@tabler/icons-react";
 import { newId } from "@/lib/supabase";
+import {
+  DsDetailPage, Section, ListRow, DsButton, DsDialog, DsDrawer,
+  DsInlineField, DsInlineTextarea, DsInlineSelect, DsInlineToggle,
+  StatusTag, type StatusTagKind,
+} from "@/components/dulceria";
+
+/* ─────────────────────────────────────────────────────────────
+ * Order detail (Phase B refit)
+ * DsDetailPage shell + B.1 metadata + B.2 unified lines grid
+ * + B.3 history (✗ deferred) + B.4 related (batches + ✗).
+ * ───────────────────────────────────────────────────────────── */
+
+type LineKind = "variant" | "single" | "decoration";
+type LineFilter = "all" | "variant" | "single" | "decoration";
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);
@@ -69,11 +87,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const packaging = usePackagingList(true);
   const replenishmentOrder = useReplenishmentOrderFor(orderId);
   const parentOrder = useOrder(order?.sourceOrderId);
-  // Full customer record for the preferences banner + missing-data badge.
   const linkedCustomer = useCustomer(order?.customerId);
   const packagingLines = useOrderPackagingLines(orderId);
   const productMap = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
   const packagingMap = useMemo(() => new Map(packaging.map((p) => [p.id!, p])), [packaging]);
+  const allOrders = useOrders();
 
   const activeMinutesMap = useProductActiveMinutesMap();
   const allLineItems = useAllProductionDayLineItems();
@@ -88,17 +106,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const allPlans = useProductionPlans();
   const allPlanStepStatuses = useAllPlanStepStatuses();
   const plansById = useMemo(() => new Map(allPlans.map((p) => [p.id!, p])), [allPlans]);
-  const linksByItemId = useMemo(() => {
-    const m = new Map<string, OrderPlanLink[]>();
-    for (const lk of orderPlanLinks) {
-      const arr = m.get(lk.orderItemId) ?? [];
-      arr.push(lk);
-      m.set(lk.orderItemId, arr);
-    }
-    return m;
-  }, [orderPlanLinks]);
 
-  // Latest product unit cost + packaging unit cost, shared with the quote flow.
+  // Cost + price hierarchy (preserved from previous implementation).
   const { data: costSnapshots = [] } = useQuery({
     queryKey: ["product-cost-snapshots", "all-for-order-detail"],
     queryFn: async () =>
@@ -109,9 +118,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     queryFn: async () =>
       assertOk(await supabase.from("packagingOrders").select("*")) as PackagingOrder[],
   });
-  // Variant rows (for price-list resolution via migration 0035's
-  // unitPrice column). One query covers every variant since the
-  // table is small and the hierarchy is evaluated per product.
   const { data: variantProducts = [] } = useQuery({
     queryKey: ["variant-products", "all-for-order-detail"],
     queryFn: async () =>
@@ -149,9 +155,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     return map;
   }, [packagingOrders]);
 
-  // productId → a plausible "retail" unit price, picked as the highest
-  // unitPrice on any variant that lists it. Consumed by
-  // resolveUnitPrice as the last-resort fallback before "none".
   const productRetailPrice = useMemo(() => {
     const map = new Map<string, number>();
     for (const cp of variantProducts) {
@@ -176,71 +179,41 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     });
   }
 
-  const [editing, setEditing] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [addingLine, setAddingLine] = useState(false);
-  // Reassignment proposals — populated when the user confirms delete
-  // AND at least one linked batch has Shelling-or-later progress. The
-  // operator then either reassigns batches to other open orders or
-  // chooses "Delete anyway" to discard the sunk cost.
+  // ── UI state ──────────────────────────────────────────────────
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [reassignProposals, setReassignProposals] = useState<ReassignmentProposal[] | null>(null);
   const [reassignBusy, setReassignBusy] = useState<string | null>(null);
   const [replaceOpen, setReplaceOpen] = useState(false);
+  const [addLineDrawerOpen, setAddLineDrawerOpen] = useState(false);
+  const [customerDrawerOpen, setCustomerDrawerOpen] = useState(false);
+  const [lineSearch, setLineSearch] = useState("");
+  const [lineFilter, setLineFilter] = useState<LineFilter>("all");
+  const [removeLineTarget, setRemoveLineTarget] = useState<
+    | { kind: LineKind; id: string; name: string }
+    | null
+  >(null);
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
-  if (order === undefined) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
-  if (order === null) return <div className="p-6 text-sm text-muted-foreground">Order not found.</div>;
-
-  async function handleStatusChange(status: OrderStatus) {
-    if (!order) return;
-    await saveOrder({ ...order, status });
+  if (order === undefined) {
+    return <div className="ds p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (order === null) {
+    return <div className="ds p-6 text-sm text-muted-foreground">Order not found.</div>;
   }
 
-  async function handleDelete() {
-    // Pre-delete reassignment check — if any linked batch has Shelling
-    // or later progress, surface candidates for reassignment before
-    // the sunk work is discarded.
-    try {
-      const proposals = await computeReassignmentProposals(orderId);
-      if (proposals.length > 0) {
-        setReassignProposals(proposals);
-        return; // Modal takes over; actual delete deferred.
-      }
-    } catch (err) {
-      console.warn("Reassignment lookup failed, proceeding with plain delete:", err);
-    }
-    await performDelete();
-  }
-
-  async function performDelete() {
-    try {
-      await deleteOrder(orderId);
-      router.replace("/orders");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("deleteOrder failed:", err);
-      alert(`Delete failed: ${msg}\n\nThe order is still in the database. Check the browser console for details.`);
-    }
-  }
-
-  async function handleReassign(proposal: ReassignmentProposal, targetOrderItemId: string) {
-    setReassignBusy(proposal.orderPlanLinkId);
-    try {
-      await reassignBatchLink(proposal.orderPlanLinkId, targetOrderItemId);
-      // Recompute remaining proposals (the reassigned batch may still
-      // have other links, and other batches may still have progress).
-      const next = await computeReassignmentProposals(orderId);
-      setReassignProposals(next);
-    } catch (err) {
-      alert(`Reassign failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setReassignBusy(null);
-    }
-  }
-
+  // ── Derived data ──────────────────────────────────────────────
   const totalQty = items.reduce((s, i) => s + i.quantity, 0);
   const deadlineDate = new Date(order.deadline);
 
-  // ── Labour + calculated cost rollup ────────────────────────────
+  const linksByItemId = new Map<string, typeof orderPlanLinks>();
+  for (const lk of orderPlanLinks) {
+    const arr = linksByItemId.get(lk.orderItemId) ?? [];
+    arr.push(lk);
+    linksByItemId.set(lk.orderItemId, arr);
+  }
+
+  // Labour + cost rollup.
   const orderProductLines: OrderProductLine[] = items.map((i) => ({
     productId: i.productId,
     quantity: i.quantity,
@@ -262,7 +235,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     capacityConfig?.labourHourlyRate ?? 0,
   );
 
-  // ── Feasibility ────────────────────────────────────────────────
+  // Feasibility.
   const activePeople = people.filter((p) => !p.archived);
   const dailyCapacityHours = activePeople.reduce((s, p) => s + (p.defaultHoursPerDay ?? 0), 0);
   const blockedDates = new Set<string>();
@@ -289,9 +262,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     const to = new Date(u.endDate).getTime();
     return to >= nowRef.getTime() && from <= deadlineDate.getTime();
   }).length;
-  // Committed hours = minutes planned on days inside the deadline
-  // window, excluding this order's own plan line items so the
-  // feasibility check doesn't double-count what we're trying to place.
   const dayDateById = new Map(productionDays.map((d) => [d.id!, d.date]));
   const thisOrdersPlanIds = new Set(
     orderPlanLinks.map((l) => l.planId).filter(Boolean) as string[],
@@ -327,14 +297,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     workingDaysToDeadline: Math.max(0, workingDays - unavailabilityAdj),
     committedHoursToDeadline: committedMinutes / 60,
   });
-  /** Product ids that don't fit within available stock + producibility
-   *  for this order's quantities. Used by the per-line feasibility dot
-   *  on OrderLineRow. */
-  const shortProductIds = new Set(feasibility.shortfalls.map((s) => s.productId));
 
-  // ── Customer-facing totals (net + VAT breakdown + gross) ───────
-  // Each line contributes its own net + rate so orders with mixed
-  // rates split correctly into { vat 10 %, vat 20 %, vat 0 % } rows.
+  // Customer-facing totals (net + VAT).
   const productLineTotals = items.map((i) => {
     const p = productMap.get(i.productId);
     const resolved = resolveProductPrice(i.productId);
@@ -350,9 +314,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   });
   const productsSubtotalNet = productLineTotals.reduce((s, l) => s + l.net, 0);
   const packagingSubtotalNet = packagingLineTotals.reduce((s, l) => s + l.net, 0);
-  // Variant lines (migration 0068) carry the customer-facing price.
-  // The unitPrice is GROSS (what customer pays); split to net using
-  // the app default VAT rate. Future enhancement: per-variant VAT.
   const variantLineTotals = variantLines.map((vl) => {
     const rate = effectiveVatRate(undefined, undefined);
     const gross = vl.unitPrice * vl.quantity;
@@ -366,883 +327,1728 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const totalGross = Math.round((totalNet + totalVat) * 100) / 100;
   const marginResult = computeOrderMargin(totalNet, calculatedCost.totalCost);
 
-  // ── Schedule rows for this order, derived from productionDayLineItems
-  // for every plan linked to this order. One row per (day × step).
-  // Done/not-started inferred from planStepStatus.
-  const stepById = new Map(productionSteps.map((s) => [s.id!, s]));
-  const doneKeysByPlan = new Map<string, Set<string>>();
-  for (const s of allPlanStepStatuses) {
-    if (!s.done) continue;
-    const set = doneKeysByPlan.get(s.planId) ?? new Set<string>();
-    set.add(s.stepKey);
-    doneKeysByPlan.set(s.planId, set);
-  }
-  interface OrderScheduleRow {
-    id: string;
-    date: string;
-    planId: string;
-    productId: string;
-    stepId: string;
-    phase: string;
-    durationMinutes: number;
-    status: "pending" | "in_progress" | "done";
-  }
-  const orderScheduleRows: OrderScheduleRow[] = [];
-  for (const li of allLineItems) {
-    if (!thisOrdersPlanIds.has(li.planId)) continue;
-    const date = dayDateById.get(li.productionDayId);
-    if (!date) continue;
-    const pp = items.find((oi) => (linksByItemId.get(oi.id!) ?? []).some((lk) => lk.planId === li.planId));
-    const productId = pp?.productId ?? "";
-    const orderedSteps = [...li.stepIds].sort((a, b) => {
-      const sa = stepById.get(a)?.sortOrder ?? 0;
-      const sb = stepById.get(b)?.sortOrder ?? 0;
-      return sa - sb;
+  // Prev/next nav by createdAt desc.
+  const sortedOrders = useMemo(() => {
+    return [...allOrders].sort((a, b) => {
+      const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bt - at;
     });
-    // Minutes split evenly across the steps for display only.
-    const perStepMin = orderedSteps.length > 0
-      ? Math.max(1, Math.round(li.plannedMinutes / orderedSteps.length))
-      : 0;
-    for (const stepId of orderedSteps) {
-      const step = stepById.get(stepId);
-      // Phase-key prefix match — bare stepId UUID lookups never match
-      // the wizard's `polishing-<ppId>` style keys.
-      const done = planStepDoneById(stepId, li.planId, stepById, doneKeysByPlan);
-      orderScheduleRows.push({
-        id: `${li.id ?? li.planId}-${stepId}`,
-        date,
-        planId: li.planId,
-        productId,
-        stepId,
-        phase: step?.name ?? stepId,
-        durationMinutes: perStepMin,
-        status: done ? "done" : "pending",
-      });
+  }, [allOrders]);
+  const orderIndex = sortedOrders.findIndex((o) => o.id === orderId);
+  const prevOrder = orderIndex > 0 ? sortedOrders[orderIndex - 1] : null;
+  const nextOrder = orderIndex >= 0 && orderIndex < sortedOrders.length - 1
+    ? sortedOrders[orderIndex + 1]
+    : null;
+  function labelFor(o: Order) {
+    return o.customerName || o.eventName || o.sourceRef || o.id?.slice(0, 6) || "—";
+  }
+
+  // Status badge mapping.
+  const statusKind: StatusTagKind = (() => {
+    switch (order.status) {
+      case "pending": return "pending";
+      case "in_production": return "scheduled";
+      case "done": return "done";
+      case "cancelled": return "neutral";
+      default: return "neutral";
+    }
+  })();
+
+  // ── Handlers ──────────────────────────────────────────────────
+  async function patchOrder(patch: Partial<Order>) {
+    if (!order) return;
+    await saveOrder({ ...order, ...patch });
+  }
+
+  async function handleDelete() {
+    try {
+      const proposals = await computeReassignmentProposals(orderId);
+      if (proposals.length > 0) {
+        setReassignProposals(proposals);
+        setDeleteOpen(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("Reassignment lookup failed, proceeding with plain delete:", err);
+    }
+    await performDelete();
+  }
+
+  async function performDelete() {
+    try {
+      await deleteOrder(orderId);
+      router.replace("/orders");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Delete failed: ${msg}`);
     }
   }
-  orderScheduleRows.sort((a, b) => a.date.localeCompare(b.date));
 
-  const scheduleByDay = new Map<string, OrderScheduleRow[]>();
-  for (const s of orderScheduleRows) {
-    const arr = scheduleByDay.get(s.date) ?? [];
-    arr.push(s);
-    scheduleByDay.set(s.date, arr);
+  async function handleCancel() {
+    await patchOrder({ status: "cancelled" });
+    setCancelOpen(false);
   }
 
+  async function handleReassign(proposal: ReassignmentProposal, targetOrderItemId: string) {
+    setReassignBusy(proposal.orderPlanLinkId);
+    try {
+      await reassignBatchLink(proposal.orderPlanLinkId, targetOrderItemId);
+      const next = await computeReassignmentProposals(orderId);
+      setReassignProposals(next);
+    } catch (err) {
+      alert(`Reassign failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setReassignBusy(null);
+    }
+  }
+
+  async function performRemoveLine() {
+    if (!removeLineTarget) return;
+    try {
+      if (removeLineTarget.kind === "single") await deleteOrderItem(removeLineTarget.id);
+      else if (removeLineTarget.kind === "variant") await removeVariantFromOrder(removeLineTarget.id);
+      else if (removeLineTarget.kind === "decoration") await deleteOrderPackagingLine(removeLineTarget.id);
+    } catch (err) {
+      alert(`Remove failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setRemoveLineTarget(null);
+    }
+  }
+
+  // ── B.3 History — schema-deferred ──────────────────────────────
+  // No `orderEvent` / audit-log table exists yet. We synthesize what
+  // we have: created (from createdAt), confirmed/in-production/done
+  // (status transitions can't be replayed without history rows —
+  // surface only the current status), and a single linked-batch
+  // creation event per batch link (from plan.createdAt).
+  type HistoryEvent = {
+    id: string;
+    time: Date;
+    eventType: "created" | "status" | "batch-linked" | "note";
+    actor: string;
+    detail: string;
+  };
+  const history: HistoryEvent[] = [];
+  if (order.createdAt) {
+    history.push({
+      id: `created-${order.id}`,
+      time: new Date(order.createdAt),
+      eventType: "created",
+      actor: "system",
+      detail: "Order created",
+    });
+  }
+  for (const lk of orderPlanLinks) {
+    const plan = plansById.get(lk.planId);
+    if (!plan?.createdAt) continue;
+    history.push({
+      id: `link-${lk.id ?? lk.planId}`,
+      time: new Date(plan.createdAt),
+      eventType: "batch-linked",
+      actor: "system",
+      detail: `Linked batch ${plan.batchNumber ?? plan.name ?? "—"} (${lk.allocatedQuantity} pcs)`,
+    });
+  }
+  history.sort((a, b) => b.time.getTime() - a.time.getTime());
+  const visibleHistory = showAllHistory ? history : history.slice(0, 10);
+
+  // ── Header title + meta ───────────────────────────────────────
+  const headerTitle = order.customerName || order.eventName || "(unnamed)";
+  const headerMeta = `Order #${order.sourceRef ?? order.id?.slice(0, 8) ?? "—"} · ${totalQty} pc · €${totalGross.toFixed(2)}`;
+
   return (
-    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-6 pb-2">
-        <BackButton fallbackHref="/orders" fallbackLabel="All orders" onBack={() => router.back()} />
-      </div>
-
-      <div className="px-4 pb-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold truncate inline-flex items-center gap-2">
-              <span className="truncate">{order.customerName || order.eventName || "(unnamed)"}</span>
-              {order.sourceRef && (
-                <span
-                  className="text-[12px] font-mono tabular-nums font-normal text-muted-foreground rounded-[4px] bg-muted px-2 py-0.5 shrink-0"
-                  title="Source order reference (Shopify, etc.)"
-                >
-                  {order.sourceRef}
-                </span>
-              )}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {ORDER_CHANNEL_LABELS[order.channel]}
-              {order.eventName && order.customerName && ` · ${order.eventName}`}
-              {" · "}
-              Deadline {deadlineDate.toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}
-              {" "}
-              {deadlineDate.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })}
-              {order.isApproxDeadline ? (
-                <span
-                  className="ml-2 text-[9.5px] uppercase border border-[color:var(--color-status-warn-edge)] bg-[color:var(--color-status-warn-bg)] text-[color:var(--color-status-warn)] px-1.5 py-0.5 align-middle"
-                  style={{ letterSpacing: "0.1em", borderRadius: 2 }}
-                >
-                  ±1 week
-                </span>
-              ) : null}
-            </p>
-            {order.customerId && (
-              <Link
-                href={`/customers/${encodeURIComponent(order.customerId)}`}
-                className="mt-1 inline-flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                View customer profile
-                {linkedCustomer && computeMissingRequiredCustomerFields(linkedCustomer).length > 0 && (
-                  <span
-                    className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-status-warn text-white text-[9px] font-bold"
-                    title={`Missing: ${computeMissingRequiredCustomerFields(linkedCustomer).join(", ")}`}
-                  >
-                    {computeMissingRequiredCustomerFields(linkedCustomer).length}
-                  </span>
-                )}
-                {" "}→
-              </Link>
-            )}
-          </div>
-          {!editing && (
-            <button onClick={() => setEditing(true)} className="p-1.5 rounded-full hover:bg-muted">
-              <Pencil className="w-4 h-4 text-muted-foreground" />
-            </button>
+    <DsDetailPage
+      title={headerTitle}
+      meta={headerMeta}
+      breadcrumb={{ label: "All orders", href: "/orders" }}
+      statusBadge={<StatusTag kind={statusKind}>{ORDER_STATUS_LABELS[order.status]}</StatusTag>}
+      navAdjacent={{
+        prev: prevOrder?.id ? { id: prevOrder.id, label: labelFor(prevOrder), href: `/orders/${encodeURIComponent(prevOrder.id)}` } : undefined,
+        next: nextOrder?.id ? { id: nextOrder.id, label: labelFor(nextOrder), href: `/orders/${encodeURIComponent(nextOrder.id)}` } : undefined,
+      }}
+      actions={
+        <div style={{ display: "inline-flex", gap: 8 }}>
+          <DsButton size="sm" onClick={() => setReplaceOpen(true)} title="Replace + credit">
+            <Copy size={12} style={{ marginRight: 4 }} /> Duplicate
+          </DsButton>
+          {order.status !== "cancelled" && (
+            <DsButton size="sm" onClick={() => setCancelOpen(true)} title="Cancel order (sets status)">
+              Cancel
+            </DsButton>
           )}
+          <DsButton
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+            style={{ color: "var(--ds-tier-urgent)" }}
+          >
+            <Trash2 size={12} style={{ marginRight: 4 }} /> Delete
+          </DsButton>
         </div>
-
-        {/* Customer preferences banner (read-only, always visible when linked) */}
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Customer-preferences banner. */}
         {linkedCustomer && (
           linkedCustomer.allergenNotes
           || linkedCustomer.packagingPrefs
           || linkedCustomer.language
           || linkedCustomer.paymentTerms
         ) && (
-          <div className="rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted px-3 py-2 text-xs space-y-1">
-            <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
-              <User className="w-3.5 h-3.5" /> Customer preferences
+          <div
+            style={{
+              borderRadius: 8,
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg-hover)",
+              padding: "10px 14px",
+              fontSize: 12,
+              color: "var(--ds-text-primary)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--ds-text-muted)", fontWeight: 500 }}>
+              <User size={13} /> Customer preferences
             </div>
             {linkedCustomer.allergenNotes && (
-              <p><span className="text-muted-foreground">Allergens:</span> {linkedCustomer.allergenNotes}</p>
+              <p><span style={{ color: "var(--ds-text-muted)" }}>Allergens:</span> {linkedCustomer.allergenNotes}</p>
             )}
             {linkedCustomer.packagingPrefs && (
-              <p><span className="text-muted-foreground">Packaging:</span> {linkedCustomer.packagingPrefs}</p>
+              <p><span style={{ color: "var(--ds-text-muted)" }}>Packaging:</span> {linkedCustomer.packagingPrefs}</p>
             )}
-            <div className="flex gap-3 text-muted-foreground">
-              {linkedCustomer.language && <span>Lang: <span className="uppercase text-foreground">{linkedCustomer.language}</span></span>}
-              {linkedCustomer.paymentTerms && <span>Payment: <span className="text-foreground">{linkedCustomer.paymentTerms}</span></span>}
-            </div>
+            {(linkedCustomer.language || linkedCustomer.paymentTerms) && (
+              <p style={{ color: "var(--ds-text-muted)" }}>
+                {linkedCustomer.language && <>Lang: <span style={{ color: "var(--ds-text-primary)", textTransform: "uppercase" }}>{linkedCustomer.language}</span> </>}
+                {linkedCustomer.paymentTerms && <>Payment: <span style={{ color: "var(--ds-text-primary)" }}>{linkedCustomer.paymentTerms}</span></>}
+              </p>
+            )}
           </div>
         )}
 
-        {/* Aggregated production pipeline — rolls up step progress
-            across every batch linked to this order. Empty state when
-            nothing is scheduled yet. */}
-        <OrderStepPipeline orderId={orderId} needByDate={order.deadline} />
-
-        {/* Open the daily-style scoped production view for this order. */}
-        {orderPlanLinks.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/orders/${encodeURIComponent(orderId)}/production`}
-              className="inline-flex items-center gap-2 rounded-[6px] bg-[color:var(--ds-tier-quarter-focus)] text-white px-4 py-2.5 text-sm font-medium hover:opacity-90"
-            >
-              <Calendar className="w-4 h-4" /> Production schedule →
-            </Link>
-            <Link
-              href={`/plan?focus=order:${encodeURIComponent(orderId)}`}
-              className="inline-flex items-center gap-2 rounded-[6px] bg-[var(--accent-mint-bg)] text-[var(--accent-mint-ink)] px-4 py-2.5 text-sm font-medium hover:bg-[var(--accent-mint-edge)]"
-            >
-              Plan this in /plan →
-            </Link>
-          </div>
-        )}
-
-        {/* Replenishment / borrow linkage banners */}
+        {/* Replenishment / borrow linkage banners. */}
         {parentOrder && (
           <Link
             href={`/orders/${encodeURIComponent(parentOrder.id!)}`}
-            className="flex items-center gap-2 rounded-[4px] border border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)] px-3 py-2 text-sm hover:bg-[color:var(--ds-tint-info)]"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              border: "0.5px solid var(--ds-tier-quarter-focus)",
+              background: "var(--ds-tint-info)",
+              padding: "8px 12px",
+              fontSize: 13,
+              borderRadius: 6,
+              textDecoration: "none",
+              color: "var(--ds-text-primary)",
+            }}
           >
-            <Package className="w-4 h-4 text-primary" />
-            <span className="flex-1">
-              <span className="font-medium">Shop Replenishment</span> for order
-              {" "}<span className="text-primary font-medium">{parentOrder.customerName || parentOrder.id?.slice(0, 8)}</span>
+            <Package size={14} />
+            <span style={{ flex: 1 }}>
+              <b>Shop Replenishment</b> for order {parentOrder.customerName || parentOrder.id?.slice(0, 8)}
             </span>
-            <span className="text-xs text-muted-foreground">View parent →</span>
+            <span style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>View parent →</span>
           </Link>
         )}
         {replenishmentOrder && (
           <Link
             href={`/orders/${encodeURIComponent(replenishmentOrder.id!)}`}
-            className="flex items-center gap-2 rounded-[4px] border border-status-ok/30 bg-status-ok/5 px-3 py-2 text-sm hover:bg-status-ok/10"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              border: "0.5px solid var(--ds-tier-positive)",
+              background: "rgba(93,202,165,0.08)",
+              padding: "8px 12px",
+              fontSize: 13,
+              borderRadius: 6,
+              textDecoration: "none",
+              color: "var(--ds-text-primary)",
+            }}
           >
-            <Package className="w-4 h-4 text-status-ok" />
-            <span className="flex-1">
-              Linked replenishment order (deadline{" "}
+            <Package size={14} />
+            <span style={{ flex: 1 }}>
+              Linked replenishment (deadline{" "}
               {new Date(replenishmentOrder.deadline).toLocaleDateString("de-AT", { day: "numeric", month: "short" })})
               {" · "}{replenishmentOrder.status}
             </span>
-            <span className="text-xs text-muted-foreground">View →</span>
+            <span style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>View →</span>
           </Link>
         )}
 
-        {/* Status selector + combined completion %. Completion is
-            averaged across every linked batch: phases done / 8 per
-            batch, mean across batches. Hidden when no batches link yet. */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {ORDER_STATUSES.map((s) => (
-            <button
-              key={s}
-              onClick={() => handleStatusChange(s)}
-              className={`rounded-[4px] border px-3 py-1 text-xs font-medium transition-colors ${
-                order.status === s
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
-              }`}
+        {/* Production pipeline + quick links. */}
+        <OrderStepPipeline orderId={orderId} needByDate={order.deadline} />
+        {orderPlanLinks.length > 0 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link
+              href={`/orders/${encodeURIComponent(orderId)}/production`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                borderRadius: 6,
+                background: "var(--ds-tier-quarter-focus)",
+                color: "#fff",
+                padding: "8px 14px",
+                fontSize: 13,
+                fontWeight: 500,
+                textDecoration: "none",
+              }}
             >
-              {ORDER_STATUS_LABELS[s]}
-            </button>
-          ))}
-          {(() => {
-            const planIds = [...new Set(orderPlanLinks.map((l) => l.planId))];
-            if (planIds.length === 0) return null;
-            let totalProgress = 0;
-            for (const pid of planIds) {
-              const p = batchPhaseProgress(pid, allPlanStepStatuses);
-              const done = p.done ? 8 : Math.max(0, p.index - 1);
-              totalProgress += done / 8;
-            }
-            const pct = Math.round((totalProgress / planIds.length) * 100);
-            return (
-              <span
-                className="ml-auto rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1 text-xs text-muted-foreground tabular-nums"
-                title="Average phases completed across linked batches"
-              >
-                {pct}% complete
-              </span>
-            );
-          })()}
-        </div>
-
-        {/* Edit form */}
-        {editing && (
-          <OrderEditForm
-            order={order}
-            onSaved={() => setEditing(false)}
-            onCancel={() => setEditing(false)}
-          />
+              <Calendar size={14} /> Production schedule →
+            </Link>
+            <Link
+              href={`/plan?focus=order:${encodeURIComponent(orderId)}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                borderRadius: 6,
+                background: "var(--accent-mint-bg)",
+                color: "var(--accent-mint-ink)",
+                padding: "8px 14px",
+                fontSize: 13,
+                fontWeight: 500,
+                textDecoration: "none",
+              }}
+            >
+              Plan this →
+            </Link>
+          </div>
         )}
 
-        {/* Priority + notes + delivery */}
-        {!editing && (
-          <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Priority</span>
-              <span className="font-medium">{ORDER_PRIORITY_LABELS[order.priority]}</span>
-            </div>
-            {order.deliveryType && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Fulfilment</span>
-                <span className="font-medium">{DELIVERY_TYPE_LABELS[order.deliveryType]}</span>
+        {/* ───── B.1 Metadata section (two-column inline edit) ───── */}
+        <Section title="Order details">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 20,
+              padding: "12px 20px",
+            }}
+          >
+            {/* Left column. */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span className="text-ds-label">Customer</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => setCustomerDrawerOpen(true)}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 4,
+                      border: "0.5px solid var(--ds-border-warm)",
+                      background: "var(--ds-card-bg)",
+                      fontSize: 13,
+                      color: order.customerId
+                        ? "var(--ds-text-primary)"
+                        : "var(--ds-text-muted)",
+                      cursor: "pointer",
+                    }}
+                    className="hover:bg-[color:var(--ds-card-bg-hover)]"
+                  >
+                    {order.customerName || order.eventName || "— pick customer —"}
+                  </button>
+                  {linkedCustomer && computeMissingRequiredCustomerFields(linkedCustomer).length > 0 && (
+                    <span
+                      title={`Missing: ${computeMissingRequiredCustomerFields(linkedCustomer).join(", ")}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 16, height: 16,
+                        borderRadius: 999,
+                        background: "var(--ds-semantic-warn)",
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {computeMissingRequiredCustomerFields(linkedCustomer).length}
+                    </span>
+                  )}
+                  {order.customerId && (
+                    <Link
+                      href={`/customers/${encodeURIComponent(order.customerId)}`}
+                      style={{ fontSize: 11, color: "var(--ds-tier-quarter-focus)" }}
+                      className="hover:underline"
+                    >
+                      Profile →
+                    </Link>
+                  )}
+                </div>
               </div>
-            )}
-            {order.deliveryAt && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Delivery / pickup</span>
-                <span className="font-medium">
-                  {new Date(order.deliveryAt).toLocaleString("en-GB", {
-                    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-                  })}
+
+              {/* "Order date" — schema has no editable orderDate column; surface createdAt read-only. */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span className="text-ds-label" title="Schema has no orderDate column — showing createdAt">
+                  Order date <span style={{ opacity: 0.55 }}>✗</span>
+                </span>
+                <span style={{ fontSize: 13, color: "var(--ds-text-muted)" }}>
+                  {order.createdAt
+                    ? new Date(order.createdAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })
+                    : "—"}
                 </span>
               </div>
-            )}
-            {order.deliveryAddress && (
-              <div className="pt-2 border-t border-[color:var(--ds-border-warm)]">
-                <p className="text-xs text-muted-foreground mb-1">Address</p>
-                <p className="text-sm whitespace-pre-wrap">{order.deliveryAddress}</p>
-              </div>
-            )}
-            {order.deliveryNotes && (
-              <div className="pt-2 border-t border-[color:var(--ds-border-warm)]">
-                <p className="text-xs text-muted-foreground mb-1">Delivery notes</p>
-                <p className="text-sm whitespace-pre-wrap">{order.deliveryNotes}</p>
-              </div>
-            )}
-            {order.notes && (
-              <div className="pt-2 border-t border-[color:var(--ds-border-warm)]">
-                <p className="text-xs text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm whitespace-pre-wrap">{order.notes}</p>
-              </div>
-            )}
+
+              <DsInlineField
+                label="Due date (deadline)"
+                value={toLocalDate(order.deadline)}
+                type="date"
+                onSave={async (next) => {
+                  if (!next) return;
+                  // Preserve time-of-day from existing deadline.
+                  const cur = new Date(order.deadline);
+                  const [y, m, d] = next.split("-").map(Number);
+                  cur.setFullYear(y, m - 1, d);
+                  await patchOrder({ deadline: cur.toISOString() });
+                }}
+              />
+
+              <DsInlineSelect<OrderChannel>
+                label="Channel"
+                value={order.channel}
+                options={ORDER_CHANNELS.map((c) => ({ value: c, label: ORDER_CHANNEL_LABELS[c] }))}
+                onSave={async (v) => patchOrder({ channel: v })}
+              />
+
+              <DsInlineSelect<OrderStatus>
+                label="Status"
+                value={order.status}
+                options={ORDER_STATUSES.map((s) => ({ value: s, label: ORDER_STATUS_LABELS[s] }))}
+                onSave={async (v) => patchOrder({ status: v })}
+              />
+
+              <DsInlineTextarea
+                label="Notes"
+                value={order.notes ?? ""}
+                rows={2}
+                onSave={async (v) => patchOrder({ notes: v.trim() || undefined })}
+              />
+            </div>
+
+            {/* Right column. */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <DsInlineField
+                label="PO / invoice ref"
+                value={order.invoiceExternalRef ?? ""}
+                onSave={async (v) => patchOrder({ invoiceExternalRef: v.trim() || undefined })}
+                placeholder="—"
+              />
+
+              <DsInlineTextarea
+                label="Shipping address"
+                value={order.deliveryAddress ?? ""}
+                rows={2}
+                onSave={async (v) => patchOrder({ deliveryAddress: v.trim() || undefined })}
+              />
+
+              <DsInlineSelect<DeliveryType | "">
+                label="Delivery method"
+                value={order.deliveryType ?? ""}
+                options={[
+                  { value: "" as DeliveryType | "", label: "— none —" },
+                  ...DELIVERY_TYPES.map((t) => ({ value: t as DeliveryType | "", label: DELIVERY_TYPE_LABELS[t] })),
+                ]}
+                onSave={async (v) => patchOrder({ deliveryType: v === "" ? undefined : (v as DeliveryType) })}
+              />
+
+              <DsInlineField
+                label="Requested delivery / pickup"
+                value={order.deliveryAt ? toLocalDate(order.deliveryAt) : ""}
+                type="date"
+                onSave={async (next) => {
+                  if (!next) return patchOrder({ deliveryAt: undefined });
+                  const [y, m, d] = next.split("-").map(Number);
+                  const cur = order.deliveryAt ? new Date(order.deliveryAt) : new Date();
+                  cur.setFullYear(y, m - 1, d);
+                  await patchOrder({ deliveryAt: cur.toISOString() });
+                }}
+              />
+
+              {/* Gift wrap toggle — schema has no giftWrap column; deferred. */}
+              <DsInlineToggle
+                label="Gift wrap ✗"
+                checked={false}
+                onChange={async () => {
+                  alert("Gift wrap toggle deferred — schema has no giftWrap column on Order.");
+                }}
+                description="Deferred — add giftWrap column on Order to enable."
+                disabled
+              />
+
+              <DsInlineTextarea
+                label="Customer / delivery note"
+                value={order.deliveryNotes ?? ""}
+                rows={2}
+                onSave={async (v) => patchOrder({ deliveryNotes: v.trim() || undefined })}
+              />
+            </div>
           </div>
-        )}
+        </Section>
 
-        {/* Summary — labour, calculated cost, price paid, feasibility */}
-        {!editing && (
-          <OrderSummaryCard
-            order={order}
-            labour={labourRollup}
-            calculatedCost={calculatedCost}
-            feasibility={feasibility}
-            labourHourlyRate={capacityConfig?.labourHourlyRate ?? null}
-            productNameById={productMap}
-            productsSubtotalNet={productsSubtotalNet}
-            packagingSubtotalNet={packagingSubtotalNet}
-            totalNet={totalNet}
-            totalVat={totalVat}
-            totalGross={totalGross}
-            vatBreakdown={vatBreakdown}
-            margin={marginResult}
-          />
-        )}
-
-        {/* Line items — "Add product" lives on the LEFT of the header
-            to match the new-order flow; the old right-side placement
-            hid below longer headers on narrow screens. */}
-        {/* Variant lines — what the customer pays for. Each row spawns
-            derived production-demand orderItems behind the scenes. */}
-        <VariantLinesSection
-          orderId={orderId}
+        {/* ───── B.2 Unified lines grid ───── */}
+        <OrderLinesGrid
+          items={items}
           variantLines={variantLines}
-          allVariants={allVariants}
-        />
-
-        <section>
-          <div className="flex items-center gap-3 mb-2">
-            {!addingLine && (
-              <button
-                onClick={() => setAddingLine(true)}
-                className="flex items-center gap-1.5 rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add product
-              </button>
-            )}
-            <h2 className="text-sm font-semibold text-primary">
-              Products ({items.length} · {totalQty} pcs)
-            </h2>
-          </div>
-
-          {/* Scheduling hint: produce-fresh lines need Regenerate plan
-              to spawn batches. Shown only when at least one produce-fresh
-              line exists without any link yet. */}
-          {(() => {
-            const produceItems = items.filter((i) => (i.fulfilmentMode ?? "produce") === "produce");
-            const anyUnlinked = produceItems.some((i) => (linksByItemId.get(i.id!) ?? []).length === 0);
-            if (!anyUnlinked) return null;
-            if (order.status !== "pending" && order.status !== "in_production") return null;
-            return (
-              <div className="mb-2 rounded-[6px] border border-dashed border-[color:var(--ds-border-warm)] bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                Pending — not yet scheduled.{" "}
-                <Link href="/plan" className="text-primary hover:underline">Regenerate plan</Link>{" "}
-                to schedule the produce-fresh lines.
-              </div>
-            );
-          })()}
-
-          {addingLine && (
-            <AddOrderLine
-              orderId={orderId}
-              nextSortOrder={items.length}
-              products={products}
-              resolveProductPrice={resolveProductPrice}
-              availableFor={(id) => {
-                const t = productLocationTotals.get(id);
-                return t ? Math.max(0, (t.store ?? 0) + (t.production ?? 0)) : 0;
-              }}
-              onSaved={() => setAddingLine(false)}
-              onCancel={() => setAddingLine(false)}
-            />
-          )}
-
-          {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
-              No products yet.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {items.map((item) => (
-                <OrderLineRow
-                  lineItems={allLineItems}
-                  productionDays={productionDays}
-                  productionSteps={productionSteps}
-                  key={item.id}
-                  item={item}
-                  product={productMap.get(item.productId)}
-                  short={shortProductIds.has(item.productId)}
-                  resolveProductPrice={resolveProductPrice}
-                  links={linksByItemId.get(item.id!) ?? []}
-                  plansById={plansById}
-                  allPlanStepStatuses={allPlanStepStatuses}
-                />
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Packaging lines */}
-        <OrderPackagingSection
-          orderId={orderId}
-          packaging={packaging}
+          packagingLines={packagingLines}
+          productMap={productMap}
+          packagingMap={packagingMap}
+          variantsMap={new Map(allVariants.map((v) => [v.id!, v]))}
+          resolveProductPrice={resolveProductPrice}
           packagingUnitCost={packagingUnitCost}
+          search={lineSearch}
+          onSearch={setLineSearch}
+          filter={lineFilter}
+          onFilter={setLineFilter}
+          onAddLine={() => setAddLineDrawerOpen(true)}
+          onRemove={(target) => setRemoveLineTarget(target)}
+          productsSubtotalNet={productsSubtotalNet}
+          packagingSubtotalNet={packagingSubtotalNet}
+          variantsSubtotalNet={variantsSubtotalNet}
+          totalNet={totalNet}
+          totalVat={totalVat}
+          totalGross={totalGross}
+          vatBreakdown={vatBreakdown}
         />
 
-        {/* Ready to pack — from-stock (borrow) fulfilment. Independent
-            of the production schedule: allocated pieces are sitting on
-            donor batches' stockLocations. Mark as packed drains them
-            and deducts this order's packaging. */}
+        {/* Pricing / cost rollup + feasibility (preserved). */}
+        <OrderSummaryCard
+          order={order}
+          labour={labourRollup}
+          calculatedCost={calculatedCost}
+          feasibility={feasibility}
+          labourHourlyRate={capacityConfig?.labourHourlyRate ?? null}
+          productNameById={productMap}
+          totalNet={totalNet}
+          totalGross={totalGross}
+          vatBreakdown={vatBreakdown}
+          margin={marginResult}
+        />
+
+        {/* Ready-to-pack section for borrow lines (preserved). */}
         <OrderReadyToPackSection orderId={orderId} />
 
-        {/* Production schedule moved to /orders/[id]/production — a daily-style
-            scoped view. Linked from the Production schedule button up top. */}
-
-        {/* Replace + Delete */}
-        <section className="pt-4 border-t border-[color:var(--ds-border-warm)] flex items-center gap-5">
-          {!confirmDelete ? (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="flex items-center gap-2 text-sm text-destructive hover:underline"
-            >
-              <Trash2 className="w-4 h-4" /> Delete order
-            </button>
+        {/* ───── B.3 History ───── */}
+        <Section
+          title="History"
+          action={
+            history.length > 10 && (
+              <button
+                type="button"
+                onClick={() => setShowAllHistory((v) => !v)}
+                className="text-ds-meta hover:underline"
+                style={{ background: "transparent", border: 0, cursor: "pointer" }}
+              >
+                {showAllHistory ? "Show last 10" : `Show all (${history.length})`}
+              </button>
+            )
+          }
+        >
+          {history.length === 0 ? (
+            <p style={{ padding: "8px 20px", fontStyle: "italic", color: "var(--ds-text-muted)", fontSize: 13 }}>
+              No history events recorded yet.
+            </p>
           ) : (
-            <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
-              <p className="text-sm font-medium text-destructive">Delete this order?</p>
-              <p className="text-xs text-muted-foreground">
-                All line items will be removed. This cannot be undone.
+            visibleHistory.map((e) => (
+              <ListRow
+                key={e.id}
+                tier="default"
+                title={
+                  <>
+                    <span style={{ marginRight: 8 }}>{e.detail}</span>
+                    <HistoryChip kind={e.eventType} />
+                  </>
+                }
+                meta={<span style={{ color: "var(--ds-text-muted)", fontStyle: "italic" }}>{e.actor}</span>}
+                side={<HistoryTime time={e.time} />}
+              />
+            ))
+          )}
+          <div style={{ padding: "8px 20px", borderTop: "0.5px solid var(--ds-border-warm)", color: "var(--ds-text-muted)", fontSize: 11, fontStyle: "italic" }}>
+            Note: full audit log (Confirmed / Edited / Status-changed / Note-added events) deferred — schema has no orderEvent table. Currently surfacing order creation + batch-link creation only. ✗
+          </div>
+        </Section>
+
+        {/* ───── B.4 Related ───── */}
+        <Section title="Related">
+          <div style={{ padding: "12px 20px" }}>
+            <p className="text-ds-label" style={{ marginBottom: 6 }}>Production batches</p>
+            {orderPlanLinks.length === 0 ? (
+              <p style={{ fontStyle: "italic", color: "var(--ds-text-muted)", fontSize: 12 }}>
+                No batches linked yet. Visit /plan and regenerate.
               </p>
-              <div className="flex gap-2">
-                <button onClick={handleDelete} className="rounded-[4px] bg-destructive text-white px-4 py-2 text-sm font-medium">
-                  Yes, delete
-                </button>
-                <button onClick={() => setConfirmDelete(false)} className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm">
-                  Cancel
-                </button>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", marginLeft: -20, marginRight: -20 }}>
+                {orderPlanLinks.map((lk) => {
+                  const plan = plansById.get(lk.planId);
+                  const progress = plan ? batchPhaseProgress(plan.id!, allPlanStepStatuses) : null;
+                  const status = plan?.status ?? "draft";
+                  return (
+                    <ListRow
+                      key={lk.id ?? lk.planId}
+                      tier="default"
+                      onClick={() =>
+                        plan?.id && router.push(`/production/${encodeURIComponent(plan.id)}?from=orders&fromId=${encodeURIComponent(orderId)}`)
+                      }
+                      title={plan?.batchNumber || plan?.name || "(batch missing)"}
+                      meta={
+                        <>
+                          <span style={{ marginRight: 8 }}>{lk.allocatedQuantity} pcs allocated</span>
+                          {progress && (
+                            <span style={{ color: "var(--ds-text-muted)" }}>
+                              · Step {progress.index}/{progress.total} {progress.label}
+                            </span>
+                          )}
+                        </>
+                      }
+                      side={
+                        <span
+                          style={{
+                            fontSize: 10,
+                            padding: "1px 7px",
+                            borderRadius: 999,
+                            background: PLAN_STATUS_BG[status],
+                            color: PLAN_STATUS_INK[status],
+                            border: `0.5px solid ${PLAN_STATUS_INK[status]}`,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                          }}
+                        >
+                          {PLAN_STATUS_LABEL[status]}
+                        </span>
+                      }
+                    />
+                  );
+                })}
               </div>
+            )}
+          </div>
+
+          <div style={{ padding: "12px 20px", borderTop: "0.5px solid var(--ds-border-warm)" }}>
+            <p className="text-ds-label" style={{ marginBottom: 6 }}>
+              Invoices <span style={{ opacity: 0.55 }}>✗</span>
+            </p>
+            <p style={{ fontStyle: "italic", color: "var(--ds-text-muted)", fontSize: 12 }}>
+              Linked invoices deferred — no `invoices` table; external refs live on the order itself:
+              {" "}
+              {order.invoiceExternalRef
+                ? <span style={{ color: "var(--ds-text-primary)", fontStyle: "normal" }}>{order.invoiceExternalRef}</span>
+                : "(none set)"}
+              {order.creditReference && (
+                <> · credit ref <span style={{ color: "var(--ds-text-primary)", fontStyle: "normal" }}>{order.creditReference}</span></>
+              )}
+            </p>
+          </div>
+
+          <div style={{ padding: "12px 20px", borderTop: "0.5px solid var(--ds-border-warm)" }}>
+            <p className="text-ds-label" style={{ marginBottom: 6 }}>
+              Picking jobs <span style={{ opacity: 0.55 }}>✗</span>
+            </p>
+            <p style={{ fontStyle: "italic", color: "var(--ds-text-muted)", fontSize: 12 }}>
+              Linked picking jobs deferred — no `pickingJob` table. Borrow lines surface in &quot;Ready to pack&quot; above.
+            </p>
+          </div>
+        </Section>
+      </div>
+
+      {/* Modals + drawers. */}
+      <DsDialog
+        open={deleteOpen}
+        tone="destructive"
+        title="Delete this order?"
+        description="All line items will be removed. If any batches have shelling-or-later progress, you'll be offered the option to reassign first."
+        confirmLabel="Delete"
+        onConfirm={async () => { setDeleteOpen(false); await handleDelete(); }}
+        onCancel={() => setDeleteOpen(false)}
+      />
+
+      <DsDialog
+        open={cancelOpen}
+        title="Cancel this order?"
+        description="Status will be set to cancelled. Order stays in the database; batches keep their state. You can switch the status back from the Order details section."
+        confirmLabel="Set cancelled"
+        onConfirm={handleCancel}
+        onCancel={() => setCancelOpen(false)}
+      />
+
+      <DsDialog
+        open={!!removeLineTarget}
+        tone="destructive"
+        title="Remove this line?"
+        description={removeLineTarget ? `${removeLineTarget.name} — this also drains any allocation tied to the line.` : ""}
+        confirmLabel="Remove"
+        onConfirm={performRemoveLine}
+        onCancel={() => setRemoveLineTarget(null)}
+      />
+
+      <DsDrawer
+        open={customerDrawerOpen}
+        onClose={() => setCustomerDrawerOpen(false)}
+        title="Change customer"
+        width={460}
+      >
+        <CustomerPickerDrawerBody
+          order={order}
+          onPicked={async (c) => {
+            await patchOrder({
+              customerId: c.id,
+              customerName: c.companyName,
+            });
+            setCustomerDrawerOpen(false);
+          }}
+        />
+      </DsDrawer>
+
+      <DsDrawer
+        open={addLineDrawerOpen}
+        onClose={() => setAddLineDrawerOpen(false)}
+        title="Add line"
+        width={560}
+      >
+        <AddLineDrawerBody
+          orderId={orderId}
+          products={products}
+          packaging={packaging.filter((p) => !p.archived)}
+          packagingUnitCost={packagingUnitCost}
+          allVariants={allVariants}
+          resolveProductPrice={resolveProductPrice}
+          nextSortOrderProducts={items.length}
+          nextSortOrderPackaging={packagingLines.length}
+          availableFor={(id) => {
+            const t = productLocationTotals.get(id);
+            return t ? Math.max(0, (t.store ?? 0) + (t.production ?? 0)) : 0;
+          }}
+          onDone={() => setAddLineDrawerOpen(false)}
+        />
+      </DsDrawer>
+
+      {replaceOpen && order && (
+        <ReplaceAndCreditModal
+          order={order}
+          items={items}
+          packagingLines={packagingLines}
+          onClose={() => setReplaceOpen(false)}
+          onDone={(newOrderId) => {
+            setReplaceOpen(false);
+            router.push(`/orders/${newOrderId}`);
+          }}
+        />
+      )}
+
+      {reassignProposals && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setReassignProposals(null)} />
+          <div className="relative w-full max-w-lg rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
+            <div className="px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)] bg-[color:var(--ds-tint-warn)]">
+              <h3 className="text-base font-bold text-[color:var(--ds-semantic-warn)] flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" /> In-flight work — reassign or discard?
+              </h3>
+              <p className="text-xs text-[color:var(--ds-semantic-warn)]/80 mt-1">
+                One or more batches have production progress. Reassign them to another open order with the same product, or Delete anyway to discard sunk work.
+              </p>
             </div>
-          )}
+            <ul className="px-5 py-3 space-y-3 max-h-80 overflow-y-auto">
+              {reassignProposals.map((p) => (
+                <li key={p.orderPlanLinkId} className="rounded border border-[color:var(--ds-border-warm)] p-3 space-y-2">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-sm font-semibold">{p.productName}</p>
+                    <span className="text-[11px] tabular-nums text-muted-foreground">
+                      {p.allocatedQuantity} pcs · batch {p.batchNumber ?? p.planName}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Progress reached <span className="font-medium">{p.progressStepKey.split("-")[0]}</span>.
+                  </p>
+                  {p.candidates.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground italic">No open orders for this product.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.candidates.slice(0, 6).map((c) => (
+                        <button
+                          key={c.orderItemId}
+                          onClick={() => handleReassign(p, c.orderItemId)}
+                          disabled={reassignBusy === p.orderPlanLinkId}
+                          className="inline-flex items-center gap-1 rounded border border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)] text-primary px-2 py-0.5 text-[11px] font-medium disabled:opacity-50"
+                          title={`Needs ${c.itemRemainingDemand} pcs · deadline ${c.deadline.slice(0, 10)}`}
+                        >
+                          → {c.orderLabel} · {c.itemRemainingDemand} pcs
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <div className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2 bg-muted/20">
+              <button onClick={() => setReassignProposals(null)} className="rounded border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm">Keep order</button>
+              <button
+                onClick={async () => { setReassignProposals(null); await performDelete(); }}
+                className="rounded bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
+              >
+                Delete anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </DsDetailPage>
+  );
+}
 
-          {!confirmDelete && (
-            <button
-              onClick={() => setReplaceOpen(true)}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:underline"
-              title="Clone this order into a new one and stamp a credit-note reference"
-            >
-              <Copy className="w-4 h-4" /> Replace + credit
-            </button>
-          )}
-        </section>
+// ────────────────────────────────────────────────────────────────
+// B.2 — Unified lines grid
+// ────────────────────────────────────────────────────────────────
 
-        {replaceOpen && order && (
-          <ReplaceAndCreditModal
-            order={order}
-            items={items}
-            packagingLines={packagingLines}
-            onClose={() => setReplaceOpen(false)}
-            onDone={(newOrderId) => {
-              setReplaceOpen(false);
-              router.push(`/orders/${newOrderId}`);
+interface LinesGridProps {
+  items: OrderItem[];
+  variantLines: import("@/types").OrderVariantLine[];
+  packagingLines: OrderPackagingLine[];
+  productMap: Map<string, { id?: string; name: string; defaultVatRate?: number }>;
+  packagingMap: Map<string, Packaging>;
+  variantsMap: Map<string, ReturnType<typeof useVariants>[number]>;
+  resolveProductPrice: (id: string) => ReturnType<typeof resolveUnitPrice>;
+  packagingUnitCost: Map<string, number>;
+  search: string;
+  onSearch: (q: string) => void;
+  filter: LineFilter;
+  onFilter: (f: LineFilter) => void;
+  onAddLine: () => void;
+  onRemove: (target: { kind: LineKind; id: string; name: string }) => void;
+  productsSubtotalNet: number;
+  packagingSubtotalNet: number;
+  variantsSubtotalNet: number;
+  totalNet: number;
+  totalVat: number;
+  totalGross: number;
+  vatBreakdown: VatBreakdown[];
+}
+
+function OrderLinesGrid(props: LinesGridProps) {
+  const {
+    items, variantLines, packagingLines,
+    productMap, packagingMap, variantsMap,
+    resolveProductPrice, packagingUnitCost,
+    search, onSearch, filter, onFilter,
+    onAddLine, onRemove,
+    productsSubtotalNet, packagingSubtotalNet, variantsSubtotalNet,
+    totalNet, totalVat, totalGross, vatBreakdown,
+  } = props;
+
+  // Build unified rows.
+  type GridRow =
+    | {
+        key: string;
+        kind: "single";
+        line: OrderItem;
+        name: string;
+        notes?: string;
+        priceSource: string;
+        unitPrice: number | null;
+        vatRate: number;
+        subtotal: number;
+      }
+    | {
+        key: string;
+        kind: "variant";
+        line: import("@/types").OrderVariantLine;
+        name: string;
+        notes?: string;
+        priceSource: string;
+        unitPrice: number | null;
+        vatRate: number;
+        subtotal: number;
+      }
+    | {
+        key: string;
+        kind: "decoration";
+        line: OrderPackagingLine;
+        name: string;
+        notes?: string;
+        priceSource: string;
+        unitPrice: number | null;
+        vatRate: number;
+        subtotal: number;
+      };
+
+  const rows: GridRow[] = [];
+  for (const v of variantLines) {
+    const variant = variantsMap.get(v.variantId);
+    rows.push({
+      key: `v-${v.id}`,
+      kind: "variant",
+      line: v,
+      name: variant?.name ?? "Variant",
+      notes: v.notes ?? undefined,
+      priceSource: "variant price",
+      unitPrice: v.unitPrice,
+      vatRate: effectiveVatRate(undefined, undefined),
+      subtotal: Math.round(v.quantity * v.unitPrice * 100) / 100,
+    });
+  }
+  for (const i of items) {
+    const product = productMap.get(i.productId);
+    const resolved = resolveProductPrice(i.productId);
+    const unitPrice = i.unitPrice ?? resolved.unitPrice ?? null;
+    const rate = effectiveVatRate(i.vatRate, product?.defaultVatRate);
+    rows.push({
+      key: `s-${i.id}`,
+      kind: "single",
+      line: i,
+      name: product?.name ?? i.productId,
+      notes: i.notes ?? undefined,
+      priceSource: priceSourceLabel(i.unitPrice, resolved.source),
+      unitPrice,
+      vatRate: rate,
+      subtotal: unitPrice != null ? Math.round(unitPrice * i.quantity * 100) / 100 : 0,
+    });
+  }
+  for (const l of packagingLines) {
+    const p = packagingMap.get(l.packagingId);
+    const cost = packagingUnitCost.get(l.packagingId);
+    const unitPrice = l.unitPrice ?? cost ?? null;
+    const rate = effectiveVatRate(l.vatRate, p?.defaultVatRate);
+    rows.push({
+      key: `d-${l.id}`,
+      kind: "decoration",
+      line: l,
+      name: p?.name ?? l.packagingId,
+      notes: l.notes ?? undefined,
+      priceSource: l.unitPrice != null ? "per-line override" : "latest purchase cost",
+      unitPrice,
+      vatRate: rate,
+      subtotal: unitPrice != null ? Math.round(unitPrice * l.quantity * 100) / 100 : 0,
+    });
+  }
+
+  const q = search.trim().toLowerCase();
+  const visible = rows.filter((r) => {
+    if (filter !== "all" && r.kind !== filter) return false;
+    if (!q) return true;
+    return r.name.toLowerCase().includes(q) || (r.notes ?? "").toLowerCase().includes(q);
+  });
+
+  // VAT line(s) for footer.
+  const vatRows = vatBreakdown.length === 0
+    ? [{ rate: 10, vat: 0, net: 0 }]
+    : vatBreakdown;
+
+  return (
+    <Section
+      title={`Lines (${rows.length})`}
+      action={
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          <DsButton variant="primary" size="sm" onClick={onAddLine}>
+            <Plus size={12} style={{ marginRight: 4 }} /> Add line
+          </DsButton>
+        </div>
+      }
+      noBody
+    >
+      {/* Toolbar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "10px 20px",
+          borderBottom: "0.5px solid var(--ds-border-warm)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            border: "0.5px solid var(--ds-border-warm)",
+            background: "var(--ds-card-bg)",
+            borderRadius: 4,
+            padding: "4px 8px",
+            flex: "0 1 280px",
+          }}
+        >
+          <Search size={13} style={{ color: "var(--ds-text-muted)" }} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Search lines…"
+            style={{
+              flex: 1, minWidth: 0,
+              border: "none", outline: "none", background: "transparent",
+              fontSize: 13, color: "var(--ds-text-primary)",
+            }}
+          />
+        </div>
+        <div style={{ display: "inline-flex", gap: 4 }}>
+          {(["all", "variant", "single", "decoration"] as LineFilter[]).map((f) => {
+            const on = filter === f;
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => onFilter(f)}
+                style={{
+                  fontSize: 11,
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  border: on ? `0.5px solid var(--ds-tier-quarter-focus)` : `0.5px solid var(--ds-border-warm)`,
+                  background: on ? "var(--ds-tier-quarter-focus)" : "var(--ds-card-bg)",
+                  color: on ? "#fff" : "var(--ds-text-muted)",
+                  cursor: "pointer",
+                  textTransform: "capitalize",
+                }}
+              >
+                {f === "all" ? "All" : f === "variant" ? "Variants" : f === "single" ? "Singles" : "Decoration"}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {visible.length === 0 ? (
+        <p style={{ padding: "16px 20px", fontStyle: "italic", color: "var(--ds-text-muted)", fontSize: 13 }}>
+          {rows.length === 0 ? "No lines yet — click \"Add line\" to begin." : "No lines match search / filter."}
+        </p>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "separate",
+              borderSpacing: 0,
+              fontSize: 13,
+            }}
+          >
+            <thead>
+              <tr
+                style={{
+                  position: "sticky",
+                  top: 0,
+                  background: "var(--ds-card-bg-hover)",
+                  zIndex: 1,
+                }}
+              >
+                <Th>Product / Variant</Th>
+                <Th align="right">Qty</Th>
+                <Th align="right">Unit price</Th>
+                <Th align="right" title="No discountPercent column on OrderItem — deferred">
+                  Disc. % <span style={{ opacity: 0.55 }}>✗</span>
+                </Th>
+                <Th align="right">VAT %</Th>
+                <Th align="right">Subtotal</Th>
+                <Th align="right" />
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((row) => (
+                <GridLineRow
+                  key={row.key}
+                  row={row}
+                  onRemove={() =>
+                    onRemove({ kind: row.kind, id: ((row.line as { id?: string }).id ?? row.key), name: row.name })
+                  }
+                />
+              ))}
+            </tbody>
+            {/* Sticky footer rows. */}
+            <tfoot>
+              <tr>
+                <Td colSpan={5} align="right" style={{ borderTop: "0.5px solid var(--ds-border-warm)", fontWeight: 500 }}>
+                  Subtotal (net)
+                </Td>
+                <Td align="right" style={{ borderTop: "0.5px solid var(--ds-border-warm)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                  €{(productsSubtotalNet + packagingSubtotalNet + variantsSubtotalNet).toFixed(2)}
+                </Td>
+                <Td style={{ borderTop: "0.5px solid var(--ds-border-warm)" }} />
+              </tr>
+              {vatRows.map((b) => (
+                <tr key={b.rate}>
+                  <Td colSpan={5} align="right" style={{ color: "var(--ds-text-muted)" }}>
+                    VAT {b.rate}%
+                  </Td>
+                  <Td align="right" style={{ color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                    €{b.vat.toFixed(2)}
+                  </Td>
+                  <Td />
+                </tr>
+              ))}
+              <tr>
+                <Td colSpan={5} align="right" style={{ borderTop: "0.5px solid var(--ds-border-warm)", fontWeight: 600 }}>
+                  Total (gross)
+                </Td>
+                <Td align="right" style={{ borderTop: "0.5px solid var(--ds-border-warm)", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                  €{totalGross.toFixed(2)}
+                </Td>
+                <Td style={{ borderTop: "0.5px solid var(--ds-border-warm)" }} />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function priceSourceLabel(override: number | undefined, source: string): string {
+  if (override != null) return "per-line override";
+  if (source === "customer") return "from customer price";
+  if (source === "priceList") return "from price list";
+  if (source === "retail") return "retail fallback";
+  if (source === "discount") return "customer discount";
+  if (source === "none") return "no price set";
+  return source;
+}
+
+function Th({
+  children, align = "left", title,
+}: {
+  children?: React.ReactNode;
+  align?: "left" | "right";
+  title?: string;
+}) {
+  return (
+    <th
+      title={title}
+      style={{
+        padding: "8px 12px",
+        textAlign: align,
+        fontSize: 10,
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        color: "var(--ds-text-muted)",
+        fontWeight: 600,
+        borderBottom: "0.5px solid var(--ds-border-warm)",
+      }}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Td({
+  children, align = "left", colSpan, style,
+}: {
+  children?: React.ReactNode;
+  align?: "left" | "right";
+  colSpan?: number;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <td colSpan={colSpan} style={{ padding: "8px 12px", textAlign: align, fontSize: 13, ...style }}>
+      {children}
+    </td>
+  );
+}
+
+function GridLineRow({
+  row, onRemove,
+}: {
+  row:
+    | { key: string; kind: "single"; line: OrderItem; name: string; notes?: string; priceSource: string; unitPrice: number | null; vatRate: number; subtotal: number; }
+    | { key: string; kind: "variant"; line: import("@/types").OrderVariantLine; name: string; notes?: string; priceSource: string; unitPrice: number | null; vatRate: number; subtotal: number; }
+    | { key: string; kind: "decoration"; line: OrderPackagingLine; name: string; notes?: string; priceSource: string; unitPrice: number | null; vatRate: number; subtotal: number; };
+  onRemove: () => void;
+}) {
+  const kindLabel = row.kind === "single" ? "Single" : row.kind === "variant" ? "Variant" : "Decoration";
+  return (
+    <tr style={{ borderBottom: "0.5px solid var(--ds-border-warm)" }}>
+      <Td>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontWeight: 500 }}>{row.name}</span>
+          <span style={{ fontSize: 10, color: "var(--ds-text-muted)" }}>
+            <span style={{ textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 6 }}>{kindLabel}</span>
+            {row.notes && <span style={{ fontStyle: "italic" }}>· {row.notes}</span>}
+          </span>
+        </div>
+      </Td>
+      <Td align="right">
+        {row.kind === "single" ? (
+          <NumberCell
+            value={row.line.quantity}
+            min={1}
+            step={1}
+            onSave={async (n) => {
+              if (!row.line.id) return;
+              await saveOrderItem({
+                id: row.line.id,
+                orderId: row.line.orderId,
+                productId: row.line.productId,
+                quantity: n,
+                sortOrder: row.line.sortOrder,
+                notes: row.line.notes,
+                fulfilmentMode: row.line.fulfilmentMode,
+                unitPrice: row.line.unitPrice,
+                vatRate: row.line.vatRate,
+              });
+            }}
+          />
+        ) : row.kind === "decoration" ? (
+          <NumberCell
+            value={row.line.quantity}
+            min={1}
+            step={1}
+            onSave={async (n) => {
+              if (!row.line.id) return;
+              await saveOrderPackagingLine({
+                id: row.line.id,
+                orderId: row.line.orderId,
+                packagingId: row.line.packagingId,
+                quantity: n,
+                sortOrder: row.line.sortOrder,
+                notes: row.line.notes,
+                unitPrice: row.line.unitPrice,
+                vatRate: row.line.vatRate,
+              });
+            }}
+          />
+        ) : (
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{row.line.quantity}</span>
+        )}
+      </Td>
+      <Td align="right">
+        {row.kind === "variant" ? (
+          // OrderVariantLine has no save endpoint exposed today; flag deferred.
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            €{row.line.unitPrice.toFixed(2)}
+            <span style={{ display: "block", fontSize: 10, color: "var(--ds-text-muted)" }}>variant set ✗</span>
+          </span>
+        ) : row.kind === "single" ? (
+          <PriceCell
+            value={row.line.unitPrice ?? null}
+            source={row.priceSource}
+            onSave={async (next) => {
+              if (!row.line.id) return;
+              await saveOrderItem({
+                id: row.line.id,
+                orderId: row.line.orderId,
+                productId: row.line.productId,
+                quantity: row.line.quantity,
+                sortOrder: row.line.sortOrder,
+                notes: row.line.notes,
+                fulfilmentMode: row.line.fulfilmentMode,
+                unitPrice: next ?? undefined,
+                vatRate: row.line.vatRate,
+              });
+            }}
+          />
+        ) : (
+          <PriceCell
+            value={row.line.unitPrice ?? null}
+            source={row.priceSource}
+            onSave={async (next) => {
+              if (!row.line.id) return;
+              await saveOrderPackagingLine({
+                id: row.line.id,
+                orderId: row.line.orderId,
+                packagingId: row.line.packagingId,
+                quantity: row.line.quantity,
+                sortOrder: row.line.sortOrder,
+                notes: row.line.notes,
+                unitPrice: next ?? undefined,
+                vatRate: row.line.vatRate,
+              });
             }}
           />
         )}
-
-        {/* Reassignment-proposal modal — fires when handleDelete detects
-            Shelling-or-later progress on a linked batch. Gives the
-            operator a chance to move the sunk work to another open
-            order instead of deleting it. */}
-        {reassignProposals && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/40 " onClick={() => setReassignProposals(null)} />
-            <div className="relative w-full max-w-lg rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
-              <div className="px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)] bg-[color:var(--ds-tint-warn)]">
-                <h3 className="text-base font-bold text-[color:var(--ds-semantic-warn)] flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> In-flight work — reassign or discard?
-                </h3>
-                <p className="text-xs text-[color:var(--ds-semantic-warn)]/80 mt-1">
-                  One or more batches for this order already have production progress. Reassign
-                  them to another open order with the same product, or choose Delete anyway to
-                  discard the sunk work.
-                </p>
-              </div>
-              <ul className="px-5 py-3 space-y-3 max-h-80 overflow-y-auto">
-                {reassignProposals.map((p) => (
-                  <li key={p.orderPlanLinkId} className="rounded-[4px] border border-[color:var(--ds-border-warm)] p-3 space-y-2">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-sm font-semibold">{p.productName}</p>
-                      <span className="text-[11px] tabular-nums text-muted-foreground">
-                        {p.allocatedQuantity} pcs · batch {p.batchNumber ?? p.planName}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Progress reached <span className="font-medium">{p.progressStepKey.split("-")[0]}</span>.
-                    </p>
-                    {p.candidates.length === 0 ? (
-                      <p className="text-[11px] text-muted-foreground italic">
-                        No open orders for this product — reassignment not possible.
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {p.candidates.slice(0, 6).map((c) => (
-                          <button
-                            key={c.orderItemId}
-                            onClick={() => handleReassign(p, c.orderItemId)}
-                            disabled={reassignBusy === p.orderPlanLinkId}
-                            className="inline-flex items-center gap-1 rounded-[4px] border border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)] hover:bg-[color:var(--ds-tint-info)] text-primary px-2 py-0.5 text-[11px] font-medium disabled:opacity-50"
-                            title={`Needs ${c.itemRemainingDemand} pcs · deadline ${c.deadline.slice(0, 10)}`}
-                          >
-                            → {c.orderLabel} · {c.itemRemainingDemand} pcs needed
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <div className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2 bg-muted/20">
-                <button
-                  onClick={() => setReassignProposals(null)}
-                  className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
-                >
-                  Keep order
-                </button>
-                <button
-                  onClick={async () => {
-                    setReassignProposals(null);
-                    await performDelete();
-                  }}
-                  className="rounded-[4px] bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
-                >
-                  Delete anyway
-                </button>
-              </div>
-            </div>
-          </div>
+      </Td>
+      <Td align="right">
+        <span style={{ color: "var(--ds-text-muted)", fontSize: 11, fontStyle: "italic" }}>—</span>
+      </Td>
+      <Td align="right">
+        {row.kind === "single" ? (
+          <VatCell
+            value={row.vatRate}
+            onSave={async (next) => {
+              if (!row.line.id) return;
+              await saveOrderItem({
+                id: row.line.id,
+                orderId: row.line.orderId,
+                productId: row.line.productId,
+                quantity: row.line.quantity,
+                sortOrder: row.line.sortOrder,
+                notes: row.line.notes,
+                fulfilmentMode: row.line.fulfilmentMode,
+                unitPrice: row.line.unitPrice,
+                vatRate: next ?? undefined,
+              });
+            }}
+          />
+        ) : row.kind === "decoration" ? (
+          <VatCell
+            value={row.vatRate}
+            onSave={async (next) => {
+              if (!row.line.id) return;
+              await saveOrderPackagingLine({
+                id: row.line.id,
+                orderId: row.line.orderId,
+                packagingId: row.line.packagingId,
+                quantity: row.line.quantity,
+                sortOrder: row.line.sortOrder,
+                notes: row.line.notes,
+                unitPrice: row.line.unitPrice,
+                vatRate: next ?? undefined,
+              });
+            }}
+          />
+        ) : (
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>{row.vatRate}%</span>
         )}
-      </div>
+      </Td>
+      <Td align="right" style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+        €{row.subtotal.toFixed(2)}
+      </Td>
+      <Td align="right">
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Remove line"
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "var(--ds-text-muted)",
+            cursor: "pointer",
+            padding: 4,
+          }}
+          className="hover:text-[color:var(--ds-tier-urgent)]"
+        >
+          <X size={14} />
+        </button>
+      </Td>
+    </tr>
+  );
+}
+
+function NumberCell({
+  value, min, step, onSave,
+}: {
+  value: number;
+  min?: number;
+  step?: number;
+  onSave: (next: number) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { if (!editing) setDraft(String(value)); }, [value, editing]);
+  if (editing) {
+    return (
+      <input
+        type="number"
+        min={min}
+        step={step}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={async () => {
+          const n = parseFloat(draft);
+          if (Number.isFinite(n) && n !== value) await onSave(n);
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") { setDraft(String(value)); setEditing(false); }
+        }}
+        autoFocus
+        style={{
+          width: 60, padding: "2px 4px", textAlign: "right",
+          fontSize: 13, border: "0.5px solid var(--ds-tier-quarter-focus)",
+          borderRadius: 3, background: "var(--ds-card-bg)",
+        }}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      style={{
+        background: "transparent", border: "none", cursor: "pointer",
+        fontSize: 13, fontVariantNumeric: "tabular-nums",
+        color: "var(--ds-text-primary)",
+        padding: "2px 4px", borderRadius: 3,
+      }}
+      className="hover:bg-[color:var(--ds-card-bg-hover)]"
+    >
+      {value}
+    </button>
+  );
+}
+
+function PriceCell({
+  value, source, onSave,
+}: {
+  value: number | null;
+  source: string;
+  onSave: (next: number | null) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value != null ? value.toFixed(2) : "");
+  useEffect(() => { if (!editing) setDraft(value != null ? value.toFixed(2) : ""); }, [value, editing]);
+  if (editing) {
+    return (
+      <input
+        type="number"
+        min={0}
+        step={0.01}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={async () => {
+          const trimmed = draft.trim();
+          const next = trimmed === "" ? null : parseFloat(trimmed);
+          if (next !== null && (!Number.isFinite(next) || next < 0)) {
+            setDraft(value != null ? value.toFixed(2) : "");
+            setEditing(false);
+            return;
+          }
+          await onSave(next);
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") { setDraft(value != null ? value.toFixed(2) : ""); setEditing(false); }
+        }}
+        autoFocus
+        style={{
+          width: 80, padding: "2px 4px", textAlign: "right",
+          fontSize: 13, border: "0.5px solid var(--ds-tier-quarter-focus)",
+          borderRadius: 3, background: "var(--ds-card-bg)",
+        }}
+      />
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        style={{
+          background: "transparent", border: "none", cursor: "pointer",
+          fontSize: 13, fontVariantNumeric: "tabular-nums",
+          color: "var(--ds-text-primary)",
+          padding: "2px 4px", borderRadius: 3,
+        }}
+        className="hover:bg-[color:var(--ds-card-bg-hover)]"
+      >
+        {value != null ? `€${value.toFixed(2)}` : "—"}
+      </button>
+      <span style={{ fontSize: 10, color: "var(--ds-text-muted)" }}>{source}</span>
     </div>
   );
 }
 
-function OrderEditForm({ order, onSaved, onCancel }: {
-  order: {
-    id?: string; channel: OrderChannel; customerName?: string; customerId?: string;
-    eventName?: string; deadline: string; priority: OrderPriority; status: OrderStatus;
-    notes?: string; pricePaid?: number;
-    deliveryType?: DeliveryType; deliveryAt?: string;
-    deliveryAddress?: string; deliveryNotes?: string;
-    isApproxDeadline?: boolean;
-    isolated?: boolean;
-  };
-  onSaved: () => void;
-  onCancel: () => void;
+function VatCell({
+  value, onSave,
+}: {
+  value: number;
+  onSave: (next: number | null) => Promise<void>;
 }) {
-  const [channel, setChannel] = useState<OrderChannel>(order.channel);
-  const [customerId, setCustomerId] = useState<string>(order.customerId ?? "");
-  const [customerName, setCustomerName] = useState(order.customerName ?? "");
-  const [eventName, setEventName] = useState(order.eventName ?? "");
-  const [deadline, setDeadline] = useState(toLocalDatetime(order.deadline));
-  const [isApproxDeadline, setIsApproxDeadline] = useState<boolean>(
-    order.isApproxDeadline ?? false,
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { if (!editing) setDraft(String(value)); }, [value, editing]);
+  if (editing) {
+    return (
+      <input
+        type="number"
+        min={0} max={100} step={0.5}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={async () => {
+          const trimmed = draft.trim();
+          const next = trimmed === "" ? null : parseFloat(trimmed);
+          if (next !== null && (!Number.isFinite(next) || next < 0 || next > 100)) {
+            setDraft(String(value));
+            setEditing(false);
+            return;
+          }
+          await onSave(next);
+          setEditing(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") { setDraft(String(value)); setEditing(false); }
+        }}
+        autoFocus
+        style={{
+          width: 50, padding: "2px 4px", textAlign: "right",
+          fontSize: 13, border: "0.5px solid var(--ds-tier-quarter-focus)",
+          borderRadius: 3, background: "var(--ds-card-bg)",
+        }}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      style={{
+        background: "transparent", border: "none", cursor: "pointer",
+        fontSize: 13, fontVariantNumeric: "tabular-nums",
+        color: "var(--ds-text-primary)",
+        padding: "2px 4px", borderRadius: 3,
+      }}
+      className="hover:bg-[color:var(--ds-card-bg-hover)]"
+    >
+      {value}%
+    </button>
   );
-  const [priority, setPriority] = useState<OrderPriority>(order.priority);
-  const [notes, setNotes] = useState(order.notes ?? "");
-  const [deliveryType, setDeliveryType] = useState<DeliveryType | "">(order.deliveryType ?? "");
-  const [deliveryAt, setDeliveryAt] = useState(order.deliveryAt ? toLocalDatetime(order.deliveryAt) : "");
-  const [deliveryAddress, setDeliveryAddress] = useState(order.deliveryAddress ?? "");
-  const [deliveryNotes, setDeliveryNotes] = useState(order.deliveryNotes ?? "");
-  const [isolated, setIsolated] = useState<boolean>(order.isolated ?? false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
+}
 
+// ────────────────────────────────────────────────────────────────
+// Customer picker drawer (search-aware replacement for select)
+// ────────────────────────────────────────────────────────────────
+
+function CustomerPickerDrawerBody({
+  order, onPicked,
+}: {
+  order: Order;
+  onPicked: (c: Customer) => Promise<void>;
+}) {
   const customers = useCustomers(false);
-  const [customerQuery, setCustomerQuery] = useState("");
-  const [customerListOpen, setCustomerListOpen] = useState(false);
-  const [addingCustomer, setAddingCustomer] = useState(false);
-
-  const customerMatches = useMemo(() => {
-    const q = customerQuery.trim().toLowerCase();
-    if (!q) return customers.slice(0, 20);
+  const [query, setQuery] = useState("");
+  const [addingNew, setAddingNew] = useState(false);
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return customers.slice(0, 30);
     return customers
       .filter((c) =>
         c.companyName.toLowerCase().includes(q)
         || (c.contactName ?? "").toLowerCase().includes(q)
-        || (c.email ?? "").toLowerCase().includes(q)
-        || (c.phone ?? "").toLowerCase().includes(q)
+        || (c.email ?? "").toLowerCase().includes(q),
       )
-      .slice(0, 20);
-  }, [customers, customerQuery]);
+      .slice(0, 30);
+  }, [customers, query]);
 
-  /** Pick a customer and preload any useful defaults onto the order form.
-   *  Per spec: channel (from type), deliveryType (from defaultDeliveryMethod),
-   *  deliveryAddress (from address, only when delivery/ship). We never
-   *  overwrite a field the user has already changed by hand — preload
-   *  is for empty fields only. */
-  function pickCustomer(c: Customer) {
-    setCustomerId(c.id!);
-    setCustomerName(c.companyName);
-    setCustomerQuery("");
-    setCustomerListOpen(false);
-    // Channel inference: B2B customer defaults to 'b2b', private to 'online'.
-    if (!order.customerId && c.type === "b2b" && channel === "online") setChannel("b2b");
-    if (!order.customerId && c.type === "private" && channel === "b2b") setChannel("online");
-    // Fulfilment preloads — only when the order's fulfilment fields are
-    // still empty (don't clobber user-entered data on re-pick).
-    if (!deliveryType && c.defaultDeliveryMethod) setDeliveryType(c.defaultDeliveryMethod);
-    if (!deliveryAddress && c.address && (c.defaultDeliveryMethod === "delivery" || c.defaultDeliveryMethod === "ship")) {
-      setDeliveryAddress(c.address);
-    }
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setSaveError("");
-    try {
-      await saveOrder({
-        id: order.id,
-        channel,
-        customerId: customerId || undefined,
-        customerName: customerName.trim() || undefined,
-        eventName: channel === "event" && eventName.trim() ? eventName.trim() : undefined,
-        deadline: new Date(deadline).toISOString(),
-        priority,
-        status: order.status,
-        notes: notes.trim() || undefined,
-        pricePaid: order.pricePaid,
-        deliveryType: deliveryType === "" ? undefined : deliveryType,
-        deliveryAt: deliveryAt ? new Date(deliveryAt).toISOString() : undefined,
-        deliveryAddress: deliveryAddress.trim() || undefined,
-        deliveryNotes: deliveryNotes.trim() || undefined,
-        isApproxDeadline,
-        isolated,
-      });
-      onSaved();
-    } catch (err) {
-      const raw: { message?: string; code?: string; details?: string } =
-        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
-      const code = raw.code ? ` (code ${raw.code})` : "";
-      setSaveError(`${raw.message || raw.details || "Save failed"}${code}`);
-      console.error("saveOrder failed:", err);
-    } finally {
-      setSaving(false);
-    }
+  if (addingNew) {
+    return (
+      <InlineNewCustomer
+        initialName={query}
+        onCreated={async (c) => { setAddingNew(false); await onPicked(c); }}
+        onCancel={() => setAddingNew(false)}
+      />
+    );
   }
 
   return (
-    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="label">Type</label>
-          <select value={channel} onChange={(e) => setChannel(e.target.value as OrderChannel)} className="input">
-            {ORDER_CHANNELS.map((c) => <option key={c} value={c}>{ORDER_CHANNEL_LABELS[c]}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="label">Priority</label>
-          <select value={priority} onChange={(e) => setPriority(e.target.value as OrderPriority)} className="input">
-            {ORDER_PRIORITIES.map((p) => <option key={p} value={p}>{ORDER_PRIORITY_LABELS[p]}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="relative">
-        <label className="label flex items-center gap-2">
-          Customer
-          {customerId && (
-            (() => {
-              const c = customers.find((x) => x.id === customerId);
-              if (!c) return null;
-              const miss = computeMissingRequiredCustomerFields(c);
-              return miss.length > 0 ? (
-                <span
-                  className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-status-warn text-white text-[10px] font-bold"
-                  title={`Missing on customer: ${miss.join(", ")}`}
-                >{miss.length}</span>
-              ) : null;
-            })()
-          )}
-        </label>
-        {customerId ? (
-          <div className="flex items-center gap-2">
-            <div className="flex-1 rounded-[6px] border border-[color:var(--ds-border-warm)] bg-muted px-3 py-1.5 text-sm">
-              {customerName || "(linked)"}
-            </div>
-            <button
-              onClick={() => { setCustomerId(""); setCustomerName(""); setCustomerListOpen(true); }}
-              className="text-xs text-primary hover:underline"
-            >
-              Change
-            </button>
-          </div>
-        ) : (
-          <>
-            <input
-              type="text"
-              value={customerQuery || customerName}
-              onChange={(e) => {
-                setCustomerQuery(e.target.value);
-                setCustomerName(e.target.value);
-                setCustomerListOpen(true);
-              }}
-              onFocus={() => setCustomerListOpen(true)}
-              placeholder="Search or type a one-off name"
-              className="input"
-              autoComplete="off"
-            />
-            {customerListOpen && (
-              <div className="absolute z-20 left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-64 overflow-y-auto">
-                {customerMatches.map((c) => {
-                  const miss = computeMissingRequiredCustomerFields(c);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => pickCustomer(c)}
-                      className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-muted"
-                    >
-                      <span className="flex-1 min-w-0">
-                        <span className="font-medium">{c.companyName}</span>
-                        {c.type && <span className="ml-2 text-[10px] uppercase text-muted-foreground">{CUSTOMER_TYPE_LABELS[c.type]}</span>}
-                        {c.contactName && <span className="text-xs text-muted-foreground block truncate">{c.contactName}{c.email ? ` · ${c.email}` : ""}</span>}
-                      </span>
-                      {miss.length > 0 && (
-                        <span className="text-[10px] text-status-warn inline-flex items-center gap-0.5">
-                          <AlertTriangle className="w-3 h-3" /> {miss.length}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const name = customerQuery.trim();
-                    // Quick-add path: if the user has typed a name that
-                    // doesn't match any existing customer, create one
-                    // right now with just companyName — the remaining
-                    // fields (type, contacts, address) can be filled in
-                    // later from /customers. Keeps the order entry fast
-                    // and matches the "type → save" reflex.
-                    if (name) {
-                      const id = await saveCustomer({ companyName: name, tags: [] });
-                      pickCustomer({ id, companyName: name, tags: [] } as Customer);
-                      setCustomerListOpen(false);
-                    } else {
-                      setAddingCustomer(true);
-                      setCustomerListOpen(false);
-                    }
-                  }}
-                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm border-t border-[color:var(--ds-border-warm)] bg-muted hover:bg-muted text-primary font-medium"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  {customerQuery.trim() ? `+ Add "${customerQuery.trim()}" as customer` : "+ New customer with details…"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-        {addingCustomer && (
-          <InlineNewCustomer
-            initialName={customerQuery.trim() || customerName.trim()}
-            onCreated={(c) => { setAddingCustomer(false); pickCustomer(c); }}
-            onCancel={() => setAddingCustomer(false)}
-          />
-        )}
-        <p className="text-[11px] text-muted-foreground mt-0.5">
-          Pick for CRM tracking + price / preference preload.
-          {" "}<Link href="/customers" className="text-primary hover:underline">Manage customers →</Link>
-        </p>
-      </div>
-
-      {channel === "event" && (
-        <div>
-          <label className="label">Event name</label>
-          <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)} className="input" />
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <input
+        type="text"
+        autoFocus
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search customers…"
+        className="input"
+      />
+      {order.customerId && (
+        <div style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>
+          Currently linked: {order.customerName ?? order.customerId}
         </div>
       )}
-
-      <div>
-        <label className="label">Deadline</label>
-        <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="input" />
-        <label className="mt-2 inline-flex items-center gap-2 text-[12px] text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={isApproxDeadline}
-            onChange={(e) => setIsApproxDeadline(e.target.checked)}
-            className="w-3.5 h-3.5"
-          />
-          Approximate — customer said "around this date" (±1 week)
-        </label>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {matches.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => onPicked(c)}
+            style={{
+              textAlign: "left",
+              padding: "8px 10px",
+              borderRadius: 4,
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              marginBottom: 4,
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+            className="hover:bg-[color:var(--ds-card-bg-hover)]"
+          >
+            <span style={{ fontWeight: 500 }}>{c.companyName}</span>
+            {c.type && (
+              <span style={{ marginLeft: 8, fontSize: 10, color: "var(--ds-text-muted)", textTransform: "uppercase" }}>
+                {CUSTOMER_TYPE_LABELS[c.type]}
+              </span>
+            )}
+            {c.contactName && (
+              <div style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>{c.contactName}{c.email ? ` · ${c.email}` : ""}</div>
+            )}
+          </button>
+        ))}
       </div>
+      <DsButton
+        variant="primary"
+        onClick={() => setAddingNew(true)}
+      >
+        <UserPlus size={12} style={{ marginRight: 4 }} />
+        {query.trim() ? `Add "${query.trim()}"` : "Add new customer"}
+      </DsButton>
+    </div>
+  );
+}
 
-      <div>
-        <label className="label">Notes</label>
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="input resize-none" />
-      </div>
+// ────────────────────────────────────────────────────────────────
+// Add line drawer (toggles between Product / Variant / Decoration)
+// ────────────────────────────────────────────────────────────────
 
-      <div className="pt-2 border-t border-[color:var(--ds-border-warm)] space-y-3">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fulfilment</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Type</label>
-            <select
-              value={deliveryType}
-              onChange={(e) => setDeliveryType(e.target.value as DeliveryType | "")}
-              className="input"
+function AddLineDrawerBody({
+  orderId, products, packaging, packagingUnitCost, allVariants,
+  resolveProductPrice, nextSortOrderProducts, nextSortOrderPackaging,
+  availableFor, onDone,
+}: {
+  orderId: string;
+  products: { id?: string; name: string; archived?: boolean }[];
+  packaging: Packaging[];
+  packagingUnitCost: Map<string, number>;
+  allVariants: ReturnType<typeof useVariants>;
+  resolveProductPrice: (id: string) => ReturnType<typeof resolveUnitPrice>;
+  nextSortOrderProducts: number;
+  nextSortOrderPackaging: number;
+  availableFor: (id: string) => number;
+  onDone: () => void;
+}) {
+  const [kind, setKind] = useState<LineKind>("single");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "inline-flex", gap: 4, alignSelf: "flex-start" }}>
+        {(["single", "variant", "decoration"] as LineKind[]).map((k) => {
+          const on = kind === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKind(k)}
+              style={{
+                fontSize: 11,
+                padding: "5px 12px",
+                borderRadius: 999,
+                border: on ? `0.5px solid var(--ds-tier-quarter-focus)` : `0.5px solid var(--ds-border-warm)`,
+                background: on ? "var(--ds-tier-quarter-focus)" : "var(--ds-card-bg)",
+                color: on ? "#fff" : "var(--ds-text-muted)",
+                cursor: "pointer",
+                textTransform: "capitalize",
+              }}
             >
-              <option value="">— none —</option>
-              {DELIVERY_TYPES.map((t) => (
-                <option key={t} value={t}>{DELIVERY_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Date / time</label>
-            <input
-              type="datetime-local"
-              value={deliveryAt}
-              onChange={(e) => setDeliveryAt(e.target.value)}
-              className="input"
-            />
-          </div>
-        </div>
-        {(deliveryType === "delivery" || deliveryType === "ship") && (
-          <div>
-            <label className="label">Address</label>
-            <textarea
-              value={deliveryAddress}
-              onChange={(e) => setDeliveryAddress(e.target.value)}
-              rows={2}
-              className="input resize-none"
-            />
-          </div>
-        )}
-        {deliveryType !== "" && (
-          <div>
-            <label className="label">Delivery notes</label>
-            <input
-              type="text"
-              value={deliveryNotes}
-              onChange={(e) => setDeliveryNotes(e.target.value)}
-              placeholder="Gate code, buzzer, courier preference…"
-              className="input"
-            />
-          </div>
-        )}
+              {k === "single" ? "Product" : k === "variant" ? "Variant" : "Decoration"}
+            </button>
+          );
+        })}
       </div>
 
-      <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-[10px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
-        <input
-          type="checkbox"
-          checked={isolated}
-          onChange={(e) => setIsolated(e.target.checked)}
-          className="mt-0.5 accent-[var(--accent-mint-ink)]"
+      {kind === "single" && (
+        <AddOrderLine
+          orderId={orderId}
+          nextSortOrder={nextSortOrderProducts}
+          products={products}
+          resolveProductPrice={resolveProductPrice}
+          availableFor={availableFor}
+          onSaved={onDone}
+          onCancel={onDone}
         />
-        <span className="text-[12.5px] leading-snug">
-          <span className="block font-medium">Keep production isolated</span>
-          <span className="block text-muted-foreground text-[11px]">
-            This order's batches stay separate — won't share moulds with replen/other orders, won't be folded into combined plans for the same product.
-          </span>
-        </span>
-      </label>
-
-      <div className="flex gap-2">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
-        <button onClick={onCancel} className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm">
-          Cancel
-        </button>
-      </div>
-      {saveError && (
-        <p className="text-xs text-status-alert pt-1">{saveError}</p>
+      )}
+      {kind === "variant" && (
+        <AddVariantForm
+          orderId={orderId}
+          allVariants={allVariants}
+          onDone={onDone}
+        />
+      )}
+      {kind === "decoration" && (
+        <AddOrderPackagingLine
+          orderId={orderId}
+          nextSortOrder={nextSortOrderPackaging}
+          packaging={packaging}
+          packagingUnitCost={packagingUnitCost}
+          onCancel={onDone}
+        />
       )}
     </div>
   );
 }
+
+// ────────────────────────────────────────────────────────────────
+// History helpers
+// ────────────────────────────────────────────────────────────────
+
+function HistoryChip({ kind }: { kind: "created" | "status" | "batch-linked" | "note" }) {
+  const label =
+    kind === "created" ? "Created"
+      : kind === "status" ? "Status changed"
+      : kind === "batch-linked" ? "Batch linked"
+      : "Note";
+  const bg =
+    kind === "created" ? "var(--accent-mint-bg)"
+      : kind === "status" ? "var(--ds-tint-info)"
+      : kind === "batch-linked" ? "var(--accent-butter-bg)"
+      : "var(--ds-card-bg-hover)";
+  const ink =
+    kind === "created" ? "var(--accent-mint-ink)"
+      : kind === "status" ? "var(--ds-tier-quarter-focus)"
+      : kind === "batch-linked" ? "var(--accent-butter-ink)"
+      : "var(--ds-text-muted)";
+  return (
+    <span
+      style={{
+        fontSize: 10, padding: "1px 7px",
+        borderRadius: 999, background: bg, color: ink,
+        textTransform: "uppercase", letterSpacing: "0.06em",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function HistoryTime({ time }: { time: Date }) {
+  const now = Date.now();
+  const diffMs = now - time.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+  let rel: string;
+  if (mins < 1) rel = "just now";
+  else if (mins < 60) rel = `${mins}m ago`;
+  else if (hrs < 24) rel = `${hrs}h ago`;
+  else if (days < 30) rel = `${days}d ago`;
+  else rel = time.toLocaleDateString("de-AT", { day: "numeric", month: "short" });
+  const abs = time.toLocaleString("de-AT", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+  return (
+    <span title={abs} style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
+      {rel}
+    </span>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────
+// Plan-status badge maps
+// ────────────────────────────────────────────────────────────────
+
+const PLAN_STATUS_LABEL: Record<ProductionPlan["status"], string> = {
+  draft: "Pending",
+  active: "In production",
+  done: "Done",
+  cancelled: "Cancelled",
+  orphaned: "Orphaned",
+};
+const PLAN_STATUS_BG: Record<ProductionPlan["status"], string> = {
+  draft: "var(--ds-card-bg-hover)",
+  active: "rgba(218,183,63,0.18)",
+  done: "rgba(93,202,165,0.18)",
+  cancelled: "rgba(153,53,86,0.12)",
+  orphaned: "rgba(153,53,86,0.12)",
+};
+const PLAN_STATUS_INK: Record<ProductionPlan["status"], string> = {
+  draft: "var(--ds-text-muted)",
+  active: "var(--ds-semantic-warn)",
+  done: "var(--accent-mint-ink)",
+  cancelled: "var(--ds-tier-urgent)",
+  orphaned: "var(--ds-tier-urgent)",
+};
+
+// ────────────────────────────────────────────────────────────────
+// AddOrderLine (kept from previous build, used inside drawer)
+// ────────────────────────────────────────────────────────────────
 
 function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, availableFor, onSaved, onCancel }: {
   orderId: string;
@@ -1267,8 +2073,6 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
   const qty = parseInt(quantity, 10);
   const available = productId ? availableFor(productId) : 0;
   const canSave = !!productId && !isNaN(qty) && qty > 0 && !!fulfilmentMode && !saving;
-  // `productInputRef` is kept so the field autofocuses on mount but is
-  // no longer re-focused post-save (the panel closes instead).
   void productInputRef;
 
   const matches = useMemo(() => {
@@ -1278,9 +2082,6 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
     return active.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 20);
   }, [products, productQuery]);
 
-  // When the user picks a product, pre-fill the net unit price from the
-  // pricing hierarchy so they can save-and-go. They can still override
-  // per line before clicking Add.
   function pickProduct(p: { id?: string; name: string }) {
     if (!p.id) return;
     setProductId(p.id);
@@ -1304,578 +2105,98 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
         sortOrder: nextSortOrder,
         notes: notes.trim() || undefined,
         unitPrice: Number.isFinite(priceNum) && priceNum >= 0 ? priceNum : undefined,
-        // fulfilmentMode is required — saveOrderItem throws without it.
         fulfilmentMode,
       });
-      // One-shot add: close the panel after a successful save instead
-      // of re-opening the picker and looping. The user clicks + again
-      // when they want another line — fewer "how do I get out of this?"
-      // moments. The AddOrderLine panel dismounts here.
       onSaved();
     } catch (err) {
       const raw: { message?: string; code?: string; details?: string } =
         err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
       const code = raw.code ? ` (code ${raw.code})` : "";
       setSaveError(`${raw.message || raw.details || "Save failed"}${code}`);
-      console.error("saveOrderItem failed:", err);
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2 mb-2">
-      <div className="grid grid-cols-6 gap-2">
-        <div className="col-span-3 relative">
-          <input
-            ref={productInputRef}
-            type="text"
-            value={productQuery}
-            onChange={(e) => {
-              setProductQuery(e.target.value);
-              setProductId("");
-              setPickerOpen(true);
-            }}
-            onFocus={() => setPickerOpen(true)}
-            placeholder="Search product…"
-            className="input"
-            autoFocus
-            autoComplete="off"
-          />
-          {pickerOpen && matches.length > 0 && (
-            <div className="absolute z-20 left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
-              {matches.map((p) => {
-                const r = resolveProductPrice(p.id!);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => pickProduct(p)}
-                    className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
-                  >
-                    <span className="flex-1 truncate">{p.name}</span>
-                    {r.unitPrice != null && (
-                      <span className="text-xs text-muted-foreground tabular-nums">€{r.unitPrice.toFixed(2)}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div>
-          <input
-            type="number"
-            min="1"
-            step="1"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); } }}
-            placeholder="Qty"
-            className="input"
-          />
-        </div>
-        <div className="col-span-2">
-          <input
-            type="number" min={0} step={0.01}
-            value={unitPriceInput}
-            onChange={(e) => setUnitPriceInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); } }}
-            placeholder="€ net / unit"
-            className="input"
-          />
-        </div>
-      </div>
-      <input
-        type="text"
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); }
-        }}
-        placeholder="Line notes (optional)"
-        className="input"
-      />
-
-      {/* Stock source — must be an explicit choice. No silent
-          Take-from-Stock; the old auto-decide was the bug. */}
-      {productId && (
-        <div className="flex items-center gap-3 flex-wrap text-xs pt-1">
-          <span className="text-muted-foreground">
-            Stock available: <span className="font-medium tabular-nums text-foreground">{available}</span>
-          </span>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setFulfilmentMode("borrow")}
-              disabled={available === 0}
-              className={`inline-flex items-center gap-1 rounded-[4px] border px-2 py-0.5 font-medium ${
-                fulfilmentMode === "borrow"
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
-              }`}
-            >
-              Take from stock
-            </button>
-            <button
-              type="button"
-              onClick={() => setFulfilmentMode("produce")}
-              className={`inline-flex items-center gap-1 rounded-[4px] border px-2 py-0.5 font-medium ${
-                fulfilmentMode === "produce"
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary"
-              }`}
-            >
-              Produce fresh
-            </button>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ position: "relative" }}>
+        <input
+          ref={productInputRef}
+          type="text"
+          value={productQuery}
+          onChange={(e) => { setProductQuery(e.target.value); setProductId(""); setPickerOpen(true); }}
+          onFocus={() => setPickerOpen(true)}
+          placeholder="Search product…"
+          className="input"
+          autoFocus
+          autoComplete="off"
+        />
+        {pickerOpen && matches.length > 0 && (
+          <div className="absolute z-20 left-0 right-0 mt-1 rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
+            {matches.map((p) => {
+              const r = resolveProductPrice(p.id!);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => pickProduct(p)}
+                  className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
+                >
+                  <span className="flex-1 truncate">{p.name}</span>
+                  {r.unitPrice != null && (
+                    <span className="text-xs text-muted-foreground tabular-nums">€{r.unitPrice.toFixed(2)}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          {!fulfilmentMode && (
-            <span className="text-status-warn">Pick one</span>
-          )}
-          {fulfilmentMode === "borrow" && !isNaN(qty) && qty > available && (
-            <span className="text-status-warn">
-              Only {available} available — rest rolls back to Produce on save.
-            </span>
-          )}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <button onClick={handleAdd} disabled={!canSave} className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
-          {saving ? "Adding…" : "Add"}
-        </button>
-        <button onClick={onCancel} className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs">
-          Cancel
-        </button>
-      </div>
-      {saveError && (
-        <p className="text-xs text-status-alert">{saveError}</p>
-      )}
-    </div>
-  );
-}
-
-function OrderLineRow({ item, product, short, resolveProductPrice, links, plansById, allPlanStepStatuses, lineItems, productionDays, productionSteps }: {
-  lineItems: import("@/types").ProductionDayLineItem[];
-  productionDays: import("@/types").ProductionDay[];
-  productionSteps: import("@/types").ProductionStep[];
-  item: OrderItem;
-  product?: { id?: string; name: string; defaultVatRate?: number };
-  short: boolean;
-  resolveProductPrice: (productId: string) => ReturnType<typeof resolveUnitPrice>;
-  links: OrderPlanLink[];
-  plansById: Map<string, ProductionPlan>;
-  allPlanStepStatuses: import("@/types").PlanStepStatus[];
-}) {
-  const productName = product?.name ?? item.productId;
-  const [pendingRemove, setPendingRemove] = useState(false);
-  const [editingQty, setEditingQty] = useState(false);
-  const [qtyInput, setQtyInput] = useState(String(item.quantity));
-  const [editingPrice, setEditingPrice] = useState(false);
-  const [priceInput, setPriceInput] = useState(item.unitPrice != null ? String(item.unitPrice) : "");
-  const [editingVat, setEditingVat] = useState(false);
-  const [vatInput, setVatInput] = useState(item.vatRate != null ? String(item.vatRate) : "");
-  const [saveError, setSaveError] = useState("");
-  const [switchingMode, setSwitchingMode] = useState(false);
-
-  // Resolved unit price — shown as placeholder hint when the line
-  // doesn't have its own. Stored per line as `unitPrice`; empty means
-  // "fall back to resolved at display time".
-  const resolved = resolveProductPrice(item.productId);
-  const effectiveUnitPrice = item.unitPrice ?? resolved.unitPrice;
-  const effectiveVat = effectiveVatRate(item.vatRate, product?.defaultVatRate);
-  const lineTotalNet = effectiveUnitPrice != null
-    ? Math.round(effectiveUnitPrice * item.quantity * 100) / 100
-    : null;
-
-  async function handleDelete() {
-    if (!item.id) return;
-    await deleteOrderItem(item.id);
-  }
-
-  async function persistLine(patch: Partial<OrderItem>) {
-    if (!item.id) return;
-    setSaveError("");
-    try {
-      await saveOrderItem({
-        id: item.id,
-        orderId: item.orderId,
-        productId: item.productId,
-        quantity: item.quantity,
-        sortOrder: item.sortOrder,
-        notes: item.notes,
-        fulfilmentMode: item.fulfilmentMode,
-        unitPrice: item.unitPrice,
-        vatRate: item.vatRate,
-        ...patch,
-      });
-    } catch (err) {
-      const raw: { message?: string; code?: string } =
-        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
-      const code = raw.code ? ` (code ${raw.code})` : "";
-      setSaveError(`${raw.message || "Save failed"}${code}`);
-    }
-  }
-
-  async function commitQty() {
-    const n = parseInt(qtyInput, 10);
-    if (!Number.isFinite(n) || n <= 0) { setQtyInput(String(item.quantity)); setEditingQty(false); return; }
-    if (n === item.quantity) { setEditingQty(false); return; }
-    await persistLine({ quantity: n });
-    setEditingQty(false);
-  }
-
-  async function commitPrice() {
-    const trimmed = priceInput.trim();
-    const next = trimmed === "" ? undefined : parseFloat(trimmed);
-    if (next !== undefined && (!Number.isFinite(next) || next < 0)) {
-      setPriceInput(item.unitPrice != null ? String(item.unitPrice) : "");
-      setEditingPrice(false);
-      return;
-    }
-    await persistLine({ unitPrice: next });
-    setEditingPrice(false);
-  }
-
-  async function commitVat() {
-    const trimmed = vatInput.trim();
-    const next = trimmed === "" ? undefined : parseFloat(trimmed);
-    if (next !== undefined && (!Number.isFinite(next) || next < 0 || next > 100)) {
-      setVatInput(item.vatRate != null ? String(item.vatRate) : "");
-      setEditingVat(false);
-      return;
-    }
-    await persistLine({ vatRate: next });
-    setEditingVat(false);
-  }
-
-  async function toggleFulfilmentMode() {
-    if (!item.id) return;
-    const next = item.fulfilmentMode === "borrow" ? "produce" : "borrow";
-    setSwitchingMode(true);
-    setSaveError("");
-    try {
-      // Saving an existing line with a different fulfilmentMode does not
-      // re-run the auto-decision. To move an existing line into 'borrow'
-      // we need to also allocate — simplest path: delete + re-add so
-      // saveOrderItem's new-line flow handles the allocation.
-      if (next === "borrow") {
-        await deleteOrderItem(item.id);
-        await saveOrderItem({
-          orderId: item.orderId,
-          productId: item.productId,
-          quantity: item.quantity,
-          sortOrder: item.sortOrder,
-          notes: item.notes,
-          fulfilmentMode: "borrow",
-        });
-      } else {
-        // Going borrow → produce: delete (releases the allocation) + re-add as produce.
-        await deleteOrderItem(item.id);
-        await saveOrderItem({
-          orderId: item.orderId,
-          productId: item.productId,
-          quantity: item.quantity,
-          sortOrder: item.sortOrder,
-          notes: item.notes,
-          fulfilmentMode: "produce",
-        });
-      }
-    } catch (err) {
-      const raw: { message?: string; code?: string } =
-        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
-      setSaveError(raw.message || "Mode switch failed");
-    } finally {
-      setSwitchingMode(false);
-    }
-  }
-
-  const isBorrow = item.fulfilmentMode === "borrow";
-  // Feasibility dot: red if this line's qty can't be satisfied even
-  // with producible-before-deadline; green if it fits. Borrow lines
-  // are always fine by definition — they're allocated from Store.
-  const feasibilityColor = isBorrow
-    ? "bg-primary"
-    : short ? "bg-status-alert" : "bg-status-ok";
-
-  return (
-    <li className={`rounded-[4px] border px-3 py-2.5 ${isBorrow ? "border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)]" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
-      <div className="flex items-center gap-3">
-        <span
-          className={`w-2 h-2 rounded-full shrink-0 ${feasibilityColor}`}
-          title={isBorrow ? "From Store stock" : short ? "Won't fit by deadline" : "Fits within capacity"}
-        />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">
-            {productName}
-            {isBorrow && (
-              <span className="ml-2 text-[10px] uppercase tracking-wide text-primary bg-primary/15 rounded px-1.5 py-0.5 align-middle">
-                From Store
-              </span>
-            )}
-          </p>
-          {item.notes && <p className="text-xs text-muted-foreground truncate">{item.notes}</p>}
-          {/* Stock-source label is display-only after save. The choice
-              between "Take from stock" and "Produce fresh" is locked
-              at order creation; changing it post-save would retroactively
-              rearrange allocation, batches, and schedules. To change a
-              line's source, delete the line and re-add it. */}
-          <p
-            className="text-[11px] text-muted-foreground mt-0.5"
-            title="Stock source is locked after save. Delete and re-add this line to change it."
-          >
-            {isBorrow ? "Use from stock (locked)" : "Produce fresh (locked)"}
-          </p>
-        </div>
-
-        {/* Unit price (net) */}
-        <div className="text-right shrink-0">
-          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Net / unit</p>
-          {editingPrice ? (
-            <input
-              type="number" min={0} step={0.01}
-              value={priceInput}
-              onChange={(e) => setPriceInput(e.target.value)}
-              onBlur={commitPrice}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                if (e.key === "Escape") { setPriceInput(item.unitPrice != null ? String(item.unitPrice) : ""); setEditingPrice(false); }
-              }}
-              autoFocus
-              placeholder={resolved.unitPrice != null ? resolved.unitPrice.toFixed(2) : "—"}
-              className="input !w-20 !text-sm text-right"
-            />
-          ) : (
-            <button
-              onClick={() => { setPriceInput(item.unitPrice != null ? String(item.unitPrice) : ""); setEditingPrice(true); }}
-              className="text-sm font-medium tabular-nums rounded px-1 hover:bg-muted"
-              title={`From ${resolved.source === "none" ? "— no price" : resolved.source}`}
-            >
-              {effectiveUnitPrice != null ? `€${effectiveUnitPrice.toFixed(2)}` : <span className="text-muted-foreground">—</span>}
-              {item.unitPrice == null && resolved.unitPrice != null && (
-                <span className="ml-1 text-[9px] text-muted-foreground uppercase">auto</span>
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* VAT */}
-        <div className="text-right shrink-0">
-          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">VAT</p>
-          {editingVat ? (
-            <input
-              type="number" min={0} max={100} step={0.5}
-              value={vatInput}
-              onChange={(e) => setVatInput(e.target.value)}
-              onBlur={commitVat}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                if (e.key === "Escape") { setVatInput(item.vatRate != null ? String(item.vatRate) : ""); setEditingVat(false); }
-              }}
-              autoFocus
-              placeholder={String(effectiveVat)}
-              className="input !w-14 !text-sm text-right"
-            />
-          ) : (
-            <button
-              onClick={() => { setVatInput(item.vatRate != null ? String(item.vatRate) : ""); setEditingVat(true); }}
-              className="text-sm tabular-nums rounded px-1 hover:bg-muted"
-            >
-              {effectiveVat}%
-              {item.vatRate == null && <span className="ml-0.5 text-[9px] text-muted-foreground uppercase">d</span>}
-            </button>
-          )}
-        </div>
-
-        {/* Qty */}
-        {editingQty ? (
-          <input
-            type="number"
-            min="1"
-            step="1"
-            value={qtyInput}
-            onChange={(e) => setQtyInput(e.target.value)}
-            onBlur={commitQty}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.currentTarget.blur(); }
-              if (e.key === "Escape") { setQtyInput(String(item.quantity)); setEditingQty(false); }
-            }}
-            autoFocus
-            className="input !w-16 text-sm text-right"
-          />
-        ) : (
-          <button
-            onClick={() => { setQtyInput(String(item.quantity)); setEditingQty(true); }}
-            className="text-sm font-medium tabular-nums shrink-0 rounded px-2 py-0.5 hover:bg-muted transition-colors"
-            title="Click to edit quantity"
-          >
-            {item.quantity}
-          </button>
         )}
-
-        {/* Line total */}
-        <div className="text-right shrink-0 w-20">
-          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Total</p>
-          <p className="text-sm font-semibold tabular-nums">
-            {lineTotalNet != null ? `€${lineTotalNet.toFixed(2)}` : "—"}
-          </p>
-        </div>
-
-        {pendingRemove ? (
-          <span className="flex items-center gap-1.5 text-xs shrink-0">
-            <button onClick={handleDelete} className="text-red-600 font-medium hover:underline">Yes</button>
-            <button onClick={() => setPendingRemove(false)} className="text-muted-foreground hover:underline">Cancel</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <input type="number" min="1" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="Qty" className="input" />
+        <input type="number" min={0} step={0.01} value={unitPriceInput} onChange={(e) => setUnitPriceInput(e.target.value)} placeholder="€ net / unit" className="input" />
+      </div>
+      <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Line notes (optional)" className="input" />
+      {productId && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 11 }}>
+          <span style={{ color: "var(--ds-text-muted)" }}>
+            Stock available: <b style={{ color: "var(--ds-text-primary)" }}>{available}</b>
           </span>
-        ) : (
-          <button onClick={() => setPendingRemove(true)} className="text-muted-foreground/50 hover:text-destructive shrink-0" aria-label="Remove line">
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-      {saveError && <p className="text-[11px] text-status-alert mt-1">{saveError}</p>}
-
-      {/* Linked batches — populated by Regenerate plan, NOT on order
-          save. Each row shows "N from <batch> (Step N/8 Label)" plus a
-          compact per-day step schedule ("Polish/Paint on 27 Apr ·
-          Shell/Fill on 28 Apr") so the user can see the batch's
-          lifecycle without opening it. */}
-      {links.length > 0 && (
-        <ul className="mt-2 space-y-1.5 pl-3 border-l-2 border-[color:var(--ds-border-warm)]">
-          {links.map((lk) => {
-            const plan = plansById.get(lk.planId);
-            const status = plan?.status ?? "draft";
-            const progress = plan
-              ? batchPhaseProgress(plan.id!, allPlanStepStatuses)
-              : null;
-            const batchLabel = plan?.batchNumber || plan?.name || "batch";
-            // Per-day step breakdown for this plan.
-            const dayDateById = new Map(productionDays.map((d) => [d.id!, d.date]));
-            const stepById = new Map(productionSteps.map((s) => [s.id!, s]));
-            const planLineItems = lineItems
-              .filter((li) => li.planId === lk.planId)
-              .map((li) => ({
-                date: dayDateById.get(li.productionDayId),
-                stepIds: li.stepIds,
-              }))
-              .filter((x) => !!x.date) as Array<{ date: string; stepIds: string[] }>;
-            planLineItems.sort((a, b) => a.date.localeCompare(b.date));
-            const perDayLabels = planLineItems.map((x) => {
-              const ordered = [...x.stepIds].sort((a, b) => {
-                const sa = stepById.get(a)?.sortOrder ?? 0;
-                const sb = stepById.get(b)?.sortOrder ?? 0;
-                return sa - sb;
-              });
-              const stepLabel = ordered.map((sid) => stepById.get(sid)?.name ?? sid).join("/");
-              const dateLabel = new Date(x.date + "T12:00:00")
-                .toLocaleDateString("de-AT", { day: "numeric", month: "short" });
-              return `${stepLabel} on ${dateLabel}`;
-            });
-            return (
-              <li key={lk.id ?? lk.planId} className="text-[11px]">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-muted-foreground shrink-0">└─</span>
-                  <span className="tabular-nums font-medium">{lk.allocatedQuantity}</span>
-                  <span className="text-muted-foreground">from</span>
-                  {plan ? (
-                    <Link
-                      href={`/production/${encodeURIComponent(plan.id!)}?from=orders&fromId=${encodeURIComponent(item.orderId)}`}
-                      className="font-medium hover:underline truncate max-w-[30ch]"
-                    >
-                      {batchLabel}
-                    </Link>
-                  ) : (
-                    <span className="text-muted-foreground italic">Batch missing</span>
-                  )}
-                  {progress && (
-                    <span className="text-muted-foreground tabular-nums">
-                      (Step {progress.index}/{progress.total} {progress.label})
-                    </span>
-                  )}
-                  <span className={`rounded-[4px] border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${PLAN_STATUS_STYLE[status]}`}>
-                    {PLAN_STATUS_LABEL[status]}
-                  </span>
-                </div>
-                {perDayLabels.length > 0 && (
-                  <p className="text-[10px] text-muted-foreground mt-0.5 pl-4 truncate" title={perDayLabels.join(" · ")}>
-                    {perDayLabels.join(" · ")}
-                  </p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-const PLAN_STATUS_LABEL: Record<ProductionPlan["status"], string> = {
-  draft: "Pending",
-  active: "In production",
-  done: "Done",
-  cancelled: "Cancelled",
-  orphaned: "Orphaned",
-};
-
-const PLAN_STATUS_STYLE: Record<ProductionPlan["status"], string> = {
-  draft: "bg-muted text-muted-foreground border-[color:var(--ds-border-warm)]",
-  active: "bg-status-warn-bg text-status-warn border-status-warn-edge",
-  done: "bg-status-ok-bg text-status-ok border-status-ok-edge",
-  cancelled: "bg-destructive/10 text-destructive border-destructive/20",
-  orphaned: "bg-status-alert-bg text-status-alert border-status-alert-edge",
-};
-
-// ─── Packaging section ──────────────────────────────────────────
-
-function OrderPackagingSection({ orderId, packaging, packagingUnitCost }: {
-  orderId: string;
-  packaging: Packaging[];
-  packagingUnitCost: Map<string, number>;
-}) {
-  const lines = useOrderPackagingLines(orderId);
-  const packagingById = useMemo(() => new Map(packaging.map((p) => [p.id!, p])), [packaging]);
-  const [adding, setAdding] = useState(false);
-  return (
-    <section>
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5">
-          <Package className="w-4 h-4" /> Packaging ({lines.length})
-        </h2>
-        {!adding && (
           <button
-            onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+            type="button"
+            onClick={() => setFulfilmentMode("borrow")}
+            disabled={available === 0}
+            className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 font-medium ${
+              fulfilmentMode === "borrow"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+            }`}
           >
-            <Plus className="w-3.5 h-3.5" /> Add packaging
+            Take from stock
           </button>
-        )}
+          <button
+            type="button"
+            onClick={() => setFulfilmentMode("produce")}
+            className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 font-medium ${
+              fulfilmentMode === "produce"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary"
+            }`}
+          >
+            Produce fresh
+          </button>
+          {!fulfilmentMode && <span style={{ color: "var(--ds-semantic-warn)" }}>Pick one</span>}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8 }}>
+        <DsButton variant="primary" onClick={handleAdd} disabled={!canSave}>
+          {saving ? "Adding…" : "Add line"}
+        </DsButton>
+        <DsButton onClick={onCancel}>Done</DsButton>
       </div>
-      {adding && (
-        <AddOrderPackagingLine
-          orderId={orderId}
-          nextSortOrder={lines.length}
-          packaging={packaging.filter((p) => !p.archived)}
-          packagingUnitCost={packagingUnitCost}
-          onCancel={() => setAdding(false)}
-        />
-      )}
-      {lines.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
-          No packaging lines. Add ribbons, gift bags, outer boxes, etc.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {lines.map((line) => (
-            <OrderPackagingLineRow
-              key={line.id}
-              line={line}
-              packagingItem={packagingById.get(line.packagingId)}
-              latestCost={packagingUnitCost.get(line.packagingId)}
-            />
-          ))}
-        </ul>
-      )}
-    </section>
+      {saveError && <p style={{ fontSize: 11, color: "var(--ds-tier-urgent)" }}>{saveError}</p>}
+    </div>
   );
 }
 
@@ -1895,7 +2216,6 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, packagingUni
   const [saving, setSaving] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
   const [saveError, setSaveError] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const qty = parseInt(quantity, 10);
   const canSave = !!packagingId && Number.isFinite(qty) && qty > 0 && !saving;
@@ -1928,306 +2248,154 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, packagingUni
         notes: notes.trim() || undefined,
         unitPrice: Number.isFinite(priceNum) && priceNum >= 0 ? priceNum : undefined,
       });
-      setPackagingId("");
-      setPackagingQuery("");
-      setPickerOpen(true);
-      setQuantity("1");
-      setUnitPriceInput("");
-      setNotes("");
+      setPackagingId(""); setPackagingQuery(""); setPickerOpen(true);
+      setQuantity("1"); setUnitPriceInput(""); setNotes("");
       setAddedCount((n) => n + 1);
-      inputRef.current?.focus();
     } catch (err) {
-      const raw: { message?: string; code?: string } =
-        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
-      const code = raw.code ? ` (code ${raw.code})` : "";
-      setSaveError(`${raw.message || "Save failed"}${code}`);
+      const raw: { message?: string } = err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      setSaveError(raw.message || "Save failed");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2 mb-2">
-      <div className="grid grid-cols-6 gap-2">
-        <div className="col-span-3 relative">
-          <input
-            ref={inputRef}
-            type="text"
-            value={packagingQuery}
-            onChange={(e) => { setPackagingQuery(e.target.value); setPackagingId(""); setPickerOpen(true); }}
-            onFocus={() => setPickerOpen(true)}
-            placeholder="Search packaging…"
-            className="input"
-            autoFocus
-            autoComplete="off"
-          />
-          {pickerOpen && matches.length > 0 && (
-            <div className="absolute z-20 left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
-              {matches.map((p) => {
-                const cost = packagingUnitCost.get(p.id!);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => pickPackaging(p)}
-                    className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
-                  >
-                    <span className="flex-1 truncate">{p.name}</span>
-                    {cost != null && <span className="text-xs text-muted-foreground tabular-nums">€{cost.toFixed(2)}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div>
-          <input
-            type="number" min="1" step="1"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); } }}
-            placeholder="Qty"
-            className="input"
-          />
-        </div>
-        <div className="col-span-2">
-          <input
-            type="number" min={0} step={0.01}
-            value={unitPriceInput}
-            onChange={(e) => setUnitPriceInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); } }}
-            placeholder="€ net / unit"
-            className="input"
-          />
-        </div>
-      </div>
-      <input
-        type="text"
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && canSave) { e.preventDefault(); handleAdd(); }
-        }}
-        placeholder="Line notes (optional)"
-        className="input"
-      />
-      <div className="flex items-center gap-2">
-        <button onClick={handleAdd} disabled={!canSave} className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
-          {saving ? "Adding…" : "Add"}
-        </button>
-        <button onClick={onCancel} className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs">
-          Done
-        </button>
-        {addedCount > 0 && (
-          <span className="text-[11px] text-muted-foreground">
-            {addedCount} line{addedCount === 1 ? "" : "s"} added
-          </span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ position: "relative" }}>
+        <input
+          type="text"
+          value={packagingQuery}
+          onChange={(e) => { setPackagingQuery(e.target.value); setPackagingId(""); setPickerOpen(true); }}
+          onFocus={() => setPickerOpen(true)}
+          placeholder="Search packaging…"
+          className="input"
+          autoFocus
+          autoComplete="off"
+        />
+        {pickerOpen && matches.length > 0 && (
+          <div className="absolute z-20 left-0 right-0 mt-1 rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
+            {matches.map((p) => {
+              const cost = packagingUnitCost.get(p.id!);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => pickPackaging(p)}
+                  className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
+                >
+                  <span className="flex-1 truncate">{p.name}</span>
+                  {cost != null && <span className="text-xs text-muted-foreground tabular-nums">€{cost.toFixed(2)}</span>}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
-      {saveError && <p className="text-xs text-status-alert">{saveError}</p>}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <input type="number" min="1" step="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="Qty" className="input" />
+        <input type="number" min={0} step={0.01} value={unitPriceInput} onChange={(e) => setUnitPriceInput(e.target.value)} placeholder="€ net / unit" className="input" />
+      </div>
+      <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Line notes (optional)" className="input" />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <DsButton variant="primary" onClick={handleAdd} disabled={!canSave}>
+          {saving ? "Adding…" : "Add"}
+        </DsButton>
+        <DsButton onClick={onCancel}>Done</DsButton>
+        {addedCount > 0 && (
+          <span style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>{addedCount} added</span>
+        )}
+      </div>
+      {saveError && <p style={{ fontSize: 11, color: "var(--ds-tier-urgent)" }}>{saveError}</p>}
     </div>
   );
 }
 
-function OrderPackagingLineRow({ line, packagingItem, latestCost }: {
-  line: OrderPackagingLine;
-  packagingItem?: Packaging;
-  latestCost?: number;
+function AddVariantForm({ orderId, allVariants, onDone }: {
+  orderId: string;
+  allVariants: ReturnType<typeof useVariants>;
+  onDone: () => void;
 }) {
-  const packagingName = packagingItem?.name ?? line.packagingId;
-  const [pendingRemove, setPendingRemove] = useState(false);
-  const [editingQty, setEditingQty] = useState(false);
-  const [qtyInput, setQtyInput] = useState(String(line.quantity));
-  const [editingPrice, setEditingPrice] = useState(false);
-  const [priceInput, setPriceInput] = useState(line.unitPrice != null ? String(line.unitPrice) : "");
-  const [editingVat, setEditingVat] = useState(false);
-  const [vatInput, setVatInput] = useState(line.vatRate != null ? String(line.vatRate) : "");
-  const [saveError, setSaveError] = useState("");
+  const [variantId, setVariantId] = useState("");
+  const [vpId, setVpId] = useState("");
+  const [qty, setQty] = useState("1");
+  const [price, setPrice] = useState("");
+  const [saving, setSaving] = useState(false);
+  const vps = useVariantPackagings(variantId);
+  const composition = useVariantPackagingProducts(vpId);
+  useEffect(() => {
+    const vp = vps.find((p) => p.id === vpId);
+    if (vp) setPrice(String(vp.price ?? vp.sellPrice ?? ""));
+  }, [vpId, vps]);
 
-  const effectiveUnitPrice = line.unitPrice ?? latestCost;
-  const effectiveVat = effectiveVatRate(line.vatRate, packagingItem?.defaultVatRate);
-  const lineTotalNet = effectiveUnitPrice != null
-    ? Math.round(effectiveUnitPrice * line.quantity * 100) / 100
-    : null;
-
-  async function handleDelete() {
-    if (!line.id) return;
-    await deleteOrderPackagingLine(line.id);
-  }
-
-  async function persistLine(patch: Partial<OrderPackagingLine>) {
-    if (!line.id) return;
-    setSaveError("");
+  async function handleAdd() {
+    if (!variantId) { alert("Pick a variant first."); return; }
+    const q = parseInt(qty, 10);
+    const p = parseFloat(price);
+    if (!Number.isFinite(q) || q <= 0) { alert("Qty must be > 0."); return; }
+    if (!Number.isFinite(p) || p < 0) { alert("Price required."); return; }
+    if (composition.length === 0 && vpId) {
+      if (!confirm("This variant size has no curated composition. Add anyway?")) return;
+    }
+    setSaving(true);
     try {
-      await saveOrderPackagingLine({
-        id: line.id,
-        orderId: line.orderId,
-        packagingId: line.packagingId,
-        quantity: line.quantity,
-        sortOrder: line.sortOrder,
-        notes: line.notes,
-        unitPrice: line.unitPrice,
-        vatRate: line.vatRate,
-        ...patch,
+      await addVariantToOrder({
+        orderId,
+        variantId,
+        variantPackagingId: vpId || null,
+        quantity: q,
+        unitPrice: p,
+        composition: composition.map((c) => ({ productId: c.productId, qty: c.qty })),
       });
-    } catch (err) {
-      const raw: { message?: string; code?: string } =
-        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
-      setSaveError(`${raw.message || "Save failed"}`);
+      onDone();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
     }
-  }
-
-  async function commitQty() {
-    const n = parseInt(qtyInput, 10);
-    if (!Number.isFinite(n) || n <= 0) { setQtyInput(String(line.quantity)); setEditingQty(false); return; }
-    if (n === line.quantity) { setEditingQty(false); return; }
-    await persistLine({ quantity: n });
-    setEditingQty(false);
-  }
-
-  async function commitPrice() {
-    const next = priceInput.trim() === "" ? undefined : parseFloat(priceInput);
-    if (next !== undefined && (!Number.isFinite(next) || next < 0)) {
-      setPriceInput(line.unitPrice != null ? String(line.unitPrice) : "");
-      setEditingPrice(false);
-      return;
-    }
-    await persistLine({ unitPrice: next });
-    setEditingPrice(false);
-  }
-
-  async function commitVat() {
-    const next = vatInput.trim() === "" ? undefined : parseFloat(vatInput);
-    if (next !== undefined && (!Number.isFinite(next) || next < 0 || next > 100)) {
-      setVatInput(line.vatRate != null ? String(line.vatRate) : "");
-      setEditingVat(false);
-      return;
-    }
-    await persistLine({ vatRate: next });
-    setEditingVat(false);
   }
 
   return (
-    <li className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2.5">
-      <div className="flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{packagingName}</p>
-          {line.notes && <p className="text-xs text-muted-foreground truncate">{line.notes}</p>}
-        </div>
-
-        {/* Net / unit */}
-        <div className="text-right shrink-0">
-          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Net / unit</p>
-          {editingPrice ? (
-            <input
-              type="number" min={0} step={0.01}
-              value={priceInput}
-              onChange={(e) => setPriceInput(e.target.value)}
-              onBlur={commitPrice}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                if (e.key === "Escape") { setPriceInput(line.unitPrice != null ? String(line.unitPrice) : ""); setEditingPrice(false); }
-              }}
-              autoFocus
-              placeholder={latestCost != null ? latestCost.toFixed(2) : "—"}
-              className="input !w-20 !text-sm text-right"
-            />
-          ) : (
-            <button
-              onClick={() => { setPriceInput(line.unitPrice != null ? String(line.unitPrice) : ""); setEditingPrice(true); }}
-              className="text-sm font-medium tabular-nums rounded px-1 hover:bg-muted"
-              title={line.unitPrice == null ? "Auto — latest purchase cost" : "Per-line override"}
-            >
-              {effectiveUnitPrice != null ? `€${effectiveUnitPrice.toFixed(2)}` : <span className="text-muted-foreground">—</span>}
-              {line.unitPrice == null && latestCost != null && (
-                <span className="ml-1 text-[9px] text-muted-foreground uppercase">auto</span>
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* VAT */}
-        <div className="text-right shrink-0">
-          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">VAT</p>
-          {editingVat ? (
-            <input
-              type="number" min={0} max={100} step={0.5}
-              value={vatInput}
-              onChange={(e) => setVatInput(e.target.value)}
-              onBlur={commitVat}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                if (e.key === "Escape") { setVatInput(line.vatRate != null ? String(line.vatRate) : ""); setEditingVat(false); }
-              }}
-              autoFocus
-              placeholder={String(effectiveVat)}
-              className="input !w-14 !text-sm text-right"
-            />
-          ) : (
-            <button
-              onClick={() => { setVatInput(line.vatRate != null ? String(line.vatRate) : ""); setEditingVat(true); }}
-              className="text-sm tabular-nums rounded px-1 hover:bg-muted"
-            >
-              {effectiveVat}%
-              {line.vatRate == null && <span className="ml-0.5 text-[9px] text-muted-foreground uppercase">d</span>}
-            </button>
-          )}
-        </div>
-
-        {editingQty ? (
-          <input
-            type="number"
-            min="1"
-            step="1"
-            value={qtyInput}
-            onChange={(e) => setQtyInput(e.target.value)}
-            onBlur={commitQty}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") { setQtyInput(String(line.quantity)); setEditingQty(false); }
-            }}
-            autoFocus
-            className="input !w-16 text-sm text-right"
-          />
-        ) : (
-          <button
-            onClick={() => { setQtyInput(String(line.quantity)); setEditingQty(true); }}
-            className="text-sm font-medium tabular-nums shrink-0 rounded px-2 py-0.5 hover:bg-muted transition-colors"
-            title="Click to edit quantity"
-          >
-            {line.quantity}
-          </button>
-        )}
-
-        {/* Line total */}
-        <div className="text-right shrink-0 w-20">
-          <p className="text-[10px] uppercase text-muted-foreground tracking-wide">Total</p>
-          <p className="text-sm font-semibold tabular-nums">
-            {lineTotalNet != null ? `€${lineTotalNet.toFixed(2)}` : "—"}
-          </p>
-        </div>
-        {pendingRemove ? (
-          <span className="flex items-center gap-1.5 text-xs shrink-0">
-            <button onClick={handleDelete} className="text-red-600 font-medium hover:underline">Yes</button>
-            <button onClick={() => setPendingRemove(false)} className="text-muted-foreground hover:underline">Cancel</button>
-          </span>
-        ) : (
-          <button onClick={() => setPendingRemove(true)} className="text-muted-foreground/50 hover:text-destructive shrink-0" aria-label="Remove line">
-            <X className="w-4 h-4" />
-          </button>
-        )}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <select value={variantId} onChange={(e) => { setVariantId(e.target.value); setVpId(""); }} className="input">
+          <option value="">— variant —</option>
+          {allVariants.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+        </select>
+        <select value={vpId} onChange={(e) => setVpId(e.target.value)} disabled={!variantId} className="input">
+          <option value="">— size —</option>
+          {vps.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.packagingId ? `Packaging #${p.id?.slice(0, 4)}` : "Loose / no packaging"} · €{Number(p.price ?? p.sellPrice ?? 0).toFixed(2)}
+            </option>
+          ))}
+        </select>
       </div>
-      {saveError && <p className="text-[11px] text-status-alert mt-1">{saveError}</p>}
-    </li>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} className="input" placeholder="Qty" />
+        <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className="input" placeholder="Price / unit (€)" />
+      </div>
+      {composition.length > 0 && (
+        <p style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>
+          Will auto-add {composition.length} product line{composition.length === 1 ? "" : "s"} to production demand.
+        </p>
+      )}
+      <div style={{ display: "flex", gap: 8 }}>
+        <DsButton variant="primary" onClick={handleAdd} disabled={saving}>
+          {saving ? "Adding…" : "Add variant"}
+        </DsButton>
+        <DsButton onClick={onDone}>Cancel</DsButton>
+      </div>
+    </div>
   );
 }
 
-// ─── Summary card (labour / price / feasibility) ───────────────
+// ────────────────────────────────────────────────────────────────
+// Summary card (kept — totals + feasibility + price paid)
+// ────────────────────────────────────────────────────────────────
 
 function OrderSummaryCard({
   order, labour, calculatedCost, feasibility, labourHourlyRate, productNameById,
-  productsSubtotalNet, packagingSubtotalNet, totalNet, totalVat, totalGross,
-  vatBreakdown, margin,
+  totalNet, totalGross, vatBreakdown, margin,
 }: {
   order: import("@/types").Order;
   labour: ReturnType<typeof computeOrderLabourHours>;
@@ -2235,113 +2403,112 @@ function OrderSummaryCard({
   feasibility: ReturnType<typeof checkOrderFeasibility>;
   labourHourlyRate: number | null;
   productNameById: Map<string, { name: string }>;
-  productsSubtotalNet: number;
-  packagingSubtotalNet: number;
   totalNet: number;
-  totalVat: number;
   totalGross: number;
   vatBreakdown: VatBreakdown[];
   margin: ReturnType<typeof computeOrderMargin>;
 }) {
   const sevColor =
-    feasibility.severity === "green"
-      ? "border-status-ok/40 bg-status-ok/5 text-status-ok"
-      : feasibility.severity === "yellow"
-        ? "border-status-warn/40 bg-status-warn/5 text-status-warn"
-        : "border-status-alert/40 bg-status-alert/5 text-status-alert";
+    feasibility.severity === "green" ? "rgba(93,202,165,0.35)"
+      : feasibility.severity === "yellow" ? "rgba(218,183,63,0.35)"
+      : "rgba(153,53,86,0.35)";
+  const sevInk =
+    feasibility.severity === "green" ? "var(--ds-tier-positive)"
+      : feasibility.severity === "yellow" ? "var(--ds-semantic-warn)"
+      : "var(--ds-tier-urgent)";
 
   return (
-    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4 space-y-3">
-      {/* Customer-facing totals */}
-      <div className="space-y-1.5">
-        <TotalLine label="Products (net)" value={productsSubtotalNet} />
-        <TotalLine label="Packaging (net)" value={packagingSubtotalNet} />
-        <TotalLine label="Subtotal (net)" value={totalNet} emphasis />
-        {vatBreakdown.length === 0 ? (
-          <TotalLine label="VAT (10%)" value={0} muted />
-        ) : (
-          vatBreakdown.map((b) => (
+    <Section title="Totals + feasibility">
+      <div style={{ padding: "12px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <TotalLine label="Subtotal (net)" value={totalNet} emphasis />
+          {vatBreakdown.map((b) => (
             <TotalLine key={b.rate} label={`VAT ${b.rate}%`} value={b.vat} muted />
-          ))
-        )}
-        <div className="border-t border-[color:var(--ds-border-warm)] pt-1.5">
-          <TotalLine label="Total (gross)" value={totalGross} emphasis />
+          ))}
+          <div style={{ borderTop: "0.5px solid var(--ds-border-warm)", paddingTop: 6 }}>
+            <TotalLine label="Total (gross)" value={totalGross} emphasis />
+          </div>
         </div>
-      </div>
 
-      {/* Price paid — toggles net / gross */}
-      <div className="pt-2 border-t border-[color:var(--ds-border-warm)]">
-        <PricePaidField
-          order={order}
-          suggestedNet={totalNet > 0 ? totalNet : undefined}
-          suggestedGross={totalGross > 0 ? totalGross : undefined}
-          vatBreakdown={vatBreakdown}
-        />
-      </div>
-
-      {/* Internal cost + labour + margin (never shown to customer) */}
-      <div className="pt-2 border-t border-[color:var(--ds-border-warm)] space-y-1.5">
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
-          Internal (not on invoice)
-        </p>
-        <TotalLine
-          label="Labour"
-          value={calculatedCost.labourCost}
-          hint={labourHourlyRate == null ? "set rate in Settings" : `${labour.totalHours}h @ €${labourHourlyRate.toFixed(2)}`}
-          muted
-        />
-        <TotalLine label="Total cost (ingredients + packaging + labour)" value={calculatedCost.totalCost} muted />
-        <div className="border-t border-[color:var(--ds-border-warm)] pt-1.5 flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Margin</span>
-          <span className={`tabular-nums font-semibold ${
-            margin.marginPercent == null
-              ? "text-muted-foreground"
-              : margin.marginPercent < 0
-                ? "text-status-alert"
-                : margin.marginPercent < 20
-                  ? "text-status-warn"
-                  : "text-status-ok"
-          }`}>
-            {order.pricePaid == null ? "—" : (
-              margin.marginPercent == null ? "—" : `${margin.marginPercent.toFixed(0)}% · €${margin.profit.toFixed(2)}`
-            )}
-          </span>
+        <div style={{ borderTop: "0.5px solid var(--ds-border-warm)", paddingTop: 8 }}>
+          <PricePaidField
+            order={order}
+            suggestedNet={totalNet > 0 ? totalNet : undefined}
+            suggestedGross={totalGross > 0 ? totalGross : undefined}
+            vatBreakdown={vatBreakdown}
+          />
         </div>
-      </div>
 
-      {/* Feasibility. Green case is an informational single-line pill
-          (no alarm icon). Yellow / red keep the AlertTriangle and the
-          multi-line shortfall breakdown. */}
-      {feasibility.severity === "green" ? (
-        <div className={`rounded-[6px] border px-3 py-1.5 flex items-center gap-2 text-xs ${sevColor}`}>
-          <Check className="w-3.5 h-3.5 shrink-0" />
-          <span className="font-medium">{feasibility.summary}</span>
-          <span className="opacity-70">
-            · {feasibility.availableHours}h available · {feasibility.freeHours}h free · {labour.totalHours}h needed
-          </span>
+        <div style={{ borderTop: "0.5px solid var(--ds-border-warm)", paddingTop: 8 }}>
+          <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ds-text-muted)", fontWeight: 600, marginBottom: 4 }}>
+            Internal (not on invoice)
+          </p>
+          <TotalLine
+            label="Labour"
+            value={calculatedCost.labourCost}
+            hint={labourHourlyRate == null ? "set rate in Settings" : `${labour.totalHours}h @ €${labourHourlyRate.toFixed(2)}`}
+            muted
+          />
+          <TotalLine label="Total cost" value={calculatedCost.totalCost} muted />
+          <div style={{ borderTop: "0.5px solid var(--ds-border-warm)", paddingTop: 4, display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 }}>
+            <span style={{ color: "var(--ds-text-muted)" }}>Margin</span>
+            <span
+              style={{
+                fontVariantNumeric: "tabular-nums",
+                fontWeight: 600,
+                color:
+                  margin.marginPercent == null
+                    ? "var(--ds-text-muted)"
+                    : margin.marginPercent < 0
+                      ? "var(--ds-tier-urgent)"
+                      : margin.marginPercent < 20
+                        ? "var(--ds-semantic-warn)"
+                        : "var(--ds-tier-positive)",
+              }}
+            >
+              {order.pricePaid == null
+                ? "—"
+                : margin.marginPercent == null
+                  ? "—"
+                  : `${margin.marginPercent.toFixed(0)}% · €${margin.profit.toFixed(2)}`}
+            </span>
+          </div>
         </div>
-      ) : (
-        <div className={`rounded-[6px] border px-3 py-2 flex items-start gap-2 ${sevColor}`}>
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">{feasibility.summary}</p>
+
+        <div
+          style={{
+            border: `0.5px solid ${sevColor}`,
+            color: sevInk,
+            background: `${sevColor.replace("0.35", "0.08")}`,
+            borderRadius: 6,
+            padding: "8px 12px",
+            display: "flex",
+            gap: 8,
+            alignItems: "flex-start",
+          }}
+        >
+          {feasibility.severity === "green"
+            ? <Check size={14} style={{ marginTop: 2 }} />
+            : <AlertTriangle size={14} style={{ marginTop: 2 }} />}
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 500 }}>{feasibility.summary}</p>
             {feasibility.shortfalls.length > 0 && (
-              <ul className="mt-1 space-y-0.5">
+              <ul style={{ marginTop: 4, fontSize: 11 }}>
                 {feasibility.shortfalls.map((s) => (
-                  <li key={s.productId} className="text-xs">
+                  <li key={s.productId}>
                     {productNameById.get(s.productId)?.name ?? s.productId}: short by {s.shortPieces} pc
-                    {" "}(need {s.required}, have {s.available} on hand, can make {s.producible})
+                    {" "}(need {s.required}, have {s.available}, can make {s.producible})
                   </li>
                 ))}
               </ul>
             )}
-            <p className="text-[11px] opacity-80 mt-1">
+            <p style={{ fontSize: 11, opacity: 0.8, marginTop: 4 }}>
               {feasibility.availableHours}h available · {feasibility.freeHours}h free · {labour.totalHours}h needed
             </p>
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    </Section>
   );
 }
 
@@ -2353,11 +2520,14 @@ function TotalLine({ label, value, hint, muted, emphasis }: {
   emphasis?: boolean;
 }) {
   return (
-    <div className={`flex items-center justify-between text-sm ${muted ? "text-muted-foreground" : ""}`}>
-      <span className={emphasis ? "font-semibold text-foreground" : ""}>{label}</span>
-      <span className="flex items-baseline gap-1.5">
-        {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
-        <span className={`tabular-nums ${emphasis ? "font-semibold text-foreground" : ""}`}>
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      fontSize: 13, color: muted ? "var(--ds-text-muted)" : "var(--ds-text-primary)",
+    }}>
+      <span style={{ fontWeight: emphasis ? 600 : 400 }}>{label}</span>
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+        {hint && <span style={{ fontSize: 10, color: "var(--ds-text-muted)" }}>{hint}</span>}
+        <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: emphasis ? 600 : 400 }}>
           €{value.toFixed(2)}
         </span>
       </span>
@@ -2365,10 +2535,6 @@ function TotalLine({ label, value, hint, muted, emphasis }: {
   );
 }
 
-/** Price paid — stored NET on the order. The UI lets the user toggle
- *  between entering net or gross; when the user types gross we back out
- *  net using a blended VAT rate (proportional to each line's net) so
- *  mixed-rate orders round correctly. Stored value is always net. */
 function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
   order: import("@/types").Order;
   suggestedNet?: number;
@@ -2377,14 +2543,10 @@ function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
 }) {
   const [mode, setMode] = useState<"net" | "gross">("net");
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(
-    order.pricePaid != null ? String(order.pricePaid) : "",
-  );
+  const [value, setValue] = useState(order.pricePaid != null ? String(order.pricePaid) : "");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // Blended rate derived from the aggregated VAT rows. When the order
-  // has no lines yet, fall back to the app's food default (10%).
   const blendedRate = useMemo(() => {
     const totalNet = vatBreakdown.reduce((s, b) => s + b.net, 0);
     if (totalNet <= 0) return 10;
@@ -2392,8 +2554,6 @@ function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
     return (totalVat / totalNet) * 100;
   }, [vatBreakdown]);
 
-  // Derive the display value for the current mode from the stored NET
-  // amount. When `editing` is true, `value` holds what the user typed.
   function displayFor(m: "net" | "gross"): string {
     if (order.pricePaid == null) return "";
     if (m === "net") return order.pricePaid.toFixed(2);
@@ -2405,64 +2565,53 @@ function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
     const trimmed = value.trim();
     if (trimmed === "") {
       setSaving(true);
-      try {
-        await saveOrder({ ...order, pricePaid: undefined });
-        setEditing(false);
-      } finally { setSaving(false); }
+      try { await saveOrder({ ...order, pricePaid: undefined }); setEditing(false); }
+      finally { setSaving(false); }
       return;
     }
     const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      setSaveError("Invalid amount");
-      return;
-    }
-    // Convert to net if the user typed gross.
-    const net = mode === "net"
-      ? parsed
-      : computeVatFromGross(parsed, blendedRate).net;
+    if (!Number.isFinite(parsed) || parsed < 0) { setSaveError("Invalid amount"); return; }
+    const net = mode === "net" ? parsed : computeVatFromGross(parsed, blendedRate).net;
     setSaving(true);
     try {
       await saveOrder({ ...order, pricePaid: Math.round(net * 100) / 100 });
       setEditing(false);
     } catch (err) {
-      const raw: { message?: string; code?: string } =
-        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      const raw: { message?: string } = err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
       setSaveError(raw.message || "Save failed");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
   const otherDisplay = order.pricePaid != null
     ? `€${displayFor(mode === "net" ? "gross" : "net")} ${mode === "net" ? "gross" : "net"}`
     : "";
-
   const suggestion = mode === "net" ? suggestedNet : suggestedGross;
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Price paid</p>
-        <div className="flex gap-0.5 text-[10px] rounded-[4px] border border-[color:var(--ds-border-warm)] p-0.5">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <p style={{ fontSize: 11, color: "var(--ds-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Price paid</p>
+        <div style={{ display: "inline-flex", gap: 2, fontSize: 10, border: "0.5px solid var(--ds-border-warm)", padding: 2, borderRadius: 4 }}>
           {(["net", "gross"] as const).map((m) => (
             <button
               key={m}
               type="button"
               onClick={() => { setMode(m); if (editing) setValue(displayFor(m)); }}
-              className={`px-1.5 py-0 rounded-full uppercase tracking-wide ${
-                mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-              }`}
+              style={{
+                padding: "1px 8px", borderRadius: 999,
+                background: mode === m ? "var(--ds-tier-quarter-focus)" : "transparent",
+                color: mode === m ? "#fff" : "var(--ds-text-muted)",
+                textTransform: "uppercase", border: "none", cursor: "pointer",
+              }}
             >{m}</button>
           ))}
         </div>
       </div>
       {editing ? (
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="text-base font-semibold">€</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+          <span style={{ fontSize: 16, fontWeight: 600 }}>€</span>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="number" step="0.01" min="0"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
@@ -2471,42 +2620,46 @@ function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
             }}
             onBlur={commit}
             autoFocus
-            className="input !py-0.5 !text-base !font-semibold !w-28"
             placeholder={suggestion != null ? suggestion.toFixed(2) : "0.00"}
+            style={{
+              fontSize: 16, fontWeight: 600, width: 110, padding: "2px 6px",
+              border: "0.5px solid var(--ds-tier-quarter-focus)", borderRadius: 4,
+              background: "var(--ds-card-bg)", color: "var(--ds-text-primary)",
+            }}
           />
           {suggestion != null && value === "" && (
             <button
               type="button"
               onMouseDown={(e) => { e.preventDefault(); setValue(suggestion.toFixed(2)); }}
-              className="text-[10px] text-primary hover:underline"
+              style={{ fontSize: 10, color: "var(--ds-tier-quarter-focus)", background: "transparent", border: "none", cursor: "pointer" }}
             >use calc</button>
           )}
         </div>
       ) : (
         <button
           onClick={() => { setValue(displayFor(mode)); setEditing(true); }}
-          className="text-base font-semibold tabular-nums hover:bg-muted rounded px-1 -ml-1 mt-0.5 inline-flex items-baseline gap-2"
-          title="Click to edit price paid"
+          style={{
+            fontSize: 16, fontWeight: 600, fontVariantNumeric: "tabular-nums",
+            background: "transparent", border: "none", cursor: "pointer",
+            padding: "2px 4px", marginLeft: -4,
+          }}
+          className="hover:bg-[color:var(--ds-card-bg-hover)] rounded"
         >
-          {order.pricePaid != null ? `€${displayFor(mode)}` : <span className="text-muted-foreground">—</span>}
-          {otherDisplay && <span className="text-[10px] text-muted-foreground">({otherDisplay})</span>}
+          {order.pricePaid != null
+            ? <>€{displayFor(mode)} <span style={{ fontSize: 10, color: "var(--ds-text-muted)", marginLeft: 4 }}>{otherDisplay && `(${otherDisplay})`}</span></>
+            : <span style={{ color: "var(--ds-text-muted)" }}>—</span>}
         </button>
       )}
-      {saving && <p className="text-[11px] text-muted-foreground">Saving…</p>}
-      {saveError && <p className="text-[11px] text-status-alert">{saveError}</p>}
+      {saving && <p style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>Saving…</p>}
+      {saveError && <p style={{ fontSize: 11, color: "var(--ds-tier-urgent)" }}>{saveError}</p>}
     </div>
   );
 }
 
-// ─── Production schedule (inline per-day view) ─────────────────
+// ────────────────────────────────────────────────────────────────
+// Ready-to-pack (kept)
+// ────────────────────────────────────────────────────────────────
 
-/** Ready-to-pack section for borrow / from-stock fulfilment.
- *  Lists every `allocated` stockLocations row tagged with this
- *  order, grouped by product, showing the source batch number so
- *  the operator knows which shelf to grab from. A Mark-as-packed
- *  button drains the allocated rows → 'sold', deducts the order's
- *  packaging, and logs audit movements. Idempotent: second click is
- *  a no-op because allocated will be empty. */
 function OrderReadyToPackSection({ orderId }: { orderId: string }) {
   const rows = useAllocatedForOrder(orderId);
   const order = useOrder(orderId);
@@ -2516,7 +2669,6 @@ function OrderReadyToPackSection({ orderId }: { orderId: string }) {
 
   if (rows.length === 0 && !done) return null;
 
-  // Group by product for a cleaner display when a line spans multiple batches.
   const byProduct = new Map<string, { productName: string; total: number; batches: Array<{ batch?: string; qty: number }> }>();
   for (const r of rows) {
     const g = byProduct.get(r.productId) ?? { productName: r.productName, total: 0, batches: [] };
@@ -2529,80 +2681,60 @@ function OrderReadyToPackSection({ orderId }: { orderId: string }) {
     setBusy(true); setErr("");
     try {
       const result = await markOrderAsPacked(orderId);
-      // Flip the order to status='done' so it falls out of pending /
-      // ready_to_pack lists. /picking does the same after markOrderAsPacked;
-      // /orders/[id] previously only drained stock, leaving the order in
-      // its prior status — looked like "nothing happened" to the operator.
-      if (order) {
-        await saveOrder({ ...order, status: "done" });
-      }
+      if (order) await saveOrder({ ...order, status: "done" });
       setDone({ pieces: result.piecesMoved, warnings: result.warnings });
     } catch (e) {
-      console.error("markOrderAsPacked failed:", e);
       setErr(formatOrderErr(e));
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   }
 
   return (
-    <section>
-      <h2 className="text-sm font-semibold text-primary mb-2 flex items-center gap-1.5">
-        <Package className="w-4 h-4" /> Ready to pack
-        <span className="text-xs font-normal text-muted-foreground">
-          ({rows.length === 0 ? "nothing allocated" : `from stock`})
-        </span>
-      </h2>
-
+    <Section title="Ready to pack">
       {rows.length > 0 ? (
-        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-          <ul className="divide-y divide-border">
-            {[...byProduct.values()].map((g) => (
-              <li key={g.productName} className="px-3 py-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{g.productName}</span>
-                  <span className="tabular-nums font-semibold">{g.total} pcs</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
+        <>
+          {[...byProduct.values()].map((g) => (
+            <ListRow
+              key={g.productName}
+              title={g.productName}
+              meta={
+                <span style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>
                   {g.batches.map((b, i) => (
                     <span key={i}>
                       {i > 0 && " · "}
-                      {b.batch ? <span className="font-mono">{b.batch}</span> : "untagged batch"}
-                      {" · "}
-                      <span className="tabular-nums">{b.qty} pcs</span>
+                      {b.batch ? <span style={{ fontFamily: "monospace" }}>{b.batch}</span> : "untagged batch"}
+                      {" · "}<span style={{ fontVariantNumeric: "tabular-nums" }}>{b.qty} pcs</span>
                     </span>
                   ))}
-                </p>
-              </li>
-            ))}
-          </ul>
-          <div className="flex items-center justify-between px-3 py-2 border-t border-[color:var(--ds-border-warm)] bg-muted">
-            <p className="text-xs text-muted-foreground">
-              Drains allocated stock + deducts this order's packaging.
+                </span>
+              }
+              side={<b style={{ fontVariantNumeric: "tabular-nums" }}>{g.total} pcs</b>}
+            />
+          ))}
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "10px 20px", background: "var(--ds-card-bg-hover)",
+            borderTop: "0.5px solid var(--ds-border-warm)",
+          }}>
+            <p style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>
+              Drains allocated stock + deducts this order&apos;s packaging.
             </p>
-            <button
-              onClick={handleMarkPacked}
-              disabled={busy}
-              className="rounded-[4px] bg-primary text-primary-foreground px-4 py-1.5 text-sm font-medium disabled:opacity-50"
-            >
+            <DsButton variant="primary" onClick={handleMarkPacked} disabled={busy}>
               {busy ? "Packing…" : "Mark as packed"}
-            </button>
+            </DsButton>
           </div>
-        </div>
+        </>
       ) : done ? (
-        <div className="rounded-[4px] border border-status-ok-edge bg-status-ok-bg px-3 py-2 text-xs text-status-ok">
-          <p className="font-medium">Packed — {done.pieces} piece{done.pieces === 1 ? "" : "s"} moved out.</p>
+        <div style={{ padding: "10px 20px", fontSize: 12, color: "var(--ds-tier-positive)" }}>
+          <p style={{ fontWeight: 500 }}>Packed — {done.pieces} piece{done.pieces === 1 ? "" : "s"} moved out.</p>
           {done.warnings.length > 0 && (
-            <ul className="mt-1 space-y-0.5 text-foreground/80">
+            <ul style={{ marginTop: 4 }}>
               {done.warnings.map((w, i) => <li key={i}>⚠ {w}</li>)}
             </ul>
           )}
         </div>
       ) : null}
-      {err && (
-        <p className="text-xs text-status-alert mt-2">{err}</p>
-      )}
-    </section>
+      {err && <p style={{ padding: "8px 20px", fontSize: 11, color: "var(--ds-tier-urgent)" }}>{err}</p>}
+    </Section>
   );
 }
 
@@ -2618,68 +2750,10 @@ function formatOrderErr(e: unknown): string {
   return String(e);
 }
 
-function OrderScheduleSection({
-  scheduleByDay, productNameById, hasAnySchedule,
-}: {
-  scheduleByDay: Map<string, Array<{
-    id: string; date: string; phase: string;
-    durationMinutes: number; productId: string;
-    status: "pending" | "in_progress" | "done";
-  }>>;
-  productNameById: Map<string, { name: string }>;
-  hasAnySchedule: boolean;
-}) {
-  return (
-    <section>
-      <h2 className="text-sm font-semibold text-primary mb-2 flex items-center gap-1.5">
-        <Calendar className="w-4 h-4" /> Production schedule
-      </h2>
-      {!hasAnySchedule ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
-          Not scheduled yet. Open the <Link href="/plan" className="text-primary hover:underline">Plan</Link> to generate production steps for this order.
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {Array.from(scheduleByDay.entries()).map(([day, steps]) => {
-            const totalMin = steps.reduce((a, s) => a + s.durationMinutes, 0);
-            return (
-              <div key={day} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium">
-                    {new Date(day + "T12:00:00").toLocaleDateString("de-AT", {
-                      weekday: "short", day: "numeric", month: "short",
-                    })}
-                  </p>
-                  <p className="text-xs text-muted-foreground tabular-nums">
-                    {Math.round(totalMin / 6) / 10}h planned
-                  </p>
-                </div>
-                <ul className="space-y-1">
-                  {steps.map((s) => (
-                    <li key={s.id} className="flex items-center gap-2 text-xs">
-                      <span className={`flex-1 truncate ${s.status === "done" ? "line-through text-muted-foreground" : ""}`}>
-                        {productNameById.get(s.productId)?.name ?? s.productId} · {s.phase}
-                      </span>
-                      <span className="tabular-nums text-muted-foreground shrink-0">
-                        {s.durationMinutes}m
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
+// ────────────────────────────────────────────────────────────────
+// Inline new customer (kept — used inside customer drawer)
+// ────────────────────────────────────────────────────────────────
 
-/** Compact "+ New customer" form used inline from the order page.
- *  Creates a minimal customer (name, type, phone, email, default
- *  fulfilment) and returns it to the caller, which then runs the
- *  normal preload flow. The customer detail page is one click away
- *  for filling the rest. */
 function InlineNewCustomer({
   initialName, onCreated, onCancel,
 }: {
@@ -2710,7 +2784,6 @@ function InlineNewCustomer({
         defaultDeliveryMethod: defaultDeliveryMethod === "" ? undefined : defaultDeliveryMethod,
         tags: [],
       });
-      // saveCustomer returns the id; reconstruct the customer shape.
       onCreated({
         id,
         companyName: companyName.trim(),
@@ -2722,72 +2795,45 @@ function InlineNewCustomer({
         tags: [],
       });
     } catch (err) {
-      const raw: { message?: string; code?: string } =
-        err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
+      const raw: { message?: string } = err instanceof Error ? { message: err.message } : ((err as Record<string, string>) ?? {});
       setSaveError(raw.message || "Save failed");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
   return (
-    <div className="mt-2 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2">
-      <p className="text-xs font-semibold text-muted-foreground">New customer (quick)</p>
-      <input
-        value={companyName}
-        onChange={(e) => setCompanyName(e.target.value)}
-        placeholder="Company / name *"
-        className="input text-sm"
-        autoFocus
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <select value={type} onChange={(e) => setType(e.target.value as CustomerType | "")} className="input text-sm">
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-text-muted)" }}>New customer (quick)</p>
+      <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Company / name *" className="input" autoFocus />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <select value={type} onChange={(e) => setType(e.target.value as CustomerType | "")} className="input">
           <option value="">— type —</option>
           {CUSTOMER_TYPES.map((t) => <option key={t} value={t}>{CUSTOMER_TYPE_LABELS[t]}</option>)}
         </select>
-        <select value={defaultDeliveryMethod} onChange={(e) => setDefaultDeliveryMethod(e.target.value as DeliveryType | "")} className="input text-sm">
+        <select value={defaultDeliveryMethod} onChange={(e) => setDefaultDeliveryMethod(e.target.value as DeliveryType | "")} className="input">
           <option value="">— fulfilment —</option>
           {DELIVERY_TYPES.map((t) => <option key={t} value={t}>{DELIVERY_TYPE_LABELS[t]}</option>)}
         </select>
-        <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Contact person" className="input text-sm" />
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" className="input text-sm" />
+        <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Contact person" className="input" />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" className="input" />
       </div>
-      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="input text-sm" />
-      <div className="flex items-center gap-2">
-        <button onClick={handleCreate} disabled={saving || !companyName.trim()}
-          className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
+      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="input" />
+      <div style={{ display: "flex", gap: 8 }}>
+        <DsButton variant="primary" onClick={handleCreate} disabled={saving || !companyName.trim()}>
           {saving ? "Creating…" : "Create + link"}
-        </button>
-        <button onClick={onCancel} className="text-xs text-muted-foreground hover:underline">Cancel</button>
-        <p className="text-[10px] text-muted-foreground">Fill the rest from the customer page later.</p>
+        </DsButton>
+        <DsButton onClick={onCancel}>Cancel</DsButton>
       </div>
-      {saveError && <p className="text-xs text-status-alert">{saveError}</p>}
+      {saveError && <p style={{ fontSize: 11, color: "var(--ds-tier-urgent)" }}>{saveError}</p>}
     </div>
   );
 }
 
-/** Convert an ISO timestamp to the local-time string datetime-local inputs expect. */
-function toLocalDatetime(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+// ────────────────────────────────────────────────────────────────
+// Replace + credit modal (kept)
+// ────────────────────────────────────────────────────────────────
 
-/**
- * Replace + Credit — clones the current order's items + packaging lines
- * into a new order with `replacesOrderId` pointing back here, and stamps
- * a `creditReference` on the original so bookkeeping can tie them.
- *
- * Deadline on the new order defaults to +7 days from today (Manuela can
- * edit on the cloned order page). Status starts as 'draft' so the
- * planner picks it up.
- */
 function ReplaceAndCreditModal({
-  order,
-  items,
-  packagingLines,
-  onClose,
-  onDone,
+  order, items, packagingLines, onClose, onDone,
 }: {
   order: Order;
   items: OrderItem[];
@@ -2806,20 +2852,15 @@ function ReplaceAndCreditModal({
     try {
       const newDeadline = new Date();
       newDeadline.setDate(newDeadline.getDate() + 7);
-
       const newOrderId = await saveOrder({
         channel: order.channel,
         customerName: order.customerName,
         customerId: order.customerId,
-        eventName: order.eventName
-          ? `${order.eventName} (replacement)`
-          : undefined,
+        eventName: order.eventName ? `${order.eventName} (replacement)` : undefined,
         deadline: newDeadline.toISOString(),
         priority: "normal",
         status: "pending",
-        notes:
-          (order.notes ? order.notes + "\n" : "") +
-          `[REPLACEMENT ${new Date().toISOString().slice(0, 10)}] ${reason}`,
+        notes: (order.notes ? order.notes + "\n" : "") + `[REPLACEMENT ${new Date().toISOString().slice(0, 10)}] ${reason}`,
         deliveryType: order.deliveryType,
         deliveryAddress: order.deliveryAddress,
         fulfillmentType: order.fulfillmentType,
@@ -2827,7 +2868,6 @@ function ReplaceAndCreditModal({
         replacesOrderId: order.id,
         replacementReason: reason || undefined,
       });
-
       for (const [idx, it] of items.entries()) {
         await saveOrderItem({
           id: newId(),
@@ -2840,7 +2880,6 @@ function ReplaceAndCreditModal({
           variantId: it.variantId,
         });
       }
-
       if (copyPackaging) {
         for (const pl of packagingLines) {
           await saveOrderPackagingLine({
@@ -2855,12 +2894,7 @@ function ReplaceAndCreditModal({
           });
         }
       }
-
-      await saveOrder({
-        ...order,
-        creditReference: creditRef || undefined,
-      });
-
+      await saveOrder({ ...order, creditReference: creditRef || undefined });
       onDone(newOrderId);
     } finally {
       setBusy(false);
@@ -2869,315 +2903,51 @@ function ReplaceAndCreditModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 " onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
         className="relative w-full max-w-md mx-4 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl"
-        style={{ borderRadius: 4 }}
+        style={{ borderRadius: 6 }}
       >
         <header className="px-5 pt-4 pb-3 border-b border-[color:var(--ds-border-warm)]">
-          <h3
-            className="text-[16px]"
-            style={{
-              fontFamily: "var(--font-serif)",
-              fontWeight: 500,
-              letterSpacing: "-0.015em",
-            }}
-          >
+          <h3 className="serif" style={{ fontFamily: "var(--font-serif)", fontSize: 16, fontWeight: 500 }}>
             Replace + credit
           </h3>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            Clone {items.length} line{items.length === 1 ? "" : "s"} into a new
-            order. Stamp credit-note reference on the original.
+            Clone {items.length} line{items.length === 1 ? "" : "s"} into a new order. Stamp credit-note ref on the original.
           </p>
         </header>
-
         <div className="px-5 py-4 space-y-3">
           <div>
             <label className="label">Reason</label>
-            <textarea
-              className="input"
-              rows={2}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. bars shattered in transit; customer complaint"
-            />
+            <textarea className="input" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. bars shattered in transit" />
           </div>
           <div>
-            <label className="label">Credit invoice ref (HelloCash etc.)</label>
-            <input
-              type="text"
-              className="input"
-              value={creditRef}
-              onChange={(e) => setCreditRef(e.target.value)}
-              placeholder="RE-2026-0123"
-            />
-            <p className="text-[10.5px] text-muted-foreground mt-1">
-              Stored on the ORIGINAL order so bookkeeping can reconcile.
-            </p>
+            <label className="label">Credit invoice ref</label>
+            <input type="text" className="input" value={creditRef} onChange={(e) => setCreditRef(e.target.value)} placeholder="RE-2026-0123" />
           </div>
           <label className="flex items-center gap-2 text-[12px]">
-            <input
-              type="checkbox"
-              checked={copyPackaging}
-              onChange={(e) => setCopyPackaging(e.target.checked)}
-            />
-            <span>
-              Also clone {packagingLines.length} packaging line
-              {packagingLines.length === 1 ? "" : "s"}
-            </span>
+            <input type="checkbox" checked={copyPackaging} onChange={(e) => setCopyPackaging(e.target.checked)} />
+            <span>Also clone {packagingLines.length} packaging line{packagingLines.length === 1 ? "" : "s"}</span>
           </label>
-          <p className="text-[11px] text-muted-foreground italic" style={{ fontFamily: "var(--font-serif)" }}>
-            New order starts as draft with deadline +7 days, unit prices zeroed.
-            Adjust after it opens.
-          </p>
         </div>
-
         <footer className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="btn-secondary">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={doReplace}
-            disabled={busy || !reason.trim()}
-            className="btn-primary"
-          >
+          <DsButton onClick={onClose}>Cancel</DsButton>
+          <DsButton variant="primary" onClick={doReplace} disabled={busy || !reason.trim()}>
             {busy ? "…" : "Create replacement"}
-          </button>
+          </DsButton>
         </footer>
       </div>
     </div>
   );
 }
 
-// ─── Variant lines (migration 0068) ──────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// Utilities
+// ────────────────────────────────────────────────────────────────
 
-function VariantLinesSection({
-  orderId, variantLines, allVariants,
-}: {
-  orderId: string;
-  variantLines: import("@/types").OrderVariantLine[];
-  allVariants: ReturnType<typeof useVariants>;
-}) {
-  const [adding, setAdding] = useState(false);
-  return (
-    <section className="mb-3">
-      <div className="flex items-center gap-3 mb-2">
-        {!adding && (
-          <button
-            onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add variant (gift box)
-          </button>
-        )}
-        <h2 className="text-sm font-semibold text-primary">
-          Variants ({variantLines.length})
-        </h2>
-      </div>
-      {adding && (
-        <AddVariantForm
-          orderId={orderId}
-          allVariants={allVariants}
-          onDone={() => setAdding(false)}
-        />
-      )}
-      {variantLines.length > 0 && (
-        <ul className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] divide-y divide-border">
-          {variantLines.map((line) => (
-            <VariantLineRow key={line.id} line={line} allVariants={allVariants} />
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function VariantLineRow({
-  line, allVariants,
-}: {
-  line: import("@/types").OrderVariantLine;
-  allVariants: ReturnType<typeof useVariants>;
-}) {
-  const variant = allVariants.find((v) => v.id === line.variantId);
-  const vps = useVariantPackagings(line.variantId);
-  const vp = vps.find((p) => p.id === line.variantPackagingId);
-  const composition = useVariantPackagingProducts(line.variantPackagingId ?? "");
-  const total = line.quantity * line.unitPrice;
-  const [pendingRemove, setPendingRemove] = useState(false);
-  return (
-    <li className="px-3 py-2.5">
-      <div className="flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">
-            {line.quantity} × {variant?.name ?? "Variant"}
-            {vp && (
-              <span className="ml-1.5 text-[11px] text-muted-foreground font-normal">
-                · size {vp.id?.slice(0, 4)}
-              </span>
-            )}
-          </p>
-          <p className="text-[11px] text-muted-foreground">
-            @ €{line.unitPrice.toFixed(2)} = €{total.toFixed(2)}
-          </p>
-        </div>
-        {pendingRemove ? (
-          <span className="flex items-center gap-2 text-[11px]">
-            <span className="text-muted-foreground">Remove?</span>
-            <button
-              onClick={async () => { await removeVariantFromOrder(line.id!); setPendingRemove(false); }}
-              className="text-destructive font-medium hover:underline"
-            >
-              Yes
-            </button>
-            <button
-              onClick={() => setPendingRemove(false)}
-              className="text-muted-foreground hover:underline"
-            >
-              Cancel
-            </button>
-          </span>
-        ) : (
-          <button
-            onClick={() => setPendingRemove(true)}
-            className="text-[11px] text-muted-foreground hover:text-destructive"
-          >
-            Remove
-          </button>
-        )}
-      </div>
-      {composition.length > 0 && (
-        <p className="text-[10.5px] text-muted-foreground mt-1">
-          ↳ {composition.length} product{composition.length === 1 ? "" : "s"} auto-added to production
-        </p>
-      )}
-    </li>
-  );
-}
-
-function AddVariantForm({
-  orderId, allVariants, onDone,
-}: {
-  orderId: string;
-  allVariants: ReturnType<typeof useVariants>;
-  onDone: () => void;
-}) {
-  const [variantId, setVariantId] = useState("");
-  const [vpId, setVpId] = useState("");
-  const [qty, setQty] = useState("1");
-  const [price, setPrice] = useState("");
-  const [saving, setSaving] = useState(false);
-  const vps = useVariantPackagings(variantId);
-  const composition = useVariantPackagingProducts(vpId);
-  // Auto-fill price from chosen variantPackaging.
-  useEffect(() => {
-    const vp = vps.find((p) => p.id === vpId);
-    if (vp) setPrice(String(vp.price ?? vp.sellPrice ?? ""));
-  }, [vpId, vps]);
-
-  async function handleAdd() {
-    if (!variantId) { alert("Pick a variant first."); return; }
-    const q = parseInt(qty, 10);
-    const p = parseFloat(price);
-    if (!Number.isFinite(q) || q <= 0) { alert("Qty must be > 0."); return; }
-    if (!Number.isFinite(p) || p < 0) { alert("Price required."); return; }
-    if (composition.length === 0 && vpId) {
-      if (!confirm("This variant size has no curated composition. Add anyway? No products will be auto-added.")) return;
-    }
-    setSaving(true);
-    try {
-      await addVariantToOrder({
-        orderId,
-        variantId,
-        variantPackagingId: vpId || null,
-        quantity: q,
-        unitPrice: p,
-        composition: composition.map((c) => ({ productId: c.productId, qty: c.qty })),
-      });
-      onDone();
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 mb-2 space-y-2">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="label">Variant</label>
-          <select
-            value={variantId}
-            onChange={(e) => { setVariantId(e.target.value); setVpId(""); }}
-            className="input"
-          >
-            <option value="">— pick one —</option>
-            {allVariants.map((v) => (
-              <option key={v.id} value={v.id}>{v.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label">Size</label>
-          <select
-            value={vpId}
-            onChange={(e) => setVpId(e.target.value)}
-            disabled={!variantId}
-            className="input"
-          >
-            <option value="">— pick a size —</option>
-            {vps.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.packagingId ? `Packaging #${p.id?.slice(0, 4)}` : "Loose / no packaging"} · €{Number(p.price ?? p.sellPrice ?? 0).toFixed(2)}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="label">Quantity</label>
-          <input
-            type="number"
-            min="1"
-            value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            className="input"
-          />
-        </div>
-        <div>
-          <label className="label">Unit price, net (€)</label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="input"
-          />
-        </div>
-      </div>
-      {composition.length > 0 && (
-        <p className="text-[11px] text-muted-foreground">
-          Will auto-add {composition.length} product line{composition.length === 1 ? "" : "s"} to production demand.
-        </p>
-      )}
-      <div className="flex gap-2">
-        <button
-          onClick={handleAdd}
-          disabled={saving}
-          className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-        >
-          {saving ? "Adding…" : "Add variant"}
-        </button>
-        <button
-          onClick={onDone}
-          className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-xs"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
+/** ISO datetime → "YYYY-MM-DD" for DsInlineField type="date". */
+function toLocalDate(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
