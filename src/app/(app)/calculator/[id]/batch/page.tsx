@@ -118,18 +118,12 @@ export default function BatchPage({ params }: { params: Promise<{ id: string }> 
   const productCount = mould.numberOfCavities * numMoulds;
 
   return (
-    <div className="px-4 pt-6 pb-12 max-w-lg">
-      <button
-        onClick={() => router.push(`/calculator/${encodeURIComponent(id)}`)}
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
-      >
-        <ChevronLeft className="w-4 h-4" /> {experiment.name}
-      </button>
-
-      <h1 className="text-xl font-bold mb-0.5">Product</h1>
-      <p className="text-sm text-muted-foreground mb-5">
-        {mould.name} · {numMoulds} mould{numMoulds !== 1 ? "s" : ""} · {productCount} product{productCount !== 1 ? "s" : ""}
-      </p>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Product"
+        meta={`${experiment.name} · ${mould.name} · ${numMoulds} mould${numMoulds !== 1 ? "s" : ""} · ${productCount} product${productCount !== 1 ? "s" : ""}`}
+      />
+      <div className="px-4 pb-12 max-w-lg">
 
       {/* Scaled product cards */}
       {step === "product" && (
@@ -263,6 +257,7 @@ export default function BatchPage({ params }: { params: Promise<{ id: string }> 
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
