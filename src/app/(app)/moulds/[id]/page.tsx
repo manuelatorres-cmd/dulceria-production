@@ -8,6 +8,7 @@ import { IconCamera as Camera, IconPencil as Pencil, IconTrash as Trash2, IconAr
 import { BackButton } from "@/components/back-button";
 import { DetailNav } from "@/components/detail-nav";
 import { InlineNameEditor } from "@/components/inline-name-editor";
+import { PageHeader, StatusTag } from "@/components/dulceria";
 import { FILL_FACTOR } from "@/lib/production";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 
@@ -103,7 +104,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
 
   if (!mould) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="ds flex items-center justify-center min-h-screen" style={{ background: "var(--ds-page-bg)" }}>
         <p className="text-muted-foreground">Loading…</p>
       </div>
     );
@@ -151,9 +152,41 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
     reader.readAsDataURL(file);
   }
 
+  const metaParts: string[] = [];
+  if (mould.productNumber) metaParts.push(mould.productNumber);
+  if (mould.brand) metaParts.push(mould.brand);
+  const metaText = metaParts.join(" · ");
+
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-6 pb-2 space-y-2">
+      <PageHeader
+        title={
+          <InlineNameEditor
+            name={mould.name}
+            onSave={async (n) => { await saveMould({ ...mould, name: n }); }}
+          />
+        }
+        meta={!editing && metaText ? metaText : undefined}
+        badges={
+          mould.archived ? (
+            <StatusTag kind="neutral">
+              <Archive className="w-3 h-3" /> Archived
+            </StatusTag>
+          ) : undefined
+        }
+        actions={
+          !editing ? (
+            <button
+              onClick={startEditing}
+              className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
+              aria-label="Edit mould"
+            >
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+            </button>
+          ) : undefined
+        }
+      />
+      <div className="px-4 pt-3 pb-2 space-y-2">
         <BackButton fallbackHref="/moulds" fallbackLabel="All moulds" onBack={() => safeBack()} />
         <DetailNav
           items={[...allMoulds].filter((m) => !m.archived).sort((a, b) => a.name.localeCompare(b.name))}
@@ -164,93 +197,58 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       <div className="px-4 pb-6 space-y-4">
-        {/* Photo + Name row — always visible */}
-        <div className="flex items-start gap-4">
-          <div className="shrink-0">
-            {editing ? (
-              <div className="flex flex-col items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 rounded-[4px] bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1 overflow-hidden"
-                >
-                  {photo ? (
-                    <img src={photo} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <>
-                      <Camera className="w-5 h-5" />
-                      <span className="text-[10px]">Photo</span>
-                    </>
-                  )}
-                </button>
-                {photo && (
-                  <button
-                    type="button"
-                    onClick={() => setPhoto(undefined)}
-                    className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            ) : (
+        {/* Photo block */}
+        <div className="shrink-0">
+          {editing ? (
+            <div className="flex flex-col items-start gap-1">
               <button
                 type="button"
-                aria-label="Edit mould photo"
-                className="w-20 h-20 rounded-[4px] overflow-hidden cursor-pointer"
-                onClick={startEditing}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-20 h-20 rounded-[4px] bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1 overflow-hidden"
               >
-                {mould.photo ? (
-                  <img src={mould.photo} alt={mould.name} className="w-full h-full object-cover" />
+                {photo ? (
+                  <img src={photo} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-2xl font-light">
-                    ◻
-                  </div>
+                  <>
+                    <Camera className="w-5 h-5" />
+                    <span className="text-[10px]">Photo</span>
+                  </>
                 )}
               </button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handlePhoto}
-              className="hidden"
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <InlineNameEditor
-                    name={mould.name}
-                    onSave={async (n) => { await saveMould({ ...mould, name: n }); }}
-                    className="text-xl font-bold"
-                  />
-                  {mould.archived && (
-                    <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
-                      <Archive className="w-3 h-3" /> Archived
-                    </span>
-                  )}
-                  {!editing && mould.productNumber && (
-                    <span className="text-sm text-muted-foreground font-mono">{mould.productNumber}</span>
-                  )}
-                </div>
-                {!editing && mould.brand && (
-                  <p className="text-sm text-muted-foreground mt-0.5">{mould.brand}</p>
-                )}
-              </div>
-              {!editing && (
+              {photo && (
                 <button
-                  onClick={startEditing}
-                  className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
-                  aria-label="Edit mould"
+                  type="button"
+                  onClick={() => setPhoto(undefined)}
+                  className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
                 >
-                  <Pencil className="w-4 h-4 text-muted-foreground" />
+                  Remove
                 </button>
               )}
             </div>
-          </div>
+          ) : (
+            <button
+              type="button"
+              aria-label="Edit mould photo"
+              className="w-20 h-20 rounded-[4px] overflow-hidden cursor-pointer"
+              onClick={startEditing}
+            >
+              {mould.photo ? (
+                <img src={mould.photo} alt={mould.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-2xl font-light">
+                  ◻
+                </div>
+              )}
+            </button>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handlePhoto}
+            className="hidden"
+          />
         </div>
 
         {editing ? (
