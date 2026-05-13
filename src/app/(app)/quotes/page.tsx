@@ -2,29 +2,50 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import { useCustomers, saveQuote } from "@/lib/hooks";
-import { quoteFromRow } from "@/lib/hooks";
+import { useCustomers, saveQuote, quoteFromRow } from "@/lib/hooks";
 import { QUOTE_STATUSES, QUOTE_STATUS_LABELS, type QuoteStatus } from "@/types";
-import { IconPlus as Plus, IconSearch as Search, IconFileText as FileText } from "@tabler/icons-react";
+import {
+  PageHeader,
+  Section,
+  ListRow,
+  StatusTag,
+  DsButton,
+  DsTabNav,
+  type ListRowTier,
+} from "@/components/dulceria";
+import { IconPlus, IconSearch, IconFileText } from "@tabler/icons-react";
+
+type Filter = "all" | QuoteStatus;
+
+const STATUS_TIER: Record<QuoteStatus, ListRowTier> = {
+  draft: "default",
+  sent: "active",
+  won: "positive",
+  lost: "parked",
+  expired: "parked",
+};
 
 export default function QuotesPage() {
+  const router = useRouter();
   const customers = useCustomers(true);
-  const customerName = useMemo(() => new Map(customers.map((c) => [c.id!, c.companyName])), [customers]);
+  const customerName = useMemo(
+    () => new Map(customers.map((c) => [c.id!, c.companyName])),
+    [customers],
+  );
 
-  // Load all quotes directly (we want the raw row so we can rehydrate JSON columns).
   const { data: rawQuotes = [] } = useQuery({
     queryKey: ["quotes-all"],
-    queryFn: async () => assertOk(await supabase.from("quotes").select("*").order("createdAt", { ascending: false })) as Array<Record<string, unknown>>,
+    queryFn: async () =>
+      assertOk(
+        await supabase.from("quotes").select("*").order("createdAt", { ascending: false }),
+      ) as Array<Record<string, unknown>>,
   });
   const quotes = useMemo(() => rawQuotes.map(quoteFromRow), [rawQuotes]);
 
-  // Auto-expire sent quotes whose expiresAt has passed. Runs once per
-  // page mount; keeps a ref of IDs already flipped so re-renders don't
-  // re-fire. No cron — the check runs any time Manuela opens this page.
   const autoExpiredRef = useRef(new Set<string>());
   useEffect(() => {
     const now = Date.now();
@@ -42,94 +63,193 @@ export default function QuotesPage() {
   }, [quotes]);
 
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<QuoteStatus | "all">("all");
+  const [filter, setFilter] = useState<Filter>("all");
+
+  const counts = useMemo(() => {
+    const c: Record<QuoteStatus, number> = { draft: 0, sent: 0, won: 0, lost: 0, expired: 0 };
+    for (const q of quotes) c[q.status]++;
+    return c;
+  }, [quotes]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return quotes.filter((quote) => {
-      if (filterStatus !== "all" && quote.status !== filterStatus) return false;
+      if (filter !== "all" && quote.status !== filter) return false;
       if (!q) return true;
       const cName = (quote.customerId && customerName.get(quote.customerId)) ?? "";
-      return (
-        quote.title.toLowerCase().includes(q) ||
-        cName.toLowerCase().includes(q)
-      );
+      return quote.title.toLowerCase().includes(q) || cName.toLowerCase().includes(q);
     });
-  }, [quotes, search, filterStatus, customerName]);
+  }, [quotes, search, filter, customerName]);
 
   return (
-    <div>
-      <PageHeader title="Quotes" description="B2B pricing calculator + quote history" />
-      <div className="px-4 pb-8 space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Quotes"
+        meta={`B2B pricing calculator + quote history · ${quotes.length} total${counts.sent > 0 ? ` · ${counts.sent} sent` : ""}${counts.won > 0 ? ` · ${counts.won} won` : ""}`}
+        actions={
+          <DsButton variant="primary" size="md" onClick={() => router.push("/quotes/new")}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <IconPlus size={14} stroke={1.5} /> New quote
+            </span>
+          </DsButton>
+        }
+      />
+
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              borderRadius: 14,
+              maxWidth: 360,
+            }}
+          >
+            <IconSearch size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by title or customer"
-              className="input !pl-9"
+              placeholder="Search by title or customer…"
+              style={{
+                fontSize: 12,
+                border: "none",
+                background: "transparent",
+                outline: "none",
+                flex: 1,
+                color: "var(--ds-text-primary)",
+              }}
             />
           </div>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as QuoteStatus | "all")}
-            className="input !w-auto text-sm"
-          >
-            <option value="all">All statuses</option>
-            {QUOTE_STATUSES.map((s) => <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>)}
-          </select>
-          <Link
-            href="/quotes/new"
-            className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" /> New quote
-          </Link>
+          <DsTabNav
+            variant="pills"
+            tabs={[
+              { id: "all", label: "All", count: quotes.length },
+              ...QUOTE_STATUSES.map((s) => ({
+                id: s,
+                label: QUOTE_STATUS_LABELS[s],
+                count: counts[s],
+              })),
+            ]}
+            activeTab={filter}
+            onChange={(id) => setFilter(id as Filter)}
+          />
         </div>
 
         {filtered.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-border bg-card p-8 text-center">
-            <FileText className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">
+          <div
+            style={{
+              borderRadius: 14,
+              border: "1px dashed var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              padding: "48px 24px",
+              textAlign: "center",
+            }}
+          >
+            <IconFileText size={28} stroke={1.5} style={{ color: "var(--ds-text-muted)", margin: "0 auto 8px" }} />
+            <p style={{ fontSize: 13, color: "var(--ds-text-muted)" }}>
               {quotes.length === 0
                 ? "No quotes yet. Click New quote to open the calculator."
-                : "No quotes match the current filters."}
+                : "No quotes match the current filter."}
             </p>
           </div>
         ) : (
-          <ul className="rounded-sm border border-border bg-card divide-y divide-border">
-            {filtered.map((q) => {
-              const cName = q.customerId ? (customerName.get(q.customerId) ?? "—") : (q.isWhatIf ? "What-If" : "—");
-              const expired = q.expiresAt && new Date(q.expiresAt) < new Date();
-              return (
-                <li key={q.id}>
-                  <Link href={`/quotes/${encodeURIComponent(q.id!)}`} className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{q.title || "Untitled quote"}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {cName}
-                        {" · "}
-                        {QUOTE_STATUS_LABELS[q.status]}
-                        {q.feasible === false && " · tight capacity"}
-                        {expired && q.status === "sent" && " · expired"}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0 text-xs">
-                      {q.sellPrice != null && (
-                        <p className="font-medium tabular-nums">€{q.sellPrice.toFixed(2)}</p>
-                      )}
-                      {q.marginPercent != null && (
-                        <p className="text-muted-foreground tabular-nums">{q.marginPercent.toFixed(0)}% margin</p>
-                      )}
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          <Section title="Quotes" action={`${filtered.length} of ${quotes.length}`}>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {filtered.map((q) => {
+                const cName = q.customerId
+                  ? customerName.get(q.customerId) ?? "—"
+                  : q.isWhatIf
+                  ? "What-If"
+                  : "—";
+                const expired = q.expiresAt && new Date(q.expiresAt) < new Date();
+                const tier: ListRowTier =
+                  q.feasible === false ? "urgent" : STATUS_TIER[q.status];
+
+                return (
+                  <li key={q.id} style={{ listStyle: "none" }}>
+                    <Link
+                      href={`/quotes/${encodeURIComponent(q.id!)}`}
+                      style={{ textDecoration: "none", color: "inherit", display: "block" }}
+                    >
+                      <ListRow
+                        tier={tier}
+                        title={
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "baseline",
+                              gap: 8,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <span>{q.title || "Untitled quote"}</span>
+                            <StatusTag kind={statusTagKind(q.status)}>
+                              {QUOTE_STATUS_LABELS[q.status]}
+                            </StatusTag>
+                            {q.feasible === false && (
+                              <StatusTag kind="pending">Tight capacity</StatusTag>
+                            )}
+                            {expired && q.status === "sent" && (
+                              <StatusTag kind="overdue">Expired</StatusTag>
+                            )}
+                          </span>
+                        }
+                        meta={cName}
+                        side={
+                          <div style={{ textAlign: "right" }}>
+                            {q.sellPrice != null && (
+                              <div
+                                style={{
+                                  fontWeight: 500,
+                                  fontVariantNumeric: "tabular-nums",
+                                  fontSize: 13,
+                                }}
+                              >
+                                €{q.sellPrice.toFixed(2)}
+                              </div>
+                            )}
+                            {q.marginPercent != null ? (
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "var(--ds-text-muted)",
+                                  fontVariantNumeric: "tabular-nums",
+                                }}
+                              >
+                                {q.marginPercent.toFixed(0)}% margin
+                              </div>
+                            ) : null}
+                          </div>
+                        }
+                      />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </Section>
         )}
       </div>
     </div>
   );
+}
+
+function statusTagKind(status: QuoteStatus): "pending" | "scheduled" | "ready" | "overdue" | "done" | "neutral" {
+  switch (status) {
+    case "draft":
+      return "neutral";
+    case "sent":
+      return "scheduled";
+    case "won":
+      return "ready";
+    case "lost":
+      return "done";
+    case "expired":
+      return "overdue";
+  }
 }

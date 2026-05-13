@@ -2,41 +2,41 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
-import {
-  useCustomers, saveCustomer, useOrders, useAllOrderItems,
-} from "@/lib/hooks";
+import { useCustomers, saveCustomer, useOrders, useAllOrderItems } from "@/lib/hooks";
 import { computeCustomerAnalytics } from "@/lib/customerAnalytics";
 import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
-import { IconPlus as Plus, IconSearch as Search, IconX as X, IconArchive as Archive, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
+import {
+  PageHeader,
+  Section,
+  DsButton,
+  DsTabNav,
+  StatusTag,
+  useToast,
+} from "@/components/dulceria";
+import { IconPlus, IconSearch, IconArchive, IconAlertTriangle } from "@tabler/icons-react";
+
+type Sort = "name" | "lifetime" | "last";
 
 export default function CustomersPage() {
   const customers = useCustomers(true);
   const orders = useOrders();
   const orderItems = useAllOrderItems();
+  const toast = useToast();
 
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string>("");
-  const [sortKey, setSortKey] = useState<"name" | "lifetime" | "last">("name");
+  const [sort, setSort] = useState<Sort>("name");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newContact, setNewContact] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Pre-compute analytics once so we can sort / filter on them.
   const stats = useMemo(() => {
     const map = new Map<string, ReturnType<typeof computeCustomerAnalytics>>();
     for (const c of customers) {
       if (!c.id) continue;
-      map.set(
-        c.id,
-        computeCustomerAnalytics({
-          customerId: c.id,
-          orders,
-          orderItems,
-        }),
-      );
+      map.set(c.id, computeCustomerAnalytics({ customerId: c.id, orders, orderItems }));
     }
     return map;
   }, [customers, orders, orderItems]);
@@ -50,7 +50,7 @@ export default function CustomersPage() {
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return customers
-      .filter((c) => showArchived ? true : !c.archived)
+      .filter((c) => (showArchived ? true : !c.archived))
       .filter((c) => !selectedTag || c.tags?.includes(selectedTag))
       .filter((c) => {
         if (!q) return true;
@@ -64,15 +64,18 @@ export default function CustomersPage() {
       .sort((a, b) => {
         const sa = stats.get(a.id!);
         const sb = stats.get(b.id!);
-        if (sortKey === "lifetime") return (sb?.lifetimeValue ?? 0) - (sa?.lifetimeValue ?? 0);
-        if (sortKey === "last") {
+        if (sort === "lifetime") return (sb?.lifetimeValue ?? 0) - (sa?.lifetimeValue ?? 0);
+        if (sort === "last") {
           const la = sa?.lastOrderAt?.getTime() ?? 0;
           const lb = sb?.lastOrderAt?.getTime() ?? 0;
           return lb - la;
         }
         return a.companyName.localeCompare(b.companyName);
       });
-  }, [customers, search, showArchived, selectedTag, sortKey, stats]);
+  }, [customers, search, showArchived, selectedTag, sort, stats]);
+
+  const activeCount = customers.filter((c) => !c.archived).length;
+  const archivedCount = customers.length - activeCount;
 
   async function handleCreate() {
     if (!newName.trim() || busy) return;
@@ -83,191 +86,278 @@ export default function CustomersPage() {
         contactName: newContact.trim() || undefined,
         tags: [],
       });
+      toast.success(`Created ${newName.trim()}`);
       setNewName("");
       setNewContact("");
       setCreating(false);
+    } catch (e) {
+      toast.error("Save failed", { description: e instanceof Error ? e.message : String(e) });
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div>
-      <PageHeader title="Customers" description="B2B contacts, order history, follow-ups" />
-      <div className="px-4 pb-8 space-y-3">
-        <div className="flex gap-2">
-          <div className="flex-1 relative min-w-0">
-            <Search aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Customers"
+        meta={`B2B contacts, order history, follow-ups · ${activeCount} active${archivedCount > 0 ? ` · ${archivedCount} archived` : ""}`}
+        actions={
+          <DsButton variant="primary" size="md" onClick={() => setCreating(true)}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <IconPlus size={14} stroke={1.5} /> New customer
+            </span>
+          </DsButton>
+        }
+      />
+
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              borderRadius: 14,
+              maxWidth: 360,
+            }}
+          >
+            <IconSearch size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by company, contact, email, tag…"
-              aria-label="Search customers"
-              className="input !pl-9"
+              placeholder="Search company, contact, email, tag…"
+              style={{
+                fontSize: 12,
+                border: "none",
+                background: "transparent",
+                outline: "none",
+                flex: 1,
+                color: "var(--ds-text-primary)",
+              }}
             />
           </div>
-          <button
-            onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" /> New customer
-          </button>
-        </div>
-
-        {creating && (
-          <div className="rounded-sm border border-border bg-card p-3 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">New customer</p>
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Company name"
-              className="input text-sm"
-              autoFocus
-            />
-            <input
-              type="text"
-              value={newContact}
-              onChange={(e) => setNewContact(e.target.value)}
-              placeholder="Contact name (optional)"
-              className="input text-sm"
-            />
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => { setCreating(false); setNewName(""); setNewContact(""); }} className="text-xs text-muted-foreground">Cancel</button>
-              <button
-                onClick={handleCreate}
-                disabled={!newName.trim() || busy}
-                className="rounded-sm bg-accent text-accent-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-              >
-                {busy ? "Saving…" : "Create"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex items-center gap-2 flex-wrap text-xs">
           {allTags.length > 0 && (
-            <div className="flex items-center gap-1 flex-wrap">
-              {allTags.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setSelectedTag(selectedTag === t ? "" : t)}
-                  className={`rounded-sm border px-2 py-0.5 ${
-                    selectedTag === t
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-              {selectedTag && (
-                <button onClick={() => setSelectedTag("")} className="text-muted-foreground">
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
+            <DsTabNav
+              variant="pills"
+              tabs={[
+                { id: "", label: "All tags" },
+                ...allTags.map((t) => ({ id: t, label: t })),
+              ]}
+              activeTab={selectedTag}
+              onChange={(id) => setSelectedTag(id)}
+            />
           )}
-          <div className="ml-auto flex items-center gap-1">
-            <span className="text-muted-foreground">Sort:</span>
-            {(["name", "lifetime", "last"] as const).map((k) => (
-              <button
-                key={k}
-                onClick={() => setSortKey(k)}
-                className={`rounded-full px-2 py-0.5 ${
-                  sortKey === k ? "bg-accent text-accent-foreground" : "border border-border text-muted-foreground"
-                }`}
-              >
-                {k === "name" ? "Name" : k === "lifetime" ? "Lifetime value" : "Last order"}
-              </button>
-            ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <DsTabNav
+              variant="pills"
+              tabs={[
+                { id: "name", label: "Name" },
+                { id: "lifetime", label: "Lifetime value" },
+                { id: "last", label: "Last order" },
+              ]}
+              activeTab={sort}
+              onChange={(id) => setSort(id as Sort)}
+            />
             <button
+              type="button"
               onClick={() => setShowArchived((v) => !v)}
-              className={`ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 border ${
-                showArchived ? "border-primary text-primary" : "border-border text-muted-foreground"
-              }`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "3px 10px",
+                fontSize: 11,
+                border: `0.5px solid ${showArchived ? "var(--ds-tier-quarter-focus)" : "var(--ds-border-warm)"}`,
+                background: showArchived ? "var(--ds-tint-info)" : "var(--ds-card-bg)",
+                color: showArchived ? "var(--ds-tier-quarter-focus)" : "var(--ds-text-muted)",
+                borderRadius: 12,
+                cursor: "pointer",
+                marginLeft: "auto",
+              }}
             >
-              <Archive className="w-3 h-3" /> {showArchived ? "Showing archived" : "Show archived"}
+              <IconArchive size={11} stroke={1.5} /> {showArchived ? "Showing archived" : "Show archived"}
             </button>
           </div>
         </div>
 
-        {/* List */}
+        {creating && (
+          <Section title="New customer">
+            <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Company name"
+                autoFocus
+                style={textInputStyle()}
+              />
+              <input
+                type="text"
+                value={newContact}
+                onChange={(e) => setNewContact(e.target.value)}
+                placeholder="Contact name (optional)"
+                style={textInputStyle()}
+              />
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <DsButton
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    setCreating(false);
+                    setNewName("");
+                    setNewContact("");
+                  }}
+                >
+                  Cancel
+                </DsButton>
+                <DsButton
+                  variant="primary"
+                  size="sm"
+                  onClick={handleCreate}
+                  disabled={!newName.trim() || busy}
+                >
+                  {busy ? "Saving…" : "Create"}
+                </DsButton>
+              </div>
+            </div>
+          </Section>
+        )}
+
         {rows.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-border bg-card p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              {customers.length === 0
-                ? "No customers yet. Create the first one to start tracking orders and follow-ups."
-                : "No customers match the current filters."}
-            </p>
-          </div>
+          <p
+            style={{
+              textAlign: "center",
+              padding: "40px 0",
+              fontFamily: "var(--font-serif)",
+              fontSize: 14,
+              color: "var(--ds-text-muted)",
+            }}
+          >
+            {customers.length === 0
+              ? "No customers yet. Click New customer to start tracking orders + follow-ups."
+              : "No customers match the current filters."}
+          </p>
         ) : (
-          <ul className="rounded-sm border border-border bg-card divide-y divide-border">
-            {rows.map((c) => {
-              const s = stats.get(c.id!);
-              return (
-                <li key={c.id}>
-                  <Link
-                    href={`/customers/${encodeURIComponent(c.id!)}`}
-                    className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/30"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-sm font-medium truncate">
-                          {c.companyName}
-                          {c.archived && <span className="ml-1.5 text-[10px] text-muted-foreground uppercase">archived</span>}
-                        </p>
-                        {(() => {
-                          const miss = computeMissingRequiredCustomerFields(c);
-                          if (miss.length === 0) return null;
-                          return (
+          <Section title="Customers" action={`${rows.length} of ${customers.length}`}>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {rows.map((c) => {
+                const s = stats.get(c.id!);
+                const miss = computeMissingRequiredCustomerFields(c);
+                return (
+                  <li key={c.id} style={{ borderTop: "0.5px solid var(--ds-border-warm)" }}>
+                    <Link
+                      href={`/customers/${encodeURIComponent(c.id!)}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        padding: "12px 20px",
+                        textDecoration: "none",
+                        color: "inherit",
+                        opacity: c.archived ? 0.6 : 1,
+                      }}
+                      className="hover:bg-[color:var(--ds-card-bg-hover)]"
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            flexWrap: "wrap",
+                            fontSize: 13,
+                            fontWeight: 500,
+                          }}
+                        >
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {c.companyName}
+                          </span>
+                          {c.archived && (
+                            <span style={{ fontSize: 9, color: "var(--ds-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                              archived
+                            </span>
+                          )}
+                          {miss.length > 0 && (
                             <span
-                              className="inline-flex items-center gap-0.5 text-[10px] text-status-warn"
                               title={`Missing: ${miss.join(", ")}`}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 2,
+                                fontSize: 10,
+                                color: "var(--ds-semantic-warn)",
+                              }}
                             >
-                              <AlertTriangle className="w-3 h-3" />
+                              <IconAlertTriangle size={11} stroke={1.5} />
                               {miss.length}
                             </span>
-                          );
-                        })()}
-                        {c.tags?.map((t) => (
-                          <span key={t} className="rounded-sm border border-border px-1.5 py-0 text-[10px] text-muted-foreground">
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {c.contactName && <>{c.contactName}</>}
-                        {c.contactName && c.email && <> · </>}
-                        {c.email}
-                      </p>
-                    </div>
-                    <div className="text-right text-xs text-muted-foreground shrink-0">
-                      {s && s.orderCount > 0 ? (
-                        <>
-                          <p className="font-medium text-foreground tabular-nums">
-                            {s.orderCount} order{s.orderCount === 1 ? "" : "s"}
-                          </p>
-                          <p className="tabular-nums">€{s.lifetimeValue.toFixed(2)}</p>
-                          {s.daysSinceLastOrder != null && (
-                            <p>
-                              last {s.daysSinceLastOrder === 0 ? "today" : `${s.daysSinceLastOrder}d ago`}
-                            </p>
                           )}
-                        </>
-                      ) : (
-                        <p>no orders yet</p>
-                      )}
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                          {c.tags?.map((t) => (
+                            <StatusTag key={t} kind="neutral">{t}</StatusTag>
+                          ))}
+                        </div>
+                        <p
+                          style={{
+                            fontSize: 11,
+                            color: "var(--ds-text-muted)",
+                            marginTop: 4,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {c.contactName && <>{c.contactName}</>}
+                          {c.contactName && c.email && <> · </>}
+                          {c.email}
+                        </p>
+                      </div>
+                      <div
+                        style={{
+                          textAlign: "right",
+                          fontSize: 11,
+                          color: "var(--ds-text-muted)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {s && s.orderCount > 0 ? (
+                          <>
+                            <p style={{ fontWeight: 500, color: "var(--ds-text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                              {s.orderCount} order{s.orderCount === 1 ? "" : "s"}
+                            </p>
+                            <p style={{ fontVariantNumeric: "tabular-nums" }}>€{s.lifetimeValue.toFixed(2)}</p>
+                            {s.daysSinceLastOrder != null && (
+                              <p>last {s.daysSinceLastOrder === 0 ? "today" : `${s.daysSinceLastOrder}d ago`}</p>
+                            )}
+                          </>
+                        ) : (
+                          <p style={{ fontStyle: "italic" }}>no orders yet</p>
+                        )}
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </Section>
         )}
       </div>
     </div>
   );
+}
+
+function textInputStyle(): React.CSSProperties {
+  return {
+    padding: "5px 8px",
+    fontSize: 13,
+    border: "0.5px solid var(--ds-border-warm)",
+    borderRadius: 4,
+    background: "var(--ds-card-bg)",
+    color: "var(--ds-text-primary)",
+    outline: "none",
+  };
 }
