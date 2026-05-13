@@ -77,6 +77,20 @@ const WIZARD_STEPS = [
 ] as const;
 type WizardStepId = typeof WIZARD_STEPS[number]["id"];
 
+/** Per-phase left-border colour for the C.4 phase cards. Mirrors the
+ *  /production-brain/daily palette so both surfaces feel like the
+ *  same workshop, just at different zoom levels. */
+const PHASE_COLOR: Record<PhaseId, string> = {
+  polishing: "var(--accent-butter-ink)",
+  colour:    "var(--accent-blush-ink)",
+  shell:     "var(--accent-butter-ink)",
+  filling:   "var(--accent-lilac-ink)",
+  fill:      "var(--ds-semantic-info)",
+  cap:       "var(--ds-tier-positive)",
+  unmould:   "var(--accent-mint-ink)",
+  packing:   "var(--accent-cocoa-ink)",
+};
+
 /** Map a user-facing step name to one of our 8 canonical phases.
  *  Exact match first (handles "Filling Prep" vs "Filling" correctly);
  *  keyword fallback for custom step names. Returns null for unmappable
@@ -207,7 +221,14 @@ function PlanContent({
     const from = params.get("from");
     if (from) { setBackHref(from); setBackLabel("Back to product"); }
     const tab = params.get("tab") as PhaseId | null;
-    if (tab && PHASES.some((p) => p.id === tab)) setActivePhase(tab);
+    if (tab && PHASES.some((p) => p.id === tab)) {
+      setActivePhase(tab);
+      // Back-compat with old `?tab=…` deep links from /orders/[id] etc.:
+      // open the wizard on the Production step + pre-expand that phase
+      // card so the operator lands where the link promised.
+      setActiveStep("production");
+      setExpandedPhases(new Set<PhaseId>([tab]));
+    }
     const step = params.get("step") as WizardStepId | null;
     if (step && WIZARD_STEPS.some((s) => s.id === step)) setActiveStep(step);
   }, []);
@@ -594,6 +615,59 @@ function PlanContent({
     rows.sort((a, b) => a.ingredientName.localeCompare(b.ingredientName));
     return rows;
   }, [consolidatedFillings, planProducts, productsMap, mouldsMap, ingredientById, ingredientStockByIngredientId]);
+
+  // Per-phase active-minute estimate for the C.4 phase cards. Walks
+  // productionStepsAll filtered by stepNameToPhase, multiplies by per-
+  // planProduct moulds (or 1 for perBatch steps). Returns minutes per
+  // PhaseId so each card header can show "~Xm".
+  const estMinutesByPhase = useMemo(() => {
+    const out: Record<PhaseId, number> = {
+      polishing: 0, colour: 0, shell: 0, filling: 0, fill: 0,
+      cap: 0, unmould: 0, packing: 0,
+    };
+    const stepsByType = new Map<string, typeof productionStepsAll>();
+    for (const s of productionStepsAll) {
+      const arr = stepsByType.get(s.productType) ?? [];
+      arr.push(s);
+      stepsByType.set(s.productType, arr);
+    }
+    for (const pp of planProducts) {
+      const product = productsMap.get(pp.productId);
+      const productType = product?.productCategoryId ?? "";
+      const stepsForType = stepsByType.get(productType) ?? [];
+      for (const s of stepsForType) {
+        const phase = stepNameToPhase(s.name);
+        if (!phase) continue;
+        out[phase] += (s.activeMinutes ?? 0) * (s.perBatch ? 1 : pp.quantity);
+      }
+    }
+    return out;
+  }, [planProducts, productsMap, productionStepsAll]);
+
+  // Which phase cards are currently expanded. Auto-expands the first
+  // incomplete phase on first render so the operator sees actionable
+  // work without scrolling; everything else collapses to save vertical
+  // space on a long batch.
+  const [expandedPhases, setExpandedPhases] = useState<Set<PhaseId> | null>(null);
+  const effectiveExpanded = useMemo(() => {
+    if (expandedPhases) return expandedPhases;
+    const auto = new Set<PhaseId>();
+    for (const ph of PHASES) {
+      const phaseSteps = steps.filter((s) => s.group === ph.id);
+      if (phaseSteps.length === 0) continue;
+      const done = phaseSteps.every((s) => statusMap.get(s.key));
+      if (!done) { auto.add(ph.id); break; }
+    }
+    return auto;
+  }, [expandedPhases, steps, statusMap]);
+
+  function togglePhaseCard(id: PhaseId) {
+    const base = expandedPhases ?? new Set(effectiveExpanded);
+    const next = new Set(base);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setExpandedPhases(next);
+  }
 
   // Local UI state for the Prep step's "prepped" + "clean" toggles.
   // Pure UI today — no DB column persists these flags. Flag ✗ deferred
@@ -1753,296 +1827,332 @@ function PlanContent({
 
         {activeStep === "production" && (
           <>
+            {steps.length === 0 ? (
+              <Section title="No steps generated">
+                <p style={{ padding: "12px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                  Make sure the products in this plan have fillings assigned.
+                </p>
+              </Section>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {PHASES.map(({ id, label }) => {
+                  const phaseSteps = steps.filter((s) => s.group === id);
+                  if (phaseSteps.length === 0) return null;
+                  const phaseDone = phaseSteps.filter((s) => statusMap.get(s.key)).length;
+                  const total = phaseSteps.length;
+                  const allDone = total > 0 && phaseDone === total;
+                  const anyDone = phaseDone > 0;
+                  const isActiveNow = anyDone && !allDone;
+                  const expanded = effectiveExpanded.has(id);
+                  const phaseColor = PHASE_COLOR[id];
+                  const estMin = estMinutesByPhase[id] ?? 0;
+                  const days = phaseDaysById.get(id) ?? [];
+                  const daysLabel = days.length === 0
+                    ? null
+                    : days.length === 1
+                      ? new Date(days[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })
+                      : `${new Date(days[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })} +${days.length - 1}`;
 
-
-      {steps.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center px-4">
-          No steps generated. Make sure the products in this plan have fillings assigned.
-        </p>
-      ) : (
-        <>
-          {/* Phase peek-card grid — 4 wide × 2 rows on most screens, 8 wide
-              on lg. Compact: label on top, count + date stacked under. */}
-          <div className="px-4 mt-3">
-            <ul className="grid grid-cols-4 lg:grid-cols-8 gap-1.5">
-              {PHASES.map(({ id, label }) => {
-                const phaseSteps = steps.filter((s) => s.group === id);
-                const phaseDone = phaseSteps.filter((s) => statusMap.get(s.key)).length;
-                const allPhaseDone = phaseSteps.length > 0 && phaseDone === phaseSteps.length;
-                const active = activePhase === id;
-                const days = phaseDaysById.get(id) ?? [];
-                const daysLabel = days.length === 0
-                  ? null
-                  : days.length === 1
-                    ? new Date(days[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })
-                    : `${new Date(days[0] + "T12:00:00").toLocaleDateString("de-AT", { day: "numeric", month: "short" })} +${days.length - 1}`;
-                const palette = (() => {
-                  if (allPhaseDone) return { bg: "var(--accent-mint-bg)", ink: "var(--accent-mint-ink)", bar: "var(--accent-mint-ink)" };
-                  if (active)       return { bg: "var(--accent-sky-bg)", ink: "var(--accent-sky-ink)", bar: "var(--accent-sky-ink)" };
-                  return { bg: "rgba(245,243,239,0.7)", ink: "var(--ds-text-primary)", bar: "#bdbcc1" };
-                })();
-                const pct = phaseSteps.length === 0 ? 0 : Math.round((phaseDone / phaseSteps.length) * 100);
-                return (
-                  <li key={id}>
-                    <button
-                      onClick={() => setActivePhase(id)}
-                      className={
-                        "w-full text-left rounded-[10px] px-2 py-1.5 transition border " +
-                        (active ? "border-foreground/30" : "border-transparent hover:border-foreground/10")
-                      }
-                      style={{ background: palette.bg, color: palette.ink }}
+                  return (
+                    <div
+                      key={id}
+                      style={{
+                        background: "var(--ds-card-bg)",
+                        border: "0.5px solid var(--ds-border-warm)",
+                        borderLeft: `3px solid ${phaseColor}`,
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        opacity: allDone ? 0.85 : 1,
+                      }}
                     >
-                      <div
-                        className="leading-tight truncate"
+                      <button
+                        type="button"
+                        onClick={() => togglePhaseCard(id)}
                         style={{
-                          fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 14,
-                          letterSpacing: "-0.012em",
+                          width: "100%", textAlign: "left", padding: "12px 18px",
+                          background: "transparent", border: "none", cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          gap: 12,
+                          borderBottom: expanded ? "0.5px solid var(--ds-border-warm)" : "none",
                         }}
                       >
-                        {label}
-                      </div>
-                      <div className="text-[10px] tabular-nums opacity-75 leading-tight">
-                        {phaseSteps.length > 0 ? `${phaseDone}/${phaseSteps.length}` : "—"}
-                      </div>
-                      {daysLabel && (
-                        <div className="text-[9.5px] opacity-65 tabular-nums leading-tight">{daysLabel}</div>
-                      )}
-                      <div className="h-[2px] bg-white/45 rounded-[4px] overflow-hidden mt-1">
-                        <div className="h-full" style={{ background: palette.bar, width: `${pct}%` }} />
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
+                          <span style={{
+                            fontFamily: "var(--font-serif)", fontSize: 16, fontWeight: 500,
+                            letterSpacing: "-0.012em", color: "var(--ds-text-primary)",
+                          }}>{label}</span>
+                          <span style={{ fontSize: 11, color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                            {phaseDone}/{total}
+                          </span>
+                          {estMin > 0 && (
+                            <span style={{ fontSize: 11, color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                              · ~{estMin} min
+                            </span>
+                          )}
+                          {daysLabel && (
+                            <span style={{ fontSize: 11, color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                              · {daysLabel}
+                            </span>
+                          )}
+                          {isActiveNow && <StatusTag kind="pending">active now</StatusTag>}
+                          {allDone && <StatusTag kind="ready">all done</StatusTag>}
+                        </div>
+                        <span style={{
+                          fontSize: 12, color: "var(--ds-text-muted)",
+                          transform: expanded ? "rotate(90deg)" : "none",
+                          transition: "transform 0.15s",
+                        }}>▸</span>
+                      </button>
 
-          {/* Active phase content */}
-          <div className="px-4 mt-3 pb-8 space-y-3">
-            {/* Materials needed — Colour tab: on-mould steps only; Cap tab: transfer sheets + after-cap steps */}
-            {((activePhase === "colour" && colouringMaterialIds.length > 0) ||
-              (activePhase === "cap" && cappingMaterialIds.length > 0)) && (
-              <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 mb-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Materials needed for this step</p>
-                <ul className="space-y-1.5">
-                  {(activePhase === "colour" ? colouringMaterialIds : cappingMaterialIds).map((id) => {
-                    const material = materialsMap.get(id);
-                    return (
-                      <li key={id} className="flex items-center gap-2.5">
-                        <span
-                          className="w-3.5 h-3.5 rounded-[4px] border border-black/10 shrink-0"
-                          style={{ backgroundColor: material?.color ?? "#9ca3af" }}
-                        />
-                        <span className="text-sm flex-1">{material?.name ?? id}</span>
-                        <LowStockFlagButton
-                          flagged={material?.lowStock}
-                          itemName={material?.name}
-                          onFlag={() => setDecorationMaterialLowStock(id, true)}
-                          size="sm"
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
+                      {expanded && (
+                        <div style={{ padding: "12px 18px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                          {/* Materials panel — colour / cap phases only */}
+                          {((id === "colour" && colouringMaterialIds.length > 0) ||
+                            (id === "cap" && cappingMaterialIds.length > 0)) && (
+                            <div style={{
+                              padding: "10px 12px",
+                              border: "0.5px solid var(--ds-border-warm)", borderRadius: 6,
+                              background: "var(--ds-card-bg-hover, rgba(0,0,0,0.02))",
+                            }}>
+                              <p style={{
+                                fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em",
+                                color: "var(--ds-text-muted)", fontWeight: 500, marginBottom: 6,
+                              }}>Materials needed</p>
+                              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                                {(id === "colour" ? colouringMaterialIds : cappingMaterialIds).map((mid) => {
+                                  const material = materialsMap.get(mid);
+                                  return (
+                                    <li key={mid} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                      <span style={{
+                                        width: 14, height: 14, borderRadius: 4,
+                                        border: "0.5px solid rgba(0,0,0,0.1)",
+                                        background: material?.color ?? "#9ca3af",
+                                        flexShrink: 0,
+                                      }} />
+                                      <span style={{ fontSize: 13, flex: 1 }}>{material?.name ?? mid}</span>
+                                      <LowStockFlagButton
+                                        flagged={material?.lowStock}
+                                        itemName={material?.name}
+                                        onFlag={() => setDecorationMaterialLowStock(mid, true)}
+                                        size="sm"
+                                      />
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Filling-prep scaled recipes link */}
+                          {id === "filling" && fillingAmounts.length > 0 && (
+                            <Link
+                              href={`/production/${encodeURIComponent(planId)}/products?back=production`}
+                              style={{
+                                display: "inline-flex", alignItems: "center", gap: 6,
+                                fontSize: 12, color: "var(--ds-text-muted)", textDecoration: "none",
+                                width: "fit-content",
+                              }}
+                              className="hover:[color:var(--ds-text-primary)]"
+                            >
+                              <BookOpen size={14} /> Scaled recipes
+                            </Link>
+                          )}
+
+                          {/* Mark all done / Unmark all */}
+                          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                            <button
+                              onClick={() => handleTogglePhase(id)}
+                              style={{
+                                fontSize: 11, color: "var(--ds-text-muted)",
+                                background: "transparent", border: "none", cursor: "pointer",
+                              }}
+                            >
+                              {allDone ? "Unmark all" : "Mark all done"}
+                            </button>
+                          </div>
+
+                          {/* Step list — shell+cap subgroup by coating */}
+                          {(id === "shell" || id === "cap")
+                            ? renderCoatingGroupedSteps(phaseSteps, statusMap, handleToggle, materialsMap, planProducts, productsMap, mouldsMap)
+                            : (
+                              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                                {phaseSteps.map((step, stepIdx) => {
+                                  const done = statusMap.get(step.key) ?? false;
+                                  const prevColors = phaseSteps[stepIdx - 1]?.colors?.join(",") ?? "";
+                                  const curColors = step.colors?.join(",") ?? "";
+                                  const showSeparator = id === "colour"
+                                    && stepIdx > 0
+                                    && step.colors && step.colors.length > 0
+                                    && curColors !== prevColors;
+                                  return (
+                                    <li key={step.key}>
+                                      {showSeparator && (
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
+                                          <div style={{ flex: 1, height: 0.5, background: "var(--ds-border-warm)" }} />
+                                          <span style={{
+                                            fontSize: 10, color: "var(--ds-text-muted)",
+                                            textTransform: "uppercase", letterSpacing: "0.06em",
+                                            display: "inline-flex", alignItems: "center", gap: 4,
+                                          }}>
+                                            Switch to
+                                            {step.colors!.map((cid) => {
+                                              const m = materialsMap.get(cid);
+                                              return (
+                                                <span
+                                                  key={cid}
+                                                  style={{
+                                                    display: "inline-block", width: 10, height: 10,
+                                                    borderRadius: 4, border: "0.5px solid rgba(0,0,0,0.1)",
+                                                    background: m?.color ?? "#9ca3af",
+                                                  }}
+                                                  title={m?.name ?? cid}
+                                                />
+                                              );
+                                            })}
+                                            {step.colors!.map((cid) => materialsMap.get(cid)?.name ?? cid).join(", ")}
+                                          </span>
+                                          <div style={{ flex: 1, height: 0.5, background: "var(--ds-border-warm)" }} />
+                                        </div>
+                                      )}
+                                      <StepItem
+                                        step={step}
+                                        done={done}
+                                        onToggle={handleToggle}
+                                        materialsMap={materialsMap}
+                                        yieldInfo={step.group === "unmould" && step.planProductId ? (() => {
+                                          const pb = planProducts.find((b) => b.id === step.planProductId);
+                                          return pb?.actualYield != null ? { actual: pb.actualYield, total: step.totalProducts ?? 0 } : null;
+                                        })() : undefined}
+                                      />
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )
+                          }
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                  <button
+                    onClick={handleReset}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      fontSize: 11, color: "var(--ds-text-muted)",
+                      background: "transparent", border: "none", cursor: "pointer",
+                    }}
+                  >
+                    <RotateCcw size={13} /> Reset all steps
+                  </button>
+                  <p style={{ fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic", margin: 0 }}>
+                    ✗ Start / Pause / per-step time-tracking deferred — no <code>planStepStatus.startedAt</code> column yet.
+                  </p>
+                </div>
               </div>
             )}
-
-            {/* Scaled recipes link — shown only in the Fillings tab */}
-            {activePhase === "filling" && fillingAmounts.length > 0 && (
-              <Link
-                href={`/production/${encodeURIComponent(planId)}/products?back=${activePhase}`}
-                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <BookOpen className="w-4 h-4 shrink-0" />
-                Scaled recipes
-              </Link>
-            )}
-
-            {/* Step checklist for active phase */}
-            {(() => {
-              const activeSteps = steps.filter((s) => s.group === activePhase);
-              if (activeSteps.length === 0) {
-                return <p className="text-sm text-muted-foreground py-4 text-center">No steps for this phase.</p>;
-              }
-
-              const allDoneInPhase = activeSteps.every((s) => statusMap.get(s.key));
-              const markAllBtn = (
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => handleTogglePhase(activePhase)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {allDoneInPhase ? "Unmark all" : "Mark all done"}
-                  </button>
-                </div>
-              );
-
-              // Shell + Cap tabs: group steps by chocolate/coating type
-              if (activePhase === "shell" || activePhase === "cap") {
-                const coatingOrder: string[] = [];
-                const byCoating = new Map<string, typeof activeSteps>();
-                for (const step of activeSteps) {
-                  const c = step.coating ?? "chocolate";
-                  if (!byCoating.has(c)) { byCoating.set(c, []); coatingOrder.push(c); }
-                  byCoating.get(c)!.push(step);
-                }
-                return (
-                  <div className="space-y-4">
-                    {markAllBtn}
-                    {coatingOrder.map((coating) => {
-                      const coatingSteps = byCoating.get(coating)!;
-                      const coatingMoulds = coatingSteps.reduce((s, st) => s + (st.mouldCount ?? 0), 0);
-                      const seedTempering = false;
-                      let temperingPanel: React.ReactNode = null;
-                      if (seedTempering) {
-                        // Sum total cavity weight (g) for all planProducts with this coating using manufacturer's cavityWeightG
-                        const mouldsMissingWeight: string[] = [];
-                        const totalCavityG = planProducts.reduce((sum, pb) => {
-                          if ((productsMap.get(pb.productId)?.coating ?? "chocolate") !== coating) return sum;
-                          const m = mouldsMap.get(pb.mouldId);
-                          if (!m) return sum;
-                          if (m.cavityWeightG == null) {
-                            if (!mouldsMissingWeight.includes(m.name)) mouldsMissingWeight.push(m.name);
-                            return sum;
-                          }
-                          return sum + pb.quantity * m.numberOfCavities * m.cavityWeightG;
-                        }, 0);
-                        if (mouldsMissingWeight.length > 0) {
-                          temperingPanel = (
-                            <div className="mt-2 mb-3 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2.5 text-xs text-status-warn">
-                              <p className="font-semibold text-status-warn text-[10px] uppercase tracking-wide mb-1">Seeding method</p>
-                              <p>Set <strong>Cavity weight (g)</strong> on {mouldsMissingWeight.join(", ")} to see chocolate amounts.</p>
-                            </div>
-                          );
-                        } else {
-                          const totalG = Math.round(totalCavityG * 1.1);
-                          const meltedG = Math.round(totalG * 4 / 5);
-                          const seedG = Math.round(totalG / 5);
-                          const isDark = coating.toLowerCase() === "dark";
-                          const silkPct = isDark ? 1 : 2;
-                          const silkG = Math.round(totalG * silkPct / 100);
-                          temperingPanel = (
-                            <div className="mt-2 mb-3 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2.5 text-xs space-y-1.5">
-                              <p className="font-semibold text-status-warn uppercase tracking-wide text-[10px]">Seeding method — chocolate amounts</p>
-                              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-status-warn">
-                                <span className="text-muted-foreground">Total chocolate</span><span className="font-medium">{totalG} g</span>
-                                <span className="text-muted-foreground">Melt (⁴⁄₅)</span><span className="font-medium">{meltedG} g</span>
-                                <span className="text-muted-foreground">Seed (¹⁄₅)</span><span className="font-medium">{seedG} g</span>
-                                <span className="text-muted-foreground">Silk / Mycryo ({silkPct}%)</span><span className="font-medium">{silkG} g</span>
-                              </div>
-                            </div>
-                          );
-                        }
-                      }
-                      const regularCapSteps = coatingSteps.filter((s) => s.subgroup !== "after_cap");
-                      const afterCapSteps = coatingSteps.filter((s) => s.subgroup === "after_cap");
-                      return (
-                      <div key={coating}>
-                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 capitalize flex items-center gap-1.5">
-                          {coating}
-                          <span className="font-normal normal-case tracking-normal">· {coatingMoulds} mould{coatingMoulds !== 1 ? "s" : ""}</span>
-                        </h3>
-                        {temperingPanel}
-                        <ul className="space-y-1.5">
-                          {regularCapSteps.map((step) => (
-                            <StepItem key={step.key} step={step} done={statusMap.get(step.key) ?? false} onToggle={handleToggle} materialsMap={materialsMap} />
-                          ))}
-                        </ul>
-                        {afterCapSteps.length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">After capping</p>
-                            <ul className="space-y-1.5">
-                              {afterCapSteps.map((step) => (
-                                <StepItem key={step.key} step={step} done={statusMap.get(step.key) ?? false} onToggle={handleToggle} materialsMap={materialsMap} />
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                      );
-                    })}
-                  </div>
-                );
-              }
-
-              return (
-                <div className="space-y-3">
-                  {markAllBtn}
-                  <ul className="space-y-1.5">
-                  {activeSteps.map((step, stepIdx) => {
-                    const done = statusMap.get(step.key) ?? false;
-                    const prevColors = activeSteps[stepIdx - 1]?.colors?.join(",") ?? "";
-                    const curColors = step.colors?.join(",") ?? "";
-                    const showSeparator = activePhase === "colour"
-                      && stepIdx > 0
-                      && step.colors && step.colors.length > 0
-                      && curColors !== prevColors;
-                    return (
-                      <li key={step.key}>
-                        {showSeparator && (
-                          <div className="flex items-center gap-2 py-1.5 mb-1.5">
-                            <div className="flex-1 h-px bg-border" />
-                            <span className="text-[10px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                              Switch to
-                              {step.colors!.map((id) => {
-                                const m = materialsMap.get(id);
-                                return (
-                                  <span
-                                    key={id}
-                                    className="inline-block w-2.5 h-2.5 rounded-[4px] border border-black/10"
-                                    style={{ backgroundColor: m?.color ?? "#9ca3af" }}
-                                    title={m?.name ?? id}
-                                  />
-                                );
-                              })}
-                              {step.colors!.map((id) => materialsMap.get(id)?.name ?? id).join(", ")}
-                            </span>
-                            <div className="flex-1 h-px bg-border" />
-                          </div>
-                        )}
-                        <StepItem
-                          step={step}
-                          done={done}
-                          onToggle={handleToggle}
-                          materialsMap={materialsMap}
-                          yieldInfo={step.group === "unmould" && step.planProductId ? (() => {
-                            const pb = planProducts.find((b) => b.id === step.planProductId);
-                            return pb?.actualYield != null ? { actual: pb.actualYield, total: step.totalProducts ?? 0 } : null;
-                          })() : undefined}
-                        />
-                      </li>
-                    );
-                  })}
-                  </ul>
-                </div>
-              );
-            })()}
-
-            <button
-              onClick={handleReset}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Reset all steps
-            </button>
-          </div>
-        </>
-      )}
           </>
         )}
 
-        {/* ── Phase C.4 — Packing (deferred placeholder) ────────── */}
-        {activeStep === "packing" && (
-          <Section title="Packing">
-            <p style={{ padding: "12px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
-              ✗ Dedicated Packing step UI deferred (Phase C.4 spec). For now, tick the
-              <strong style={{ color: "var(--ds-text-primary)", fontWeight: 500 }}>{" "}Packing{" "}</strong>
-              phase under step 3 — Production. Packaging consumption + product-stock
-              deduction still fires the same way through the PackingModal.
-            </p>
-          </Section>
-        )}
+        {/* ── Phase C.5 — Packing ───────────────────────────────── */}
+        {activeStep === "packing" && (() => {
+          const packingSteps = steps.filter((s) => s.group === "packing");
+          // Variant boxes vs single-product packing. The current model
+          // doesn't distinguish boxes from singles — every planProduct
+          // gets one packing step. We surface them all as "Boxes to
+          // pack"; Singles to wrap stays ✗ until variant boxes are
+          // first-class on the plan model.
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <Section
+                title="Boxes to pack"
+                action={
+                  packingSteps.length > 0 && (
+                    <span style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>
+                      {packingSteps.filter((s) => statusMap.get(s.key)).length}/{packingSteps.length} packed
+                    </span>
+                  )
+                }
+                noBody
+              >
+                {packingSteps.length === 0 ? (
+                  <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                    No packing steps generated. Packing-only batches (e.g. borrowed-from-store orders) won't render here.
+                  </p>
+                ) : (
+                  packingSteps.map((step) => {
+                    const done = statusMap.get(step.key) ?? false;
+                    const pp = step.planProductId ? planProducts.find((b) => b.id === step.planProductId) : null;
+                    const product = pp ? productsMap.get(pp.productId) : null;
+                    const linkedOrderLabels = pp && planLinks.length > 0
+                      ? planLinks
+                        .filter((lk) => allOrderItems.find((oi) => oi.id === lk.orderItemId)?.productId === pp.productId)
+                        .map((lk) => {
+                          const item = allOrderItems.find((oi) => oi.id === lk.orderItemId);
+                          const order = item ? allOrders.find((o) => o.id === item.orderId) : null;
+                          return order ? (order.customerName || order.eventName || order.sourceRef || "order") : null;
+                        })
+                        .filter((s): s is string => !!s)
+                      : [];
+                    return (
+                      <ListRow
+                        key={step.key}
+                        tier={done ? "done" : "default"}
+                        title={
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ textDecoration: done ? "line-through" : "none" }}>
+                              {product?.name ?? step.label.replace(/^Pack:\s*/, "")}
+                            </span>
+                            {step.totalProducts ? (
+                              <span style={{ color: "var(--ds-text-muted)", fontWeight: 400, fontVariantNumeric: "tabular-nums" }}>
+                                · {step.totalProducts} pc
+                              </span>
+                            ) : null}
+                          </span>
+                        }
+                        meta={
+                          <>
+                            {linkedOrderLabels.length > 0 ? (
+                              <span>for {linkedOrderLabels.slice(0, 2).join(", ")}{linkedOrderLabels.length > 2 ? ` +${linkedOrderLabels.length - 2}` : ""}</span>
+                            ) : (
+                              <span style={{ fontStyle: "italic", color: "var(--ds-text-muted)" }}>surplus / store</span>
+                            )}
+                          </>
+                        }
+                        side={
+                          <button
+                            onClick={() => handleToggle(step.key)}
+                            style={{
+                              fontSize: 11, padding: "4px 10px",
+                              border: `0.5px solid ${done ? "var(--accent-mint-ink, #4ea58a)" : "var(--ds-tier-quarter-focus)"}`,
+                              background: done ? "var(--accent-mint-bg, #e5f3ec)" : "var(--ds-tier-quarter-focus)",
+                              color: done ? "var(--accent-mint-ink, #2f7259)" : "#fff",
+                              borderRadius: 12, cursor: "pointer",
+                            }}
+                          >
+                            {done ? "Packed ✓" : "Pack"}
+                          </button>
+                        }
+                      />
+                    );
+                  })
+                )}
+              </Section>
 
-        {/* ── Phase C.5 — Wrap up (partial — see spec C.5) ──────── */}
+              <Section title="Singles to wrap" noBody>
+                <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                  ✗ Singles-to-wrap surface deferred — schema has no flag to distinguish
+                  single-product wrap tasks from boxed packing. Until then everything
+                  lives under <strong style={{ color: "var(--ds-text-primary)", fontWeight: 500 }}>Boxes to pack</strong> above.
+                </p>
+              </Section>
+            </div>
+          );
+        })()}
+
+        {/* ── Phase C.6 — Wrap up ───────────────────────────────── */}
         {activeStep === "wrapup" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <Section title="Yield" noBody>
@@ -2143,6 +2253,33 @@ function PlanContent({
               </Section>
             )}
 
+            <Section title="Notes">
+              <div style={{ padding: "12px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+                <DsInlineTextarea
+                  label="Day notes"
+                  value={plan.notes ?? ""}
+                  onSave={async (v) => {
+                    const trimmed = (v as string).trim();
+                    await saveProductionPlan({ ...plan as any, id: plan.id, notes: trimmed || undefined });
+                  }}
+                  placeholder="What happened today — temperature swings, supplier delays, anything noteworthy."
+                />
+                <div>
+                  <DsInlineTextarea
+                    label="Issues encountered"
+                    value=""
+                    onSave={async () => { /* no-op until schema lands */ }}
+                    disabled
+                    placeholder="✗ Deferred — needs plan.issuesNotes column"
+                  />
+                  <p style={{ marginTop: 4, fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                    ✗ Separate issues field deferred — no <code>plan.issuesNotes</code> column yet.
+                    For now log issues in Day notes above.
+                  </p>
+                </div>
+              </div>
+            </Section>
+
             {plan.status !== "done" && (
               <Section title="Mark complete">
                 <div style={{ padding: "12px 20px" }}>
@@ -2156,12 +2293,6 @@ function PlanContent({
                 </div>
               </Section>
             )}
-
-            <p style={{ fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
-              ✗ Plan-level day notes + issues textareas deferred — no
-              dedicated <code>plan.dayNotes</code> / <code>plan.issuesNotes</code>
-              columns; for now use the per-batch note above the wizard.
-            </p>
           </div>
         )}
       </DsDetailPage>
@@ -2448,6 +2579,78 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
         )}
       </div>
     </button>
+  );
+}
+
+// ─── Step rendering helper ──────────────────────────────────────────
+
+/** Render shell + cap phase steps grouped by coating (dark / milk /
+ *  white). Lifted out of the production-step JSX so the phase-card map
+ *  can call it inline without ballooning the parent JSX. Mirrors the
+ *  pre-C.4 behaviour 1:1, including the seedTempering panel hook (kept
+ *  off behind `seedTempering = false` until per-product seeding lands).
+ */
+function renderCoatingGroupedSteps(
+  phaseSteps: Array<{
+    key: string; label: string; group: string; detail?: string;
+    colors?: string[]; coating?: string; subgroup?: string; mouldCount?: number;
+    planProductId?: string; totalProducts?: number;
+  }>,
+  statusMap: Map<string, boolean>,
+  handleToggle: (key: string) => void,
+  materialsMap: Map<string, DecorationMaterial>,
+  _planProducts: PlanProduct[],
+  _productsMap: Map<string, Product>,
+  _mouldsMap: Map<string, Mould>,
+): React.ReactNode {
+  const coatingOrder: string[] = [];
+  const byCoating = new Map<string, typeof phaseSteps>();
+  for (const step of phaseSteps) {
+    const c = step.coating ?? "chocolate";
+    if (!byCoating.has(c)) { byCoating.set(c, []); coatingOrder.push(c); }
+    byCoating.get(c)!.push(step);
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {coatingOrder.map((coating) => {
+        const coatingSteps = byCoating.get(coating)!;
+        const coatingMoulds = coatingSteps.reduce((s, st) => s + (st.mouldCount ?? 0), 0);
+        const regularSteps = coatingSteps.filter((s) => s.subgroup !== "after_cap");
+        const afterCapSteps = coatingSteps.filter((s) => s.subgroup === "after_cap");
+        return (
+          <div key={coating}>
+            <h3 style={{
+              fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em",
+              color: "var(--ds-text-muted)", fontWeight: 500, marginBottom: 6,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <span style={{ textTransform: "capitalize" }}>{coating}</span>
+              <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>
+                · {coatingMoulds} mould{coatingMoulds !== 1 ? "s" : ""}
+              </span>
+            </h3>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              {regularSteps.map((step) => (
+                <StepItem key={step.key} step={step} done={statusMap.get(step.key) ?? false} onToggle={handleToggle} materialsMap={materialsMap} />
+              ))}
+            </ul>
+            {afterCapSteps.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <p style={{
+                  fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em",
+                  color: "var(--ds-text-muted)", fontWeight: 500, marginBottom: 6,
+                }}>After capping</p>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {afterCapSteps.map((step) => (
+                    <StepItem key={step.key} step={step} done={statusMap.get(step.key) ?? false} onToggle={handleToggle} materialsMap={materialsMap} />
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

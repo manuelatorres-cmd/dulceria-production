@@ -477,11 +477,16 @@ Phase B.4   /orders/[id] related section                       ✓ shipped
 Phase C.1   /production/[id] wizard chrome (DsTabNav step pills) ✓ shipped
 Phase C.2   /production/[id] Plan step                            ✓ shipped
 Phase C.3   /production/[id] Prep step                            ✓ shipped
-Phase C.4   /production/[id] Production step
-Phase C.5   /production/[id] Packing step
-Phase C.6   /production/[id] Wrap up step
+Phase C.4   /production/[id] Production step                      ✓ shipped
+Phase C.5   /production/[id] Packing step                         ✓ shipped
+Phase C.6   /production/[id] Wrap up step                         ✓ shipped
 
-Phase F.1   /lab/audit-tab refit (if time)
+Phase E.1   SettingsProvider build                                ✓ shipped
+Phase E.2   Extract 8 settings sections                           ✓ shipped
+Phase E.3   Wire subroutes                                        ✓ shipped
+Phase E.4   Delete all-tabs.tsx                                   ✓ shipped
+
+Phase F.1   /lab/audit-tab refit (if time)                        ✓ shipped
 ```
 
 ~22 commits. Each phase independently shippable.
@@ -532,7 +537,53 @@ Phase F.1   /lab/audit-tab refit (if time)
 - ✗ Drag handles render as ▲▼ buttons + grip icon — true HTML5 / dnd-kit drag deferred (kept tap-to-reorder for now); `reorderPlanProduct` swaps `sortOrder` via two `savePlanProduct` calls — `src/app/(app)/production/[id]/page.tsx:735-748, 1465-1486`
 - ✗ "Assigned person" cell prints `unassigned ✗` — schema lacks `planProducts.assignedPersonId`. Migration noted inline (echoes the same gap surfaced on `/production-brain/daily`) — `src/app/(app)/production/[id]/page.tsx:1495, 2272-2275`
 
-## Phase C.3 — `/production/[id]` Prep step · evidence
+## Phase C.4 — `/production/[id]` Production step · evidence
+
+- ✓ Pastel-gradient phase peek grid + activePhase content removed; 8 collapsible white cards with per-phase 3px coloured left border render in canonical order — `src/app/(app)/production/[id]/page.tsx:1832-2057`
+- ✓ Phase-colour map mirrors `/production-brain/daily` D.2 (butter / blush / butter / lilac / info / positive / mint / cocoa) — `src/app/(app)/production/[id]/page.tsx:83-92`
+- ✓ Card header: serif phase label + `{done}/{total}` + `~Xm` est minutes + optional date range + `active now` (pending kind) chip while partially done + `all done` (ready kind) chip when complete — `src/app/(app)/production/[id]/page.tsx:1859-1908`
+- ✓ Est-minute compute walks `productionSteps` filtered by `stepNameToPhase`, scaling by `pp.quantity` (or 1 for `perBatch`) — `src/app/(app)/production/[id]/page.tsx:623-647`
+- ✓ Auto-expand the first incomplete phase on first render; click any header to manually toggle (`expandedPhases` + `togglePhaseCard`) — `src/app/(app)/production/[id]/page.tsx:651-670`
+- ✓ Materials-needed panel (colour + cap phases) and Scaled-recipes link (filling-prep) render inline inside their owning card — `src/app/(app)/production/[id]/page.tsx:1922-1959`
+- ✓ Shell + Cap subgroup-by-coating + Painting "Switch to" colour-divider preserved via lifted `renderCoatingGroupedSteps` helper — `src/app/(app)/production/[id]/page.tsx:1972-2026, 2593-2660`
+- ✓ "Mark all done / Unmark all" inline per-card via existing `handleTogglePhase` — `src/app/(app)/production/[id]/page.tsx:1962-1971`
+- ✓ Reset all steps button kept (footer of step body) — `src/app/(app)/production/[id]/page.tsx:2040-2055`
+- ✓ Back-compat: legacy `?tab=<phase>` URL pre-expands matching card on Production step — `src/app/(app)/production/[id]/page.tsx:219-228`
+- ✗ Start / Pause / per-step time tracking deferred (no `planStepStatus.startedAt` column); flagged inline in the footer of the step body — `src/app/(app)/production/[id]/page.tsx:2050-2052`
+
+## Phase C.5 — `/production/[id]` Packing step · evidence
+
+- ✓ Section "Boxes to pack" lists every `packing-*` step from the generated step set; `ListRow` per box with product name + piece count + linked-order labels (`for {customer}`) + Pack / Packed pill — `src/app/(app)/production/[id]/page.tsx:2059-2143`
+- ✓ Done count shown in section header action (`x/y packed`) — `src/app/(app)/production/[id]/page.tsx:2069-2076`
+- ✓ Pack pill triggers existing `handleToggle(step.key)` which routes through the `PackingModal` (packaging consumption + product-stock deduct + tick) — `src/app/(app)/production/[id]/page.tsx:2129-2140, 877-892`
+- ✓ "Singles to wrap" Section rendered as ✗ deferred placeholder — schema has no flag distinguishing single-product wrap tasks from boxed packing; everything currently lives under "Boxes to pack" — `src/app/(app)/production/[id]/page.tsx:2145-2152`
+
+## Phase C.6 — `/production/[id]` Wrap up step · evidence
+
+- ✓ Section "Yield" — planned / actual / variance table per `planProduct` with mint/rose variance colouring — `src/app/(app)/production/[id]/page.tsx:2156-2208`
+- ✓ Section "Product notes" — per-`planProduct` inline-editable note (`savePlanProduct`) — `src/app/(app)/production/[id]/page.tsx:2210-2266`
+- ✓ Section "Notes" — Day notes wired via `DsInlineTextarea` → `plan.notes` write through `saveProductionPlan` — `src/app/(app)/production/[id]/page.tsx:2268-2281`
+- ✓ Section "Mark complete" — primary `DsButton` opens `DsDialog`; confirm fires `handleMarkAllDone` (yield + status flips) — `src/app/(app)/production/[id]/page.tsx:2304-2316`
+- ✗ "Issues encountered" textarea rendered disabled with `✗` — no `plan.issuesNotes` column. Migration: add a separate `issuesNotes` text column on `productionPlans` — `src/app/(app)/production/[id]/page.tsx:2283-2298`
+- ✗ Per-batch variance reason column deferred — no `planProducts.varianceReason` schema column. Migration noted inline at footer of Yield section — `src/app/(app)/production/[id]/page.tsx:2204-2207`
+
+## Phase E — Settings monolith split · evidence
+
+- ✓ `SettingsProvider` lifts shared parent state into context, consumed by every subroute layout — `src/components/settings/settings-provider.tsx`
+- ✓ Each settings subroute wraps its section in `<SettingsProvider>` and renders the per-tab component (backup / capacity / demo / equipment / import / market / printing / steps) — `src/app/(app)/settings/backup/page.tsx`, `src/app/(app)/settings/capacity/page.tsx`, `src/app/(app)/settings/demo/page.tsx`, `src/app/(app)/settings/equipment/page.tsx`, `src/app/(app)/settings/import/page.tsx`, `src/app/(app)/settings/market/page.tsx`, `src/app/(app)/settings/printing/page.tsx`, `src/app/(app)/settings/steps/page.tsx`
+- ✓ Per-tab component files exist (re-exports from shared `_section-impls.tsx` where the body still lives) — `src/components/settings/{backup,capacity,demo,equipment,import,market,printing,steps}-section.tsx`
+- ✓ `src/components/settings/all-tabs.tsx` deleted from the tree
+- ✗ `_section-impls.tsx` (~2800 LOC) holds the monolith body each per-tab component re-exports; full physical split of the impls deferred — surface contract met (per-tab files + provider + subroute wiring) but a future refactor pass should move the bodies into the named files so the impls module can be deleted
+
+## Phase F.1 — `/lab/audit-tab` refit · evidence
+
+- ✓ Bespoke tinted `Tile` components replaced by 4 `StatCard` cards (variants `ok` / `warn` / `urgent` / `parked`) — `src/app/(app)/lab/audit-tab.tsx:135-145`
+- ✓ Audit list wrapped in a single `Section` (`title="Recipe audit"`) so it picks up the DS card shell instead of free-floating `<ul>` — `src/app/(app)/lab/audit-tab.tsx:147-166`
+- ✓ Each `AuditCard` row gets a 3px left-border keyed to severity + a single `StatusTag` chip (kind mapping in `severityToTagKind`) — `src/app/(app)/lab/audit-tab.tsx:172-186, 277-318`
+- ✓ Row hover uses `--ds-card-bg-hover` Tailwind class for consistency with other DS rows — `src/app/(app)/lab/audit-tab.tsx:286-294`
+- ✓ Expanded body still uses the existing composition bars / issues / suggestions — only the chrome was refit, semantic content preserved
+
+
 
 - ✓ Section "Mise en place" aggregates `consolidatedFillings[].scaledIngredients` + per-`planProduct` shell-ingredient grams (`calculateShellWeightG × cavities × moulds`); rows show `need / on hand / short` from `ingredientStock.quantityG` — `src/app/(app)/production/[id]/page.tsx:558-602, 1576-1612`
 - ✓ Short rows render with `tier="urgent"` (rose left border); prepped rows render with `tier="done"` and line-through label — `src/app/(app)/production/[id]/page.tsx:1583, 1592-1596`

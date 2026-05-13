@@ -19,6 +19,7 @@ import {
 } from "@/lib/lab/ganache-rules";
 import type { Component } from "@/lib/lab/ingredients";
 import type { Filling, Ingredient, FillingIngredient } from "@/types";
+import { Section, StatCard, StatusTag, type StatCardVariant, type StatusTagKind } from "@/components/dulceria";
 
 const GANACHE_CATEGORY = "Ganaches (Emulsions)";
 
@@ -96,7 +97,7 @@ export function AuditTab() {
   }
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="ds" style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 960 }}>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-1 text-sm">
           {(
@@ -128,38 +129,64 @@ export function AuditTab() {
         </button>
       </div>
 
-      {/* Summary tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <Tile label="Well balanced" value={counts.ok} tone="ok" />
-        <Tile label="Tweak suggested" value={counts.warn} tone="warn" />
-        <Tile label="Out of band" value={counts.bad} tone="bad" />
-        <Tile label="Skipped (data)" value={counts.skip} tone="muted" />
+      {/* Summary tiles → DS StatCards (F.1) */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: 12,
+      }}>
+        <StatCard label="Well balanced" value={counts.ok} variant="ok" />
+        <StatCard label="Tweak suggested" value={counts.warn} variant="warn" />
+        <StatCard label="Out of band" value={counts.bad} variant="urgent" />
+        <StatCard label="Skipped (data)" value={counts.skip} variant="parked" />
       </div>
 
-      {/* List */}
-      {filtered.length === 0 ? (
-        <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-8 text-sm text-muted-foreground text-center">
-          No fillings match this filter.
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {filtered.map((row) => (
-            <AuditCard
-              key={row.filling.id ?? row.filling.name}
-              row={row}
-              expanded={expandedId === row.filling.id}
-              onToggle={() => setExpandedId((cur) => (cur === row.filling.id ? null : row.filling.id ?? null))}
-            />
-          ))}
-        </ul>
-      )}
+      <Section title="Recipe audit" noBody>
+        {filtered.length === 0 ? (
+          <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+            No fillings match this filter.
+          </p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {filtered.map((row) => (
+              <AuditCard
+                key={row.filling.id ?? row.filling.name}
+                row={row}
+                expanded={expandedId === row.filling.id}
+                onToggle={() => setExpandedId((cur) => (cur === row.filling.id ? null : row.filling.id ?? null))}
+              />
+            ))}
+          </ul>
+        )}
+      </Section>
 
-      <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+      <p className="text-xs text-muted-foreground leading-relaxed" style={{ maxWidth: 640 }}>
         Audit checks ganache balance against Jungstedt&apos;s target bands. Non-ganache categories (caramels, fruit gels, giandujas, cookie layers) aren&apos;t band-validated yet — they&apos;re shown for completeness but skipped. Suggestions are first-order; verify on an AW meter before scaling.
       </p>
     </div>
   );
 }
+
+/** Map AuditRow.overall → StatusTag kind. Keeps the F.1 "max 2 status
+ *  tags per row" cap honest — we render one severity tag in AuditCard. */
+function severityToTagKind(s: AuditRow["overall"]): StatusTagKind {
+  if (s === "bad") return "overdue";
+  if (s === "warn") return "pending";
+  if (s === "ok") return "ready";
+  return "neutral";
+}
+function severityToTagLabel(s: AuditRow["overall"]): string {
+  if (s === "bad") return "out of band";
+  if (s === "warn") return "tweak";
+  if (s === "ok") return "balanced";
+  return "skipped";
+}
+// Keep the StatCard variant lookup typed even though we inline the
+// mapping above — useful for the next refit pass.
+const _UNUSED_VARIANT_MAP: Record<AuditRow["overall"], StatCardVariant> = {
+  bad: "urgent", warn: "warn", ok: "ok", skip: "parked",
+};
+void _UNUSED_VARIANT_MAP;
 
 // ── Row builders ──────────────────────────────────────────────────────────
 function buildRow(
@@ -218,23 +245,6 @@ function sortBySeverity(a: AuditRow, b: AuditRow): number {
 }
 
 // ── UI parts ──────────────────────────────────────────────────────────────
-function Tile({ label, value, tone }: { label: string; value: number; tone: "ok" | "warn" | "bad" | "muted" }) {
-  const cls =
-    tone === "ok"
-      ? "border-status-ok-edge bg-status-ok-bg/30 text-status-ok"
-      : tone === "warn"
-      ? "border-status-warn-edge bg-status-warn-bg/30 text-status-warn"
-      : tone === "bad"
-      ? "border-status-alert-edge bg-status-alert-bg/30 text-status-alert"
-      : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-muted-foreground";
-  return (
-    <div className={`rounded-[4px] border ${cls} px-4 py-3`}>
-      <div className="text-2xl font-medium tabular-nums">{value}</div>
-      <div className="text-[11px] uppercase tracking-widest mt-0.5 opacity-90">{label}</div>
-    </div>
-  );
-}
-
 function AuditCard({
   row,
   expanded,
@@ -253,14 +263,16 @@ function AuditCard({
       : overall === "ok"
       ? CheckCircle2
       : FileWarning;
-  const iconTone =
-    overall === "bad"
-      ? "text-status-alert"
-      : overall === "warn"
-      ? "text-status-warn"
-      : overall === "ok"
-      ? "text-status-ok"
-      : "text-muted-foreground";
+  const iconColor =
+    overall === "bad" ? "var(--ds-tier-urgent)"
+    : overall === "warn" ? "var(--ds-semantic-warn)"
+    : overall === "ok" ? "var(--ds-tier-positive)"
+    : "var(--ds-text-muted)";
+  const borderColor =
+    overall === "bad" ? "var(--ds-tier-urgent)"
+    : overall === "warn" ? "var(--ds-semantic-warn)"
+    : overall === "ok" ? "var(--ds-tier-positive)"
+    : "transparent";
 
   const ganacheCat = filling.category === GANACHE_CATEGORY;
   const skipReason =
@@ -273,40 +285,68 @@ function AuditCard({
       : "";
 
   return (
-    <li className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-      <button onClick={onToggle} className="w-full text-left px-4 py-3 hover:bg-muted transition-colors flex items-start gap-3">
-        <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${iconTone}`} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium">{filling.name}</span>
-            <span className="text-[11px] text-muted-foreground">{filling.category}</span>
+    <li style={{
+      borderLeft: `3px solid ${borderColor}`,
+      borderBottom: "0.5px solid var(--ds-border-warm)",
+    }}>
+      <button
+        onClick={onToggle}
+        style={{
+          width: "100%", textAlign: "left", padding: "12px 18px",
+          background: "transparent", border: "none", cursor: "pointer",
+          display: "flex", alignItems: "flex-start", gap: 12,
+        }}
+        className="hover:bg-[color:var(--ds-card-bg-hover)]"
+      >
+        <Icon style={{ width: 16, height: 16, marginTop: 2, color: iconColor, flexShrink: 0 }} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{filling.name}</span>
+            <StatusTag kind={severityToTagKind(overall)}>{severityToTagLabel(overall)}</StatusTag>
+            <span style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>{filling.category}</span>
             {filling.waterActivity != null && (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
+              <span style={{ fontSize: 11, color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>
                 · AW {filling.waterActivity.toFixed(2)}
               </span>
             )}
           </div>
           {overall !== "skip" && totalG > 0 && (
-            <div className="text-xs text-muted-foreground mt-0.5 tabular-nums">
+            <div style={{ fontSize: 12, color: "var(--ds-text-muted)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
               {COMPONENT_ORDER.map((c) => `${COMPONENT_LABEL[c]} ${breakdown.percent[c].toFixed(1)}%`).join(" · ")}
             </div>
           )}
-          {skipReason && <div className="text-xs text-muted-foreground mt-0.5">{skipReason}</div>}
-          <div className="text-xs text-muted-foreground mt-0.5">
+          {skipReason && <div style={{ fontSize: 12, color: "var(--ds-text-muted)", marginTop: 2 }}>{skipReason}</div>}
+          <div style={{ fontSize: 12, color: "var(--ds-text-muted)", marginTop: 2 }}>
             {issues.length > 0 && `${issues.length} issue${issues.length === 1 ? "" : "s"}`}
             {issues.length > 0 && suggestions.length > 0 && " · "}
             {suggestions.length > 0 && `${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"}`}
             {issues.length === 0 && suggestions.length === 0 && overall !== "skip" && "all bands within ideal range"}
           </div>
         </div>
-        <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform mt-0.5 ${expanded ? "rotate-90" : ""}`} />
+        <ChevronRight style={{
+          width: 16, height: 16, color: "var(--ds-text-muted)",
+          marginTop: 2, flexShrink: 0,
+          transform: expanded ? "rotate(90deg)" : "none",
+          transition: "transform 0.15s",
+        }} />
       </button>
 
       {expanded && (
-        <div className="border-t border-[color:var(--ds-border-warm)] bg-muted/20 px-4 py-3 space-y-3 text-sm">
+        <div style={{
+          borderTop: "0.5px solid var(--ds-border-warm)",
+          background: "var(--ds-card-bg-hover, rgba(0,0,0,0.02))",
+          padding: "12px 18px",
+          display: "flex", flexDirection: "column", gap: 12,
+          fontSize: 13,
+        }}>
           {missingCompositionNames.length > 0 && (
-            <div className="rounded-[4px] border border-status-alert-edge bg-status-alert-bg/20 px-3 py-2 text-xs">
-              <strong className="text-status-alert">Missing composition:</strong>{" "}
+            <div style={{
+              padding: "8px 12px",
+              border: `0.5px solid var(--ds-tier-urgent)`,
+              borderRadius: 4, fontSize: 12,
+              background: "var(--ds-card-bg)",
+            }}>
+              <strong style={{ color: "var(--ds-tier-urgent)" }}>Missing composition:</strong>{" "}
               {missingCompositionNames.join(", ")}. Composition % aren&apos;t set on these ingredients — calculator can&apos;t see them.
             </div>
           )}
