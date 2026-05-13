@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard — A+C hybrid</title>
+<style>
+  :root {
+    --page-bg: #fbf6f1;
+    --card-bg: #ffffff;
+    --card-bg-hover: #f5f0e3;
+    --border-warm: #e8e3d6;
+    --today-tint: #fdf6e8;
+    --text-primary: #2c2515;
+    --text-muted: #8a7e64;
+    --tier-quarter-focus: #264443;
+    --tier-active: #fbccb9;
+    --tier-urgent: #993556;
+    --tier-positive: #5dcaa5;
+    --semantic-warn: #dab73f;
+    --semantic-critical: #993556;
+    --semantic-info: #264443;
+    --tint-warn: #fff7e9;
+    --tint-critical: #fdeae3;
+    --tint-ok: #ecf7f1;
+    --tint-info: #ebf0ee;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .serif { font-family: "Playfair Display", Georgia, serif; }
+  .muted { color: var(--text-muted); }
+  .tabular { font-variant-numeric: tabular-nums; }
+  
+  /* Layout */
+  .app {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 100vh;
+  }
+  
+  .sidebar {
+    background: #1a3433;
+    color: white;
+    padding: 16px;
+  }
+  .sidebar-logo {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    padding: 0 8px;
+  }
+  .nav-section {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.5);
+    padding: 8px 8px;
+    margin-top: 16px;
+    margin-bottom: 4px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: rgba(255,255,255,0.85);
+    font-size: 13px;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.05); }
+  .nav-item.active { background: rgba(255,255,255,0.1); color: white; }
+  .nav-item .icon { width: 14px; height: 14px; opacity: 0.7; }
+  
+  /* Page header */
+  .page-header {
+    padding: 20px 32px 16px;
+  }
+  .page-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .page-header h1 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+  }
+  .page-header .meta {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .page-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  .badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    border: 0.5px solid var(--border-warm);
+    background: var(--card-bg);
+  }
+  .badge.urgent { color: var(--tier-urgent); border-color: var(--tier-urgent); }
+  .badge.warn { color: var(--semantic-warn); border-color: var(--semantic-warn); }
+  
+  .btn {
+    padding: 6px 14px;
+    border: 0.5px solid var(--border-warm);
+    border-radius: 4px;
+    background: var(--card-bg);
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--card-bg-hover); }
+  .btn.sm { padding: 3px 8px; font-size: 11px; }
+  .btn.primary { background: var(--tier-quarter-focus); color: white; border-color: var(--tier-quarter-focus); }
+  
+  /* Page body */
+  .page-body {
+    padding: 0 32px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  /* ============ ZONE CARDS (C-style top) ============ */
+  .zone-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+  }
+  .zone {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+  }
+  .zone:hover {
+    border-color: var(--tier-quarter-focus);
+  }
+  .zone.urgent { border-left: 3px solid var(--tier-urgent); }
+  .zone.warn { border-left: 3px solid var(--semantic-warn); }
+  .zone.ok { border-left: 3px solid var(--tier-positive); }
+  .zone.info { border-left: 3px solid var(--semantic-info); }
+  
+  .zone-header {
+    padding: 12px 14px 8px;
+  }
+  .zone-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .zone-status {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    font-size: 10px;
+  }
+  .zone-status.urgent { color: var(--tier-urgent); }
+  .zone-status.warn { color: var(--semantic-warn); }
+  .zone-status.ok { color: var(--tier-positive); }
+  .zone-status.info { color: var(--semantic-info); }
+  
+  .zone-count {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1.1;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .zone-count .unit {
+    font-size: 16px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+  .zone-count.urgent { color: var(--tier-urgent); }
+  .zone-count.warn { color: var(--semantic-warn); }
+  .zone-count.ok { color: var(--tier-positive); }
+  
+  .zone-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+  .zone-footer {
+    padding: 8px 14px;
+    background: var(--page-bg);
+    border-top: 0.5px solid var(--border-warm);
+    margin-top: auto;
+  }
+  .zone-footer a {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .zone:hover .zone-footer a {
+    color: var(--tier-quarter-focus);
+  }
+  
+  /* ============ PRODUCTION PROGRESS STRIP ============ */
+  .progress-strip {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    padding: 14px 18px;
+  }
+  .progress-strip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .progress-strip-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .progress-strip-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  .step-flow {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    align-items: stretch;
+  }
+  .step-pill {
+    background: var(--page-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 4px;
+    padding: 8px 10px;
+    text-align: center;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .step-pill:hover {
+    background: var(--card-bg-hover);
+  }
+  .step-pill.done {
+    background: var(--tint-ok);
+    border-color: var(--tier-positive);
+  }
+  .step-pill.active {
+    background: var(--tint-warn);
+    border-color: var(--semantic-warn);
+  }
+  .step-pill .step-name {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .step-pill .step-progress {
+    font-size: 18px;
+    font-family: "Playfair Display", Georgia, serif;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-top: 4px;
+  }
+  .step-pill .step-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .step-pill::after {
+    content: "›";
+    position: absolute;
+    right: -7px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--border-warm);
+    font-size: 14px;
+    z-index: 2;
+  }
+  .step-pill:last-child::after { display: none; }
+  
+  /* ============ TWO COLUMN BODY ============ */
+  .body-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  
+  .section {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 12px 18px 8px;
+    border-bottom: 0.5px solid var(--border-warm);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .section-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .section-action {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .section-action:hover { color: var(--tier-quarter-focus); }
+  
+  /* Compact rows for lists */
+  .compact-row {
+    padding: 8px 18px;
+    border-left: 3px solid transparent;
+    border-bottom: 0.5px solid var(--border-warm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .compact-row:hover { background: var(--card-bg-hover); }
+  .compact-row:last-child { border-bottom: none; }
+  .compact-row.urgent { border-left-color: var(--tier-urgent); }
+  .compact-row.warn { border-left-color: var(--semantic-warn); }
+  .compact-row.info { border-left-color: var(--semantic-info); }
+  
+  .compact-row-main { flex: 1; min-width: 0; }
+  .compact-row-title {
+    font-size: 13px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .compact-row-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .compact-row-side {
+    font-size: 11px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .compact-row-side .days-overdue {
+    color: var(--tier-urgent);
+    font-weight: 500;
+  }
+  .compact-row-side a {
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .compact-row-side a:hover { color: var(--tier-quarter-focus); }
+  
+  /* Mini week */
+  .mini-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    padding: 12px 18px;
+  }
+  .mini-day {
+    text-align: center;
+    padding: 8px 4px;
+    border-radius: 4px;
+    border: 0.5px solid var(--border-warm);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mini-day:hover { background: var(--card-bg-hover); }
+  .mini-day.today {
+    background: var(--today-tint);
+    border-color: var(--tier-quarter-focus);
+  }
+  .mini-day-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .mini-day-num {
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .mini-day-bar {
+    height: 2px;
+    background: var(--border-warm);
+    margin-top: 6px;
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .mini-day-fill {
+    height: 100%;
+    background: var(--tier-positive);
+  }
+  .mini-day-fill.warn { background: var(--semantic-warn); }
+  .mini-day-batches {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">Dulceria</div>
+    <div class="nav-item active">
+      <span class="icon">⌂</span>
+      Dashboard
+    </div>
+    <div class="nav-section">Spaces</div>
+    <div class="nav-item"><span class="icon">☐</span>Workshop</div>
+    <div class="nav-item"><span class="icon">☐</span>Pantry</div>
+    <div class="nav-item"><span class="icon">☐</span>Shop</div>
+    <div class="nav-item"><span class="icon">☐</span>Customers</div>
+    <div class="nav-item"><span class="icon">☐</span>Observatory</div>
+    <div class="nav-item"><span class="icon">☐</span>Lab</div>
+    <div style="margin-top: 200px;">
+      <div class="nav-item"><span class="icon">↗</span>Shopping</div>
+      <div class="nav-item"><span class="icon">⚙</span>Settings</div>
+    </div>
+  </aside>
+  
+  <!-- MAIN -->
+  <main>
+    
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <div class="page-header-row">
+        <div>
+          <h1>Welcome back</h1>
+          <p class="meta">Di., 12. Mai · 08:14 · 16 batches scheduled · Painting in progress</p>
+        </div>
+        <div class="page-header-actions">
+          <span class="badge urgent">1 urgent</span>
+          <span class="badge warn">3 attention</span>
+          <button class="btn">Close production day</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- PAGE BODY -->
+    <div class="page-body">
+      
+      <!-- ============ ZONE CARDS (6 across) ============ -->
+      <div class="zone-grid">
+        
+        <div class="zone warn">
+          <div class="zone-header">
+            <div class="zone-label">
+              <span>Production</span>
+              <span class="zone-status warn">in progress</span>
+            </div>
+            <div class="zone-count warn">2<span class="unit">/16</span></div>
+            <div class="zone-subtitle">Painting · 13% · ~3h to next</div>
+          </div>
+          <div class="zone-footer"><a>open →</a></div>
+        </div>
+        
+        <div class="zone urgent">
+          <div class="zone-header">
+            <div class="zone-label">
+              <span>Orders</span>
+              <span class="zone-status urgent">overdue</span>
+            </div>
+            <div class="zone-count urgent">11</div>
+            <div class="zone-subtitle">oldest 9 days</div>
+          </div>
+          <div class="zone-footer"><a>open →</a></div>
+        </div>
+        
+        <div class="zone warn">
+          <div class="zone-header">
+            <div class="zone-label">
+              <span>Stock</span>
+              <span class="zone-status warn">attention</span>
+            </div>
+            <div class="zone-count warn">39</div>
+            <div class="zone-subtitle">below min · 12 ingr. short</div>
+          </div>
+          <div class="zone-footer"><a>open →</a></div>
+        </div>
+        
+        <div class="zone info">
+          <div class="zone-header">
+            <div class="zone-label">
+              <span>This week</span>
+              <span class="zone-status info">on track</span>
+            </div>
+            <div class="zone-count">67</div>
+            <div class="zone-subtitle">batches · peak Sa 30%</div>
+          </div>
+          <div class="zone-footer"><a>open →</a></div>
+        </div>
+        
+        <div class="zone warn">
+          <div class="zone-header">
+            <div class="zone-label">
+              <span>Compliance</span>
+              <span class="zone-status warn">1 todo</span>
+            </div>
+            <div class="zone-count warn">1</div>
+            <div class="zone-subtitle">temperature log incomplete</div>
+          </div>
+          <div class="zone-footer"><a>open →</a></div>
+        </div>
+        
+        <div class="zone ok">
+          <div class="zone-header">
+            <div class="zone-label">
+              <span>Campaigns</span>
+              <span class="zone-status ok">running</span>
+            </div>
+            <div class="zone-count ok">7</div>
+            <div class="zone-subtitle">planned + running</div>
+          </div>
+          <div class="zone-footer"><a>open →</a></div>
+        </div>
+        
+      </div>
+      
+      <!-- ============ PRODUCTION PROGRESS FLOW ============ -->
+      <div class="progress-strip">
+        <div class="progress-strip-header">
+          <span class="progress-strip-title">Today's pipeline</span>
+          <span class="progress-strip-meta">16 batches · Apple Walnut, Crunchy Nougat +14 · ends ~17:00 · full schedule →</span>
+        </div>
+        
+        <div class="step-flow">
+          <div class="step-pill done">
+            <div class="step-name">Polishing</div>
+            <div class="step-progress">16/16</div>
+            <div class="step-meta">done · 07:00</div>
+          </div>
+          <div class="step-pill active">
+            <div class="step-name">Painting</div>
+            <div class="step-progress">2/16</div>
+            <div class="step-meta">in progress</div>
+          </div>
+          <div class="step-pill">
+            <div class="step-name">Shelling</div>
+            <div class="step-progress">0/16</div>
+            <div class="step-meta">~10:30</div>
+          </div>
+          <div class="step-pill">
+            <div class="step-name">Fill</div>
+            <div class="step-progress">0/16</div>
+            <div class="step-meta">~12:00</div>
+          </div>
+          <div class="step-pill">
+            <div class="step-name">Filling Prep</div>
+            <div class="step-progress">0/16</div>
+            <div class="step-meta">~13:30</div>
+          </div>
+          <div class="step-pill">
+            <div class="step-name">Cap</div>
+            <div class="step-progress">0/16</div>
+            <div class="step-meta">~15:00</div>
+          </div>
+          <div class="step-pill">
+            <div class="step-name">Unmould</div>
+            <div class="step-progress">0/16</div>
+            <div class="step-meta">~17:00</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ============ TWO-COLUMN BODY ============ -->
+      <div class="body-grid">
+        
+        <!-- LEFT COLUMN -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          
+          <!-- ATTENTION -->
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Needs attention</span>
+              <a class="section-action">5 items</a>
+            </div>
+            <div class="compact-row urgent">
+              <div class="compact-row-main">
+                <div class="compact-row-title">11 orders past deadline</div>
+                <div class="compact-row-meta">Re-schedule or contact customer</div>
+              </div>
+              <div class="compact-row-side"><a>open →</a></div>
+            </div>
+            <div class="compact-row warn">
+              <div class="compact-row-main">
+                <div class="compact-row-title">12 ingredients short</div>
+                <div class="compact-row-meta">Place supplier order</div>
+              </div>
+              <div class="compact-row-side"><a>list →</a></div>
+            </div>
+            <div class="compact-row warn">
+              <div class="compact-row-main">
+                <div class="compact-row-title">39 products below minimum</div>
+                <div class="compact-row-meta">Production Store thinning · consider replen</div>
+              </div>
+              <div class="compact-row-side"><a>stock →</a></div>
+            </div>
+            <div class="compact-row info">
+              <div class="compact-row-main">
+                <div class="compact-row-title">5 fillings to cook this week</div>
+                <div class="compact-row-meta">Kalamansi · Raspberry Passionfruit</div>
+              </div>
+              <div class="compact-row-side"><a>plan →</a></div>
+            </div>
+            <div class="compact-row warn">
+              <div class="compact-row-main">
+                <div class="compact-row-title">Temperature log not completed</div>
+                <div class="compact-row-meta">1 device needs check</div>
+              </div>
+              <div class="compact-row-side"><a>log →</a></div>
+            </div>
+          </div>
+          
+          <!-- UPCOMING DEADLINES -->
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Upcoming deadlines</span>
+              <a class="section-action">all orders →</a>
+            </div>
+            <div class="compact-row urgent">
+              <div class="compact-row-main">
+                <div class="compact-row-title">Margot Löbl · #4425</div>
+                <div class="compact-row-meta">9 pcs · Almond Praline, Hazelnut Caramel +3</div>
+              </div>
+              <div class="compact-row-side"><span class="days-overdue">9d overdue</span></div>
+            </div>
+            <div class="compact-row urgent">
+              <div class="compact-row-main">
+                <div class="compact-row-title">Barbara Wieser · #4427</div>
+                <div class="compact-row-meta">6 pcs · Kalamansi Cheesecake +3</div>
+              </div>
+              <div class="compact-row-side"><span class="days-overdue">9d overdue</span></div>
+            </div>
+            <div class="compact-row urgent">
+              <div class="compact-row-main">
+                <div class="compact-row-title">l.grund@hotmail.com · #4429</div>
+                <div class="compact-row-meta">9 pcs · Almond Praline +3</div>
+              </div>
+              <div class="compact-row-side"><span class="days-overdue">8d overdue</span></div>
+            </div>
+            <div class="compact-row urgent">
+              <div class="compact-row-main">
+                <div class="compact-row-title">leonie.vukic1@gmail.com · #4433</div>
+                <div class="compact-row-meta">2 pcs · Peanut Crunch Bar</div>
+              </div>
+              <div class="compact-row-side"><span class="days-overdue">8d overdue</span></div>
+            </div>
+            <div class="compact-row urgent">
+              <div class="compact-row-main">
+                <div class="compact-row-title">tobisteger9@gmail.com · #4434</div>
+                <div class="compact-row-meta">15 pcs · Pistachio Raspberry +4</div>
+              </div>
+              <div class="compact-row-side"><span class="days-overdue">8d overdue</span></div>
+            </div>
+          </div>
+          
+        </div>
+        
+        <!-- RIGHT COLUMN -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          
+          <!-- WEEK -->
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Next 7 days</span>
+              <a class="section-action">full plan →</a>
+            </div>
+            <div class="mini-week">
+              <div class="mini-day today">
+                <div class="mini-day-label">Di</div>
+                <div class="mini-day-num">12</div>
+                <div class="mini-day-bar"><div class="mini-day-fill warn" style="width: 57%"></div></div>
+                <div class="mini-day-batches">16</div>
+              </div>
+              <div class="mini-day">
+                <div class="mini-day-label">Mi</div>
+                <div class="mini-day-num">13</div>
+                <div class="mini-day-bar"><div class="mini-day-fill" style="width: 14%"></div></div>
+                <div class="mini-day-batches">3</div>
+              </div>
+              <div class="mini-day">
+                <div class="mini-day-label">Do</div>
+                <div class="mini-day-num">14</div>
+                <div class="mini-day-bar"><div class="mini-day-fill" style="width: 20%"></div></div>
+                <div class="mini-day-batches">5</div>
+              </div>
+              <div class="mini-day">
+                <div class="mini-day-label">Fr</div>
+                <div class="mini-day-num">15</div>
+                <div class="mini-day-bar"><div class="mini-day-fill warn" style="width: 53%"></div></div>
+                <div class="mini-day-batches">12</div>
+              </div>
+              <div class="mini-day">
+                <div class="mini-day-label">Sa</div>
+                <div class="mini-day-num">16</div>
+                <div class="mini-day-bar"><div class="mini-day-fill warn" style="width: 30%"></div></div>
+                <div class="mini-day-batches">8</div>
+              </div>
+              <div class="mini-day">
+                <div class="mini-day-label">So</div>
+                <div class="mini-day-num">17</div>
+                <div class="mini-day-bar"><div class="mini-day-fill" style="width: 0%"></div></div>
+                <div class="mini-day-batches">—</div>
+              </div>
+              <div class="mini-day">
+                <div class="mini-day-label">Mo</div>
+                <div class="mini-day-num">18</div>
+                <div class="mini-day-bar"><div class="mini-day-fill" style="width: 5%"></div></div>
+                <div class="mini-day-batches">2</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- STOCK SNAPSHOT -->
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Stock snapshot</span>
+              <a class="section-action">full stock →</a>
+            </div>
+            <div class="compact-row urgent">
+              <div class="compact-row-main">
+                <div class="compact-row-title">Crunchy Nougat</div>
+                <div class="compact-row-meta">0 in stock · 25 pcs demand</div>
+              </div>
+              <div class="compact-row-side"><span class="days-overdue">critical</span></div>
+            </div>
+            <div class="compact-row warn">
+              <div class="compact-row-main">
+                <div class="compact-row-title">Lillet Berry</div>
+                <div class="compact-row-meta">12 in stock · 67 pcs demand</div>
+              </div>
+              <div class="compact-row-side">low</div>
+            </div>
+            <div class="compact-row warn">
+              <div class="compact-row-main">
+                <div class="compact-row-title">Strawberry — Lemon Bar</div>
+                <div class="compact-row-meta">8 in stock · 15 pcs demand</div>
+              </div>
+              <div class="compact-row-side">low</div>
+            </div>
+            <div class="compact-row">
+              <div class="compact-row-main">
+                <div class="compact-row-title">Kalamansi Cheesecake</div>
+                <div class="compact-row-meta">80 in stock · 67 pcs demand</div>
+              </div>
+              <div class="compact-row-side">ok</div>
+            </div>
+            <div class="compact-row">
+              <div class="compact-row-main">
+                <div class="compact-row-title">Hazelnut Caramel</div>
+                <div class="compact-row-meta">50 in stock · 67 pcs demand</div>
+              </div>
+              <div class="compact-row-side">ok</div>
+            </div>
+          </div>
+          
+          <!-- CAMPAIGNS -->
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Active campaigns</span>
+              <a class="section-action">all 7 →</a>
+            </div>
+            <div class="compact-row">
+              <div class="compact-row-main">
+                <div class="compact-row-title">Bar Launch</div>
+                <div class="compact-row-meta">7 batches · live · ends 7 Jun</div>
+              </div>
+              <div class="compact-row-side">running</div>
+            </div>
+            <div class="compact-row warn">
+              <div class="compact-row-main">
+                <div class="compact-row-title">PO Mothersday</div>
+                <div class="compact-row-meta">50 pcs · due 14 May</div>
+              </div>
+              <div class="compact-row-side"><span class="days-overdue">2d left</span></div>
+            </div>
+            <div class="compact-row">
+              <div class="compact-row-main">
+                <div class="compact-row-title">PO Replen 06.05</div>
+                <div class="compact-row-meta">11 batches · ready to pack</div>
+              </div>
+              <div class="compact-row-side">ready</div>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sidebar redesign — all 6 spaces</title>
+<style>
+  :root {
+    --page-bg: #fbf6f1;
+    --card-bg: #ffffff;
+    --border-warm: #e8e3d6;
+    --text-primary: #2c2515;
+    --text-muted: #8a7e64;
+    --tier-quarter-focus: #264443;
+    --tier-positive: #5dcaa5;
+    --tier-active: #fbccb9;
+    --semantic-warn: #dab73f;
+    --tier-urgent: #993556;
+    
+    /* sidebar */
+    --sb-bg: #1a3433;
+    --sb-bg-darker: #142827;
+    --sb-text: rgba(255,255,255,0.85);
+    --sb-text-muted: rgba(255,255,255,0.45);
+    --sb-text-faint: rgba(255,255,255,0.3);
+    --sb-active-bg: rgba(255,255,255,0.1);
+    --sb-hover-bg: rgba(255,255,255,0.04);
+    --sb-divider: rgba(255,255,255,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .serif { font-family: "Playfair Display", Georgia, serif; }
+  
+  .container {
+    display: flex;
+    gap: 24px;
+    padding: 32px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  
+  .variant-label {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+  }
+  .variant-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 12px;
+    max-width: 280px;
+  }
+  
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    background: var(--sb-bg);
+    color: var(--sb-text);
+    padding: 0;
+    border-radius: 12px;
+    width: 260px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  
+  /* Logo header */
+  .sb-logo {
+    padding: 16px 20px;
+    border-bottom: 0.5px solid var(--sb-divider);
+  }
+  .sb-logo-text {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: white;
+  }
+  
+  /* Persistent dashboard link */
+  .sb-home {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    color: var(--sb-text);
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 0.5px solid var(--sb-divider);
+  }
+  .sb-home:hover { background: var(--sb-hover-bg); }
+  .sb-home.active {
+    background: var(--sb-active-bg);
+    color: white;
+  }
+  .sb-home-icon {
+    width: 16px; height: 16px;
+    opacity: 0.7;
+  }
+  
+  /* Spaces section label */
+  .sb-spaces-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sb-text-faint);
+    padding: 14px 20px 6px;
+    font-weight: 600;
+  }
+  
+  /* Space item (top level) */
+  .sb-space {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 20px;
+    color: var(--sb-text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .sb-space:hover { background: var(--sb-hover-bg); }
+  .sb-space.active {
+    background: var(--sb-active-bg);
+    color: white;
+    font-weight: 500;
+  }
+  .sb-space-icon {
+    width: 16px; height: 16px;
+    opacity: 0.7;
+    font-size: 14px;
+  }
+  .sb-space-chevron {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--sb-text-muted);
+    transition: transform 0.2s;
+  }
+  .sb-space.expanded .sb-space-chevron {
+    transform: rotate(90deg);
+  }
+  
+  /* Sub-section (group within a space) */
+  .sb-subsection {
+    padding: 0;
+    background: var(--sb-bg-darker);
+  }
+  .sb-subgroup-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--sb-text-faint);
+    padding: 10px 20px 4px 36px;
+    font-weight: 600;
+  }
+  .sb-subitem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 20px 6px 36px;
+    color: var(--sb-text-muted);
+    font-size: 12.5px;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .sb-subitem:hover {
+    background: var(--sb-hover-bg);
+    color: var(--sb-text);
+  }
+  .sb-subitem.active {
+    color: white;
+    background: var(--sb-hover-bg);
+    border-left: 2px solid var(--tier-positive);
+    padding-left: 34px;
+  }
+  .sb-subitem-icon {
+    width: 13px; height: 13px;
+    opacity: 0.5;
+    font-size: 11px;
+  }
+  .sb-subitem-badge {
+    margin-left: auto;
+    background: var(--tier-urgent);
+    color: white;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+  .sb-subitem-badge.warn { background: var(--semantic-warn); color: var(--sb-bg); }
+  .sb-subitem-badge.ok { background: var(--tier-positive); color: var(--sb-bg); }
+  
+  /* Bottom utility section */
+  .sb-bottom {
+    margin-top: auto;
+    border-top: 0.5px solid var(--sb-divider);
+    padding: 8px 0;
+  }
+  .sb-bottom-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 20px;
+    color: var(--sb-text-muted);
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .sb-bottom-item:hover {
+    background: var(--sb-hover-bg);
+    color: var(--sb-text);
+  }
+  .sb-bottom-item .icon {
+    width: 14px; height: 14px;
+    opacity: 0.6;
+  }
+  
+  /* User area */
+  .sb-user {
+    padding: 12px 20px;
+    border-top: 0.5px solid var(--sb-divider);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--sb-text-muted);
+  }
+  .sb-user-icon {
+    width: 14px; height: 14px;
+    opacity: 0.5;
+  }
+  .sb-user-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  
+  <!-- ============================================ -->
+  <!-- VARIANT A: Workshop expanded                  -->
+  <!-- ============================================ -->
+  
+  <div>
+    <div class="variant-label">Workshop space — expanded</div>
+    <div class="variant-desc">Sub-nav grouped by workflow stage. All production-brain routes now reachable.</div>
+    
+    <div class="sidebar">
+      
+      <div class="sb-logo">
+        <div class="sb-logo-text">Dulceria</div>
+      </div>
+      
+      <!-- Persistent dashboard -->
+      <div class="sb-home">
+        <span class="sb-home-icon">⌂</span>
+        <span>Dashboard</span>
+      </div>
+      
+      <!-- SPACES -->
+      <div class="sb-spaces-label">Spaces</div>
+      
+      <!-- Workshop EXPANDED -->
+      <div class="sb-space active expanded">
+        <span class="sb-space-icon">☐</span>
+        <span>Workshop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <div class="sb-subsection">
+        
+        <div class="sb-subgroup-label">Work queue</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▤</span>
+          <span>Orders</span>
+          <span class="sb-subitem-badge">11</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⌂</span>
+          <span>Picking</span>
+          <span class="sb-subitem-badge ok">2</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▤</span>
+          <span>Production orders</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Schedule</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▦</span>
+          <span>Calendar (month)</span>
+        </div>
+        <div class="sb-subitem active">
+          <span class="sb-subitem-icon">▦</span>
+          <span>Plan (week)</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▦</span>
+          <span>Daily</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Planning tools</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⊞</span>
+          <span>Planner (replen)</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⊞</span>
+          <span>Manual planner</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⊞</span>
+          <span>Needed vs stock</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Resources</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▢</span>
+          <span>Stock</span>
+          <span class="sb-subitem-badge warn">39</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▢</span>
+          <span>Equipment</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⚠</span>
+          <span>HACCP</span>
+          <span class="sb-subitem-badge warn">1</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Campaigns</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⊕</span>
+          <span>Campaigns</span>
+          <span class="sb-subitem-badge">1</span>
+        </div>
+        
+      </div>
+      
+      <!-- Other spaces collapsed -->
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Pantry</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Shop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Customers</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Observatory</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Lab</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <!-- Bottom -->
+      <div class="sb-bottom">
+        <div class="sb-bottom-item">
+          <span class="icon">↗</span>
+          <span>Shopping</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">▦</span>
+          <span>Workshop wall</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">⚙</span>
+          <span>Settings</span>
+        </div>
+      </div>
+      
+      <div class="sb-user">
+        <span class="sb-user-icon">○</span>
+        <span class="sb-user-email">office@dulceria-gmbh.at</span>
+      </div>
+      
+    </div>
+  </div>
+  
+  <!-- ============================================ -->
+  <!-- VARIANT B: Pantry expanded                    -->
+  <!-- ============================================ -->
+  
+  <div>
+    <div class="variant-label">Pantry — expanded</div>
+    <div class="variant-desc">Catalog items grouped by what they're for in production.</div>
+    
+    <div class="sidebar">
+      
+      <div class="sb-logo">
+        <div class="sb-logo-text">Dulceria</div>
+      </div>
+      
+      <div class="sb-home">
+        <span class="sb-home-icon">⌂</span>
+        <span>Dashboard</span>
+      </div>
+      
+      <div class="sb-spaces-label">Spaces</div>
+      
+      <div class="sb-space">
+        <span class="sb-space-icon">☐</span>
+        <span>Workshop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <!-- Pantry EXPANDED -->
+      <div class="sb-space active expanded">
+        <span class="sb-space-icon">⊕</span>
+        <span>Pantry</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <div class="sb-subsection">
+        
+        <div class="sb-subgroup-label">Catalog</div>
+        <div class="sb-subitem active">
+          <span class="sb-subitem-icon">▢</span>
+          <span>Products</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▢</span>
+          <span>Variants</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Recipe building blocks</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⊙</span>
+          <span>Ingredients</span>
+          <span class="sb-subitem-badge warn">12</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⊙</span>
+          <span>Fillings</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⊙</span>
+          <span>Decoration</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Production materials</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▢</span>
+          <span>Moulds</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▢</span>
+          <span>Packaging</span>
+        </div>
+        
+      </div>
+      
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Shop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Customers</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Observatory</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Lab</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <div class="sb-bottom">
+        <div class="sb-bottom-item">
+          <span class="icon">↗</span>
+          <span>Shopping</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">▦</span>
+          <span>Workshop wall</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">⚙</span>
+          <span>Settings</span>
+        </div>
+      </div>
+      
+      <div class="sb-user">
+        <span class="sb-user-icon">○</span>
+        <span class="sb-user-email">office@dulceria-gmbh.at</span>
+      </div>
+      
+    </div>
+  </div>
+  
+  <!-- ============================================ -->
+  <!-- VARIANT C: Shop expanded                      -->
+  <!-- ============================================ -->
+  
+  <div>
+    <div class="variant-label">Shop — expanded</div>
+    <div class="variant-desc">Physical retail / counter operations.</div>
+    
+    <div class="sidebar">
+      
+      <div class="sb-logo">
+        <div class="sb-logo-text">Dulceria</div>
+      </div>
+      
+      <div class="sb-home">
+        <span class="sb-home-icon">⌂</span>
+        <span>Dashboard</span>
+      </div>
+      
+      <div class="sb-spaces-label">Spaces</div>
+      
+      <div class="sb-space">
+        <span class="sb-space-icon">☐</span>
+        <span>Workshop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Pantry</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <!-- Shop EXPANDED -->
+      <div class="sb-space active expanded">
+        <span class="sb-space-icon">⊕</span>
+        <span>Shop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <div class="sb-subsection">
+        
+        <div class="sb-subitem active">
+          <span class="sb-subitem-icon">⌂</span>
+          <span>Overview</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Daily operations</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">⊞</span>
+          <span>Counter (custom box)</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▤</span>
+          <span>Daily count</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Stock movements</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">↘</span>
+          <span>Transfer in</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">↗</span>
+          <span>Stock out</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▤</span>
+          <span>Monthly count</span>
+        </div>
+        
+      </div>
+      
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Customers</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Observatory</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Lab</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <div class="sb-bottom">
+        <div class="sb-bottom-item">
+          <span class="icon">↗</span>
+          <span>Shopping</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">▦</span>
+          <span>Workshop wall</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">⚙</span>
+          <span>Settings</span>
+        </div>
+      </div>
+      
+      <div class="sb-user">
+        <span class="sb-user-icon">○</span>
+        <span class="sb-user-email">office@dulceria-gmbh.at</span>
+      </div>
+      
+    </div>
+  </div>
+  
+  <!-- ============================================ -->
+  <!-- VARIANT D: Observatory expanded               -->
+  <!-- ============================================ -->
+  
+  <div>
+    <div class="variant-label">Observatory — expanded</div>
+    <div class="variant-desc">Analytics, costs, performance review.</div>
+    
+    <div class="sidebar">
+      
+      <div class="sb-logo">
+        <div class="sb-logo-text">Dulceria</div>
+      </div>
+      
+      <div class="sb-home">
+        <span class="sb-home-icon">⌂</span>
+        <span>Dashboard</span>
+      </div>
+      
+      <div class="sb-spaces-label">Spaces</div>
+      
+      <div class="sb-space">
+        <span class="sb-space-icon">☐</span>
+        <span>Workshop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Pantry</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Shop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Customers</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <!-- Observatory EXPANDED -->
+      <div class="sb-space active expanded">
+        <span class="sb-space-icon">⊕</span>
+        <span>Observatory</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <div class="sb-subsection">
+        
+        <div class="sb-subgroup-label">Performance</div>
+        <div class="sb-subitem active">
+          <span class="sb-subitem-icon">▲</span>
+          <span>Sales (weekly)</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▲</span>
+          <span>Monthly review</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">▲</span>
+          <span>Stats</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Economics</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">€</span>
+          <span>Pricing (cost + margin)</span>
+        </div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">€</span>
+          <span>Product cost</span>
+        </div>
+        
+        <div class="sb-subgroup-label">Data</div>
+        <div class="sb-subitem">
+          <span class="sb-subitem-icon">↑</span>
+          <span>CSV imports</span>
+        </div>
+        
+      </div>
+      
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Lab</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <div class="sb-bottom">
+        <div class="sb-bottom-item">
+          <span class="icon">↗</span>
+          <span>Shopping</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">▦</span>
+          <span>Workshop wall</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">⚙</span>
+          <span>Settings</span>
+        </div>
+      </div>
+      
+      <div class="sb-user">
+        <span class="sb-user-icon">○</span>
+        <span class="sb-user-email">office@dulceria-gmbh.at</span>
+      </div>
+      
+    </div>
+  </div>
+  
+  <!-- ============================================ -->
+  <!-- VARIANT E: All collapsed (default)            -->
+  <!-- ============================================ -->
+  
+  <div>
+    <div class="variant-label">Default state — all collapsed</div>
+    <div class="variant-desc">When you're at /dashboard, all spaces collapsed. Click any to expand.</div>
+    
+    <div class="sidebar">
+      
+      <div class="sb-logo">
+        <div class="sb-logo-text">Dulceria</div>
+      </div>
+      
+      <div class="sb-home active">
+        <span class="sb-home-icon">⌂</span>
+        <span>Dashboard</span>
+      </div>
+      
+      <div class="sb-spaces-label">Spaces</div>
+      
+      <div class="sb-space">
+        <span class="sb-space-icon">☐</span>
+        <span>Workshop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Pantry</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Shop</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Customers</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Observatory</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      <div class="sb-space">
+        <span class="sb-space-icon">⊕</span>
+        <span>Lab</span>
+        <span class="sb-space-chevron">›</span>
+      </div>
+      
+      <div class="sb-bottom">
+        <div class="sb-bottom-item">
+          <span class="icon">↗</span>
+          <span>Shopping</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">▦</span>
+          <span>Workshop wall</span>
+        </div>
+        <div class="sb-bottom-item">
+          <span class="icon">⚙</span>
+          <span>Settings</span>
+        </div>
+      </div>
+      
+      <div class="sb-user">
+        <span class="sb-user-icon">○</span>
+        <span class="sb-user-email">office@dulceria-gmbh.at</span>
+      </div>
+      
+    </div>
+  </div>
+  
+</div>
+
+</body>
+</html>

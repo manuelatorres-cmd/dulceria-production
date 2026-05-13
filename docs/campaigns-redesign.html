@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Campaigns — redesign mockups</title>
+<style>
+  :root {
+    --page-bg: #fbf6f1;
+    --card-bg: #ffffff;
+    --card-bg-hover: #f5f0e3;
+    --border-warm: #e8e3d6;
+    --today-tint: #fdf6e8;
+    --text-primary: #2c2515;
+    --text-muted: #8a7e64;
+    --tier-quarter-focus: #264443;
+    --tier-active: #fbccb9;
+    --tier-urgent: #993556;
+    --tier-positive: #5dcaa5;
+    --semantic-warn: #dab73f;
+    --semantic-critical: #993556;
+    --semantic-info: #264443;
+    --tint-warn: #fff7e9;
+    --tint-critical: #fdeae3;
+    --tint-ok: #ecf7f1;
+    --tint-info: #ebf0ee;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .serif { font-family: "Playfair Display", Georgia, serif; }
+  .muted { color: var(--text-muted); }
+  .tabular { font-variant-numeric: tabular-nums; }
+  
+  .app {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 100vh;
+  }
+  
+  .sidebar {
+    background: #1a3433;
+    color: white;
+    padding: 16px;
+  }
+  .sidebar-logo {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 20px; font-weight: 600;
+    margin-bottom: 16px; padding: 0 8px;
+  }
+  .sidebar-back {
+    font-size: 11px; color: rgba(255,255,255,0.4);
+    padding: 6px 8px; text-transform: uppercase;
+    letter-spacing: 0.08em; cursor: pointer;
+  }
+  .nav-section {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 16px; font-weight: 600; color: white;
+    padding: 16px 8px 6px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px; border-radius: 4px; cursor: pointer;
+    color: rgba(255,255,255,0.85); font-size: 13px;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.05); }
+  .nav-item.active { background: rgba(255,255,255,0.1); color: white; }
+  .nav-item .icon { width: 14px; height: 14px; opacity: 0.7; }
+  
+  /* Variant separator */
+  .variant-marker {
+    background: var(--tier-urgent);
+    color: white;
+    padding: 8px 32px;
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  
+  /* Page header */
+  .page-header {
+    padding: 20px 32px 16px;
+  }
+  .breadcrumb {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+    cursor: pointer;
+  }
+  .page-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .page-header h1 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+  }
+  .page-header .meta {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .page-header-actions {
+    display: flex; gap: 8px; align-items: center;
+  }
+  
+  .badge {
+    padding: 4px 10px; border-radius: 12px; font-size: 12px;
+    border: 0.5px solid var(--border-warm); background: var(--card-bg);
+  }
+  .badge.urgent { color: var(--tier-urgent); border-color: var(--tier-urgent); }
+  .badge.warn { color: var(--semantic-warn); border-color: var(--semantic-warn); }
+  .badge.ok { color: var(--tier-positive); border-color: var(--tier-positive); }
+  
+  .btn {
+    padding: 6px 14px; border: 0.5px solid var(--border-warm);
+    border-radius: 4px; background: var(--card-bg); font-size: 13px;
+    color: var(--text-primary); cursor: pointer;
+  }
+  .btn:hover { background: var(--card-bg-hover); }
+  .btn.sm { padding: 3px 10px; font-size: 11px; }
+  .btn.primary { background: var(--tier-quarter-focus); color: white; border-color: var(--tier-quarter-focus); }
+  
+  .page-body {
+    padding: 0 32px 32px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  
+  /* ===== CAMPAIGNS LIST ===== */
+  
+  /* Filter strip */
+  .filter-row {
+    display: flex; gap: 8px; align-items: center;
+    padding: 12px 0;
+    border-bottom: 0.5px solid var(--border-warm);
+    margin-bottom: 8px;
+  }
+  .pill {
+    padding: 5px 12px; border: 0.5px solid var(--border-warm);
+    border-radius: 14px; cursor: pointer;
+    font-size: 12px; background: var(--card-bg); color: var(--text-muted);
+  }
+  .pill:hover { background: var(--card-bg-hover); }
+  .pill.active {
+    background: var(--tier-quarter-focus); color: white;
+    border-color: var(--tier-quarter-focus);
+  }
+  .pill .count { color: rgba(255,255,255,0.7); margin-left: 4px; font-size: 11px; }
+  .pill:not(.active) .count { color: var(--text-muted); }
+  
+  /* Section block */
+  .section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 12px 0 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .section-label .count {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  
+  /* Campaign grid */
+  .campaign-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  
+  .campaign-card {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .campaign-card:hover {
+    border-color: var(--tier-quarter-focus);
+  }
+  
+  .campaign-card.urgent { border-left: 3px solid var(--tier-urgent); }
+  .campaign-card.warn { border-left: 3px solid var(--semantic-warn); }
+  .campaign-card.active { border-left: 3px solid var(--semantic-info); }
+  .campaign-card.ok { border-left: 3px solid var(--tier-positive); }
+  .campaign-card.done { border-left: 3px solid var(--tier-positive); opacity: 0.65; }
+  .campaign-card.planned { border-left: 3px solid var(--border-warm); }
+  
+  .campaign-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .campaign-name {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .campaign-type {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border: 0.5px solid var(--border-warm);
+    border-radius: 10px;
+    background: var(--page-bg);
+    white-space: nowrap;
+  }
+  .campaign-type.seasonal { border-color: var(--tier-active); color: var(--tier-active); }
+  .campaign-type.launch { border-color: var(--semantic-info); color: var(--semantic-info); }
+  .campaign-type.market { border-color: var(--semantic-warn); color: var(--semantic-warn); }
+  
+  .campaign-dates {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    font-variant-numeric: tabular-nums;
+  }
+  .campaign-dates strong {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-style: normal;
+  }
+  
+  .campaign-stats {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    margin-top: 2px;
+  }
+  .campaign-stat {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .campaign-stat-value {
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .campaign-stat-label {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-style: italic;
+  }
+  
+  .campaign-progress {
+    margin-top: 4px;
+  }
+  .campaign-progress-bar {
+    height: 4px;
+    background: var(--border-warm);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .campaign-progress-fill {
+    height: 100%;
+    background: var(--tier-positive);
+  }
+  .campaign-progress-fill.warn { background: var(--semantic-warn); }
+  .campaign-progress-fill.urgent { background: var(--tier-urgent); }
+  
+  .campaign-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .campaign-status-text {
+    font-style: italic;
+  }
+  .campaign-status-text.urgent { color: var(--tier-urgent); font-weight: 500; font-style: normal; }
+  .campaign-status-text.warn { color: var(--semantic-warn); font-weight: 500; font-style: normal; }
+  .campaign-status-text.ok { color: var(--tier-positive); font-weight: 500; font-style: normal; }
+  
+  /* New campaign card */
+  .new-campaign-card {
+    background: transparent;
+    border: 0.5px dashed var(--border-warm);
+    border-radius: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+    min-height: 140px;
+  }
+  .new-campaign-card:hover {
+    background: var(--card-bg);
+    border-color: var(--tier-quarter-focus);
+    color: var(--tier-quarter-focus);
+  }
+  
+  /* ===== CAMPAIGN DETAIL ===== */
+  
+  /* Timeline */
+  .timeline-strip {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+  .timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .timeline-title {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+  }
+  .timeline-status {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--text-muted);
+  }
+  .timeline-status .urgent { color: var(--tier-urgent); font-weight: 500; font-style: normal; }
+  .timeline-status .warn { color: var(--semantic-warn); font-weight: 500; font-style: normal; }
+  
+  .timeline-bar-wrap {
+    position: relative;
+    height: 32px;
+    background: var(--page-bg);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .timeline-bar-elapsed {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: var(--tier-quarter-focus);
+    opacity: 0.1;
+  }
+  .timeline-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 2px solid var(--tier-quarter-focus);
+    z-index: 2;
+  }
+  .timeline-marker.today {
+    border-color: var(--tier-urgent);
+  }
+  .timeline-marker-label {
+    position: absolute;
+    top: 100%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .timeline-marker.today .timeline-marker-label {
+    color: var(--tier-urgent);
+    font-weight: 500;
+  }
+  
+  /* KPI cards (detail page) */
+  .detail-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  
+  .detail-kpi {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-left: 3px solid var(--semantic-info);
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .detail-kpi.urgent { border-left-color: var(--tier-urgent); }
+  .detail-kpi.warn { border-left-color: var(--semantic-warn); }
+  .detail-kpi.ok { border-left-color: var(--tier-positive); }
+  
+  .detail-kpi-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .detail-kpi-value {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.1;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .detail-kpi-value.urgent { color: var(--tier-urgent); }
+  .detail-kpi-value.warn { color: var(--semantic-warn); }
+  .detail-kpi-value.ok { color: var(--tier-positive); }
+  .detail-kpi-value .unit {
+    font-size: 14px; color: var(--text-muted); font-weight: 400;
+  }
+  .detail-kpi-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  
+  /* Product list */
+  .section {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 12px 18px 8px;
+    border-bottom: 0.5px solid var(--border-warm);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .section-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .section-action {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  
+  .category-block {
+    border-bottom: 0.5px solid var(--border-warm);
+  }
+  .category-block:last-child { border-bottom: none; }
+  
+  .category-header {
+    padding: 10px 18px;
+    background: var(--page-bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+  }
+  .category-name {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .category-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .category-status {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .category-status.not-started {
+    color: var(--text-muted);
+    background: var(--page-bg);
+    border: 0.5px solid var(--border-warm);
+  }
+  .category-status.in-progress {
+    color: var(--semantic-warn);
+    background: var(--tint-warn);
+    border: 0.5px solid var(--semantic-warn);
+  }
+  .category-status.done {
+    color: var(--tier-positive);
+    background: var(--tint-ok);
+    border: 0.5px solid var(--tier-positive);
+  }
+  
+  .product-row {
+    padding: 10px 18px;
+    display: grid;
+    grid-template-columns: 1fr auto 100px;
+    gap: 16px;
+    align-items: center;
+    border-bottom: 0.5px solid var(--border-warm);
+    border-left: 3px solid transparent;
+    cursor: pointer;
+  }
+  .product-row:last-child { border-bottom: none; }
+  .product-row:hover { background: var(--card-bg-hover); }
+  .product-row.in-progress { border-left-color: var(--semantic-warn); }
+  .product-row.done { border-left-color: var(--tier-positive); opacity: 0.6; }
+  
+  .product-row-main {
+    min-width: 0;
+  }
+  .product-row-name {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .product-row-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  
+  .product-row-step {
+    font-size: 11px;
+    text-align: right;
+  }
+  .product-row-step-name {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .product-row-step-meta {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  .product-row-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .progress-pct {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 28px;
+    text-align: right;
+  }
+  .progress-pct.done { color: var(--tier-positive); font-weight: 500; }
+  .progress-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border-warm);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--tier-positive);
+  }
+  .progress-fill.warn { background: var(--semantic-warn); }
+  
+  /* Next-up section in detail page */
+  .next-up {
+    background: var(--tint-warn);
+    border: 0.5px solid var(--semantic-warn);
+    border-left: 3px solid var(--semantic-warn);
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .next-up-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .next-up-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--semantic-warn);
+    font-weight: 600;
+  }
+  .next-up-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .next-up-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================ -->
+<!-- VARIANT 1: CAMPAIGNS LIST                    -->
+<!-- ============================================ -->
+
+<div class="variant-marker">1 — Campaigns list</div>
+
+<div class="app">
+  
+  <aside class="sidebar">
+    <div class="sidebar-logo">Dulceria</div>
+    <div class="sidebar-back">‹ Dashboard</div>
+    <div class="nav-section">Workshop</div>
+    <div class="nav-item"><span class="icon">⌂</span>Overview</div>
+    <div class="nav-item"><span class="icon">☐</span>Orders</div>
+    <div class="nav-item"><span class="icon">☐</span>Picking</div>
+    <div class="nav-item"><span class="icon">☐</span>Production orders</div>
+    <div class="nav-item"><span class="icon">☐</span>Calendar</div>
+    <div class="nav-item"><span class="icon">☐</span>Plan</div>
+    <div class="nav-item"><span class="icon">☐</span>Planner</div>
+    <div class="nav-item"><span class="icon">☐</span>Daily</div>
+    <div class="nav-item active"><span class="icon">☐</span>Campaigns</div>
+    <div class="nav-item"><span class="icon">☐</span>Stock</div>
+  </aside>
+  
+  <main>
+    <div class="page-header">
+      <div class="page-header-row">
+        <div>
+          <h1>Campaigns</h1>
+          <p class="meta">Seasonal boxes, limited editions, launches · 7 total · 4 active · 1 urgent</p>
+        </div>
+        <div class="page-header-actions">
+          <span class="badge urgent">1 urgent</span>
+          <button class="btn">Calendar view</button>
+          <button class="btn primary">+ New campaign</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="page-body">
+      
+      <!-- Filter pills -->
+      <div class="filter-row">
+        <div class="pill active">All <span class="count">7</span></div>
+        <div class="pill">Active <span class="count">4</span></div>
+        <div class="pill">Planned <span class="count">2</span></div>
+        <div class="pill">Done <span class="count">1</span></div>
+        <div class="pill">Seasonal <span class="count">3</span></div>
+        <div class="pill">Launch <span class="count">3</span></div>
+        <div class="pill">Market event <span class="count">1</span></div>
+        <div style="flex: 1"></div>
+        <input type="search" placeholder="Search campaigns..." style="padding: 5px 12px; border: 0.5px solid var(--border-warm); border-radius: 14px; font-size: 12px; min-width: 200px;">
+      </div>
+      
+      <!-- ACTIVE -->
+      <div class="section-label">
+        Active <span class="count">4</span>
+      </div>
+      
+      <div class="campaign-grid">
+        
+        <!-- Veganmania - URGENT - market event soon, lots of products -->
+        <div class="campaign-card warn">
+          <div class="campaign-card-header">
+            <span class="campaign-name">Veganmania</span>
+            <span class="campaign-type market">market</span>
+          </div>
+          <div class="campaign-dates">
+            <strong>04 Jun → 07 Jun 2026</strong> · 23 days away
+          </div>
+          <div class="campaign-stats">
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">20</span>
+              <span class="campaign-stat-label">products</span>
+            </div>
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">12</span>
+              <span class="campaign-stat-label">batches planned</span>
+            </div>
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">0</span>
+              <span class="campaign-stat-label">done</span>
+            </div>
+          </div>
+          <div class="campaign-progress">
+            <div class="campaign-progress-bar">
+              <div class="campaign-progress-fill warn" style="width: 0%"></div>
+            </div>
+          </div>
+          <div class="campaign-footer">
+            <span class="campaign-status-text warn">production starts in 7 days</span>
+            <span>0%</span>
+          </div>
+        </div>
+        
+        <!-- Bar Launch - active, in production window -->
+        <div class="campaign-card active">
+          <div class="campaign-card-header">
+            <span class="campaign-name">Bar Launch</span>
+            <span class="campaign-type seasonal">seasonal</span>
+          </div>
+          <div class="campaign-dates">
+            <strong>04 Jun → 07 Jun 2026</strong> · 23 days away
+          </div>
+          <div class="campaign-stats">
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">2</span>
+              <span class="campaign-stat-label">products</span>
+            </div>
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">7</span>
+              <span class="campaign-stat-label">batches planned</span>
+            </div>
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">0</span>
+              <span class="campaign-stat-label">done</span>
+            </div>
+          </div>
+          <div class="campaign-progress">
+            <div class="campaign-progress-bar">
+              <div class="campaign-progress-fill" style="width: 0%"></div>
+            </div>
+          </div>
+          <div class="campaign-footer">
+            <span class="campaign-status-text">on time · production starts 30 May</span>
+            <span>0%</span>
+          </div>
+        </div>
+        
+        <!-- Brownie Bites - active, far out launch -->
+        <div class="campaign-card active">
+          <div class="campaign-card-header">
+            <span class="campaign-name">Brownie Bites</span>
+            <span class="campaign-type launch">launch</span>
+          </div>
+          <div class="campaign-dates">
+            <strong>04 Jun → 31 Aug 2026</strong> · 23 days to start
+          </div>
+          <div class="campaign-stats">
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">0</span>
+              <span class="campaign-stat-label">products yet</span>
+            </div>
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">—</span>
+              <span class="campaign-stat-label">batches</span>
+            </div>
+          </div>
+          <div class="campaign-progress">
+            <div class="campaign-progress-bar">
+              <div class="campaign-progress-fill" style="width: 0%"></div>
+            </div>
+          </div>
+          <div class="campaign-footer">
+            <span class="campaign-status-text">setup needed · add products</span>
+            <span>—</span>
+          </div>
+        </div>
+        
+        <!-- Peanutbutter Cups - rolling launch -->
+        <div class="campaign-card active">
+          <div class="campaign-card-header">
+            <span class="campaign-name">Peanutbutter Cups</span>
+            <span class="campaign-type launch">launch</span>
+          </div>
+          <div class="campaign-dates">
+            <strong>04 Jun → 31 Dec 2026</strong> · 23 days to start
+          </div>
+          <div class="campaign-stats">
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">0</span>
+              <span class="campaign-stat-label">products yet</span>
+            </div>
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">—</span>
+              <span class="campaign-stat-label">batches</span>
+            </div>
+          </div>
+          <div class="campaign-progress">
+            <div class="campaign-progress-bar">
+              <div class="campaign-progress-fill" style="width: 0%"></div>
+            </div>
+          </div>
+          <div class="campaign-footer">
+            <span class="campaign-status-text">setup needed · add products</span>
+            <span>—</span>
+          </div>
+        </div>
+        
+      </div>
+      
+      <!-- PLANNED -->
+      <div class="section-label">
+        Planned <span class="count">2</span>
+      </div>
+      
+      <div class="campaign-grid">
+        
+        <div class="campaign-card planned">
+          <div class="campaign-card-header">
+            <span class="campaign-name">Salted Caramel Jars</span>
+            <span class="campaign-type launch">launch</span>
+          </div>
+          <div class="campaign-dates">
+            <strong>16 May → 31 Dec 2026</strong> · 4 days to start
+          </div>
+          <div class="campaign-stats">
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">0</span>
+              <span class="campaign-stat-label">products yet</span>
+            </div>
+          </div>
+          <div class="campaign-footer">
+            <span class="campaign-status-text">draft · add products to activate</span>
+          </div>
+        </div>
+        
+        <div class="campaign-card planned">
+          <div class="campaign-card-header">
+            <span class="campaign-name">Winter Edition</span>
+            <span class="campaign-type seasonal">seasonal</span>
+          </div>
+          <div class="campaign-dates">
+            <strong>01 Nov → 24 Dec 2026</strong> · 173 days away
+          </div>
+          <div class="campaign-stats">
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">0</span>
+              <span class="campaign-stat-label">products yet</span>
+            </div>
+          </div>
+          <div class="campaign-footer">
+            <span class="campaign-status-text">draft · plan in Q3</span>
+          </div>
+        </div>
+        
+        <div class="new-campaign-card">
+          + new planned campaign
+        </div>
+        
+      </div>
+      
+      <!-- DONE -->
+      <div class="section-label">
+        Done <span class="count">1</span>
+      </div>
+      
+      <div class="campaign-grid">
+        
+        <div class="campaign-card done">
+          <div class="campaign-card-header">
+            <span class="campaign-name">Mothersday</span>
+            <span class="campaign-type seasonal">seasonal</span>
+          </div>
+          <div class="campaign-dates">
+            <strong>30 Apr → 10 May 2026</strong> · shipped 2 days ago
+          </div>
+          <div class="campaign-stats">
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">6</span>
+              <span class="campaign-stat-label">products</span>
+            </div>
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">42</span>
+              <span class="campaign-stat-label">batches</span>
+            </div>
+            <div class="campaign-stat">
+              <span class="campaign-stat-value">42</span>
+              <span class="campaign-stat-label">done</span>
+            </div>
+          </div>
+          <div class="campaign-progress">
+            <div class="campaign-progress-bar">
+              <div class="campaign-progress-fill" style="width: 100%"></div>
+            </div>
+          </div>
+          <div class="campaign-footer">
+            <span class="campaign-status-text ok">✓ shipped on time</span>
+            <span>100%</span>
+          </div>
+        </div>
+        
+      </div>
+      
+    </div>
+  </main>
+</div>
+
+<!-- ============================================ -->
+<!-- VARIANT 2: CAMPAIGN DETAIL                   -->
+<!-- ============================================ -->
+
+<div class="variant-marker">2 — Campaign detail (Bar Launch)</div>
+
+<div class="app">
+  
+  <aside class="sidebar">
+    <div class="sidebar-logo">Dulceria</div>
+    <div class="sidebar-back">‹ Dashboard</div>
+    <div class="nav-section">Workshop</div>
+    <div class="nav-item"><span class="icon">⌂</span>Overview</div>
+    <div class="nav-item"><span class="icon">☐</span>Orders</div>
+    <div class="nav-item"><span class="icon">☐</span>Picking</div>
+    <div class="nav-item"><span class="icon">☐</span>Production orders</div>
+    <div class="nav-item"><span class="icon">☐</span>Calendar</div>
+    <div class="nav-item"><span class="icon">☐</span>Plan</div>
+    <div class="nav-item"><span class="icon">☐</span>Planner</div>
+    <div class="nav-item"><span class="icon">☐</span>Daily</div>
+    <div class="nav-item active"><span class="icon">☐</span>Campaigns</div>
+    <div class="nav-item"><span class="icon">☐</span>Stock</div>
+  </aside>
+  
+  <main>
+    <div class="page-header">
+      <div class="breadcrumb">‹ Campaigns</div>
+      <div class="page-header-row">
+        <div>
+          <h1>Bar Launch</h1>
+          <p class="meta">
+            <span class="campaign-type seasonal" style="display: inline-block; vertical-align: middle; margin-right: 6px;">seasonal</span>
+            04 Jun → 07 Jun 2026 · 23 days to launch · production starts 30 May
+          </p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn">Edit</button>
+          <button class="btn">Production schedule →</button>
+          <button class="btn primary">Plan in /plan →</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="page-body">
+      
+      <!-- NEXT UP -->
+      <div class="next-up">
+        <div class="next-up-content">
+          <div class="next-up-label">⏵ next up</div>
+          <div class="next-up-title">Start Polishing on Pistachio Chocolate Bar</div>
+          <div class="next-up-meta">7 batches scheduled · ramp starts 30 May (18 days from today)</div>
+        </div>
+        <button class="btn primary">Start now</button>
+      </div>
+      
+      <!-- TIMELINE -->
+      <div class="timeline-strip">
+        <div class="timeline-header">
+          <span class="timeline-title">Campaign timeline</span>
+          <span class="timeline-status">
+            <span class="warn">production starts in 18 days</span> · launch 23 days away · 25 days total window
+          </span>
+        </div>
+        
+        <div class="timeline-bar-wrap">
+          <div class="timeline-bar-elapsed" style="width: 28%"></div>
+          
+          <!-- Today marker -->
+          <div class="timeline-marker today" style="left: 28%">
+            <div class="timeline-marker-label">today · 12 May</div>
+          </div>
+          
+          <!-- Production start marker -->
+          <div class="timeline-marker" style="left: 53%">
+            <div class="timeline-marker-label">production · 30 May</div>
+          </div>
+          
+          <!-- Launch marker -->
+          <div class="timeline-marker" style="left: 90%">
+            <div class="timeline-marker-label">launch · 04 Jun</div>
+          </div>
+        </div>
+        <div style="height: 30px;"></div>
+      </div>
+      
+      <!-- KPI STRIP -->
+      <div class="detail-kpi-grid">
+        <div class="detail-kpi">
+          <div class="detail-kpi-label">Products in campaign</div>
+          <div class="detail-kpi-value">2</div>
+          <div class="detail-kpi-meta">1 category · Bar</div>
+        </div>
+        
+        <div class="detail-kpi">
+          <div class="detail-kpi-label">Batches planned</div>
+          <div class="detail-kpi-value">7</div>
+          <div class="detail-kpi-meta">in /plan · auto-scheduled</div>
+        </div>
+        
+        <div class="detail-kpi warn">
+          <div class="detail-kpi-label">Production progress</div>
+          <div class="detail-kpi-value warn">0<span class="unit">%</span></div>
+          <div class="detail-kpi-meta">0 of 14 steps complete</div>
+        </div>
+        
+        <div class="detail-kpi">
+          <div class="detail-kpi-label">Days to launch</div>
+          <div class="detail-kpi-value">23</div>
+          <div class="detail-kpi-meta">deadline 04 Jun · on time</div>
+        </div>
+      </div>
+      
+      <!-- PRODUCTS -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Products & production steps</span>
+          <a class="section-action">add product → · expand all → · open in /plan</a>
+        </div>
+        
+        <div class="category-block">
+          <div class="category-header">
+            <div>
+              <span class="category-name">Bar · 2 products</span>
+              <span class="category-meta"> · 14 steps total · 0/14 done · 0% avg</span>
+            </div>
+            <span class="category-status not-started">not started</span>
+          </div>
+          
+          <!-- Product 1 -->
+          <div class="product-row">
+            <div class="product-row-main">
+              <div class="product-row-name">Pistachio Chocolate Bar</div>
+              <div class="product-row-meta">bar mould · 24 pcs/run · 3 batches planned · ~6h total</div>
+            </div>
+            <div class="product-row-step">
+              <div class="product-row-step-name">Polishing</div>
+              <div class="product-row-step-meta">starts 30 May</div>
+            </div>
+            <div class="product-row-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+              </div>
+              <span class="progress-pct">0%</span>
+            </div>
+          </div>
+          
+          <!-- Product 2 -->
+          <div class="product-row">
+            <div class="product-row-main">
+              <div class="product-row-name">Strawberry Chocolate</div>
+              <div class="product-row-meta">bar mould · 24 pcs/run · 4 batches planned · ~8h total</div>
+            </div>
+            <div class="product-row-step">
+              <div class="product-row-step-name">Polishing</div>
+              <div class="product-row-step-meta">starts 31 May</div>
+            </div>
+            <div class="product-row-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+              </div>
+              <span class="progress-pct">0%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

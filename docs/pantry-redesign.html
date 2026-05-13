@@ -1,0 +1,1934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pantry redesign — all 7 pages</title>
+<style>
+  :root {
+    --page-bg: #fbf6f1;
+    --card-bg: #ffffff;
+    --card-bg-hover: #f5f0e3;
+    --border-warm: #e8e3d6;
+    --text-primary: #2c2515;
+    --text-muted: #8a7e64;
+    --tier-quarter-focus: #264443;
+    --tier-active: #fbccb9;
+    --tier-urgent: #993556;
+    --tier-positive: #5dcaa5;
+    --semantic-warn: #dab73f;
+    --tint-warn: #fff7e9;
+    --tint-critical: #fdeae3;
+    --tint-ok: #ecf7f1;
+    --tint-info: #ebf0ee;
+    --today-tint: #fdf6e8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .serif { font-family: "Playfair Display", Georgia, serif; }
+  .muted { color: var(--text-muted); }
+  .tabular { font-variant-numeric: tabular-nums; }
+  
+  /* Variant marker */
+  .variant-marker {
+    background: var(--tier-urgent);
+    color: white;
+    padding: 12px 32px;
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .variant-marker .sub {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 12px;
+    font-style: italic;
+    color: rgba(255,255,255,0.85);
+    font-weight: 400;
+    margin-left: 12px;
+  }
+  
+  /* Page shell */
+  .page {
+    padding: 24px 32px 48px;
+  }
+  .page-header {
+    margin-bottom: 16px;
+  }
+  .page-header h1 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 26px;
+    font-weight: 600;
+  }
+  .page-header .meta {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .page-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .page-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  .btn {
+    padding: 6px 14px;
+    border: 0.5px solid var(--border-warm);
+    border-radius: 4px;
+    background: var(--card-bg);
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--card-bg-hover); }
+  .btn.primary { background: var(--tier-quarter-focus); color: white; border-color: var(--tier-quarter-focus); }
+  .btn.sm { padding: 3px 10px; font-size: 11px; }
+  
+  .pill-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    padding: 4px 10px;
+    border: 0.5px solid var(--border-warm);
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 12px;
+    background: var(--card-bg);
+    color: var(--text-muted);
+  }
+  .pill:hover { background: var(--card-bg-hover); color: var(--text-primary); }
+  .pill.active {
+    background: var(--tier-quarter-focus);
+    color: white;
+    border-color: var(--tier-quarter-focus);
+  }
+  .pill-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  
+  .badge {
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    border: 0.5px solid var(--border-warm);
+    background: var(--card-bg);
+  }
+  .badge.urgent { color: var(--tier-urgent); border-color: var(--tier-urgent); }
+  .badge.warn { color: var(--semantic-warn); border-color: var(--semantic-warn); }
+  .badge.ok { color: var(--tier-positive); border-color: var(--tier-positive); }
+  
+  /* ============================================ */
+  /* PRODUCTS — visual grid (compact 6-col)       */
+  /* ============================================ */
+  
+  .products-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+  .product-card {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+  }
+  .product-card:hover {
+    border-color: var(--tier-quarter-focus);
+    transform: translateY(-1px);
+  }
+  .product-card.urgent { border-left: 2px solid var(--tier-urgent); }
+  .product-card.warn { border-left: 2px solid var(--semantic-warn); }
+  .product-card.low-stock { border-left: 2px solid var(--tier-urgent); }
+  
+  .product-image {
+    background: var(--page-bg);
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+    position: relative;
+  }
+  .product-image-stock {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    padding: 1px 6px;
+    font-size: 9px;
+    font-family: inherit;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .product-image-stock.warn { color: var(--semantic-warn); border-color: var(--semantic-warn); }
+  .product-image-stock.urgent { color: var(--tier-urgent); border-color: var(--tier-urgent); }
+  .product-image-stock.ok { color: var(--tier-positive); border-color: var(--tier-positive); }
+  
+  .product-body {
+    padding: 8px 10px 10px;
+  }
+  .product-name {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.25;
+    margin-bottom: 3px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .product-recipe {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.25;
+    margin-bottom: 5px;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .product-allergens {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+  }
+  .allergen-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--semantic-warn);
+    color: white;
+    font-size: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    cursor: help;
+  }
+  .allergen-dot.gluten { background: #c89958; }
+  .allergen-dot.nuts { background: #8b4513; }
+  .allergen-dot.soy { background: #5dcaa5; }
+  .allergen-dot.alcohol { background: #993556; }
+  .allergen-dot.dairy { background: #fbccb9; color: var(--text-primary); }
+  
+  /* Category section header */
+  .category-header {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 18px;
+    font-weight: 600;
+    margin-top: 24px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .category-header:first-child { margin-top: 0; }
+  .category-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    font-family: -apple-system, sans-serif;
+    font-weight: 400;
+  }
+  
+  /* Add new card */
+  .add-card {
+    background: transparent;
+    border: 0.5px dashed var(--border-warm);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.15s;
+    min-height: 140px;
+  }
+  .add-card:hover {
+    background: var(--card-bg);
+    border-color: var(--tier-quarter-focus);
+    color: var(--tier-quarter-focus);
+  }
+  .add-card-icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+  .add-card-label {
+    font-size: 12px;
+    font-style: italic;
+  }
+  
+  /* ============================================ */
+  /* FILLINGS — info reference layout             */
+  /* ============================================ */
+  
+  .fillings-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  
+  .filling-card {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filling-card:hover { border-color: var(--tier-quarter-focus); }
+  .filling-card.testing { border-left: 3px solid var(--semantic-warn); }
+  .filling-card.to-try { border-left: 3px solid var(--tier-active); }
+  .filling-card.confirmed { border-left: 3px solid var(--tier-positive); }
+  
+  .filling-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+  }
+  .filling-name {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .filling-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .filling-status.confirmed { color: var(--tier-positive); background: var(--tint-ok); }
+  .filling-status.testing { color: var(--semantic-warn); background: var(--tint-warn); }
+  .filling-status.to-try { color: var(--tier-active); background: var(--tint-critical); }
+  
+  .filling-used-in {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 8px;
+  }
+  .filling-allergens {
+    display: flex;
+    gap: 4px;
+  }
+  
+  /* ============================================ */
+  /* INGREDIENTS — supplier/composition layout    */
+  /* ============================================ */
+  
+  .ing-table {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .ing-table-header {
+    display: grid;
+    grid-template-columns: 280px 1fr 120px 100px 100px;
+    gap: 16px;
+    padding: 10px 16px;
+    background: var(--page-bg);
+    border-bottom: 0.5px solid var(--border-warm);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .ing-row {
+    display: grid;
+    grid-template-columns: 280px 1fr 120px 100px 100px;
+    gap: 16px;
+    padding: 10px 16px;
+    border-bottom: 0.5px solid var(--border-warm);
+    border-left: 3px solid transparent;
+    align-items: center;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .ing-row:last-child { border-bottom: none; }
+  .ing-row:hover { background: var(--card-bg-hover); }
+  .ing-row.short { border-left-color: var(--semantic-warn); }
+  .ing-row.out { border-left-color: var(--tier-urgent); }
+  .ing-name-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .ing-name {
+    font-weight: 500;
+  }
+  .ing-name-alt {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .ing-supplier {
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .ing-composition {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .ing-composition.ok { color: var(--tier-positive); font-style: normal; font-weight: 500; }
+  .ing-composition.missing { color: var(--semantic-warn); font-weight: 500; font-style: normal; }
+  .ing-stock-status {
+    font-size: 11px;
+    text-align: right;
+    font-weight: 500;
+  }
+  .ing-stock-status.in { color: var(--tier-positive); }
+  .ing-stock-status.low { color: var(--semantic-warn); }
+  .ing-stock-status.out { color: var(--tier-urgent); }
+  .ing-stock-status.ordered { color: var(--semantic-info); }
+  .ing-action {
+    text-align: right;
+  }
+  
+  /* ============================================ */
+  /* MOULDS — visual grid                         */
+  /* ============================================ */
+  
+  .moulds-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .mould-card {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mould-card:hover {
+    border-color: var(--tier-quarter-focus);
+    transform: translateY(-1px);
+  }
+  .mould-image {
+    aspect-ratio: 1.4;
+    background: var(--page-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-style: italic;
+    position: relative;
+  }
+  .mould-image-svg {
+    width: 70%;
+    height: 70%;
+    opacity: 0.5;
+  }
+  .mould-body {
+    padding: 10px 12px 12px;
+  }
+  .mould-name {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .mould-brand {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+  .mould-specs {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--text-primary);
+  }
+  .mould-spec {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .mould-spec-value {
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .mould-spec-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  
+  /* ============================================ */
+  /* PACKAGING — stock-first table                */
+  /* ============================================ */
+  
+  .pack-table {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .pack-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 100px 90px 100px 130px;
+    gap: 16px;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--border-warm);
+    border-left: 3px solid transparent;
+    align-items: center;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .pack-row:last-child { border-bottom: none; }
+  .pack-row:hover { background: var(--card-bg-hover); }
+  .pack-row.low { border-left-color: var(--semantic-warn); }
+  .pack-row.out { border-left-color: var(--tier-urgent); }
+  .pack-header-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 100px 90px 100px 130px;
+    gap: 16px;
+    padding: 10px 16px;
+    background: var(--page-bg);
+    border-bottom: 0.5px solid var(--border-warm);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .pack-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--page-bg);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 18px;
+  }
+  .pack-name {
+    font-weight: 500;
+  }
+  .pack-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .pack-fits {
+    font-size: 12px;
+  }
+  .pack-fits .val {
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .pack-cost {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    text-align: right;
+  }
+  .pack-stock {
+    text-align: right;
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .pack-stock.in { color: var(--tier-positive); }
+  .pack-stock.low { color: var(--semantic-warn); }
+  .pack-stock.out { color: var(--tier-urgent); }
+  
+  /* ============================================ */
+  /* VARIANTS — timeline view                      */
+  /* ============================================ */
+  
+  .variants-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .variants-tab {
+    padding: 5px 12px;
+    border-radius: 14px;
+    border: 0.5px solid var(--border-warm);
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .variants-tab.active {
+    background: var(--tier-quarter-focus);
+    color: white;
+    border-color: var(--tier-quarter-focus);
+  }
+  
+  .variant-section-label {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 20px;
+    margin-bottom: 8px;
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+  .variant-section-label .count {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    font-family: -apple-system, sans-serif;
+    font-weight: 400;
+  }
+  
+  .variants-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .variant-row {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-left: 3px solid transparent;
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: 1fr 200px 100px;
+    gap: 16px;
+    align-items: center;
+    cursor: pointer;
+  }
+  .variant-row:hover { background: var(--card-bg-hover); }
+  .variant-row.ongoing { border-left-color: var(--tier-positive); }
+  .variant-row.past { border-left-color: var(--text-muted); opacity: 0.65; }
+  .variant-row.upcoming { border-left-color: var(--semantic-warn); }
+  
+  .variant-name {
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .variant-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .variant-dates {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .variant-status {
+    font-size: 11px;
+    text-align: right;
+    font-weight: 500;
+  }
+  .variant-status.ongoing { color: var(--tier-positive); }
+  .variant-status.past { color: var(--text-muted); }
+  .variant-status.upcoming { color: var(--semantic-warn); }
+  
+  /* ============================================ */
+  /* COLLECTIONS — tag index                      */
+  /* ============================================ */
+  
+  .collections-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .collection-card {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 100px;
+    justify-content: center;
+  }
+  .collection-card:hover {
+    border-color: var(--tier-quarter-focus);
+    background: var(--card-bg-hover);
+  }
+  .collection-card.unlabelled {
+    border-style: dashed;
+    opacity: 0.6;
+  }
+  .collection-name {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .collection-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  /* ============================================ */
+  /* DECORATION — visual swatch grid              */
+  /* ============================================ */
+  
+  .deco-type-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+    border-bottom: 0.5px solid var(--border-warm);
+  }
+  .deco-type-tab {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -0.5px;
+  }
+  .deco-type-tab:hover { color: var(--text-primary); }
+  .deco-type-tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--tier-quarter-focus);
+    font-weight: 500;
+  }
+  .deco-type-count {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: 4px;
+  }
+  
+  .deco-swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+  }
+  .deco-swatch {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+  }
+  .deco-swatch:hover {
+    border-color: var(--tier-quarter-focus);
+    transform: translateY(-1px);
+  }
+  .deco-color {
+    aspect-ratio: 1.4;
+    width: 100%;
+    position: relative;
+  }
+  .deco-color-stock {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .deco-color-stock.low { color: var(--semantic-warn); }
+  .deco-color-stock.out { color: var(--tier-urgent); }
+  .deco-swatch-body {
+    padding: 8px 10px 10px;
+  }
+  .deco-swatch-name {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+  .deco-swatch-brand {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 1px;
+  }
+  .deco-swatch-usage {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .deco-category-header {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 20px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .deco-category-header:first-child { margin-top: 0; }
+  
+  /* Layout sandwich — search + add as sticky */
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .search {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .search input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 13px;
+  }
+  .search-icon {
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================ -->
+<!-- PRODUCTS                                      -->
+<!-- ============================================ -->
+<div class="variant-marker">
+  Products <span class="sub">visual grid — browse, edit, create</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Products</h1>
+        <p class="meta">42 products across 5 categories · 3 low stock</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn">Categories</button>
+        <button class="btn">Import</button>
+        <button class="btn primary">+ New product</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="toolbar">
+    <div class="search">
+      <span class="search-icon">⌕</span>
+      <input placeholder="Search by name, recipe, allergen...">
+    </div>
+    <button class="btn">Filters</button>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Category</span>
+    <div class="pill active">All</div>
+    <div class="pill">Bar (4)</div>
+    <div class="pill">Bar filled (7)</div>
+    <div class="pill">Moulded (21)</div>
+    <div class="pill">Special (2)</div>
+    <div class="pill">Toasty (4)</div>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Avoid</span>
+    <div class="pill">Cereals/gluten</div>
+    <div class="pill">Peanuts</div>
+    <div class="pill">Soybeans</div>
+    <div class="pill">Hazelnuts</div>
+    <div class="pill">Walnuts</div>
+    <div class="pill">Pistachio nuts</div>
+    <div class="pill">Alcohol</div>
+  </div>
+  
+  <div class="category-header serif">Bar <span class="category-count">4 products</span></div>
+  
+  <div class="products-grid">
+    
+    <div class="product-card">
+      <div class="product-image">
+        L
+        <div class="product-image-stock ok">in stock</div>
+      </div>
+      <div class="product-body">
+        <div class="product-name">Lemon — Strawberry Bar</div>
+        <div class="product-recipe">Lemon chocolate · Strawberry chocolate</div>
+        <div class="product-allergens">
+          <span class="allergen-dot soy" title="Soybeans">SY</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="product-card warn">
+      <div class="product-image">
+        P
+        <div class="product-image-stock warn">low · 8</div>
+      </div>
+      <div class="product-body">
+        <div class="product-name">Pistachio Chocolate Bar</div>
+        <div class="product-recipe">Pistachio chocolate</div>
+        <div class="product-allergens">
+          <span class="allergen-dot nuts" title="Pistachio nuts">PN</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="product-card">
+      <div class="product-image">
+        S
+        <div class="product-image-stock ok">in stock</div>
+      </div>
+      <div class="product-body">
+        <div class="product-name">Strawberry — Lemon Bar</div>
+        <div class="product-recipe">Strawberry chocolate · Lemon chocolate</div>
+        <div class="product-allergens">
+          <span class="allergen-dot soy">SY</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="product-card">
+      <div class="product-image">
+        S
+        <div class="product-image-stock ok">in stock</div>
+      </div>
+      <div class="product-body">
+        <div class="product-name">Strawberry Chocolate</div>
+        <div class="product-recipe">Strawberry chocolate</div>
+        <div class="product-allergens">
+          <span class="allergen-dot soy">SY</span>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+  
+  <div class="category-header serif">Moulded <span class="category-count">21 products · 1 low stock</span></div>
+  
+  <div class="products-grid">
+    
+    <div class="product-card">
+      <div class="product-image">
+        A
+        <div class="product-image-stock ok">in stock</div>
+      </div>
+      <div class="product-body">
+        <div class="product-name">Almond Praline</div>
+        <div class="product-recipe">White chocolate Almond Ganache</div>
+        <div class="product-allergens">
+          <span class="allergen-dot nuts">AL</span>
+          <span class="allergen-dot alcohol">AC</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="product-card">
+      <div class="product-image">
+        A
+        <div class="product-image-stock ok">in stock</div>
+      </div>
+      <div class="product-body">
+        <div class="product-name">Apple Walnut</div>
+        <div class="product-recipe">Apple Caramel · Granola Cookie</div>
+        <div class="product-allergens">
+          <span class="allergen-dot gluten">GL</span>
+          <span class="allergen-dot nuts">WL</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="product-card urgent">
+      <div class="product-image">
+        C
+        <div class="product-image-stock urgent">out · 0</div>
+      </div>
+      <div class="product-body">
+        <div class="product-name">Crunchy Nougat</div>
+        <div class="product-recipe">Nougat Crunch Filling</div>
+        <div class="product-allergens">
+          <span class="allergen-dot nuts">HZ</span>
+          <span class="allergen-dot soy">SY</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="product-card">
+      <div class="product-image">
+        D
+        <div class="product-image-stock ok">in stock</div>
+      </div>
+      <div class="product-body">
+        <div class="product-name">Double Caramel</div>
+        <div class="product-recipe">Salted Caramel · Chocolate Caramel</div>
+        <div class="product-allergens">
+          <span class="allergen-dot soy">SY</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="add-card">
+      <div class="add-card-icon">+</div>
+      <div class="add-card-label">new moulded product</div>
+    </div>
+    
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- FILLINGS                                      -->
+<!-- ============================================ -->
+<div class="variant-marker">
+  Fillings <span class="sub">browse for info — confirmed status, allergens, used in</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Fillings</h1>
+        <p class="meta">53 fillings across 8 categories · 18 ganaches, 7 caramels, 5 fruit gels</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn">Categories</button>
+        <button class="btn primary">+ New filling</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="toolbar">
+    <div class="search">
+      <span class="search-icon">⌕</span>
+      <input placeholder="Search filling name, used-in product...">
+    </div>
+    <button class="btn">Filters</button>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Status</span>
+    <div class="pill active">All</div>
+    <div class="pill">Confirmed (44)</div>
+    <div class="pill">Testing (3)</div>
+    <div class="pill">To try (6)</div>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Category</span>
+    <div class="pill">Alcohol (2)</div>
+    <div class="pill">Caramels & Syrups (7)</div>
+    <div class="pill">Chocolates (1)</div>
+    <div class="pill">Croustillants (5)</div>
+    <div class="pill">Fruit-based (5)</div>
+    <div class="pill">Ganaches (18)</div>
+    <div class="pill">Pralines (7)</div>
+  </div>
+  
+  <div class="category-header serif">Ganaches <span class="category-count">18 fillings</span></div>
+  
+  <div class="fillings-grid">
+    
+    <div class="filling-card confirmed">
+      <div class="filling-card-header">
+        <div class="filling-name">Amaretto Ganache</div>
+        <span class="filling-status confirmed">confirmed</span>
+      </div>
+      <div class="filling-used-in">Used in: Almond Praline, Tiramisu</div>
+      <div class="filling-allergens">
+        <span class="allergen-dot alcohol">AC</span>
+      </div>
+    </div>
+    
+    <div class="filling-card confirmed">
+      <div class="filling-card-header">
+        <div class="filling-name">Cheesecake Ganache</div>
+        <span class="filling-status confirmed">confirmed</span>
+      </div>
+      <div class="filling-used-in">Used in: Strawberry Cheesecake</div>
+      <div class="filling-allergens"></div>
+    </div>
+    
+    <div class="filling-card confirmed">
+      <div class="filling-card-header">
+        <div class="filling-name">Cherry Ganache</div>
+        <span class="filling-status confirmed">confirmed</span>
+      </div>
+      <div class="filling-used-in">Used in: Double Cherry</div>
+      <div class="filling-allergens">
+        <span class="allergen-dot soy">SY</span>
+      </div>
+    </div>
+    
+    <div class="filling-card testing">
+      <div class="filling-card-header">
+        <div class="filling-name">Dark Chocolate Ganache</div>
+        <span class="filling-status testing">testing</span>
+      </div>
+      <div class="filling-used-in">Used in: Dark Chocolate Mousse Toasty</div>
+      <div class="filling-allergens">
+        <span class="allergen-dot soy">SY</span>
+      </div>
+    </div>
+    
+    <div class="filling-card to-try">
+      <div class="filling-card-header">
+        <div class="filling-name">White chocolate Almond Ganache</div>
+        <span class="filling-status to-try">to try</span>
+      </div>
+      <div class="filling-used-in">Not yet used in products</div>
+      <div class="filling-allergens">
+        <span class="allergen-dot alcohol">AC</span>
+        <span class="allergen-dot nuts">AL</span>
+      </div>
+    </div>
+    
+    <div class="add-card" style="min-height: 100px;">
+      <div class="add-card-icon" style="font-size: 18px;">+</div>
+      <div class="add-card-label">new ganache</div>
+    </div>
+    
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- INGREDIENTS                                   -->
+<!-- ============================================ -->
+<div class="variant-marker">
+  Ingredients <span class="sub">structured supplier + composition data — reorder lives in /shopping</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Ingredients</h1>
+        <p class="meta">68 ingredients · 12 short · 5 missing composition data</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn">Categories</button>
+        <button class="btn">Import composition</button>
+        <button class="btn primary">+ New ingredient</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="toolbar">
+    <div class="search">
+      <span class="search-icon">⌕</span>
+      <input placeholder="Search name, manufacturer, alt name...">
+    </div>
+    <button class="btn">Filters</button>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Stock</span>
+    <div class="pill active">All</div>
+    <div class="pill">In stock (51)</div>
+    <div class="pill">Low (5)</div>
+    <div class="pill">Out (7)</div>
+    <div class="pill">Ordered (5)</div>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Category</span>
+    <div class="pill">Alcohol (4)</div>
+    <div class="pill">Chocolate (2)</div>
+    <div class="pill">Essential oils (3)</div>
+    <div class="pill">Fats (4)</div>
+    <div class="pill">Flavors (9)</div>
+    <div class="pill">Infusions (12)</div>
+    <div class="pill">Nuts (10)</div>
+    <div class="pill">Sugars (6)</div>
+  </div>
+  
+  <div class="category-header serif">Alcohol <span class="category-count">4 ingredients</span></div>
+  
+  <div class="ing-table">
+    <div class="ing-table-header">
+      <div>Ingredient</div>
+      <div>Supplier · composition</div>
+      <div>Last updated</div>
+      <div>Stock</div>
+      <div></div>
+    </div>
+    
+    <div class="ing-row">
+      <div class="ing-name-cell">
+        <span class="ing-name">Amaretto</span>
+        <span class="ing-name-alt">Amaretto</span>
+      </div>
+      <div>
+        <div class="ing-supplier">Billa</div>
+        <div class="ing-composition ok">✓ composition complete · 1 page (ALK)</div>
+      </div>
+      <div class="ing-composition">8 May 2026</div>
+      <div class="ing-stock-status in">in stock</div>
+      <div class="ing-action">
+        <button class="btn sm">edit</button>
+      </div>
+    </div>
+    
+    <div class="ing-row">
+      <div class="ing-name-cell">
+        <span class="ing-name">Champagner</span>
+        <span class="ing-name-alt">Champagne</span>
+      </div>
+      <div>
+        <div class="ing-supplier">Billa</div>
+        <div class="ing-composition ok">✓ composition complete · 1 page (ALK)</div>
+      </div>
+      <div class="ing-composition">25 Apr 2026</div>
+      <div class="ing-stock-status in">in stock</div>
+      <div class="ing-action">
+        <button class="btn sm">edit</button>
+      </div>
+    </div>
+    
+    <div class="ing-row short">
+      <div class="ing-name-cell">
+        <span class="ing-name">Gin</span>
+        <span class="ing-name-alt">Gin</span>
+      </div>
+      <div>
+        <div class="ing-supplier">Billa</div>
+        <div class="ing-composition ok">✓ composition complete · 1 page (ALK)</div>
+      </div>
+      <div class="ing-composition">1 May 2026</div>
+      <div class="ing-stock-status low">low · order</div>
+      <div class="ing-action">
+        <button class="btn sm">edit</button>
+      </div>
+    </div>
+    
+    <div class="ing-row out">
+      <div class="ing-name-cell">
+        <span class="ing-name">Lillet</span>
+        <span class="ing-name-alt">Lillet</span>
+      </div>
+      <div>
+        <div class="ing-supplier">Lillet</div>
+        <div class="ing-composition missing">⚠ no composition · add data</div>
+      </div>
+      <div class="ing-composition">8 May 2026</div>
+      <div class="ing-stock-status out">out</div>
+      <div class="ing-action">
+        <button class="btn sm">edit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- MOULDS                                        -->
+<!-- ============================================ -->
+<div class="variant-marker">
+  Moulds <span class="sub">visual reference — capacity at a glance, rarely edited</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Moulds</h1>
+        <p class="meta">12 moulds · used by 42 products · total capacity 8 fills simultaneously</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn primary">+ New mould</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="toolbar">
+    <div class="search">
+      <span class="search-icon">⌕</span>
+      <input placeholder="Search name or brand...">
+    </div>
+    <button class="btn">Filters</button>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Tag</span>
+    <div class="pill active">All</div>
+    <div class="pill">Bar (3)</div>
+    <div class="pill">Filled (2)</div>
+    <div class="pill">Moulded (5)</div>
+    <div class="pill">Hearts (2)</div>
+    <div class="pill">Limited (1)</div>
+    <div class="pill">Toasty (1)</div>
+  </div>
+  
+  <div class="moulds-grid">
+    
+    <div class="mould-card">
+      <div class="mould-image">
+        <svg class="mould-image-svg" viewBox="0 0 60 40" fill="none">
+          <rect x="2" y="2" width="56" height="36" rx="2" stroke="currentColor" stroke-width="1"/>
+          <rect x="6" y="6" width="14" height="28" rx="1" fill="currentColor" opacity="0.3"/>
+          <rect x="23" y="6" width="14" height="28" rx="1" fill="currentColor" opacity="0.3"/>
+          <rect x="40" y="6" width="14" height="28" rx="1" fill="currentColor" opacity="0.3"/>
+        </svg>
+      </div>
+      <div class="mould-body">
+        <div class="mould-name">Bar filled</div>
+        <div class="mould-brand">MFS Moulds</div>
+        <div class="mould-specs">
+          <div class="mould-spec">
+            <span class="mould-spec-value">147 g</span>
+            <span class="mould-spec-label">weight</span>
+          </div>
+          <div class="mould-spec">
+            <span class="mould-spec-value">3</span>
+            <span class="mould-spec-label">cavities</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="mould-card">
+      <div class="mould-image">
+        <svg class="mould-image-svg" viewBox="0 0 60 40" fill="none">
+          <rect x="2" y="2" width="56" height="36" rx="2" stroke="currentColor" stroke-width="1"/>
+          <rect x="6" y="6" width="14" height="28" rx="1" fill="currentColor" opacity="0.2"/>
+          <rect x="23" y="6" width="14" height="28" rx="1" fill="currentColor" opacity="0.2"/>
+          <rect x="40" y="6" width="14" height="28" rx="1" fill="currentColor" opacity="0.2"/>
+        </svg>
+      </div>
+      <div class="mould-body">
+        <div class="mould-name">Bar thin</div>
+        <div class="mould-brand">MFS Moulds</div>
+        <div class="mould-specs">
+          <div class="mould-spec">
+            <span class="mould-spec-value">100 g</span>
+            <span class="mould-spec-label">weight</span>
+          </div>
+          <div class="mould-spec">
+            <span class="mould-spec-value">3</span>
+            <span class="mould-spec-label">cavities</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="mould-card">
+      <div class="mould-image">
+        <svg class="mould-image-svg" viewBox="0 0 60 40" fill="none">
+          <circle cx="15" cy="20" r="5" fill="currentColor" opacity="0.3"/>
+          <circle cx="30" cy="20" r="5" fill="currentColor" opacity="0.3"/>
+          <circle cx="45" cy="20" r="5" fill="currentColor" opacity="0.3"/>
+        </svg>
+      </div>
+      <div class="mould-body">
+        <div class="mould-name">Diamond Hearts</div>
+        <div class="mould-brand">MFS</div>
+        <div class="mould-specs">
+          <div class="mould-spec">
+            <span class="mould-spec-value">10 g</span>
+            <span class="mould-spec-label">weight</span>
+          </div>
+          <div class="mould-spec">
+            <span class="mould-spec-value">28</span>
+            <span class="mould-spec-label">cavities</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="mould-card">
+      <div class="mould-image">
+        <svg class="mould-image-svg" viewBox="0 0 60 40" fill="none">
+          <path d="M30 32 L18 18 Q18 10 26 10 Q30 10 30 14 Q30 10 34 10 Q42 10 42 18 Z" fill="currentColor" opacity="0.4"/>
+        </svg>
+      </div>
+      <div class="mould-body">
+        <div class="mould-name">Heart XXL</div>
+        <div class="mould-brand">AMZ</div>
+        <div class="mould-specs">
+          <div class="mould-spec">
+            <span class="mould-spec-value">250 g</span>
+            <span class="mould-spec-label">weight</span>
+          </div>
+          <div class="mould-spec">
+            <span class="mould-spec-value">2</span>
+            <span class="mould-spec-label">cavities</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="add-card">
+      <div class="add-card-icon">+</div>
+      <div class="add-card-label">new mould</div>
+    </div>
+    
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- PACKAGING                                     -->
+<!-- ============================================ -->
+<div class="variant-marker">
+  Packaging <span class="sub">stock-first table — fits / cost / supplier visible</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Packaging</h1>
+        <p class="meta">7 SKUs · €0.71–€25.00 unit cost · 2 low stock</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn primary">+ New packaging</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="toolbar">
+    <div class="search">
+      <span class="search-icon">⌕</span>
+      <input placeholder="Search by name or manufacturer...">
+    </div>
+    <button class="btn">Filters</button>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Stock</span>
+    <div class="pill active">All</div>
+    <div class="pill">In stock (5)</div>
+    <div class="pill">Low (2)</div>
+    <div class="pill">Out (0)</div>
+    <div class="pill">Ordered (0)</div>
+  </div>
+  
+  <div class="pack-table">
+    <div class="pack-header-row">
+      <div></div>
+      <div>Name · supplier</div>
+      <div>Fits</div>
+      <div>Cost/unit</div>
+      <div>Stock</div>
+      <div>Last order</div>
+    </div>
+    
+    <div class="pack-row">
+      <div class="pack-icon">▢</div>
+      <div>
+        <div class="pack-name">Bar 140</div>
+        <div class="pack-meta">Folprint</div>
+      </div>
+      <div class="pack-fits"><span class="val">1 bar</span></div>
+      <div class="pack-cost">€0.71</div>
+      <div class="pack-stock in">420</div>
+      <div class="pack-meta" style="font-size: 11px;">3 May 2026 · 500 units</div>
+    </div>
+    
+    <div class="pack-row">
+      <div class="pack-icon">▢</div>
+      <div>
+        <div class="pack-name">Bar 90</div>
+        <div class="pack-meta">Folprint</div>
+      </div>
+      <div class="pack-fits"><span class="val">1 bar</span></div>
+      <div class="pack-cost">—</div>
+      <div class="pack-stock in">200</div>
+      <div class="pack-meta" style="font-size: 11px;">—</div>
+    </div>
+    
+    <div class="pack-row low">
+      <div class="pack-icon">⬚</div>
+      <div>
+        <div class="pack-name">Dulceria 16</div>
+        <div class="pack-meta">Folprint · big box</div>
+      </div>
+      <div class="pack-fits"><span class="val">16 pcs</span></div>
+      <div class="pack-cost">€3.33</div>
+      <div class="pack-stock low">12 · low</div>
+      <div class="pack-meta" style="font-size: 11px;">18 Apr 2026 · 40 units</div>
+    </div>
+    
+    <div class="pack-row">
+      <div class="pack-icon">⬚</div>
+      <div>
+        <div class="pack-name">Dulceria 4</div>
+        <div class="pack-meta">Folprint · small box</div>
+      </div>
+      <div class="pack-fits"><span class="val">4 pcs</span></div>
+      <div class="pack-cost">€1.78</div>
+      <div class="pack-stock in">85</div>
+      <div class="pack-meta" style="font-size: 11px;">2 May 2026 · 100 units</div>
+    </div>
+    
+    <div class="pack-row">
+      <div class="pack-icon">⬚</div>
+      <div>
+        <div class="pack-name">Dulceria 8</div>
+        <div class="pack-meta">Folprint · medium box</div>
+      </div>
+      <div class="pack-fits"><span class="val">8 pcs</span></div>
+      <div class="pack-cost">€2.44</div>
+      <div class="pack-stock in">62</div>
+      <div class="pack-meta" style="font-size: 11px;">2 May 2026 · 80 units</div>
+    </div>
+    
+    <div class="pack-row low">
+      <div class="pack-icon">♥</div>
+      <div>
+        <div class="pack-name">Heart — Cut out flower</div>
+        <div class="pack-meta">Pack.ly</div>
+      </div>
+      <div class="pack-fits"><span class="val">1 pc</span></div>
+      <div class="pack-cost">€1.09</div>
+      <div class="pack-stock low">8 · low</div>
+      <div class="pack-meta" style="font-size: 11px;">15 Mar 2026 · 50 units</div>
+    </div>
+    
+    <div class="pack-row">
+      <div class="pack-icon">⊟</div>
+      <div>
+        <div class="pack-name">Tray (loose pralines)</div>
+        <div class="pack-meta">—</div>
+      </div>
+      <div class="pack-fits"><span class="val">63 pcs</span></div>
+      <div class="pack-cost">€25.00</div>
+      <div class="pack-stock in">5</div>
+      <div class="pack-meta" style="font-size: 11px;">—</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- VARIANTS                                      -->
+<!-- ============================================ -->
+<div class="variant-marker">
+  Variants <span class="sub">finished sellable products = product + packaging · seasonal timeline</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Variants</h1>
+        <p class="meta">25 variants · 22 ongoing · 4 past · seasonal & standard product assortments</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn">Calendar view</button>
+        <button class="btn primary">+ New variant</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="toolbar">
+    <div class="search">
+      <span class="search-icon">⌕</span>
+      <input placeholder="Search variant name...">
+    </div>
+    <button class="btn">Filters</button>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Status</span>
+    <div class="pill active">All</div>
+    <div class="pill">Active (22)</div>
+    <div class="pill">Past (4)</div>
+    <div class="pill">Upcoming (0)</div>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Type</span>
+    <div class="pill">Standard (20)</div>
+    <div class="pill">Seasonal (4)</div>
+    <div class="pill">Box (5)</div>
+    <div class="pill">Bar (6)</div>
+    <div class="pill">B2B (2)</div>
+  </div>
+  
+  <div class="variant-section-label">Past seasonal <span class="count">4 variants</span></div>
+  
+  <div class="variants-list">
+    
+    <div class="variant-row past">
+      <div>
+        <div class="variant-name">Mothersday Edition</div>
+        <div class="variant-sub">seasonal · 6 products in box</div>
+      </div>
+      <div class="variant-dates">03/05 → 10/05/2026</div>
+      <div class="variant-status past">past · 2d ago</div>
+    </div>
+    
+    <div class="variant-row past">
+      <div>
+        <div class="variant-name">Lemon Strawberry Bar</div>
+        <div class="variant-sub">seasonal · bar variant</div>
+      </div>
+      <div class="variant-dates">03/05 → 10/05/2026</div>
+      <div class="variant-status past">past · 2d ago</div>
+    </div>
+    
+    <div class="variant-row past">
+      <div>
+        <div class="variant-name">Strawberry Lemon Bar</div>
+        <div class="variant-sub">seasonal · bar variant</div>
+      </div>
+      <div class="variant-dates">03/05 → 10/05/2026</div>
+      <div class="variant-status past">past · 2d ago</div>
+    </div>
+    
+  </div>
+  
+  <div class="variant-section-label">Active <span class="count">22 variants</span></div>
+  
+  <div class="variants-list">
+    
+    <div class="variant-row ongoing">
+      <div>
+        <div class="variant-name">Strawberry Nougat (personalized — Linda)</div>
+        <div class="variant-sub">standard · 1 product · B2B</div>
+      </div>
+      <div class="variant-dates">from 27/04/2026</div>
+      <div class="variant-status ongoing">ongoing</div>
+    </div>
+    
+    <div class="variant-row ongoing">
+      <div>
+        <div class="variant-name">Bestseller</div>
+        <div class="variant-sub">standard box · top 16 products</div>
+      </div>
+      <div class="variant-dates">from 25/04/2026</div>
+      <div class="variant-status ongoing">ongoing</div>
+    </div>
+    
+    <div class="variant-row ongoing">
+      <div>
+        <div class="variant-name">Tiramisu</div>
+        <div class="variant-sub">standard · 1 product</div>
+      </div>
+      <div class="variant-dates">from 25/04/2026</div>
+      <div class="variant-status ongoing">ongoing</div>
+    </div>
+    
+    <div class="variant-row ongoing">
+      <div>
+        <div class="variant-name">Apple Walnut</div>
+        <div class="variant-sub">standard · bonbon sortiment</div>
+      </div>
+      <div class="variant-dates">from 25/04/2026</div>
+      <div class="variant-status ongoing">ongoing</div>
+    </div>
+    
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- COLLECTIONS                                   -->
+<!-- ============================================ -->
+<div class="variant-marker">
+  Collections <span class="sub">view + browse — tag index, click to filter Variants</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Collections</h1>
+        <p class="meta">Variant labels grouped — every label is a collection · derived from Variants</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn">Manage labels →</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="collections-grid">
+    
+    <div class="collection-card">
+      <div class="collection-name">Standard</div>
+      <div class="collection-count">24 variants</div>
+    </div>
+    
+    <div class="collection-card">
+      <div class="collection-name">Moulded</div>
+      <div class="collection-count">18 variants</div>
+    </div>
+    
+    <div class="collection-card">
+      <div class="collection-name">B2B</div>
+      <div class="collection-count">8 variants</div>
+    </div>
+    
+    <div class="collection-card">
+      <div class="collection-name">Bar</div>
+      <div class="collection-count">6 variants</div>
+    </div>
+    
+    <div class="collection-card">
+      <div class="collection-name">Box</div>
+      <div class="collection-count">5 variants</div>
+    </div>
+    
+    <div class="collection-card">
+      <div class="collection-name">Limited</div>
+      <div class="collection-count">4 variants</div>
+    </div>
+    
+    <div class="collection-card">
+      <div class="collection-name">Nut</div>
+      <div class="collection-count">1 variant</div>
+    </div>
+    
+    <div class="collection-card unlabelled">
+      <div class="collection-name">Unlabelled</div>
+      <div class="collection-count">1 variant · no labels</div>
+    </div>
+    
+  </div>
+</div>
+
+
+<!-- ============================================ -->
+<!-- DECORATION                                    -->
+<!-- ============================================ -->
+<div class="variant-marker">
+  Decoration <span class="sub">visual swatch grid — types will grow beyond cocoa butter</span>
+</div>
+
+<div class="page">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Decoration</h1>
+        <p class="meta">Materials, categories, and shell design techniques · 12 colors, 4 lustre dusts, 3 transfer sheets</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn">Categories</button>
+        <button class="btn">Designs</button>
+        <button class="btn primary">+ New material</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="deco-type-tabs">
+    <div class="deco-type-tab active">Materials <span class="deco-type-count">19</span></div>
+    <div class="deco-type-tab">Categories <span class="deco-type-count">5</span></div>
+    <div class="deco-type-tab">Designs <span class="deco-type-count">12</span></div>
+  </div>
+  
+  <div class="toolbar">
+    <div class="search">
+      <span class="search-icon">⌕</span>
+      <input placeholder="Search material name or manufacturer...">
+    </div>
+    <button class="btn">Filters</button>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Stock</span>
+    <div class="pill active">All</div>
+    <div class="pill">In stock (15)</div>
+    <div class="pill">Low (3)</div>
+    <div class="pill">Out (1)</div>
+  </div>
+  
+  <div class="pill-row">
+    <span class="pill-label">Type</span>
+    <div class="pill">Cocoa Butter (1)</div>
+    <div class="pill">Cocoa Butter Colored (11)</div>
+    <div class="pill">Lustre Dust (4)</div>
+    <div class="pill">Transfer Sheet (3)</div>
+    <div class="pill">Other (0)</div>
+  </div>
+  
+  <div class="deco-category-header serif">Cocoa Butter Colored <span class="category-count">11 colors</span></div>
+  
+  <div class="deco-swatch-grid">
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #226633;">
+        <span class="deco-color-stock">240g</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Forest Green</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 1 product</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #c5982a;">
+        <span class="deco-color-stock">180g</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Gold Nugget</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 3 products</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #a3d340;">
+        <span class="deco-color-stock low">45g · low</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Lime Green</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 4 products</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #f4a73c;">
+        <span class="deco-color-stock">220g</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Mandarine Orange</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 5 products</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #1d4eb3;">
+        <span class="deco-color-stock">310g</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Ocean Blue</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 5 products</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #8c25c4;">
+        <span class="deco-color-stock">175g</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Orchid Purple</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 4 products</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #d61d1d;">
+        <span class="deco-color-stock">280g</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Passion Red</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 6 products</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #1a1a1a;">
+        <span class="deco-color-stock out">0g · out</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Pirate Black</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 2 products</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #f5f5f5;">
+        <span class="deco-color-stock">200g</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Polar White</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 6 products</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #f7e23b;">
+        <span class="deco-color-stock">160g</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Sunny Yellow</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 4 products</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch">
+      <div class="deco-color" style="background: #b5e5e0;">
+        <span class="deco-color-stock">90g</span>
+      </div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name">Tiffany Blue</div>
+        <div class="deco-swatch-brand">Roxy & Rich</div>
+        <div class="deco-swatch-usage">used in 1 product</div>
+      </div>
+    </div>
+    
+    <div class="deco-swatch" style="border-style: dashed; background: transparent;">
+      <div class="deco-color" style="background: transparent; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 24px;">+</div>
+      <div class="deco-swatch-body">
+        <div class="deco-swatch-name" style="color: var(--text-muted); font-style: italic;">new color</div>
+        <div class="deco-swatch-brand"></div>
+      </div>
+    </div>
+    
+  </div>
+  
+</div>
+
+</body>
+</html>

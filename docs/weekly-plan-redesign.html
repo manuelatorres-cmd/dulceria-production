@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Production plan — weekly view redesign</title>
+<style>
+  :root {
+    --page-bg: #fbf6f1;
+    --card-bg: #ffffff;
+    --border-warm: #e8e3d6;
+    --text-primary: #2c2515;
+    --text-muted: #8a7e64;
+    --caramel: #dab73f;
+    --teal: #264443;
+    --blush: #fbccb9;
+    --gray: #b4b2a9;
+    --rose: #993556;
+    --mint: #5dcaa5;
+    --hover-bg: #f5f0e3;
+    --today-tint: #fdf6e8;
+    --closed-bg: #f3eee2;
+    --draft-tint: #fff7e9;
+    --conflict-tint: #fdeae3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .serif { font-family: "Playfair Display", Georgia, serif; }
+  .muted { color: var(--text-muted); }
+  .italic { font-style: italic; }
+  .small { font-size: 12px; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  
+  /* ===== TABS (top of page) ===== */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 16px 32px 0;
+  }
+  .tab {
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  .tab.active {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  
+  .view-tabs {
+    padding: 0 32px;
+    margin-top: 16px;
+    display: flex;
+    gap: 6px;
+  }
+  .view-tab {
+    padding: 6px 14px;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-muted);
+    border: 0.5px solid transparent;
+  }
+  .view-tab.active {
+    background: var(--teal);
+    color: white;
+    border-color: var(--teal);
+  }
+  .view-tab:not(.active):hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+  }
+  
+  /* ===== COMPRESSED HEADER ===== */
+  header {
+    padding: 16px 32px 12px;
+  }
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  header h1 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+  }
+  .header-meta {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+    margin-left: 12px;
+  }
+  
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .focus-select {
+    border: 0.5px solid var(--border-warm);
+    border-radius: 4px;
+    padding: 6px 12px;
+    background: var(--card-bg);
+    font-size: 13px;
+    cursor: pointer;
+    min-width: 140px;
+  }
+  .badge-warn {
+    padding: 4px 10px;
+    background: var(--draft-tint);
+    border: 0.5px solid var(--caramel);
+    border-radius: 12px;
+    font-size: 12px;
+    color: var(--text-primary);
+  }
+  
+  .header-stats {
+    display: flex;
+    gap: 16px;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-top: 6px;
+    align-items: center;
+  }
+  .header-stats .sep {
+    color: var(--border-warm);
+  }
+  .header-stats strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  
+  .header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 0.5px solid var(--border-warm);
+  }
+  
+  .view-switcher {
+    display: flex;
+    gap: 0;
+    border: 0.5px solid var(--border-warm);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .view-switcher button {
+    padding: 6px 14px;
+    border: none;
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-muted);
+    border-right: 0.5px solid var(--border-warm);
+  }
+  .view-switcher button:last-child { border-right: none; }
+  .view-switcher button.active {
+    background: var(--teal);
+    color: white;
+  }
+  
+  .btn {
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 0.5px solid var(--border-warm);
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  .btn:hover { background: var(--hover-bg); }
+  .btn-primary {
+    background: var(--teal);
+    color: white;
+    border-color: var(--teal);
+  }
+  
+  /* ===== COLLAPSED FILTER STRIP ===== */
+  .filter-strip {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 6px;
+    padding: 10px 16px;
+    margin: 0 32px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-strip:hover { background: var(--hover-bg); }
+  .filter-strip.expanded {
+    cursor: default;
+    background: var(--card-bg);
+  }
+  .filter-strip-summary {
+    font-size: 13px;
+    color: var(--text-primary);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .filter-strip-summary .icon {
+    color: var(--text-muted);
+  }
+  .filter-strip-toggle {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  
+  .filter-expanded-content {
+    display: none;
+    padding: 16px;
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 6px;
+    margin: 0 32px 16px;
+  }
+  .filter-expanded-content.show { display: block; }
+  .filter-row-grouping {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .filter-group {
+    border: 0.5px solid var(--border-warm);
+    border-radius: 6px;
+    padding: 10px;
+  }
+  .filter-group-header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border: 0.5px solid var(--border-warm);
+    border-radius: 12px;
+    font-size: 11px;
+    margin: 2px 2px;
+    background: var(--card-bg);
+  }
+  .filter-pill.active {
+    background: var(--teal);
+    color: white;
+    border-color: var(--teal);
+  }
+  .filter-pill .qty {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+  
+  /* ===== CALENDAR ===== */
+  .calendar-shell {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    margin: 0 32px;
+    overflow: hidden;
+  }
+  
+  .calendar-header {
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 0.5px solid var(--border-warm);
+  }
+  .calendar-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .calendar-nav {
+    display: flex;
+    gap: 4px;
+  }
+  
+  .week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+  
+  .day-col {
+    border-right: 0.5px solid var(--border-warm);
+    min-height: 480px;
+    display: flex;
+    flex-direction: column;
+  }
+  .day-col:last-child { border-right: none; }
+  
+  .day-header {
+    padding: 10px 12px 8px;
+    border-bottom: 0.5px solid var(--border-warm);
+  }
+  .day-name {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .day-date {
+    font-size: 16px;
+    font-weight: 500;
+    margin-top: 1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .day-cap-text {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .cap-pct {
+    font-weight: 500;
+  }
+  .cap-pct.warn { color: var(--caramel); }
+  .cap-pct.over { color: var(--rose); }
+  .cap-bar {
+    height: 3px;
+    background: var(--border-warm);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .cap-fill {
+    height: 100%;
+    background: var(--mint);
+  }
+  .cap-fill.warn { background: var(--caramel); }
+  .cap-fill.over { background: var(--rose); }
+  
+  .day-content {
+    flex: 1;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  /* Today */
+  .day-col.today .day-header { background: var(--today-tint); }
+  .day-col.today .day-date { color: var(--rose); }
+  
+  /* Closed days — subtle, no stripe */
+  .day-col.closed .day-header { background: var(--closed-bg); }
+  .day-col.closed .day-content {
+    background: var(--closed-bg);
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-style: italic;
+    opacity: 0.6;
+  }
+  .day-col.closed .day-cap-text { display: none; }
+  .day-col.closed .cap-bar { display: none; }
+  
+  /* ===== STEP BLOCKS ===== */
+  .step {
+    background: var(--page-bg);
+    border-left: 3px solid var(--blush);
+    padding: 7px 9px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: grab;
+    transition: all 0.1s;
+  }
+  .step:hover {
+    background: var(--hover-bg);
+    transform: translateX(1px);
+  }
+  .step.locked {
+    border-left-color: var(--teal);
+  }
+  .step.passive {
+    border-left: 3px dashed var(--gray);
+    background: transparent;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .step.conflict {
+    border-left-color: var(--rose);
+    background: var(--conflict-tint);
+  }
+  
+  .step-row1 {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .step-row1 .lock-icon {
+    font-size: 10px;
+    color: var(--teal);
+  }
+  .step-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    flex: 1;
+  }
+  .step-time {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .step-row2 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .step-row2 .product-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .step-row2 .qty {
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Spanning passive step */
+  .span-step {
+    grid-column: span 2;
+    background: var(--card-bg);
+    border: 0.5px dashed var(--gray);
+    border-left: 3px dashed var(--gray);
+    border-radius: 3px;
+    padding: 8px 10px;
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 12px;
+    margin-bottom: 4px;
+    position: relative;
+  }
+  .span-step::before {
+    content: "⏱";
+    margin-right: 4px;
+  }
+  
+  /* ===== BOTTOM SUMMARY ===== */
+  .summary {
+    margin: 16px 32px 24px;
+    padding: 14px 20px;
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .summary strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .summary-row {
+    display: flex;
+    gap: 16px;
+  }
+  .summary-row .sep {
+    color: var(--border-warm);
+  }
+  
+  /* ===== CONFLICT INDICATOR ===== */
+  .conflict-warn {
+    background: var(--conflict-tint);
+    border-left: 2px solid var(--rose);
+    padding: 4px 8px;
+    margin: 4px 0 0;
+    border-radius: 2px;
+    color: var(--rose);
+    font-size: 11px;
+  }
+  
+  /* ===== DAY DETAIL DRAWER (placeholder) ===== */
+  .drawer-backdrop {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(44, 37, 21, 0.4);
+    display: none;
+    z-index: 100;
+  }
+  .drawer-backdrop.show { display: block; }
+  .drawer {
+    position: fixed;
+    top: 0; right: 0;
+    width: 480px;
+    height: 100%;
+    background: var(--card-bg);
+    box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+    padding: 24px;
+    overflow-y: auto;
+  }
+  .drawer h3 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+  .drawer .drawer-sub {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  .drawer-section {
+    margin-bottom: 20px;
+  }
+  .drawer-section h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .hour-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 0.5px solid var(--border-warm);
+  }
+  .hour-time {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    font-size: 12px;
+    width: 50px;
+  }
+  .hour-content {
+    flex: 1;
+    font-size: 13px;
+  }
+  .drawer-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <div class="tab active">Weekly</div>
+  <div class="tab">Pivot</div>
+  <div class="tab">Daily</div>
+</div>
+
+<header>
+  <div class="header-row">
+    <div>
+      <span class="serif" style="font-size: 28px; font-weight: 600;">Production plan</span>
+      <span class="header-meta">89 batches · 5 days · last update 22:47, 8h ago</span>
+    </div>
+    <div class="header-actions">
+      <span class="badge-warn">1 tight day</span>
+      <select class="focus-select">
+        <option>Focus on...</option>
+        <option>Mother's Day 2026</option>
+        <option>Bar Line Launch</option>
+      </select>
+      <button class="btn btn-primary">↻ Regenerate plan</button>
+    </div>
+  </div>
+  
+  <div class="header-stats">
+    <span><strong>14 days</strong> · 8.05–17.05</span>
+    <span class="sep">·</span>
+    <span><strong>67</strong> batches · wk1 60 / wk2 7</span>
+    <span class="sep">·</span>
+    <span><strong>31%</strong> capacity (1008/3213 min)</span>
+    <span class="sep">·</span>
+    <span><strong>0</strong> tight days</span>
+    <span class="sep">·</span>
+    <span>peak <strong>Sa 09.05</strong> · 33 batches · 30%</span>
+  </div>
+  
+  <div class="header-controls">
+    <div class="view-switcher">
+      <button>Day</button>
+      <button class="active">Week</button>
+      <button>Pivot</button>
+      <button>Month</button>
+    </div>
+    <div class="header-actions">
+      <button class="btn">Filling cooking list</button>
+    </div>
+  </div>
+</header>
+
+<!-- COLLAPSED FILTER STRIP -->
+<div class="filter-strip" onclick="toggleFilter()">
+  <div class="filter-strip-summary">
+    <span class="icon">⊞</span>
+    <span><strong>15 sources visible</strong> · 11 orders + 1 campaign + 3 POs</span>
+  </div>
+  <div class="filter-strip-toggle">show details ▼</div>
+</div>
+
+<!-- EXPANDED FILTER (hidden by default) -->
+<div class="filter-expanded-content" id="filterExpanded">
+  <div class="filter-row-grouping">
+    <div class="filter-group">
+      <div class="filter-group-header">Shared · 6 orders · 2 batches</div>
+      <span class="filter-pill active">Order #4437 <span class="qty">2b</span></span>
+      <span class="filter-pill active">Order #4433 <span class="qty">2b</span></span>
+      <span class="filter-pill active">Order #4444 <span class="qty">1b</span></span>
+      <span class="filter-pill active">Order #4425 <span class="qty">1b</span></span>
+      <span class="filter-pill active">Order #4427 <span class="qty">1b</span></span>
+      <span class="filter-pill active">Order #4429 <span class="qty">1b</span></span>
+    </div>
+    <div class="filter-group">
+      <div class="filter-group-header">Shared · 2 orders · 2 batches</div>
+      <span class="filter-pill active">Order #4445 <span class="qty">2b</span></span>
+      <span class="filter-pill active">Order #4446 <span class="qty">2b</span></span>
+    </div>
+    <div class="filter-group">
+      <div class="filter-group-header">Shared · 2 orders · 1 batch</div>
+      <span class="filter-pill active">Order #4434 <span class="qty">1b</span></span>
+      <span class="filter-pill active">Order #4443 <span class="qty">1b</span></span>
+    </div>
+  </div>
+  
+  <div style="display: flex; gap: 12px;">
+    <div class="filter-group" style="flex: 1;">
+      <div class="filter-group-header">Solo · 1 order</div>
+      <span class="filter-pill active">Order #4442 <span class="qty">1b</span></span>
+    </div>
+    <div class="filter-group" style="flex: 1;">
+      <div class="filter-group-header">Campaigns · 1</div>
+      <span class="filter-pill active" style="background: var(--draft-tint); border-color: var(--caramel); color: var(--text-primary);">⊕ Bar Launch <span class="qty">7b</span></span>
+    </div>
+    <div class="filter-group" style="flex: 1;">
+      <div class="filter-group-header">POs · 3</div>
+      <span class="filter-pill active">PO Replen 06.05 <span class="qty">11b</span></span>
+      <span class="filter-pill active">PO Mothersday <span class="qty">10b</span></span>
+      <span class="filter-pill active">PO New <span class="qty">16b</span></span>
+    </div>
+  </div>
+  
+  <div style="margin-top: 12px; padding-top: 12px; border-top: 0.5px solid var(--border-warm); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted);">
+    <span>Tick any source to filter the calendar to those batches. Multi-select supported.</span>
+    <button class="btn small">Reset filters</button>
+  </div>
+</div>
+
+<!-- CALENDAR -->
+<div class="calendar-shell">
+  <div class="calendar-header">
+    <div class="calendar-title">Week of 4 May 2026</div>
+    <div class="calendar-nav">
+      <button class="btn">← prev</button>
+      <button class="btn">today</button>
+      <button class="btn">next →</button>
+    </div>
+  </div>
+  
+  <div class="week-grid">
+    
+    <!-- MON -->
+    <div class="day-col" onclick="openDayDrawer(this)">
+      <div class="day-header">
+        <div class="day-name">Mon</div>
+        <div class="day-date">4</div>
+        <div class="day-cap-text">
+          <span>2h 58m / 14h</span>
+          <span class="cap-pct">11%</span>
+        </div>
+        <div class="cap-bar"><div class="cap-fill" style="width: 11%"></div></div>
+      </div>
+      <div class="day-content">
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Polishing</span>
+            <span class="step-time">2h 58m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Hazelnut Caramel mould</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Shelling</span>
+            <span class="step-time">2h 58m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Lillet Berry · 24 pcs</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Fill</span>
+            <span class="step-time">2h 58m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Lillet Berry</span>
+            <span class="qty">· 24 pcs</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- TUE -->
+    <div class="day-col" onclick="openDayDrawer(this)">
+      <div class="day-header">
+        <div class="day-name">Tue</div>
+        <div class="day-date">5</div>
+        <div class="day-cap-text">
+          <span>6h 20m / 14h</span>
+          <span class="cap-pct">45%</span>
+        </div>
+        <div class="cap-bar"><div class="cap-fill" style="width: 45%"></div></div>
+      </div>
+      <div class="day-content">
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Temper</span>
+            <span class="step-time">1h</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">dark chocolate</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Fill</span>
+            <span class="step-time">2h</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Almond Praline</span>
+            <span class="qty">· 40 pcs</span>
+          </div>
+        </div>
+        <div class="step passive">
+          <div class="step-row1">
+            <span class="step-name">Set/cool</span>
+            <span class="step-time">→ Wed</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Almond Praline · 20h passive</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Decorate</span>
+            <span class="step-time">30m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Lillet Berry · 24 pcs</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Package</span>
+            <span class="step-time">1h</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Hazelnut Caramel · 12 pcs</span>
+          </div>
+        </div>
+        <div class="conflict-warn">⚠ Mould conflict at 11:00</div>
+      </div>
+    </div>
+    
+    <!-- WED -->
+    <div class="day-col" onclick="openDayDrawer(this)">
+      <div class="day-header">
+        <div class="day-name">Wed</div>
+        <div class="day-date">6</div>
+        <div class="day-cap-text">
+          <span>2h / 14h</span>
+          <span class="cap-pct">14%</span>
+        </div>
+        <div class="cap-bar"><div class="cap-fill" style="width: 14%"></div></div>
+      </div>
+      <div class="day-content">
+        <div class="step passive">
+          <div class="step-row1">
+            <span class="step-name">Set/cool ends</span>
+            <span class="step-time">08:00</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Almond Praline</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Unmould</span>
+            <span class="step-time">1h</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Almond Praline · 40 pcs</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Fill</span>
+            <span class="step-time">1h</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Kalamansi Cheesecake · 16 pcs</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- THU - today -->
+    <div class="day-col today" onclick="openDayDrawer(this)">
+      <div class="day-header">
+        <div class="day-name">Thu · today</div>
+        <div class="day-date">7</div>
+        <div class="day-cap-text">
+          <span>8h / 14h</span>
+          <span class="cap-pct warn">57%</span>
+        </div>
+        <div class="cap-bar"><div class="cap-fill warn" style="width: 57%"></div></div>
+      </div>
+      <div class="day-content">
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Temper</span>
+            <span class="step-time">1h</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">dark chocolate</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Fill</span>
+            <span class="step-time">1h</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Crunchy Nougat · 8 pcs</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Decorate</span>
+            <span class="step-time">30m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Almond Praline (yest.)</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Package</span>
+            <span class="step-time">1h</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Almond Praline · 40 pcs</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Polish</span>
+            <span class="step-time">30m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Hazelnut Caramel mould</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- FRI -->
+    <div class="day-col" onclick="openDayDrawer(this)">
+      <div class="day-header">
+        <div class="day-name">Fri</div>
+        <div class="day-date">8</div>
+        <div class="day-cap-text">
+          <span>7h 26m / 14h</span>
+          <span class="cap-pct warn">53%</span>
+        </div>
+        <div class="cap-bar"><div class="cap-fill warn" style="width: 53%"></div></div>
+      </div>
+      <div class="day-content">
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Painting</span>
+            <span class="step-time">14m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Almond Praline · 2 cat</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Fill</span>
+            <span class="step-time">59m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Almond Praline · 5 cat</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Bar mould</span>
+            <span class="step-time">37m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Strawberry-Lemon Bar · 2 pcs</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Strawberry pour</span>
+            <span class="step-time">20m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Strawberry Cheesecake</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Lemon zest</span>
+            <span class="step-time">17m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Lemon Bar</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Bar (Filled)</span>
+            <span class="step-time">3h 6m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Pistachio Bar · 6 pcs</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-row1">
+            <span class="step-name">Toasty</span>
+            <span class="step-time">3h 4m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Pistachio Raspberry · 4 pcs</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- SAT -->
+    <div class="day-col" onclick="openDayDrawer(this)">
+      <div class="day-header">
+        <div class="day-name">Sat</div>
+        <div class="day-date">9</div>
+        <div class="day-cap-text">
+          <span>4h 12m / 14h</span>
+          <span class="cap-pct">30%</span>
+        </div>
+        <div class="cap-bar"><div class="cap-fill" style="width: 30%"></div></div>
+      </div>
+      <div class="day-content">
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Shelling</span>
+            <span class="step-time">68m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Pistachio Crunch · 5 cat</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Painting</span>
+            <span class="step-time">14m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Almond Praline · 14 cat</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Fill</span>
+            <span class="step-time">16m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Hazelnut · 16 cat</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Filling</span>
+            <span class="step-time">16m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Lillet Berry · 16 cat</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Capping</span>
+            <span class="step-time">16m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Hazelnut · 16 cat</span>
+          </div>
+        </div>
+        <div class="step locked">
+          <div class="step-row1">
+            <span class="lock-icon">🔒</span>
+            <span class="step-name">Unmould</span>
+            <span class="step-time">16m</span>
+          </div>
+          <div class="step-row2">
+            <span class="product-name">Lillet · 16 cat</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- SUN closed -->
+    <div class="day-col closed">
+      <div class="day-header">
+        <div class="day-name">Sun</div>
+        <div class="day-date">10</div>
+      </div>
+      <div class="day-content">
+        closed
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<!-- BOTTOM SUMMARY -->
+<div class="summary">
+  <div class="summary-row">
+    <span>This week · <strong>6 days</strong> · <strong>67 batches</strong></span>
+    <span class="sep">·</span>
+    <span><strong>30h 44m</strong> total · <strong>4 mould fills</strong></span>
+    <span class="sep">·</span>
+    <span><strong>peak Sat</strong> at 30% capacity</span>
+  </div>
+  <div class="summary-row">
+    <span class="muted italic">Next week · 7 batches scheduled · <a href="#" style="color: var(--teal); text-decoration: none;">view →</a></span>
+  </div>
+</div>
+
+<!-- DAY DETAIL DRAWER -->
+<div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDayDrawer()">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-close" onclick="closeDayDrawer()">×</div>
+    
+    <h3 class="serif">Tuesday, 5 May 2026</h3>
+    <p class="drawer-sub">6h 20m planned · 14h capacity · 45% utilization</p>
+    
+    <div class="drawer-section">
+      <h4>Hour by hour</h4>
+      <div class="hour-row">
+        <span class="hour-time">09:00</span>
+        <div class="hour-content">
+          🔒 <strong>Temper</strong> · dark chocolate · 1h
+        </div>
+      </div>
+      <div class="hour-row">
+        <span class="hour-time">10:00</span>
+        <div class="hour-content">
+          🔒 <strong>Fill</strong> · Almond Praline · 40 pcs · 2h
+        </div>
+      </div>
+      <div class="hour-row">
+        <span class="hour-time">12:00</span>
+        <div class="hour-content muted italic">
+          ⏱ <strong>Set/cool</strong> · Almond Praline · 20h passive · → Wed 08:00
+        </div>
+      </div>
+      <div class="hour-row">
+        <span class="hour-time">13:00</span>
+        <div class="hour-content">
+          <strong>Decorate</strong> · Lillet Berry · 24 pcs · 30m
+        </div>
+      </div>
+      <div class="hour-row">
+        <span class="hour-time">13:30</span>
+        <div class="hour-content">
+          <strong>Package</strong> · Hazelnut Caramel · 12 pcs · 1h
+        </div>
+      </div>
+    </div>
+    
+    <div class="drawer-section">
+      <h4>Conflicts (1)</h4>
+      <div class="conflict-warn">
+        ⚠ Mould conflict at 11:00 — 3-cav mould booked for Almond Praline + Hazelnut Caramel
+      </div>
+    </div>
+    
+    <div class="drawer-section">
+      <h4>Day notes</h4>
+      <textarea style="width: 100%; min-height: 80px; padding: 8px; border: 0.5px solid var(--border-warm); border-radius: 4px; font-family: inherit; font-size: 13px;" placeholder="Notes for this day..."></textarea>
+    </div>
+    
+    <div style="display: flex; gap: 8px; margin-top: 24px;">
+      <button class="btn btn-primary" style="flex: 1;">Mark as worked</button>
+      <button class="btn">Reschedule day</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleFilter() {
+    const expanded = document.getElementById('filterExpanded');
+    expanded.classList.toggle('show');
+    const strip = document.querySelector('.filter-strip');
+    strip.classList.toggle('expanded');
+    const toggle = document.querySelector('.filter-strip-toggle');
+    toggle.textContent = expanded.classList.contains('show') ? 'hide details ▲' : 'show details ▼';
+  }
+  
+  function openDayDrawer(el) {
+    if (el.classList.contains('closed')) return;
+    document.getElementById('drawerBackdrop').classList.add('show');
+  }
+  function closeDayDrawer() {
+    document.getElementById('drawerBackdrop').classList.remove('show');
+  }
+</script>
+
+</body>
+</html>

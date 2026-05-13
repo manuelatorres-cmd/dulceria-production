@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Workshop dashboard — redesign</title>
+<style>
+  :root {
+    --page-bg: #fbf6f1;
+    --card-bg: #ffffff;
+    --card-bg-hover: #f5f0e3;
+    --border-warm: #e8e3d6;
+    --today-tint: #fdf6e8;
+    --text-primary: #2c2515;
+    --text-muted: #8a7e64;
+    --tier-quarter-focus: #264443;
+    --tier-active: #fbccb9;
+    --tier-urgent: #993556;
+    --tier-positive: #5dcaa5;
+    --semantic-warn: #dab73f;
+    --semantic-critical: #993556;
+    --semantic-info: #264443;
+    --tint-warn: #fff7e9;
+    --tint-critical: #fdeae3;
+    --tint-ok: #ecf7f1;
+    --tint-info: #ebf0ee;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .serif { font-family: "Playfair Display", Georgia, serif; }
+  .muted { color: var(--text-muted); }
+  .tabular { font-variant-numeric: tabular-nums; }
+  
+  /* Layout */
+  .app {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 100vh;
+  }
+  
+  .sidebar {
+    background: #1a3433;
+    color: white;
+    padding: 16px;
+  }
+  .sidebar-logo {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding: 0 8px;
+  }
+  .sidebar-back {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    padding: 6px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+  }
+  .nav-section {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: white;
+    padding: 16px 8px 6px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: rgba(255,255,255,0.85);
+    font-size: 13px;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.05); }
+  .nav-item.active { background: rgba(255,255,255,0.1); color: white; }
+  .nav-item .icon { width: 14px; height: 14px; opacity: 0.7; }
+  
+  /* Page header */
+  .page-header {
+    padding: 20px 32px 16px;
+  }
+  .page-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .page-header h1 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+  }
+  .page-header .meta {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .page-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  .badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    border: 0.5px solid var(--border-warm);
+    background: var(--card-bg);
+  }
+  .badge.urgent { color: var(--tier-urgent); border-color: var(--tier-urgent); }
+  .badge.warn { color: var(--semantic-warn); border-color: var(--semantic-warn); }
+  .badge.ok { color: var(--tier-positive); border-color: var(--tier-positive); }
+  
+  .btn {
+    padding: 6px 14px;
+    border: 0.5px solid var(--border-warm);
+    border-radius: 4px;
+    background: var(--card-bg);
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--card-bg-hover); }
+  .btn.sm { padding: 3px 8px; font-size: 11px; }
+  .btn.primary { background: var(--tier-quarter-focus); color: white; border-color: var(--tier-quarter-focus); }
+  
+  /* Page body */
+  .page-body {
+    padding: 0 32px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  /* ============ NOW BAR (top, full width) ============ */
+  .now-bar {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-left: 4px solid var(--semantic-warn);
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 20px;
+    align-items: center;
+  }
+  .now-bar-main {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+  .now-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--semantic-warn);
+    font-weight: 600;
+  }
+  .now-step {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .now-meta {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .now-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .now-progress-pct {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--semantic-warn);
+    font-variant-numeric: tabular-nums;
+  }
+  .now-bar-inner {
+    width: 120px;
+    height: 4px;
+    background: var(--border-warm);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .now-bar-fill {
+    height: 100%;
+    background: var(--semantic-warn);
+  }
+  .now-actions {
+    display: flex;
+    gap: 6px;
+  }
+  
+  /* ============ UTILIZATION STRIP (4 cards) ============ */
+  .util-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .util-card {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .util-card.ok { border-left: 3px solid var(--tier-positive); }
+  .util-card.warn { border-left: 3px solid var(--semantic-warn); }
+  .util-card.urgent { border-left: 3px solid var(--tier-urgent); }
+  .util-card.info { border-left: 3px solid var(--semantic-info); }
+  
+  .util-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+  }
+  .util-status {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+  }
+  .util-status.ok { color: var(--tier-positive); }
+  .util-status.warn { color: var(--semantic-warn); }
+  .util-status.urgent { color: var(--tier-urgent); }
+  
+  .util-value {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.1;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .util-value .unit {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+  
+  .util-bar {
+    height: 4px;
+    background: var(--border-warm);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .util-fill {
+    height: 100%;
+    background: var(--tier-positive);
+  }
+  .util-fill.warn { background: var(--semantic-warn); }
+  .util-fill.over { background: var(--tier-urgent); }
+  
+  .util-detail {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 6px;
+    line-height: 1.3;
+  }
+  
+  /* ============ MAIN GRID ============ */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+  }
+  
+  .section {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 12px 18px 8px;
+    border-bottom: 0.5px solid var(--border-warm);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .section-title {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .section-action {
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .section-action:hover { color: var(--tier-quarter-focus); }
+  
+  /* ============ ACTIVE BATCHES TABLE ============ */
+  .batch-row {
+    padding: 10px 18px;
+    border-left: 3px solid transparent;
+    border-bottom: 0.5px solid var(--border-warm);
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 16px;
+    align-items: center;
+  }
+  .batch-row:hover { background: var(--card-bg-hover); }
+  .batch-row:last-child { border-bottom: none; }
+  .batch-row.active { border-left-color: var(--semantic-warn); background: var(--tint-warn); }
+  .batch-row.next { border-left-color: var(--tier-quarter-focus); }
+  .batch-row.queued { border-left-color: var(--border-warm); }
+  .batch-row.done { border-left-color: var(--tier-positive); opacity: 0.6; }
+  
+  .batch-row-main {
+    min-width: 0;
+  }
+  .batch-row-title {
+    font-size: 13px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .batch-row-title.active::before {
+    content: "● ";
+    color: var(--semantic-warn);
+  }
+  .batch-row-title.done::before {
+    content: "✓ ";
+    color: var(--tier-positive);
+  }
+  .batch-row-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 2px;
+  }
+  .batch-row-step {
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 500;
+    text-align: right;
+  }
+  .batch-row-step .meta {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-style: italic;
+    font-weight: 400;
+  }
+  .batch-row-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  
+  /* ============ MOULD GRID ============ */
+  .mould-grid {
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .mould-tile {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .mould-tile.in-use {
+    border-left: 3px solid var(--semantic-warn);
+    background: var(--tint-warn);
+  }
+  .mould-tile.free {
+    border-left: 3px solid var(--tier-positive);
+  }
+  .mould-tile.blocked {
+    border-left: 3px solid var(--tier-urgent);
+    opacity: 0.7;
+  }
+  .mould-tile-title {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .mould-tile-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .mould-tile-status {
+    font-size: 10px;
+    margin-top: 4px;
+    font-weight: 500;
+  }
+  .mould-tile.in-use .mould-tile-status { color: var(--semantic-warn); }
+  .mould-tile.free .mould-tile-status { color: var(--tier-positive); }
+  .mould-tile.blocked .mould-tile-status { color: var(--tier-urgent); }
+  
+  /* ============ COMPACT LIST ============ */
+  .compact-row {
+    padding: 8px 18px;
+    border-left: 3px solid transparent;
+    border-bottom: 0.5px solid var(--border-warm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .compact-row:hover { background: var(--card-bg-hover); }
+  .compact-row:last-child { border-bottom: none; }
+  .compact-row.urgent { border-left-color: var(--tier-urgent); }
+  .compact-row.warn { border-left-color: var(--semantic-warn); }
+  .compact-row.info { border-left-color: var(--semantic-info); }
+  .compact-row.ok { border-left-color: var(--tier-positive); }
+  
+  .compact-row-title {
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .compact-row-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .compact-row-side {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .compact-row-side .urgent { color: var(--tier-urgent); font-weight: 500; font-style: normal; }
+  .compact-row-side .warn { color: var(--semantic-warn); font-weight: 500; font-style: normal; }
+  
+  /* Quick action buttons */
+  .quick-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .quick-action {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  .quick-action:hover {
+    background: var(--card-bg-hover);
+    border-color: var(--tier-quarter-focus);
+  }
+  .quick-action-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">Dulceria</div>
+    <div class="sidebar-back">‹ Dashboard</div>
+    <div class="nav-section">Workshop</div>
+    <div class="nav-item active"><span class="icon">⌂</span>Overview</div>
+    <div class="nav-item"><span class="icon">☐</span>Orders</div>
+    <div class="nav-item"><span class="icon">☐</span>Picking</div>
+    <div class="nav-item"><span class="icon">☐</span>Production orders</div>
+    <div class="nav-item"><span class="icon">☐</span>Calendar</div>
+    <div class="nav-item"><span class="icon">☐</span>Plan</div>
+    <div class="nav-item"><span class="icon">☐</span>Planner</div>
+    <div class="nav-item"><span class="icon">☐</span>Daily</div>
+    <div class="nav-item"><span class="icon">☐</span>Campaigns</div>
+    <div class="nav-item"><span class="icon">☐</span>Stock</div>
+    <div style="margin-top: 60px;">
+      <div class="nav-item"><span class="icon">↗</span>Shopping</div>
+      <div class="nav-item"><span class="icon">⚙</span>Settings</div>
+    </div>
+  </aside>
+  
+  <!-- MAIN -->
+  <main>
+    
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+      <div class="page-header-row">
+        <div>
+          <h1>Workshop</h1>
+          <p class="meta">08:14 · Painting in progress · 5h slack remaining today</p>
+        </div>
+        <div class="page-header-actions">
+          <span class="badge warn">2 attention</span>
+          <button class="btn">New batch</button>
+          <button class="btn primary">Quick add to today</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- PAGE BODY -->
+    <div class="page-body">
+      
+      <!-- ============ NOW BAR (what's running) ============ -->
+      <div class="now-bar">
+        <div class="now-bar-main">
+          <div>
+            <div class="now-label">⏵ Now in progress</div>
+            <div class="now-step">Painting · Almond Praline</div>
+            <div class="now-meta">2 of 16 moulds · 1h elapsed · ~2h 40m remaining · ends ~10:54</div>
+          </div>
+        </div>
+        <div class="now-progress">
+          <div class="now-progress-pct">13%</div>
+          <div class="now-bar-inner"><div class="now-bar-fill" style="width: 13%"></div></div>
+        </div>
+        <div class="now-actions">
+          <button class="btn sm">Pause</button>
+          <button class="btn sm">Mark step done</button>
+          <button class="btn sm primary">Open daily →</button>
+        </div>
+      </div>
+      
+      <!-- ============ UTILIZATION STRIP (4 cards) ============ -->
+      <div class="util-grid">
+        
+        <!-- Capacity used today -->
+        <div class="util-card warn">
+          <div>
+            <div class="util-label">
+              <span>Today's capacity</span>
+              <span class="util-status warn">57%</span>
+            </div>
+            <div class="util-value">8h<span class="unit">/14h</span></div>
+            <div class="util-bar"><div class="util-fill warn" style="width: 57%"></div></div>
+          </div>
+          <div class="util-detail">5h slack · 1 production day open</div>
+        </div>
+        
+        <!-- Moulds -->
+        <div class="util-card warn">
+          <div>
+            <div class="util-label">
+              <span>Moulds in use</span>
+              <span class="util-status warn">1 booked</span>
+            </div>
+            <div class="util-value">1<span class="unit">/8</span></div>
+            <div class="util-bar"><div class="util-fill warn" style="width: 13%"></div></div>
+          </div>
+          <div class="util-detail">3-cav booked · 7 moulds free</div>
+        </div>
+        
+        <!-- Ingredients ready -->
+        <div class="util-card urgent">
+          <div>
+            <div class="util-label">
+              <span>Ingredients</span>
+              <span class="util-status urgent">12 short</span>
+            </div>
+            <div class="util-value">12<span class="unit">short</span></div>
+            <div class="util-bar"><div class="util-fill over" style="width: 30%"></div></div>
+          </div>
+          <div class="util-detail">blocks 3 planned batches · order today</div>
+        </div>
+        
+        <!-- Ready to pack -->
+        <div class="util-card ok">
+          <div>
+            <div class="util-label">
+              <span>Ready to pack</span>
+              <span class="util-status ok">2 orders</span>
+            </div>
+            <div class="util-value">2</div>
+            <div class="util-bar"><div class="util-fill" style="width: 100%"></div></div>
+          </div>
+          <div class="util-detail">3 batches unmoulded · pack today</div>
+        </div>
+        
+      </div>
+      
+      <!-- ============ MAIN GRID ============ -->
+      <div class="main-grid">
+        
+        <!-- LEFT: ACTIVE BATCHES + NEXT UP -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Active in workshop now</span>
+              <a class="section-action">open daily →</a>
+            </div>
+            
+            <!-- ACTIVE -->
+            <div class="batch-row active">
+              <div class="batch-row-main">
+                <div class="batch-row-title active">Almond Praline · 40 pcs</div>
+                <div class="batch-row-meta">PO Mothersday · started 09:00</div>
+              </div>
+              <div class="batch-row-step">
+                Painting
+                <div class="meta">2/16 moulds</div>
+              </div>
+              <div class="batch-row-time">~10:54</div>
+            </div>
+            
+            <!-- NEXT UP -->
+            <div class="batch-row next">
+              <div class="batch-row-main">
+                <div class="batch-row-title">Hazelnut Caramel · 24 pcs</div>
+                <div class="batch-row-meta">Online orders #4437 +2</div>
+              </div>
+              <div class="batch-row-step">
+                Shelling
+                <div class="meta">queued · next</div>
+              </div>
+              <div class="batch-row-time">~10:54</div>
+            </div>
+            
+            <div class="batch-row queued">
+              <div class="batch-row-main">
+                <div class="batch-row-title">Lillet Berry · 24 pcs</div>
+                <div class="batch-row-meta">Online orders #4425 +3</div>
+              </div>
+              <div class="batch-row-step">
+                Fill
+                <div class="meta">queued</div>
+              </div>
+              <div class="batch-row-time">~12:00</div>
+            </div>
+            
+            <div class="batch-row queued">
+              <div class="batch-row-main">
+                <div class="batch-row-title">Crunchy Nougat · 8 pcs</div>
+                <div class="batch-row-meta">Online orders #4433 +1</div>
+              </div>
+              <div class="batch-row-step">
+                Filling prep
+                <div class="meta">queued</div>
+              </div>
+              <div class="batch-row-time">~13:30</div>
+            </div>
+            
+            <!-- DONE -->
+            <div class="batch-row done">
+              <div class="batch-row-main">
+                <div class="batch-row-title done">Apple Walnut · 16 pcs</div>
+                <div class="batch-row-meta">PO Replen · done 08:30</div>
+              </div>
+              <div class="batch-row-step">
+                Polishing
+                <div class="meta">16/16 ✓</div>
+              </div>
+              <div class="batch-row-time">07:00 – 08:30</div>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Draft batches awaiting decision</span>
+              <a class="section-action">6 drafts · review →</a>
+            </div>
+            
+            <div class="compact-row info">
+              <div>
+                <div class="compact-row-title">PO: Double Caramel · 1 pc</div>
+                <div class="compact-row-meta">created 3d ago · not scheduled</div>
+              </div>
+              <div class="compact-row-side"><a>review →</a></div>
+            </div>
+            <div class="compact-row info">
+              <div>
+                <div class="compact-row-title">PO: Ginger Gin · 1 pc</div>
+                <div class="compact-row-meta">created 3d ago · not scheduled</div>
+              </div>
+              <div class="compact-row-side"><a>review →</a></div>
+            </div>
+            <div class="compact-row info">
+              <div>
+                <div class="compact-row-title">PO: Peanut Crunch · 1 pc</div>
+                <div class="compact-row-meta">created 3d ago · not scheduled</div>
+              </div>
+              <div class="compact-row-side"><a>review →</a></div>
+            </div>
+            <div class="compact-row info">
+              <div>
+                <div class="compact-row-title">+ 3 more drafts</div>
+                <div class="compact-row-meta">Strawberry Nougat, Peanutbutter Jelly, Apple Walnut</div>
+              </div>
+              <div class="compact-row-side"><a>show all →</a></div>
+            </div>
+          </div>
+          
+        </div>
+        
+        <!-- RIGHT: MOULDS + READY TO PACK + COMPLIANCE -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Mould occupancy</span>
+              <a class="section-action">manage moulds →</a>
+            </div>
+            <div class="mould-grid">
+              <div class="mould-tile in-use">
+                <div class="mould-tile-title">3-cav</div>
+                <div class="mould-tile-meta">Almond Praline · 40 pcs</div>
+                <div class="mould-tile-status">in use · ~10:54</div>
+              </div>
+              <div class="mould-tile free">
+                <div class="mould-tile-title">Filled</div>
+                <div class="mould-tile-meta">no batch assigned</div>
+                <div class="mould-tile-status">free</div>
+              </div>
+              <div class="mould-tile free">
+                <div class="mould-tile-title">Bar</div>
+                <div class="mould-tile-meta">no batch assigned</div>
+                <div class="mould-tile-status">free</div>
+              </div>
+              <div class="mould-tile free">
+                <div class="mould-tile-title">Bar filled</div>
+                <div class="mould-tile-meta">no batch assigned</div>
+                <div class="mould-tile-status">free</div>
+              </div>
+              <div class="mould-tile free">
+                <div class="mould-tile-title">Toasty</div>
+                <div class="mould-tile-meta">no batch assigned</div>
+                <div class="mould-tile-status">free</div>
+              </div>
+              <div class="mould-tile blocked">
+                <div class="mould-tile-title">Heart XXL</div>
+                <div class="mould-tile-meta">drying · until tomorrow</div>
+                <div class="mould-tile-status">blocked</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Ready to pack</span>
+              <a class="section-action">picking →</a>
+            </div>
+            <div class="compact-row ok">
+              <div>
+                <div class="compact-row-title">mxmx.stormx@gmail.com · #4439</div>
+                <div class="compact-row-meta">4 pcs · Almond Praline +1</div>
+              </div>
+              <div class="compact-row-side"><span class="urgent">5d overdue</span></div>
+            </div>
+            <div class="compact-row ok">
+              <div>
+                <div class="compact-row-title">sushiq99@yahoo.de · #4449</div>
+                <div class="compact-row-meta">8 pcs · Espresso Shot, Double Caramel +5</div>
+              </div>
+              <div class="compact-row-side">due today</div>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Compliance today</span>
+              <a class="section-action">HACCP →</a>
+            </div>
+            <div class="compact-row warn">
+              <div>
+                <div class="compact-row-title">Temperature log</div>
+                <div class="compact-row-meta">fridge 2 · not recorded today</div>
+              </div>
+              <div class="compact-row-side"><span class="warn">log now</span></div>
+            </div>
+            <div class="compact-row ok">
+              <div>
+                <div class="compact-row-title">Calibration checks</div>
+                <div class="compact-row-meta">all devices up to date</div>
+              </div>
+              <div class="compact-row-side">ok</div>
+            </div>
+            <div class="compact-row ok">
+              <div>
+                <div class="compact-row-title">Cleaning log</div>
+                <div class="compact-row-meta">last done yesterday 18:00</div>
+              </div>
+              <div class="compact-row-side">ok</div>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+      <!-- ============ QUICK ACTIONS ============ -->
+      <div class="quick-actions">
+        <button class="quick-action">
+          <span class="quick-action-icon">+</span>
+          <span>New order</span>
+        </button>
+        <button class="quick-action">
+          <span class="quick-action-icon">▤</span>
+          <span>Open planner</span>
+        </button>
+        <button class="quick-action">
+          <span class="quick-action-icon">☐</span>
+          <span>Stock</span>
+        </button>
+        <button class="quick-action">
+          <span class="quick-action-icon">⊞</span>
+          <span>Campaigns</span>
+        </button>
+      </div>
+      
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

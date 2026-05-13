@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Manual planner — v2 mockup</title>
+<style>
+  :root {
+    --page-bg: #fbf6f1;
+    --card-bg: #ffffff;
+    --border-warm: #e8e3d6;
+    --text-primary: #2c2515;
+    --text-muted: #8a7e64;
+    --caramel: #dab73f;
+    --teal: #264443;
+    --blush: #fbccb9;
+    --gray: #b4b2a9;
+    --rose: #993556;
+    --mint: #5dcaa5;
+    --hover-bg: #f5f0e3;
+    --today-tint: #fdf6e8;
+    --closed-tint: #ebe8df;
+    --draft-tint: #fff7e9;
+    --draft-border: #dab73f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .serif { font-family: "Playfair Display", Georgia, serif; }
+  .muted { color: var(--text-muted); }
+  .italic { font-style: italic; }
+  .small { font-size: 12px; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  
+  /* HEADER */
+  header {
+    padding: 24px 32px 0;
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .tab {
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-muted);
+    border: 0.5px solid transparent;
+  }
+  .tab.active {
+    background: var(--teal);
+    color: white;
+  }
+  
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+  header h1 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 30px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  header .subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+  }
+  
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  .btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: 0.5px solid var(--border-warm);
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+    transition: all 0.15s;
+  }
+  .btn:hover { background: var(--hover-bg); }
+  .btn-primary {
+    background: var(--teal);
+    color: white;
+    border-color: var(--teal);
+  }
+  .btn-primary:hover { background: #1a3433; }
+  .btn-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  /* TWO-COLUMN LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    padding: 0 32px 24px;
+  }
+  
+  /* LEFT — DEMAND PICKER */
+  .pane {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .pane-header {
+    padding: 16px 20px 12px;
+    border-bottom: 0.5px solid var(--border-warm);
+  }
+  .pane-header h2 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .pane-header .meta {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+  }
+  
+  .filter-row {
+    display: flex;
+    gap: 6px;
+    padding: 10px 20px;
+    border-bottom: 0.5px solid var(--border-warm);
+    flex-wrap: wrap;
+  }
+  .pill {
+    padding: 4px 10px;
+    border: 0.5px solid var(--border-warm);
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 12px;
+    background: var(--card-bg);
+    color: var(--text-muted);
+  }
+  .pill:hover { background: var(--hover-bg); }
+  .pill.active {
+    background: var(--teal);
+    color: white;
+    border-color: var(--teal);
+  }
+  
+  .pane-body {
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 320px);
+  }
+  
+  /* CATEGORY GROUPS */
+  .category {
+    border-bottom: 0.5px solid var(--border-warm);
+  }
+  .category-header {
+    padding: 12px 20px 8px;
+    background: var(--page-bg);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+  }
+  .category-meta {
+    text-transform: none;
+    letter-spacing: 0;
+    font-style: italic;
+    font-weight: 400;
+  }
+  
+  .product-row {
+    border-left: 3px solid transparent;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 0.5px solid var(--border-warm);
+  }
+  .product-row:last-child { border-bottom: none; }
+  .product-row:hover { background: var(--hover-bg); }
+  .product-row.urgent { border-left-color: var(--rose); }
+  .product-row.planned { border-left-color: var(--blush); }
+  .product-row.in-draft {
+    border-left-color: var(--draft-border);
+    background: var(--draft-tint);
+  }
+  .product-row.covered { opacity: 0.4; }
+  .product-row.expanded { background: var(--hover-bg); }
+  
+  .product-line1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .product-name {
+    font-size: 14px;
+    font-weight: 500;
+    flex: 1;
+  }
+  .product-name .chevron {
+    color: var(--text-muted);
+    font-size: 10px;
+    margin-right: 4px;
+  }
+  .product-stock {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+    white-space: nowrap;
+  }
+  .product-line2 {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-top: 2px;
+  }
+  .product-urgency {
+    color: var(--rose);
+    font-weight: 500;
+  }
+  .product-in-draft-tag {
+    color: var(--caramel);
+    font-weight: 500;
+    font-size: 11px;
+  }
+  
+  /* EXPANDED ORDERS */
+  .orders-expanded {
+    margin-top: 10px;
+    padding: 10px 0 4px;
+    border-top: 0.5px solid var(--border-warm);
+  }
+  .orders-expanded.hidden { display: none; }
+  
+  .smart-suggestion {
+    background: var(--draft-tint);
+    border-left: 3px solid var(--caramel);
+    padding: 8px 12px;
+    margin: 0 0 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .smart-suggestion:hover {
+    background: #fff1d9;
+  }
+  .smart-suggestion .arrow {
+    color: var(--caramel);
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 8px 0 4px;
+    font-weight: 500;
+  }
+  
+  .order-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .order-line:hover { background: var(--page-bg); border-radius: 3px; }
+  .order-info {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
+  .order-num {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: ui-monospace, monospace;
+  }
+  .order-customer {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .order-due {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-style: italic;
+    white-space: nowrap;
+  }
+  .order-due.urgent { color: var(--rose); font-weight: 500; }
+  .order-qty {
+    font-weight: 500;
+    font-size: 12px;
+    width: 40px;
+    text-align: right;
+  }
+  .order-checkbox {
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border-warm);
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .order-line.in-draft .order-checkbox {
+    background: var(--caramel);
+    border-color: var(--caramel);
+    color: white;
+    font-size: 10px;
+  }
+  .order-line.in-draft {
+    opacity: 0.7;
+  }
+  
+  /* RIGHT — WEEK CALENDAR + DRAFT BAR */
+  .right-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  /* DRAFT BATCH BAR */
+  .draft-bar {
+    background: var(--card-bg);
+    border: 0.5px solid var(--draft-border);
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+  .draft-bar.empty {
+    border-style: dashed;
+    border-color: var(--border-warm);
+    background: transparent;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 13px;
+    padding: 20px;
+  }
+  .draft-bar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .draft-bar-title {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+  }
+  .draft-bar-title h3 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .draft-bar-summary {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+  }
+  
+  .draft-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .draft-item {
+    background: var(--page-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 14px;
+    padding: 4px 10px 4px 8px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .draft-item .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .draft-item .x {
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    margin-left: 4px;
+  }
+  .draft-item .x:hover { color: var(--rose); }
+  
+  .draft-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 0.5px solid var(--border-warm);
+    padding-top: 10px;
+  }
+  .draft-target-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .draft-target-info.set {
+    color: var(--teal);
+    font-style: normal;
+    font-weight: 500;
+  }
+  
+  /* WEEK GRID */
+  .week-pane {
+    background: var(--card-bg);
+    border: 0.5px solid var(--border-warm);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .week-header {
+    padding: 14px 20px;
+    border-bottom: 0.5px solid var(--border-warm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .week-header h2 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-top: 0.5px solid var(--border-warm);
+  }
+  .day-col {
+    border-right: 0.5px solid var(--border-warm);
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+  }
+  .day-col:last-child { border-right: none; }
+  
+  .day-header-cell {
+    padding: 10px 12px;
+    border-bottom: 0.5px solid var(--border-warm);
+    text-align: left;
+    background: var(--page-bg);
+  }
+  .day-header-cell .day-name {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .day-header-cell .day-date {
+    font-size: 14px;
+    font-weight: 500;
+    margin-top: 1px;
+    font-variant-numeric: tabular-nums;
+  }
+  .day-header-cell.today .day-date { color: var(--rose); }
+  .day-header-cell .day-cap {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cap-bar {
+    height: 3px;
+    background: var(--border-warm);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .cap-fill {
+    height: 100%;
+    background: var(--mint);
+  }
+  .cap-fill.warn { background: var(--caramel); }
+  .cap-fill.over { background: var(--rose); }
+  
+  .day-content {
+    flex: 1;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .day-col.closed .day-header-cell { background: var(--closed-tint); }
+  .day-col.closed .day-content {
+    background: repeating-linear-gradient(
+      45deg,
+      var(--closed-tint),
+      var(--closed-tint) 4px,
+      transparent 4px,
+      transparent 8px
+    );
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-style: italic;
+  }
+  
+  .day-col.today .day-header-cell { background: var(--today-tint); }
+  
+  .day-col.drop-target {
+    background: var(--draft-tint);
+  }
+  .day-col.drop-target .day-content {
+    background: var(--draft-tint);
+    border: 2px dashed var(--draft-border);
+    border-radius: 6px;
+    margin: 6px;
+  }
+  
+  /* STEP BLOCKS IN GRID */
+  .step-block {
+    background: var(--page-bg);
+    border-left: 3px solid var(--blush);
+    padding: 6px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    line-height: 1.3;
+    cursor: grab;
+  }
+  .step-block:hover { background: var(--hover-bg); }
+  .step-block.locked { border-left-color: var(--teal); }
+  .step-block.locked::before { content: "🔒 "; font-size: 9px; }
+  .step-block.passive {
+    border-left: 3px dashed var(--gray);
+    background: transparent;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .step-block.passive::before { content: "⏱ "; font-size: 9px; }
+  .step-block.draft-preview {
+    border-left-color: var(--draft-border);
+    background: var(--draft-tint);
+    border: 0.5px dashed var(--draft-border);
+    border-left: 3px solid var(--draft-border);
+    cursor: default;
+  }
+  .step-block .step-product {
+    font-weight: 500;
+  }
+  .step-block .step-meta {
+    color: var(--text-muted);
+    font-size: 10px;
+    margin-top: 1px;
+  }
+  
+  .conflict-warn {
+    color: var(--rose);
+    font-size: 10px;
+    padding: 2px 4px;
+    margin-top: 2px;
+    border-left: 2px solid var(--rose);
+  }
+  
+  .empty-day-hint {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-align: center;
+    padding: 20px 4px;
+    font-style: italic;
+    border: 0.5px dashed var(--border-warm);
+    border-radius: 4px;
+    margin: 8px;
+  }
+  
+  /* MODAL */
+  .modal-backdrop {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(44, 37, 21, 0.4);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 520px;
+    width: 90%;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  }
+  .modal h3 {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+  .modal .modal-sub {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+    margin-bottom: 18px;
+  }
+  .modal-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+  .modal-option {
+    padding: 12px 16px;
+    border: 0.5px solid var(--border-warm);
+    border-radius: 6px;
+    cursor: pointer;
+    background: var(--card-bg);
+    text-align: left;
+    transition: all 0.15s;
+  }
+  .modal-option:hover {
+    border-color: var(--teal);
+    background: var(--today-tint);
+  }
+  .modal-option.recommended {
+    border-color: var(--draft-border);
+    background: var(--draft-tint);
+  }
+  .modal-option-label {
+    font-weight: 500;
+    margin-bottom: 3px;
+  }
+  .modal-option-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  
+  /* CATEGORY DOT COLORS */
+  .dot.moulded { background: var(--rose); }
+  .dot.bars { background: var(--teal); }
+  .dot.bars-filled { background: var(--blush); }
+  .dot.toasties { background: var(--caramel); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="tabs">
+    <div class="tab">Dashboard</div>
+    <div class="tab">Daily</div>
+    <div class="tab">Planner</div>
+    <div class="tab">Needed</div>
+    <div class="tab active">Manual</div>
+    <div class="tab">Equipment</div>
+    <div class="tab">HACCP</div>
+  </div>
+  
+  <div class="header-row">
+    <div>
+      <h1 class="serif">Manual planner</h1>
+      <p class="subtitle">Select demand · build a draft batch · drop on a day · save as production order.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn">← prev week</button>
+      <button class="btn">today</button>
+      <button class="btn">next week →</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  
+  <!-- LEFT: DEMAND PICKER -->
+  <div class="pane">
+    <div class="pane-header">
+      <h2 class="serif">Demand</h2>
+      <div class="meta">29 products · 67 pcs urgent · 17 overdue</div>
+    </div>
+    
+    <div class="filter-row">
+      <div class="pill active">All</div>
+      <div class="pill">Online orders</div>
+      <div class="pill">POs</div>
+      <div class="pill">Urgent</div>
+      <div class="pill">Low stock</div>
+    </div>
+    
+    <div class="pane-body">
+      
+      <!-- MOULDED CATEGORY -->
+      <div class="category">
+        <div class="category-header">
+          <span><span class="dot moulded" style="display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align: middle;"></span>Moulded · 12 products</span>
+          <span class="category-meta">3-cav, filled · 16-40 pcs/run</span>
+        </div>
+        
+        <!-- Almond Praline EXPANDED + IN DRAFT -->
+        <div class="product-row in-draft expanded" onclick="toggleRow(event, this)">
+          <div class="product-line1">
+            <div class="product-name">
+              <span class="chevron">▼</span>Almond Praline
+              <span class="product-in-draft-tag">· in draft batch</span>
+            </div>
+            <div class="product-stock">stock 24</div>
+          </div>
+          <div class="product-line2">
+            <div>67 pcs · 17 ord · 50 PO · 3-cav · 40 pcs/run</div>
+            <div class="product-urgency">⚠ 3 due in 2d</div>
+          </div>
+          
+          <div class="orders-expanded" onclick="event.stopPropagation()">
+            <div class="smart-suggestion" onclick="openFillModal()">
+              <div>
+                <span class="arrow">→</span>
+                <strong>Plan 40-piece run</strong> — covers 24 ord + 16 toward PO
+              </div>
+            </div>
+            
+            <div class="section-label">Orders (showing 5 of 17)</div>
+            <div class="order-line in-draft" onclick="event.stopPropagation()">
+              <div class="order-info">
+                <div class="order-checkbox">✓</div>
+                <span class="order-num">#4425</span>
+                <span class="order-customer">Margot Löbl</span>
+                <span class="order-due urgent">3 May</span>
+              </div>
+              <span class="order-qty">2</span>
+            </div>
+            <div class="order-line in-draft" onclick="event.stopPropagation()">
+              <div class="order-info">
+                <div class="order-checkbox">✓</div>
+                <span class="order-num">#4427</span>
+                <span class="order-customer">Barbara Wieser</span>
+                <span class="order-due urgent">3 May</span>
+              </div>
+              <span class="order-qty">1</span>
+            </div>
+            <div class="order-line" onclick="event.stopPropagation()">
+              <div class="order-info">
+                <div class="order-checkbox"></div>
+                <span class="order-num">#4429</span>
+                <span class="order-customer">l.grund@hotmail.com</span>
+                <span class="order-due urgent">4 May</span>
+              </div>
+              <span class="order-qty">2</span>
+            </div>
+            <div class="order-line" onclick="event.stopPropagation()">
+              <div class="order-info">
+                <div class="order-checkbox"></div>
+                <span class="order-num">#4434</span>
+                <span class="order-customer">tobistgr9@gmail.com</span>
+                <span class="order-due">4 May</span>
+              </div>
+              <span class="order-qty">3</span>
+            </div>
+            <div class="order-line" onclick="event.stopPropagation()">
+              <div class="order-info">
+                <div class="order-checkbox"></div>
+                <span class="order-num">#4437</span>
+                <span class="order-customer">Waltraud Lechner</span>
+                <span class="order-due">4 May</span>
+              </div>
+              <span class="order-qty">2</span>
+            </div>
+            <div class="muted italic small" style="padding: 4px 0;">+ 12 more orders — show all</div>
+            
+            <div class="section-label">POs (1)</div>
+            <div class="order-line in-draft" onclick="event.stopPropagation()">
+              <div class="order-info">
+                <div class="order-checkbox">✓</div>
+                <span class="order-num">PO</span>
+                <span class="order-customer">Mothersday · partial fills</span>
+                <span class="order-due">14 May</span>
+              </div>
+              <span class="order-qty">37</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="product-row planned">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Hazelnut Caramel</div>
+            <div class="product-stock">stock 50</div>
+          </div>
+          <div class="product-line2">
+            <div>67 pcs · 17 ord · 50 PO · 3-cav · 40 pcs/run</div>
+            <div style="color: var(--teal);">40 planned Tue</div>
+          </div>
+        </div>
+        
+        <div class="product-row">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Lillet Berry</div>
+            <div class="product-stock">stock 12</div>
+          </div>
+          <div class="product-line2">
+            <div>67 pcs · 17 ord · 50 PO · 3-cav · 40 pcs/run</div>
+            <div></div>
+          </div>
+        </div>
+        
+        <div class="product-row covered">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Kalamansi Cheesecake</div>
+            <div class="product-stock">stock 80 ✓</div>
+          </div>
+          <div class="product-line2">
+            <div>67 pcs · filled · 16 pcs/run</div>
+            <div></div>
+          </div>
+        </div>
+        
+        <div class="product-row urgent">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Crunchy Nougat</div>
+            <div class="product-stock">stock 0</div>
+          </div>
+          <div class="product-line2">
+            <div>25 pcs · 2 ord · 23 PO · filled · 8/run</div>
+            <div class="product-urgency">⚠ 2 due tmrw</div>
+          </div>
+        </div>
+        
+        <div class="product-row">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Peanut Crunch</div>
+            <div class="product-stock">stock 18</div>
+          </div>
+          <div class="product-line2">
+            <div>24 pcs · 2 ord · 22 PO · filled · 8/run</div>
+            <div></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- BARS CATEGORY -->
+      <div class="category">
+        <div class="category-header">
+          <span><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--teal); margin-right:6px; vertical-align: middle;"></span>Bars · 3 products</span>
+          <span class="category-meta">bar mould · 24 pcs/run</span>
+        </div>
+        <div class="product-row">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Strawberry — Lemon Bar</div>
+            <div class="product-stock">stock 8</div>
+          </div>
+          <div class="product-line2">
+            <div>15 pcs · 5 ord · 10 PO · bar · 24/run</div>
+            <div></div>
+          </div>
+        </div>
+        <div class="product-row">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Lemon — Strawberry Bar</div>
+            <div class="product-stock">stock 5</div>
+          </div>
+          <div class="product-line2">
+            <div>12 pcs · 2 ord · 10 PO · bar · 24/run</div>
+            <div></div>
+          </div>
+        </div>
+        <div class="product-row">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Pistachio Crunch Bar</div>
+            <div class="product-stock">stock 14</div>
+          </div>
+          <div class="product-line2">
+            <div>7 pcs · 2 ord · 5 PO · bar · 24/run</div>
+            <div></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- BARS FILLED CATEGORY -->
+      <div class="category">
+        <div class="category-header">
+          <span><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--blush); margin-right:6px; vertical-align: middle;"></span>Bars filled · 4 products</span>
+          <span class="category-meta">bar filled · 24 pcs/run</span>
+        </div>
+        <div class="product-row">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Bar (Filled) Pistachio</div>
+            <div class="product-stock">stock 22</div>
+          </div>
+          <div class="product-line2">
+            <div>3 pcs · 1 ord · 2 PO · bar fill · 24/run</div>
+            <div></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- TOASTIES CATEGORY -->
+      <div class="category">
+        <div class="category-header">
+          <span><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--caramel); margin-right:6px; vertical-align: middle;"></span>Toasties · 3 products</span>
+          <span class="category-meta">toasty mould · 12 pcs/run</span>
+        </div>
+        <div class="product-row">
+          <div class="product-line1">
+            <div class="product-name"><span class="chevron">▶</span>Pistachio Raspberry Toasty</div>
+            <div class="product-stock">stock 6</div>
+          </div>
+          <div class="product-line2">
+            <div>5 pcs · 0 ord · 5 PO · toasty · 12/run</div>
+            <div></div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <!-- RIGHT: DRAFT BAR + WEEK GRID -->
+  <div class="right-pane">
+    
+    <!-- DRAFT BATCH BAR -->
+    <div class="draft-bar">
+      <div class="draft-bar-header">
+        <div class="draft-bar-title">
+          <h3 class="serif">Draft batch</h3>
+          <span class="draft-bar-summary">1 product · 40 pcs · 1 mould fill · ~5h 30m total</span>
+        </div>
+        <button class="btn small">Cancel draft</button>
+      </div>
+      
+      <div class="draft-items">
+        <div class="draft-item">
+          <span class="dot moulded"></span>
+          Almond Praline · 40 pcs (3-cav)
+          <span class="x">×</span>
+        </div>
+        <div class="muted small italic" style="align-self: center;">drag to a day below ↓</div>
+      </div>
+      
+      <div class="draft-actions">
+        <div class="draft-target-info">
+          ⏵ drop on a day to set production date
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn">Edit</button>
+          <button class="btn btn-primary btn-disabled">Save as production order</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- WEEK GRID -->
+    <div class="week-pane">
+      <div class="week-header">
+        <h2 class="serif">Week of 4 May 2026</h2>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="muted small italic">Locked items pin · auto-planner respects them</span>
+        </div>
+      </div>
+      
+      <div class="week-grid">
+        
+        <!-- MON empty (drop target) -->
+        <div class="day-col">
+          <div class="day-header-cell">
+            <div class="day-name">Mon</div>
+            <div class="day-date">4 May</div>
+            <div class="day-cap">0h / 14h</div>
+            <div class="cap-bar"><div class="cap-fill" style="width: 0%"></div></div>
+          </div>
+          <div class="day-content">
+            <div class="empty-day-hint">drop draft here</div>
+          </div>
+        </div>
+        
+        <!-- TUE — has stuff -->
+        <div class="day-col">
+          <div class="day-header-cell">
+            <div class="day-name">Tue</div>
+            <div class="day-date">5 May</div>
+            <div class="day-cap">6h 20m / 14h</div>
+            <div class="cap-bar"><div class="cap-fill" style="width: 45%"></div></div>
+          </div>
+          <div class="day-content">
+            <div class="step-block locked">
+              <div class="step-product">Temper · dark</div>
+              <div class="step-meta">1h · 09:00</div>
+            </div>
+            <div class="step-block locked">
+              <div class="step-product">Fill · Almond Praline</div>
+              <div class="step-meta">40 pcs · 2h · 10:00</div>
+            </div>
+            <div class="step-block passive">
+              <div class="step-product">Set/cool · Almond Praline</div>
+              <div class="step-meta">20h passive · → Wed</div>
+            </div>
+            <div class="step-block">
+              <div class="step-product">Decorate · Lillet</div>
+              <div class="step-meta">30m · 13:00</div>
+            </div>
+            <div class="step-block">
+              <div class="step-product">Package · Hazelnut</div>
+              <div class="step-meta">1h · 13:30</div>
+            </div>
+            <div class="conflict-warn">⚠ Mould 11:00</div>
+          </div>
+        </div>
+        
+        <!-- WED — drop target HIGHLIGHTED -->
+        <div class="day-col drop-target">
+          <div class="day-header-cell">
+            <div class="day-name">Wed</div>
+            <div class="day-date">6 May</div>
+            <div class="day-cap">2h + draft / 14h</div>
+            <div class="cap-bar"><div class="cap-fill" style="width: 50%"></div></div>
+          </div>
+          <div class="day-content">
+            <div class="step-block passive">
+              <div class="step-product">Set/cool ends</div>
+              <div class="step-meta">→ 08:00</div>
+            </div>
+            <div class="step-block">
+              <div class="step-product">Unmould · Almond Praline</div>
+              <div class="step-meta">1h · 08:00</div>
+            </div>
+            <div class="step-block">
+              <div class="step-product">Fill · Kalamansi</div>
+              <div class="step-meta">16 pcs · 1h · 09:00</div>
+            </div>
+            
+            <!-- DRAFT PREVIEW -->
+            <div class="step-block draft-preview">
+              <div class="step-product">+ Almond Praline batch</div>
+              <div class="step-meta">40 pcs · ~5h 30m total</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- THU — today -->
+        <div class="day-col today">
+          <div class="day-header-cell today">
+            <div class="day-name">Thu · today</div>
+            <div class="day-date">7 May</div>
+            <div class="day-cap">8h / 14h</div>
+            <div class="cap-bar"><div class="cap-fill warn" style="width: 57%"></div></div>
+          </div>
+          <div class="day-content">
+            <div class="step-block locked">
+              <div class="step-product">Temper · dark</div>
+              <div class="step-meta">1h · 09:00</div>
+            </div>
+            <div class="step-block locked">
+              <div class="step-product">Fill · Crunchy Nougat</div>
+              <div class="step-meta">8 pcs · 1h · 10:00</div>
+            </div>
+            <div class="step-block">
+              <div class="step-product">Decorate · AP yesterday</div>
+              <div class="step-meta">30m · 11:00</div>
+            </div>
+            <div class="step-block">
+              <div class="step-product">Package · AP</div>
+              <div class="step-meta">40 pcs · 1h · 11:30</div>
+            </div>
+            <div class="step-block">
+              <div class="step-product">Polish · HC mould</div>
+              <div class="step-meta">30m · 14:00</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- FRI -->
+        <div class="day-col">
+          <div class="day-header-cell">
+            <div class="day-name">Fri</div>
+            <div class="day-date">8 May</div>
+            <div class="day-cap">12h / 14h</div>
+            <div class="cap-bar"><div class="cap-fill warn" style="width: 86%"></div></div>
+          </div>
+          <div class="day-content">
+            <div class="step-block">
+              <div class="step-product">Fill · Hazelnut</div>
+              <div class="step-meta">40 pcs · 2h · 09:00</div>
+            </div>
+            <div class="step-block">
+              <div class="step-product">Multi-step · Lillet</div>
+              <div class="step-meta">3h 30m</div>
+            </div>
+            <div class="step-block">
+              <div class="step-product">Mothersday PO prep</div>
+              <div class="step-meta">50 pcs · 5h</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- SAT closed -->
+        <div class="day-col closed">
+          <div class="day-header-cell closed">
+            <div class="day-name">Sat</div>
+            <div class="day-date">9 May</div>
+            <div class="day-cap muted">closed</div>
+          </div>
+          <div class="day-content">closed</div>
+        </div>
+        
+        <!-- SUN closed -->
+        <div class="day-col closed">
+          <div class="day-header-cell closed">
+            <div class="day-name">Sun</div>
+            <div class="day-date">10 May</div>
+            <div class="day-cap muted">closed</div>
+          </div>
+          <div class="day-content">closed</div>
+        </div>
+        
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<!-- Fill mould modal -->
+<div class="modal-backdrop" id="fillModal">
+  <div class="modal">
+    <h3 class="serif">Almond Praline · 3-cav mould</h3>
+    <p class="modal-sub">Mould produces <strong>40 pcs per run</strong>. You have <strong>3 selected orders = 3 pcs</strong>. How to use the rest?</p>
+    
+    <div class="modal-options">
+      <div class="modal-option recommended" onclick="closeFillModal()">
+        <div class="modal-option-label">→ Fill from PO Mothersday (recommended)</div>
+        <div class="modal-option-detail">37 pcs toward 50 pc PO · covers 74% of PO in one run</div>
+      </div>
+      <div class="modal-option" onclick="closeFillModal()">
+        <div class="modal-option-label">Add to stock</div>
+        <div class="modal-option-detail">37 pcs to inventory · current 24 → 61</div>
+      </div>
+      <div class="modal-option" onclick="closeFillModal()">
+        <div class="modal-option-label">Make only 3 pcs</div>
+        <div class="modal-option-detail">Surplus 37 → store/freezer/waste at unmould · not recommended</div>
+      </div>
+    </div>
+    
+    <div class="modal-actions">
+      <button class="btn" onclick="closeFillModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="closeFillModal()">Use selection</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleRow(e, el) {
+    if (el.classList.contains('expanded')) {
+      el.classList.remove('expanded');
+      const expanded = el.querySelector('.orders-expanded');
+      if (expanded) expanded.classList.add('hidden');
+    } else {
+      document.querySelectorAll('.product-row.expanded').forEach(r => {
+        r.classList.remove('expanded');
+        const exp = r.querySelector('.orders-expanded');
+        if (exp) exp.classList.add('hidden');
+      });
+      el.classList.add('expanded');
+      const expanded = el.querySelector('.orders-expanded');
+      if (expanded) expanded.classList.remove('hidden');
+    }
+  }
+  
+  function openFillModal() {
+    document.getElementById('fillModal').classList.add('show');
+  }
+  function closeFillModal() {
+    document.getElementById('fillModal').classList.remove('show');
+  }
+</script>
+
+</body>
+</html>
