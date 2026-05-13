@@ -193,7 +193,10 @@ export default function SetupWizardPage() {
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <PageHeader title="Setup" meta={"First-run wizard" + " · " + "Data the brain needs before it can schedule properly. Fill each section or dismiss entries you don't plan to use yet."} />
+      <PageHeader
+        title="Setup checklist"
+        meta="First-run wizard · data the brain needs before it can schedule properly · fill each section or dismiss what you won't use"
+      />
 
       <section
         className="mb-6 border border-border bg-card p-4"
