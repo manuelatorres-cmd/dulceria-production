@@ -71,14 +71,14 @@ const PHASES = [
 type PhaseId = (typeof PHASES)[number]["id"];
 
 const PHASE_TINT: Record<PhaseId, { from: string; to: string; ink: string }> = {
-  polishing: { from: "var(--accent-butter-bg)", to: "#fdf1e2", ink: "var(--accent-butter-ink)" },
-  colour:    { from: "#fdeeea", to: "#fdf1e2", ink: "var(--accent-blush-ink)" },
-  shell:     { from: "var(--accent-butter-bg)", to: "#fdf1e2", ink: "var(--accent-butter-ink)" },
-  filling:   { from: "#f3eef6", to: "#fdeeea", ink: "#6a4d89" },
-  fill:      { from: "var(--accent-sky-bg)", to: "#f3eef6", ink: "var(--accent-sky-ink)" },
-  cap:       { from: "#eff3ec", to: "var(--accent-mint-bg)", ink: "#5c7050" },
+  polishing: { from: "var(--accent-butter-bg)", to: "var(--accent-peach-bg)", ink: "var(--accent-butter-ink)" },
+  colour:    { from: "var(--accent-blush-bg)", to: "var(--accent-peach-bg)", ink: "var(--accent-blush-ink)" },
+  shell:     { from: "var(--accent-butter-bg)", to: "var(--accent-peach-bg)", ink: "var(--accent-butter-ink)" },
+  filling:   { from: "var(--accent-lilac-bg)", to: "var(--accent-blush-bg)", ink: "var(--accent-lilac-ink)" },
+  fill:      { from: "var(--accent-sky-bg)", to: "var(--accent-lilac-bg)", ink: "var(--accent-sky-ink)" },
+  cap:       { from: "var(--accent-sage-bg)", to: "var(--accent-mint-bg)", ink: "var(--accent-sage-ink)" },
   unmould:   { from: "var(--accent-mint-bg)", to: "var(--accent-butter-bg)", ink: "var(--accent-mint-ink)" },
-  packing:   { from: "#fdf1e2", to: "#fdeeea", ink: "#9a6640" },
+  packing:   { from: "var(--accent-peach-bg)", to: "var(--accent-blush-bg)", ink: "var(--accent-peach-ink)" },
 };
 
 function todayIso(): string {
