@@ -281,7 +281,7 @@ export default function StockAdjustPage() {
         </button>
 
         {/* Common settings */}
-        <section className="rounded-[14px] border border-border bg-card p-3">
+        <section className="rounded-[6px] border border-border bg-card p-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className="label">Type</label>
@@ -394,7 +394,7 @@ export default function StockAdjustPage() {
         </section>
 
         {/* Item list — like monthly count */}
-        <section className="rounded-[14px] border border-border overflow-hidden">
+        <section className="rounded-[6px] border border-border overflow-hidden">
           {visibleRows.length === 0 ? (
             <p className="px-4 py-6 text-sm text-muted-foreground italic text-center">
               No items match. Adjust filters or change type.

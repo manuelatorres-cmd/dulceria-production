@@ -266,7 +266,7 @@ export default function SalesReportPage() {
 
       {/* Range picker */}
       <div className="px-4 mb-5">
-        <div className="rounded-[14px] bg-card border border-border p-3 flex items-center flex-wrap gap-3">
+        <div className="rounded-[6px] bg-card border border-border p-3 flex items-center flex-wrap gap-3">
           <div className="flex gap-1">
             <button
               onClick={() => setRange("this-week")}
@@ -324,11 +324,11 @@ export default function SalesReportPage() {
           By product · sorted by sold
         </h2>
         {productRollup.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-border rounded-[14px]">
+          <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-border rounded-[6px]">
             No movement in this window.
           </p>
         ) : (
-          <div className="rounded-[14px] border border-border overflow-hidden">
+          <div className="rounded-[6px] border border-border overflow-hidden">
             <table className="w-full text-[12px]">
               <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
                 <tr>
@@ -364,7 +364,7 @@ export default function SalesReportPage() {
         <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-2">
           By reason
         </h2>
-        <div className="rounded-[14px] border border-border bg-card p-3 flex flex-wrap gap-3">
+        <div className="rounded-[6px] border border-border bg-card p-3 flex flex-wrap gap-3">
           {[...SOLD_REASONS, ...NON_REVENUE_REASONS].map((r) => (
             <div key={r} className="text-[12px]">
               <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
@@ -381,7 +381,7 @@ export default function SalesReportPage() {
         <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-2">
           By channel
         </h2>
-        <div className="rounded-[14px] border border-border bg-card p-3 flex flex-wrap gap-4">
+        <div className="rounded-[6px] border border-border bg-card p-3 flex flex-wrap gap-4">
           <div className="text-[12px]">
             <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">Counter / event</div>
             <div className="font-semibold tabular-nums">{channelTotals.counter} pcs</div>
@@ -403,7 +403,7 @@ export default function SalesReportPage() {
           <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-2">
             Packaging consumed (orders)
           </h2>
-          <div className="rounded-[14px] border border-border overflow-hidden">
+          <div className="rounded-[6px] border border-border overflow-hidden">
             <table className="w-full text-[12px]">
               <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
                 <tr>
@@ -430,7 +430,7 @@ export default function SalesReportPage() {
           <h2 className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-2">
             Slow movers · no movement in window ({slowMovers.length})
           </h2>
-          <div className="rounded-[14px] border border-dashed border-border p-3 text-[12px] text-muted-foreground">
+          <div className="rounded-[6px] border border-dashed border-border p-3 text-[12px] text-muted-foreground">
             {slowMovers.slice(0, 30).map((p) => p.name).join(", ")}
             {slowMovers.length > 30 ? ` · +${slowMovers.length - 30} more` : ""}
           </div>
@@ -450,7 +450,7 @@ function Tile({
   return (
     <div
       className={
-        "rounded-[14px] border p-3 " +
+        "rounded-[6px] border p-3 " +
         (tone === "alert"
           ? "border-status-alert-edge bg-status-alert-bg/40 text-status-alert"
           : "border-border bg-card")

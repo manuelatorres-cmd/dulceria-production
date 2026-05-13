@@ -165,7 +165,7 @@ export default function ProductionOrderDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4">
         {/* Main fields */}
-        <section className="space-y-3 rounded-[14px] border border-border bg-card/80 p-4">
+        <section className="space-y-3 rounded-[6px] border border-border bg-card/80 p-4">
           <div className="flex justify-end items-center gap-1.5 -mb-1">
             {editing ? (
               <>
@@ -323,7 +323,7 @@ export default function ProductionOrderDetailPage({
         </section>
 
         {/* Items */}
-        <aside className="rounded-[14px] border border-border bg-card/80 p-4">
+        <aside className="rounded-[6px] border border-border bg-card/80 p-4">
           <h3
             className="text-[13px] mb-2"
             style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
@@ -447,7 +447,7 @@ function LinkedBatches({
   );
   if (linked.length === 0) {
     return (
-      <section className="mt-4 rounded-[14px] border border-border bg-card/80 p-4">
+      <section className="mt-4 rounded-[6px] border border-border bg-card/80 p-4">
         <h3
           className="text-[13px] mb-1.5"
           style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.012em" }}
@@ -481,7 +481,7 @@ function LinkedBatches({
   }
 
   return (
-    <section className="mt-4 rounded-[14px] border border-border bg-card/80 p-4">
+    <section className="mt-4 rounded-[6px] border border-border bg-card/80 p-4">
       <div className="flex items-baseline justify-between mb-2">
         <h3
           className="text-[13px]"

@@ -2003,7 +2003,7 @@ export default function DailyV2Page() {
                   />
                 </div>
                 <div
-                  className="rounded-[14px] p-3 sm:p-4"
+                  className="rounded-[6px] p-3 sm:p-4"
                   style={{ background: "rgba(255,255,255,0.6)", color: tint.ink, minHeight: 180 }}
                 >
                   {/* Colour phase: show consolidated worklist instead of
@@ -2322,7 +2322,7 @@ export default function DailyV2Page() {
           {/* Phase peek-card grid — compact, click to focus. Same
               hide-empty rule as the top strip: phases without batches
               today drop out so the grid only shows active work. */}
-          <section className="rounded-[14px] bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] p-2">
+          <section className="rounded-[6px] bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] p-2">
             <ul className="grid grid-cols-4 lg:grid-cols-8 gap-1.5">
               {PHASES.filter((ph) => rollups[ph.id].totalBatches > 0).map((ph) => {
                 const r = rollups[ph.id];

@@ -1603,7 +1603,7 @@ function WeekView(props: {
     <div>
       {/* Weekly stats — replaces the old per-day strip; numbers cover
           the full 14-day visible window. */}
-      <div className="rounded-[18px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] p-4 mb-3 grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="rounded-[8px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] p-4 mb-3 grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
           <p className="text-[10px] uppercase text-muted-foreground" style={{ letterSpacing: "0.12em" }}>
             Window
@@ -1701,7 +1701,7 @@ function WeekView(props: {
           onClick={() => setPendingDrop(null)}
         >
           <div
-            className="rounded-[18px] border border-[color:var(--ds-border-warm)] bg-white p-5 max-w-md w-full mx-4 shadow-xl"
+            className="rounded-[8px] border border-[color:var(--ds-border-warm)] bg-white p-5 max-w-md w-full mx-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3
@@ -2552,7 +2552,7 @@ function ScheduledPanel({
   }
 
   return (
-    <section className="bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] mb-4">
+    <section className="bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[8px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] mb-4">
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
@@ -2826,7 +2826,7 @@ function DemandByUrgency({
   const totalNet = productTotals.reduce((s, p) => s + p.net, 0);
 
   return (
-    <section className="bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] mb-4">
+    <section className="bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[8px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)] mb-4">
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}
@@ -3799,7 +3799,7 @@ function PivotView(props: {
   const [expandedCellKey, setExpandedCellKey] = useState<string | null>(null);
 
   // ── Render. ─────────────────────────────────────────────────────
-  const CARD_LOCAL = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+  const CARD_LOCAL = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[8px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
 
   if (focusedSources.length === 0) {
     return (
@@ -4142,7 +4142,7 @@ function MonthDayDrop({
   return (
     <div
       ref={setNodeRef}
-      className="rounded-[14px] p-4"
+      className="rounded-[6px] p-4"
       style={{
         background: isOver ? "rgba(246,198,203,0.45)" : "rgba(255,255,255,0.85)",
         border: isOver ? "2px solid #2e4839" : "1px solid var(--border)",
@@ -4589,7 +4589,7 @@ function MonthView(props: {
   }
 
   // ── Render. ─────────────────────────────────────────────────────
-  const CARD_LOCAL = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+  const CARD_LOCAL = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[8px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={pointerWithin}>

@@ -1262,7 +1262,7 @@ function PartialStockPrompt({ lines, onApply, onCancel }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
+      <div className="absolute inset-0 bg-black/40 " onClick={onCancel} />
       <div className="relative w-full max-w-lg rounded border border-border bg-card shadow-xl overflow-hidden">
         <div className="px-5 pt-5 pb-3 border-b border-border">
           <h3 className="text-base font-bold text-foreground">Not enough in stock</h3>

@@ -121,7 +121,7 @@ type CampaignViewProps = {
   onEdit: () => void;
 };
 
-const CARD = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[18px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
+const CARD = "bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[8px] p-4 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
 
 function CampaignView({
   campaign, products, productCategories, allPlans, allPlanProducts, allStepStatuses, productionSteps, orders, orderItems, onEdit,

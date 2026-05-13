@@ -525,13 +525,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex flex-wrap gap-2">
             <Link
               href={`/orders/${encodeURIComponent(orderId)}/production`}
-              className="inline-flex items-center gap-2 rounded-[14px] bg-foreground text-background px-4 py-2.5 text-sm font-medium hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-[6px] bg-foreground text-background px-4 py-2.5 text-sm font-medium hover:opacity-90"
             >
               <Calendar className="w-4 h-4" /> Production schedule →
             </Link>
             <Link
               href={`/plan?focus=order:${encodeURIComponent(orderId)}`}
-              className="inline-flex items-center gap-2 rounded-[14px] bg-[#e3ebe6] text-[#2e4839] px-4 py-2.5 text-sm font-medium hover:bg-[#d4e0d8]"
+              className="inline-flex items-center gap-2 rounded-[6px] bg-[#e3ebe6] text-[#2e4839] px-4 py-2.5 text-sm font-medium hover:bg-[#d4e0d8]"
             >
               Plan this in /plan →
             </Link>
@@ -832,7 +832,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             order instead of deleting it. */}
         {reassignProposals && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setReassignProposals(null)} />
+            <div className="absolute inset-0 bg-black/40 " onClick={() => setReassignProposals(null)} />
             <div className="relative w-full max-w-lg rounded border border-border bg-card shadow-xl overflow-hidden">
               <div className="px-5 pt-5 pb-3 border-b border-border bg-amber-50">
                 <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
@@ -2869,7 +2869,7 @@ function ReplaceAndCreditModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 " onClick={onClose} />
       <div
         className="relative w-full max-w-md mx-4 border border-border bg-card shadow-xl"
         style={{ borderRadius: 4 }}

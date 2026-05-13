@@ -454,13 +454,13 @@ export default function DailyCountPage() {
               Variant sizes ({visibleSizeRows.length}{activeCategories.size > 0 ? ` of ${sizeRows.length}` : ""})
             </h2>
             {visibleSizeRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-border rounded-[14px]">
+              <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-border rounded-[6px]">
                 {activeCategories.size > 0
                   ? "No variant sizes match the selected category filter."
                   : "No variants set up. Create one at /variants first."}
               </p>
             ) : (
-              <ul className="rounded-[14px] border border-border divide-y divide-border bg-card">
+              <ul className="rounded-[6px] border border-border divide-y divide-border bg-card">
                 {visibleSizeRows.map((row) => {
                   const qty = variantQty[row.id] ?? 0;
                   const overrideStr = variantPriceOverride[row.id] ?? "";
@@ -525,7 +525,7 @@ export default function DailyCountPage() {
             {singleProductSales.length === 0 ? (
               <p className="text-[12px] text-muted-foreground italic">No singles. Click "+ Add line" if any bars sold individually.</p>
             ) : (
-              <ul className="rounded-[14px] border border-border divide-y divide-border bg-card">
+              <ul className="rounded-[6px] border border-border divide-y divide-border bg-card">
                 {singleProductSales.map((sp, i) => (
                   <li key={i} className="px-3 py-2 flex items-center gap-2 flex-wrap">
                     <select
@@ -595,11 +595,11 @@ export default function DailyCountPage() {
               </div>
             )}
             {countableProducts.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-border rounded-[14px]">
+              <p className="text-sm text-muted-foreground italic px-3 py-3 border border-dashed border-border rounded-[6px]">
                 Nothing to count. Add some shop stock or variant sales first.
               </p>
             ) : (
-              <div className="rounded-[14px] border border-border overflow-hidden">
+              <div className="rounded-[6px] border border-border overflow-hidden">
                 <table className="w-full text-[12px]">
                   <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
                     <tr>
