@@ -203,7 +203,7 @@ export function AllocationSplitModal({
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium truncate flex items-center gap-1.5">
                     <span
-                      className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm"
+                      className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-[4px]"
                       style={{ background: tagBg, color: tagInk, letterSpacing: "0.08em" }}
                     >
                       {tagText}
@@ -301,7 +301,7 @@ export function AllocationSplitModal({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
+            className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
           >
             Back
           </button>
@@ -309,7 +309,7 @@ export function AllocationSplitModal({
             type="button"
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             Save allocation
           </button>

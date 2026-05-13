@@ -428,7 +428,7 @@ export default function StatsPage() {
               <button
                 key={p.value}
                 onClick={() => handlePresetChange(p.value)}
-                className={`px-3 py-1 text-xs rounded-sm border transition-colors ${
+                className={`px-3 py-1 text-xs rounded-[4px] border transition-colors ${
                   timePreset === p.value
                     ? "bg-stone-800 text-white border-stone-800"
                     : "bg-transparent text-stone-600 border-stone-300 hover:bg-stone-100 hover:border-stone-400"
@@ -661,7 +661,7 @@ export default function StatsPage() {
                     {productColorList.map((r) => (
                       <div
                         key={r.id}
-                        className="w-3 h-3 rounded-sm cursor-default"
+                        className="w-3 h-3 rounded-[4px] cursor-default"
                         style={{ backgroundColor: r.color }}
                         onMouseEnter={(e) =>
                           setTooltip({
@@ -680,7 +680,7 @@ export default function StatsPage() {
                       <>
                         <span className="text-[9px] text-muted-foreground mx-0.5">·</span>
                         <div
-                          className="w-3 h-3 rounded-sm bg-stone-200 cursor-default"
+                          className="w-3 h-3 rounded-[4px] bg-stone-200 cursor-default"
                           onMouseEnter={(e) => {
                             const totalWaste = chartData.reduce((s, d) => s + d.waste, 0);
                             setTooltip({

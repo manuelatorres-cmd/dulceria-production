@@ -221,7 +221,7 @@ export default function ProductionBrainDashboardPage() {
               {plans.slice(0, 6).map((plan) => (
                 <li
                   key={plan.id}
-                  className="rounded-sm bg-muted px-3 py-2 text-sm flex items-center justify-between"
+                  className="rounded-[4px] bg-muted px-3 py-2 text-sm flex items-center justify-between"
                 >
                   <span className="font-medium">
                     {plan.name ?? `Batch ${plan.batchNumber ?? plan.id?.slice(0, 6)}`}

@@ -78,7 +78,7 @@ export default function OnlineOrdersPage() {
           <div className="flex gap-2">
             <Link
               href="/orders/online/import"
-              className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
+              className="inline-flex items-center gap-1.5 rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium"
             >
               <Upload className="w-4 h-4" /> Import Shopify CSV
             </Link>
@@ -146,7 +146,7 @@ export default function OnlineOrdersPage() {
             </div>
           </div>
           {onlineOrders.length === 0 ? (
-            <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
+            <div className="rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
               <p className="text-sm text-muted-foreground">
                 No open online orders. Import a Shopify CSV to get started.
               </p>
@@ -188,7 +188,7 @@ export default function OnlineOrdersPage() {
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/orders/online/${encodeURIComponent(o.id!)}`}
-                          className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
+                          className="inline-flex items-center gap-1 rounded-[4px] border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
                         >
                           <FileText className="w-3 h-3" /> Packing slip
                         </Link>
@@ -250,7 +250,7 @@ function ShipButton({ orderId, disabled }: { orderId: string; disabled: boolean 
       onClick={handleClick}
       disabled={disabled}
       title={disabled ? "Not enough stock in Production Storage" : "Deduct pieces and mark shipped"}
-      className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-2.5 py-1 text-xs font-medium disabled:opacity-50"
+      className="inline-flex items-center gap-1 rounded-[4px] bg-primary text-primary-foreground px-2.5 py-1 text-xs font-medium disabled:opacity-50"
     >
       <Truck className="w-3 h-3" /> Ship
     </button>

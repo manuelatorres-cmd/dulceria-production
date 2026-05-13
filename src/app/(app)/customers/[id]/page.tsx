@@ -221,13 +221,13 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           <div className="flex items-center gap-2">
             <Link
               href={`/quotes/new?customerId=${encodeURIComponent(customer.id!)}`}
-              className="inline-flex items-center gap-1.5 rounded-sm bg-accent text-accent-foreground px-3 py-1.5 text-xs font-medium"
+              className="inline-flex items-center gap-1.5 rounded-[4px] bg-accent text-accent-foreground px-3 py-1.5 text-xs font-medium"
             >
               <FileText className="w-3.5 h-3.5" /> New quote
             </Link>
             <button
               onClick={() => setCustomerArchived(customer.id!, !customer.archived)}
-              className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+              className="inline-flex items-center gap-1 rounded-[4px] border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <Archive className="w-3 h-3" /> {customer.archived ? "Restore" : "Archive"}
             </button>
@@ -238,7 +238,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         {missingRequired.length > 0 && (
           <button
             onClick={() => setEditing(true)}
-            className="w-full flex items-center gap-2 rounded-sm border border-status-warn/40 bg-status-warn/5 px-3 py-2 text-left hover:bg-status-warn/10"
+            className="w-full flex items-center gap-2 rounded-[4px] border border-status-warn/40 bg-status-warn/5 px-3 py-2 text-left hover:bg-status-warn/10"
           >
             <AlertTriangle className="w-4 h-4 text-status-warn shrink-0" />
             <span className="flex-1 text-sm">
@@ -367,7 +367,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <div className="col-span-2 flex gap-2 justify-end">
                 <button onClick={() => { setEditing(false); setHydratedFor(null); }} className="text-xs text-muted-foreground">Cancel</button>
-                <button onClick={handleSaveProfile} className="rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium">Save</button>
+                <button onClick={handleSaveProfile} className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium">Save</button>
               </div>
             </div>
           ) : (
@@ -395,7 +395,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               {customer.tags?.length ? (
                 <><dt className="text-muted-foreground text-xs">Tags</dt>
                 <dd className="flex gap-1 flex-wrap">
-                  {customer.tags.map((t) => (<span key={t} className="rounded-sm border border-[color:var(--ds-border-warm)] px-1.5 py-0 text-[10px]">{t}</span>))}
+                  {customer.tags.map((t) => (<span key={t} className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-1.5 py-0 text-[10px]">{t}</span>))}
                 </dd></>
               ) : null}
               {customer.notes && <><dt className="text-muted-foreground text-xs col-span-2">Notes</dt><dd className="col-span-2 text-xs text-foreground whitespace-pre-line">{customer.notes}</dd></>}
@@ -493,7 +493,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               <button
                 onClick={handleAddContact}
                 disabled={!newContactSummary.trim()}
-                className="rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1"
+                className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" /> Log contact
               </button>
@@ -556,7 +556,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               <button
                 onClick={handleAddFollowup}
                 disabled={!newFollowupSubject.trim() || !newFollowupDue}
-                className="rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1"
+                className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" /> Add
               </button>
@@ -572,7 +572,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                   <li key={f.id} className="flex items-start gap-2 px-3 py-2 text-sm">
                     <button
                       onClick={() => completeCustomerFollowup(f.id!, !f.completedAt)}
-                      className={`mt-0.5 w-4 h-4 rounded-sm border flex items-center justify-center shrink-0 ${
+                      className={`mt-0.5 w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 ${
                         f.completedAt
                           ? "bg-status-ok border-status-ok text-white"
                           : overdue
@@ -773,7 +773,7 @@ function CustomerProductPricesSection({
           />
           <div className="flex items-center gap-2">
             <button onClick={handleAdd} disabled={saving || !productId || !price}
-              className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
+              className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
               {saving ? "Saving…" : "Add"}
             </button>
             <button onClick={() => setAdding(false)} className="text-xs text-muted-foreground hover:underline">Cancel</button>

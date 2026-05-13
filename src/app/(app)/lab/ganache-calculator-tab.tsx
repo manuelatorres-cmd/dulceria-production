@@ -276,7 +276,7 @@ export function GanacheCalculatorTab() {
             Issues
           </h2>
           {issues.length === 0 && breakdown.totalGrams > 0 ? (
-            <div className="rounded-sm border border-status-ok-edge bg-status-ok-bg/30 px-4 py-3 text-sm text-status-ok flex items-start gap-2">
+            <div className="rounded-[4px] border border-status-ok-edge bg-status-ok-bg/30 px-4 py-3 text-sm text-status-ok flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <span>All bands within ideal range. Good balance.</span>
             </div>
@@ -385,7 +385,7 @@ function VerdictCard({ severity, totalG, hint }: { severity: Severity; totalG: n
   const Icon = severity === "bad" ? AlertCircle : severity === "warn" ? AlertTriangle : CheckCircle2;
 
   return (
-    <div className={`rounded-sm border px-4 py-3 ${tone}`}>
+    <div className={`rounded-[4px] border px-4 py-3 ${tone}`}>
       <div className="flex items-center gap-2 mb-1.5">
         <Icon className="w-4 h-4" />
         <span className="text-sm font-medium">{label}</span>
@@ -423,7 +423,7 @@ function SuggestionRow({ suggestion, onApply }: { suggestion: Suggestion; onAppl
       </div>
       <button
         onClick={onApply}
-        className="flex-shrink-0 text-xs px-2 py-1 rounded-sm border border-[color:var(--ds-border-warm)] hover:bg-muted transition-colors"
+        className="flex-shrink-0 text-xs px-2 py-1 rounded-[4px] border border-[color:var(--ds-border-warm)] hover:bg-muted transition-colors"
       >
         Apply
       </button>
@@ -442,7 +442,7 @@ function IssueRow({ issue }: { issue: ReturnType<typeof validateGanache>[number]
   const iconTone = issue.severity === "bad" ? "text-status-alert" : issue.severity === "warn" ? "text-status-warn" : "text-status-ok";
 
   return (
-    <li className={`rounded-sm border ${tone} px-3 py-2.5`}>
+    <li className={`rounded-[4px] border ${tone} px-3 py-2.5`}>
       <div className="flex items-start gap-2">
         <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${iconTone}`} />
         <div className="min-w-0 text-sm">

@@ -281,7 +281,7 @@ export default function NeededPage() {
                       type="button"
                       onClick={() => toggle(o.id!)}
                       className={
-                        "w-full text-left rounded-sm border px-2 py-1.5 flex items-start gap-2 transition " +
+                        "w-full text-left rounded-[4px] border px-2 py-1.5 flex items-start gap-2 transition " +
                         (checked
                           ? "border-foreground bg-foreground/5"
                           : "border-[color:var(--ds-border-warm)] hover:border-foreground/40")

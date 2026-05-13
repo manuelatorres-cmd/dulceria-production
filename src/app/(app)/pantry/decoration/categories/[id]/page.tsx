@@ -104,7 +104,7 @@ export default function DecorationCategoryDetailPage({ params }: { params: Promi
               className="text-xl font-bold"
             />
             {category.archived && (
-              <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
+              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
                 <Archive className="w-3 h-3" /> Archived
               </span>
             )}
@@ -167,7 +167,7 @@ export default function DecorationCategoryDetailPage({ params }: { params: Promi
             )
           ) : (
             confirmDelete ? (
-              <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+              <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                 <p className="text-sm text-destructive font-medium">Delete this category?</p>
                 <p className="text-xs text-muted-foreground">
                   No materials are currently using it. This cannot be undone.
@@ -175,7 +175,7 @@ export default function DecorationCategoryDetailPage({ params }: { params: Promi
                 <div className="flex gap-2">
                   <button
                     onClick={async () => { await deleteDecorationCategory(categoryId); router.replace("/pantry/decoration"); }}
-                    className="rounded-sm bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
+                    className="rounded-[4px] bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
                   >
                     Yes, delete
                   </button>

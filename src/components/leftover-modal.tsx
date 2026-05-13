@@ -96,7 +96,7 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
         {/* Header */}
         <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-9 h-9 rounded-sm bg-primary/10 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-[4px] bg-primary/10 flex items-center justify-center">
               <Droplets className="w-5 h-5 text-primary" />
             </div>
             <div>
@@ -182,14 +182,14 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
           <button
             onClick={handleFreeze}
             disabled={!anyPositive}
-            className="rounded-sm border border-sky-200 bg-white px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+            className="rounded-[4px] border border-sky-200 bg-white px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
           >
             <Snowflake className="w-4 h-4" /> Freeze leftover
           </button>
           <button
             onClick={handleConfirm}
             disabled={!anyPositive}
-            className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             Save leftover
           </button>

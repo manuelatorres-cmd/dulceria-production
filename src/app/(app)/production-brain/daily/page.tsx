@@ -2130,7 +2130,7 @@ export default function DailyV2Page() {
                                 }}
                               >
                                 <span
-                                  className="mt-1 inline-block rounded-sm flex-shrink-0"
+                                  className="mt-1 inline-block rounded-[4px] flex-shrink-0"
                                   style={{
                                     width: 14, height: 14,
                                     background: row.done ? "#4a7a5e" : "transparent",
@@ -2360,7 +2360,7 @@ export default function DailyV2Page() {
                       <div className="text-[10px] tabular-nums opacity-75 leading-tight">
                         {r.doneBatches}/{r.totalBatches}
                       </div>
-                      <div className="h-[2px] bg-white/45 rounded-sm overflow-hidden mt-1">
+                      <div className="h-[2px] bg-white/45 rounded-[4px] overflow-hidden mt-1">
                         <div className="h-full" style={{ background: palette.bar, width: `${pct}%` }} />
                       </div>
                     </button>
@@ -2415,7 +2415,7 @@ function FilterOptionRow({
         (checked ? "bg-primary/10 text-foreground" : "hover:bg-muted text-foreground")
       }
     >
-      <span className="w-3.5 h-3.5 shrink-0 rounded-sm border border-[color:var(--ds-border-warm)] flex items-center justify-center text-[10px]">
+      <span className="w-3.5 h-3.5 shrink-0 rounded-[4px] border border-[color:var(--ds-border-warm)] flex items-center justify-center text-[10px]">
         {checked ? "✓" : ""}
       </span>
       <span className="flex-1 truncate">{label}</span>

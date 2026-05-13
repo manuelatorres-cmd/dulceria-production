@@ -33,7 +33,7 @@ export function StockStatusPanel({
 
   if (pendingAction) {
     return (
-      <div className="rounded-sm border border-status-warn-edge bg-status-warn-bg p-3 space-y-2">
+      <div className="rounded-[4px] border border-status-warn-edge bg-status-warn-bg p-3 space-y-2">
         <p className="text-sm font-medium text-status-warn">
           {pendingAction === "low" ? "Flag as low stock?" : "Mark as out of stock?"}
         </p>
@@ -67,7 +67,7 @@ export function StockStatusPanel({
   if (outOfStock) {
     return (
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-sm border border-status-alert-edge bg-status-alert-bg text-status-alert">
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-[4px] border border-status-alert-edge bg-status-alert-bg text-status-alert">
           <ShoppingCart className="w-3.5 h-3.5" />
           Out of stock — on shopping list
         </span>
@@ -90,7 +90,7 @@ export function StockStatusPanel({
   if (lowStock) {
     return (
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-sm border ${lowStockOrdered ? "border-status-ok-edge bg-status-ok-bg text-status-ok" : "border-status-warn-edge bg-status-warn-bg text-status-warn"}`}>
+        <span className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-[4px] border ${lowStockOrdered ? "border-status-ok-edge bg-status-ok-bg text-status-ok" : "border-status-warn-edge bg-status-warn-bg text-status-warn"}`}>
           <ShoppingCart className="w-3.5 h-3.5" />
           {lowStockOrdered ? "Ordered — awaiting delivery" : "Low stock — on shopping list"}
         </span>

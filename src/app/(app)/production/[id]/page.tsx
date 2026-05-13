@@ -941,7 +941,7 @@ function PlanContent({
                   </Link>
                 ))}
                 {surplusPlanned > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted px-2 py-0.5 text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted px-2 py-0.5 text-muted-foreground">
                     Surplus · {surplusPlanned} pcs
                   </span>
                 )}
@@ -959,7 +959,7 @@ function PlanContent({
                 if (!plan.id) return;
                 try { await startProductionPlan(plan.id); } catch (e) { console.error(e); }
               }}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:opacity-90"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:opacity-90"
               title="Mark this batch as in-progress and flip its linked orders to in production. Step ticks keep working as before."
             >
               <Play className="w-3.5 h-3.5" /> Start production
@@ -968,7 +968,7 @@ function PlanContent({
         </div>
 
         {/* Progress bar */}
-        <div className="mt-3 h-1.5 rounded-sm bg-muted overflow-hidden">
+        <div className="mt-3 h-1.5 rounded-[4px] bg-muted overflow-hidden">
           <div
             className="h-full bg-accent rounded-full transition-all duration-300"
             style={{ width: `${(phaseDoneCount / PHASES.length) * 100}%` }}
@@ -1009,7 +1009,7 @@ function PlanContent({
 
         {/* Deadline impact warning after an unmould yield short-stocks open orders */}
         {deadlineImpact && deadlineImpact.length > 0 && (
-          <div className="mt-3 rounded-sm border border-status-alert-edge bg-status-alert-bg px-3 py-2.5">
+          <div className="mt-3 rounded-[4px] border border-status-alert-edge bg-status-alert-bg px-3 py-2.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-status-alert">
@@ -1107,7 +1107,7 @@ function PlanContent({
                       {daysLabel && (
                         <div className="text-[9.5px] opacity-65 tabular-nums leading-tight">{daysLabel}</div>
                       )}
-                      <div className="h-[2px] bg-white/45 rounded-sm overflow-hidden mt-1">
+                      <div className="h-[2px] bg-white/45 rounded-[4px] overflow-hidden mt-1">
                         <div className="h-full" style={{ background: palette.bar, width: `${pct}%` }} />
                       </div>
                     </button>
@@ -1130,7 +1130,7 @@ function PlanContent({
                     return (
                       <li key={id} className="flex items-center gap-2.5">
                         <span
-                          className="w-3.5 h-3.5 rounded-sm border border-black/10 shrink-0"
+                          className="w-3.5 h-3.5 rounded-[4px] border border-black/10 shrink-0"
                           style={{ backgroundColor: material?.color ?? "#9ca3af" }}
                         />
                         <span className="text-sm flex-1">{material?.name ?? id}</span>
@@ -1289,7 +1289,7 @@ function PlanContent({
                                 return (
                                   <span
                                     key={id}
-                                    className="inline-block w-2.5 h-2.5 rounded-sm border border-black/10"
+                                    className="inline-block w-2.5 h-2.5 rounded-[4px] border border-black/10"
                                     style={{ backgroundColor: m?.color ?? "#9ca3af" }}
                                     title={m?.name ?? id}
                                   />
@@ -1377,7 +1377,7 @@ function PlanContent({
       {plan.status !== "done" && (
         <div className="px-4 pt-4 pb-8 border-t border-[color:var(--ds-border-warm)] mt-2">
           {confirmMarkDone ? (
-            <div className="rounded-sm border border-status-ok-edge bg-status-ok-bg px-3 py-2.5">
+            <div className="rounded-[4px] border border-status-ok-edge bg-status-ok-bg px-3 py-2.5">
               <p className="text-sm font-medium text-status-ok mb-0.5">Mark entire batch as done?</p>
               <p className="text-xs text-status-ok mb-2.5">
                 All {steps.length} steps will be marked complete and this batch will be closed out.
@@ -1528,7 +1528,7 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
   return (
     <button
       onClick={() => onToggle(step.key)}
-      className={`w-full flex items-center gap-3 p-3 rounded-sm border text-left transition-colors ${
+      className={`w-full flex items-center gap-3 p-3 rounded-[4px] border text-left transition-colors ${
         done ? "border-status-ok-edge bg-status-ok-bg" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"
       }`}
     >
@@ -1548,7 +1548,7 @@ function StepItem({ step, done, onToggle, materialsMap, yieldInfo }: {
             return (
               <span
                 key={id}
-                className="inline-block w-3 h-3 rounded-sm border border-black/10"
+                className="inline-block w-3 h-3 rounded-[4px] border border-black/10"
                 style={{ backgroundColor: m?.color ?? "#9ca3af" }}
                 title={m?.name ?? id}
               />

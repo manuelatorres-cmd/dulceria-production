@@ -367,13 +367,13 @@ function NewQuotePageInner() {
             <div className="flex items-center gap-2">
               <button
                 onClick={addProductLine}
-                className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
+                className="inline-flex items-center gap-1 rounded-[4px] border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
               >
                 <Plus className="w-3 h-3" /> Product
               </button>
               <button
                 onClick={addBoxLine}
-                className="inline-flex items-center gap-1 rounded-sm border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
+                className="inline-flex items-center gap-1 rounded-[4px] border border-[color:var(--ds-border-warm)] px-2.5 py-1 text-xs hover:border-primary hover:text-primary"
               >
                 <Package className="w-3 h-3" /> Box
               </button>
@@ -586,7 +586,7 @@ function NewQuotePageInner() {
 
         {/* Feasibility */}
         {feasibility && (
-          <section className={`rounded-sm border p-4 ${feasibility.feasible ? "border-status-ok-edge bg-status-ok-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
+          <section className={`rounded-[4px] border p-4 ${feasibility.feasible ? "border-status-ok-edge bg-status-ok-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
             <div className="flex items-start gap-2">
               {feasibility.feasible ? (
                 <CheckCircle className="w-4 h-4 text-status-ok mt-0.5" />
@@ -629,7 +629,7 @@ function NewQuotePageInner() {
               onClick={() => handleSave("sent")}
               disabled={!canSave || isWhatIf}
               title={isWhatIf ? "What-If quotes can only be saved as drafts" : undefined}
-              className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               <FileText className="w-3.5 h-3.5" /> Save &amp; send
             </button>

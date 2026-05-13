@@ -172,7 +172,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 rounded-sm bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1 overflow-hidden"
+                  className="w-20 h-20 rounded-[4px] bg-muted flex flex-col items-center justify-center text-muted-foreground gap-1 overflow-hidden"
                 >
                   {photo ? (
                     <img src={photo} alt="" className="w-full h-full object-cover" />
@@ -197,7 +197,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
               <button
                 type="button"
                 aria-label="Edit mould photo"
-                className="w-20 h-20 rounded-sm overflow-hidden cursor-pointer"
+                className="w-20 h-20 rounded-[4px] overflow-hidden cursor-pointer"
                 onClick={startEditing}
               >
                 {mould.photo ? (
@@ -228,7 +228,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
                     className="text-xl font-bold"
                   />
                   {mould.archived && (
-                    <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
+                    <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
                       <Archive className="w-3 h-3" /> Archived
                     </span>
                   )}
@@ -359,7 +359,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
                   {tags.map((t) => (
                     <span
                       key={t}
-                      className="inline-flex items-center gap-1 rounded-sm bg-[var(--accent-lilac-bg)] text-[var(--accent-lilac-ink)] text-xs font-medium px-2 py-0.5"
+                      className="inline-flex items-center gap-1 rounded-[4px] bg-[var(--accent-lilac-bg)] text-[var(--accent-lilac-ink)] text-xs font-medium px-2 py-0.5"
                     >
                       {t}
                       <button
@@ -396,7 +396,7 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
                     if (v && !tags.includes(v)) setTags([...tags, v]);
                     setTagDraft("");
                   }}
-                  className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 text-sm"
+                  className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 text-sm"
                 >
                   Add
                 </button>
@@ -523,13 +523,13 @@ export default function MouldDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             ) : (
               /* Not in use — allow full delete */
-              <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+              <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                 <p className="text-sm font-medium text-destructive">Delete this mould?</p>
                 <p className="text-xs text-muted-foreground">This will permanently remove the mould. This cannot be undone.</p>
                 <div className="flex gap-2">
                   <button
                     onClick={async () => { await deleteMould(mouldId); router.replace("/moulds"); }}
-                    className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
+                    className="inline-flex items-center justify-center rounded-[4px] bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
                   >
                     Yes, delete mould
                   </button>

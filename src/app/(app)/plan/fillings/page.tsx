@@ -263,7 +263,7 @@ export default function FillingConsolidationPage() {
 
         {/* Unresolved items */}
         {result.unresolved.length > 0 && (
-          <section className="rounded-sm border border-status-warn-edge bg-status-warn-bg px-3 py-2.5 text-xs text-status-warn">
+          <section className="rounded-[4px] border border-status-warn-edge bg-status-warn-bg px-3 py-2.5 text-xs text-status-warn">
             <p className="font-medium">
               {result.unresolved.length} order item{result.unresolved.length > 1 ? "s" : ""} couldn&apos;t be included
             </p>
@@ -286,7 +286,7 @@ export default function FillingConsolidationPage() {
 
         {/* Cooking list */}
         {result.needs.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
+          <div className="rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
             <p className="text-sm text-muted-foreground">
               No fillings needed in the next {windowDays} days.
             </p>
@@ -323,7 +323,7 @@ export default function FillingConsolidationPage() {
                 return (
                   <li
                     key={need.fillingId}
-                    className={`rounded-sm border bg-[color:var(--ds-card-bg)] overflow-hidden ${
+                    className={`rounded-[4px] border bg-[color:var(--ds-card-bg)] overflow-hidden ${
                       nothingToCook
                         ? "border-status-ok-edge"
                         : cookable === "short"
@@ -362,12 +362,12 @@ export default function FillingConsolidationPage() {
                               <span className="text-[10px] text-muted-foreground">· {need.category}</span>
                             )}
                             {need.shared && (
-                              <span className="inline-flex items-center gap-0.5 rounded-sm border border-primary/40 bg-primary/5 text-primary px-1.5 py-0 text-[10px] font-medium">
+                              <span className="inline-flex items-center gap-0.5 rounded-[4px] border border-primary/40 bg-primary/5 text-primary px-1.5 py-0 text-[10px] font-medium">
                                 <Users className="w-2.5 h-2.5" /> Shared ({need.usedBy.length})
                               </span>
                             )}
                             {need.frozenG > 0 && (
-                              <span className="inline-flex items-center gap-0.5 rounded-sm border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-medium">
+                              <span className="inline-flex items-center gap-0.5 rounded-[4px] border border-sky-200 bg-sky-50 text-sky-700 px-1.5 py-0 text-[10px] font-medium">
                                 <Snowflake className="w-2.5 h-2.5" /> {formatGrams(need.frozenG)} frozen
                               </span>
                             )}
@@ -419,7 +419,7 @@ export default function FillingConsolidationPage() {
                                 setCookedGrams(String(need.toCookBufferedG));
                                 setCookedNotes("");
                               }}
-                              className="mt-1.5 inline-flex items-center gap-1 text-[10.5px] px-2 py-1 rounded-sm bg-foreground text-background hover:opacity-90"
+                              className="mt-1.5 inline-flex items-center gap-1 text-[10.5px] px-2 py-1 rounded-[4px] bg-foreground text-background hover:opacity-90"
                               title="Add this batch to filling stock + deduct ingredients"
                             >
                               <CheckCircle2 className="w-3 h-3" /> Mark as cooked
@@ -512,7 +512,7 @@ export default function FillingConsolidationPage() {
           onClick={() => !cookedSaving && setCookedModal(null)}
         >
           <div
-            className="bg-[color:var(--ds-card-bg)] rounded-sm border border-[color:var(--ds-border-warm)] p-5 max-w-[420px] w-[92vw] shadow-xl"
+            className="bg-[color:var(--ds-card-bg)] rounded-[4px] border border-[color:var(--ds-border-warm)] p-5 max-w-[420px] w-[92vw] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-semibold mb-1">
@@ -545,7 +545,7 @@ export default function FillingConsolidationPage() {
                 type="button"
                 onClick={() => setCookedModal(null)}
                 disabled={cookedSaving}
-                className="text-[12px] px-3 py-1.5 rounded-sm border border-[color:var(--ds-border-warm)] hover:bg-muted"
+                className="text-[12px] px-3 py-1.5 rounded-[4px] border border-[color:var(--ds-border-warm)] hover:bg-muted"
               >
                 Cancel
               </button>
@@ -553,7 +553,7 @@ export default function FillingConsolidationPage() {
                 type="button"
                 onClick={applyCooked}
                 disabled={cookedSaving || !cookedGrams.trim()}
-                className="text-[12px] px-3 py-1.5 rounded-sm bg-foreground text-background disabled:opacity-50"
+                className="text-[12px] px-3 py-1.5 rounded-[4px] bg-foreground text-background disabled:opacity-50"
               >
                 {cookedSaving ? "Saving…" : "Mark cooked + deduct ingredients"}
               </button>

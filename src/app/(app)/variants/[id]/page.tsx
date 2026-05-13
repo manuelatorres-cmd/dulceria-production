@@ -780,7 +780,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
             <div>
               <label className="label">Kind</label>
               <div className="flex gap-2">
-                <label className={`flex-1 rounded-sm border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "curated" ? "border-primary bg-primary/5 text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
+                <label className={`flex-1 rounded-[4px] border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "curated" ? "border-primary bg-primary/5 text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
                   <input
                     type="radio"
                     name="variant-kind"
@@ -794,7 +794,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     Fixed products per size. Locked on orders.
                   </span>
                 </label>
-                <label className={`flex-1 rounded-sm border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "free-pick" ? "border-primary bg-primary/5 text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
+                <label className={`flex-1 rounded-[4px] border px-3 py-2 cursor-pointer text-sm transition-colors ${kind === "free-pick" ? "border-primary bg-primary/5 text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:bg-muted"}`}>
                   <input
                     type="radio"
                     name="variant-kind"
@@ -834,7 +834,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 {labels.map((label) => (
                   <span
                     key={label}
-                    className="inline-flex items-center gap-1 rounded-sm bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
+                    className="inline-flex items-center gap-1 rounded-[4px] bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
                   >
                     {label}
                     <button
@@ -890,7 +890,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                 {aliases.map((a) => (
                   <span
                     key={a}
-                    className="inline-flex items-center gap-1 rounded-sm bg-muted text-foreground px-2.5 py-0.5 text-xs"
+                    className="inline-flex items-center gap-1 rounded-[4px] bg-muted text-foreground px-2.5 py-0.5 text-xs"
                   >
                     {a}
                     <button
@@ -958,7 +958,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full ${STATUS_CLASS[status]}`}>
                 {STATUS_LABEL[status]}
               </span>
-              <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-sm bg-muted text-muted-foreground capitalize">
+              <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-[4px] bg-muted text-muted-foreground capitalize">
                 {variant.kind ?? "curated"}
               </span>
               <span className="text-[11px] text-muted-foreground">
@@ -989,7 +989,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                   <Link
                     key={label}
                     href={`/collections/${encodeURIComponent(label.toLowerCase())}`}
-                    className="inline-flex items-center rounded-sm bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium hover:bg-primary/20 transition-colors"
+                    className="inline-flex items-center rounded-[4px] bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium hover:bg-primary/20 transition-colors"
                   >
                     {label}
                   </Link>
@@ -1017,7 +1017,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {variantProducts.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+            <p className="text-sm text-muted-foreground py-4 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
               {editing ? 'No products yet \u2014 tap "Add product" to start.' : "No products in this variant."}
             </p>
           ) : (
@@ -1117,7 +1117,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Per-product cost summary */}
           {avgCost && productCosts.length > 0 && (
-            <div className="mt-3 rounded-sm bg-muted px-3 py-2.5 flex items-baseline justify-between">
+            <div className="mt-3 rounded-[4px] bg-muted px-3 py-2.5 flex items-baseline justify-between">
               <span className="text-xs text-muted-foreground">
                 Avg. product cost <span className="text-[10px]">({avgCost.count} products with pricing)</span>
               </span>
@@ -1423,7 +1423,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {variantPackagings.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-6 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm space-y-1">
+            <div className="text-sm text-muted-foreground py-6 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px] space-y-1">
               <p>No box pricing configured yet.</p>
               <p className="text-xs">Add a box to see cost breakdowns and margins.</p>
             </div>
@@ -1589,7 +1589,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               <Trash2 className="w-4 h-4" /> Delete variant
             </button>
           ) : (
-            <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+            <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
               <p className="text-sm font-medium text-destructive">Delete this variant?</p>
               <p className="text-xs text-muted-foreground">
                 This removes the variant, its product list, and box pricing. The products themselves are not affected.
@@ -1664,7 +1664,7 @@ function BoxExtras({
           </p>
           <ul className="flex flex-wrap gap-1">
             {composition.map((vpp) => (
-              <li key={vpp.id} className="text-[11px] rounded-sm bg-muted text-foreground px-2 py-0.5">
+              <li key={vpp.id} className="text-[11px] rounded-[4px] bg-muted text-foreground px-2 py-0.5">
                 {productMap.get(vpp.productId) ?? vpp.productId} &times; {vpp.qty}
               </li>
             ))}
@@ -2198,7 +2198,7 @@ function VariantOnHandRow({ variantPackagingId }: { variantPackagingId: string }
   }
 
   return (
-    <div className="mt-2 px-3 py-2 rounded-sm bg-muted border border-[color:var(--ds-border-warm)]">
+    <div className="mt-2 px-3 py-2 rounded-[4px] bg-muted border border-[color:var(--ds-border-warm)]">
       <p className="text-[10.5px] font-medium uppercase text-muted-foreground tracking-wide mb-1.5">
         On hand
       </p>

@@ -166,13 +166,13 @@ export default function BoxContentsImportPage() {
 
       <div className="px-4 pb-10 space-y-5">
         {!parsed && !result && (
-          <section className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center space-y-3">
+          <section className="rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center space-y-3">
             <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
             <div>
               <p className="text-sm">Drop your box-builder CSV here or</p>
               <button
                 onClick={() => fileRef.current?.click()}
-                className="mt-2 rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium"
+                className="mt-2 rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium"
               >
                 Choose file
               </button>
@@ -205,7 +205,7 @@ export default function BoxContentsImportPage() {
         )}
 
         {result && (
-          <div className="rounded-sm border border-status-ok-edge bg-status-ok-bg p-4 flex items-start gap-2">
+          <div className="rounded-[4px] border border-status-ok-edge bg-status-ok-bg p-4 flex items-start gap-2">
             <CheckCircle className="w-4 h-4 text-status-ok mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-status-ok">
@@ -244,7 +244,7 @@ export default function BoxContentsImportPage() {
                 <button
                   onClick={handleImport}
                   disabled={importable.orders.length === 0 || importing}
-                  className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+                  className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   {importing
                     ? "Attaching…"
@@ -264,7 +264,7 @@ export default function BoxContentsImportPage() {
                 return (
                   <li
                     key={o.orderRef}
-                    className={`rounded-sm border bg-[color:var(--ds-card-bg)] p-3 space-y-2 ${matched ? "border-[color:var(--ds-border-warm)]" : "border-status-warn-edge bg-status-warn-bg/30"}`}
+                    className={`rounded-[4px] border bg-[color:var(--ds-card-bg)] p-3 space-y-2 ${matched ? "border-[color:var(--ds-border-warm)]" : "border-status-warn-edge bg-status-warn-bg/30"}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -318,7 +318,7 @@ export default function BoxContentsImportPage() {
                                 <button
                                   type="button"
                                   onClick={() => toggleSkip(o.orderRef, i)}
-                                  className={`text-[11px] px-2 py-1 rounded-sm border transition ${
+                                  className={`text-[11px] px-2 py-1 rounded-[4px] border transition ${
                                     skipped
                                       ? "bg-foreground text-background border-foreground"
                                       : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-foreground"

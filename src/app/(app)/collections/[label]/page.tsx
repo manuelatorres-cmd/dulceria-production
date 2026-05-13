@@ -136,7 +136,7 @@ export default function CollectionDetailPage({
                           {(v.labels ?? []).map((l) => (
                             <span
                               key={l}
-                              className="text-[10px] rounded-sm bg-muted text-muted-foreground px-1.5 py-0.5"
+                              className="text-[10px] rounded-[4px] bg-muted text-muted-foreground px-1.5 py-0.5"
                             >
                               {l}
                             </span>

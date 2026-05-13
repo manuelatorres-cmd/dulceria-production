@@ -154,7 +154,7 @@ export default function RunBatchPage({ params }: { params: Promise<{ id: string 
 
       {/* Live preview */}
       {mould && (
-        <div className="mb-6 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted px-4 py-4">
+        <div className="mb-6 rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
             Batch preview
           </p>

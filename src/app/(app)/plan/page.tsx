@@ -1636,7 +1636,7 @@ function WeekView(props: {
           <p className="text-[10.5px] text-muted-foreground tabular-nums">
             {totalUsed} / {totalAvail} min
           </p>
-          <div className="h-[3px] rounded-sm mt-1 overflow-hidden" style={{ background: "rgba(0,0,0,0.05)" }}>
+          <div className="h-[3px] rounded-[4px] mt-1 overflow-hidden" style={{ background: "rgba(0,0,0,0.05)" }}>
             <div style={{ width: `${Math.min(100, weekUtil)}%`, height: "100%", background: weekUtil >= 100 ? "#2e4839" : weekUtil >= 80 ? "#8a7030" : "#4a7a5e" }} />
           </div>
         </div>
@@ -3260,7 +3260,7 @@ function BatchGroupRow({
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="hidden sm:block w-16 h-[3px] bg-white/45 rounded-sm overflow-hidden">
+            <span className="hidden sm:block w-16 h-[3px] bg-white/45 rounded-[4px] overflow-hidden">
               <span className="block h-full" style={{ background: tint.bar, width: `${pct}%` }} />
             </span>
             <span className="text-[10.5px] tabular-nums opacity-75 w-10 text-right">{totalMinutes}m</span>
@@ -3296,7 +3296,7 @@ function BatchGroupRow({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="hidden sm:block w-16 h-[3px] bg-white/45 rounded-sm overflow-hidden">
+          <span className="hidden sm:block w-16 h-[3px] bg-white/45 rounded-[4px] overflow-hidden">
             <span className="block h-full" style={{ background: tint.bar, width: `${pct}%` }} />
           </span>
           <span className="text-[10.5px] tabular-nums opacity-75 w-10 text-right">{totalMinutes}m</span>

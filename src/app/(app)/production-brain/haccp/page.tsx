@@ -156,7 +156,7 @@ function UnitCard({ unit }: { unit: ColdStorageUnit }) {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 mt-3">
-        <div className="rounded-sm bg-muted p-3">
+        <div className="rounded-[4px] bg-muted p-3">
           <h4 className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold mb-2">
             Last reading
           </h4>
@@ -194,7 +194,7 @@ function UnitCard({ unit }: { unit: ColdStorageUnit }) {
           )}
         </div>
 
-        <div className="rounded-sm bg-muted p-3">
+        <div className="rounded-[4px] bg-muted p-3">
           <h4 className="uppercase tracking-wider text-[10px] text-muted-foreground font-semibold mb-2">
             Log reading
           </h4>
@@ -389,7 +389,7 @@ function NewUnitForm({ hasAny }: { hasAny: boolean }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[12px] px-3 py-1.5 rounded-sm bg-foreground text-background"
+        className="text-[12px] px-3 py-1.5 rounded-[4px] bg-foreground text-background"
       >
         + Add cold storage unit
       </button>
@@ -471,7 +471,7 @@ function NewUnitForm({ hasAny }: { hasAny: boolean }) {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="text-[12px] px-3 py-1.5 rounded-sm border border-[color:var(--ds-border-warm)] hover:bg-muted"
+            className="text-[12px] px-3 py-1.5 rounded-[4px] border border-[color:var(--ds-border-warm)] hover:bg-muted"
           >
             Cancel
           </button>
@@ -480,7 +480,7 @@ function NewUnitForm({ hasAny }: { hasAny: boolean }) {
           type="button"
           onClick={submit}
           disabled={busy || !name.trim()}
-          className="text-[12px] px-3 py-1.5 rounded-sm bg-foreground text-background disabled:opacity-50"
+          className="text-[12px] px-3 py-1.5 rounded-[4px] bg-foreground text-background disabled:opacity-50"
         >
           {busy ? "Saving…" : "Add unit"}
         </button>

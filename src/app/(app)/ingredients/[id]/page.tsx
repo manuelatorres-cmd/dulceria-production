@@ -117,7 +117,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
               className="text-xl font-bold"
             />
             {ingredient.archived && (
-              <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
+              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
                 <Archive className="w-3 h-3" /> Archived
               </span>
             )}
@@ -481,7 +481,7 @@ function ShellTabReadView({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <span className="rounded-sm bg-primary/10 text-primary border border-primary/20 px-3 py-1 text-xs font-medium">
+        <span className="rounded-[4px] bg-primary/10 text-primary border border-primary/20 px-3 py-1 text-xs font-medium">
           Shell chocolate (couverture)
         </span>
       </div>
@@ -506,7 +506,7 @@ function IngredientDeletePanel({
   // Case 3: produced AND still in active fillings → blocked
   if (produced && hasActiveFillings) {
     return (
-      <div className="rounded-sm border border-warning/30 bg-warning-muted p-4 space-y-3">
+      <div className="rounded-[4px] border border-warning/30 bg-warning-muted p-4 space-y-3">
         <p className="text-sm font-medium text-warning">Cannot remove this ingredient</p>
         <p className="text-xs text-muted-foreground">
           This ingredient has been used in production and is still part of {activeFillings.length === 1 ? "an active filling" : `${activeFillings.length} active fillings`}.
@@ -531,7 +531,7 @@ function IngredientDeletePanel({
   // Case 4: produced but only in superseded fillings → safe to archive
   if (produced && !hasActiveFillings) {
     return (
-      <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+      <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
         <p className="text-sm font-medium text-destructive">Archive this ingredient?</p>
         <p className="text-xs text-muted-foreground">
           This ingredient has been used in production batches. It will be archived — hidden from lists but preserved for history.
@@ -552,7 +552,7 @@ function IngredientDeletePanel({
   // Case 2: in active fillings but never produced → warn, allow delete
   if (hasActiveFillings) {
     return (
-      <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+      <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
         <p className="text-sm font-medium text-destructive">Delete this ingredient?</p>
         <p className="text-xs text-muted-foreground">
           This ingredient is used in {activeFillings.length} filling{activeFillings.length !== 1 ? "s" : ""}. Deleting it will remove it from {activeFillings.length === 1 ? "that filling" : "those fillings"}. This cannot be undone.
@@ -560,7 +560,7 @@ function IngredientDeletePanel({
         <ul className="space-y-1">
           {activeFillings.map((l) => (
             <li key={l.id} className="text-xs font-medium flex items-center gap-1.5">
-              <span className="w-1 h-1 rounded-sm bg-destructive shrink-0" />
+              <span className="w-1 h-1 rounded-[4px] bg-destructive shrink-0" />
               {l.name}
             </li>
           ))}
@@ -568,7 +568,7 @@ function IngredientDeletePanel({
         <div className="flex gap-2">
           <button
             onClick={onDelete}
-            className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
+            className="inline-flex items-center justify-center rounded-[4px] bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
           >
             Yes, delete ingredient
           </button>
@@ -580,13 +580,13 @@ function IngredientDeletePanel({
 
   // Case 1: not in use anywhere → simple delete
   return (
-    <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+    <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
       <p className="text-sm font-medium text-destructive">Delete this ingredient?</p>
       <p className="text-xs text-muted-foreground">This will permanently remove the ingredient from your library. This cannot be undone.</p>
       <div className="flex gap-2">
         <button
           onClick={onDelete}
-          className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
+          className="inline-flex items-center justify-center rounded-[4px] bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
         >
           Yes, delete ingredient
         </button>
@@ -759,7 +759,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
           comma-thousands separator doesn't get misread as a decimal
           (Austrian convention reads "25,000" as 25.000 = 25). Below
           1kg we keep grams. */}
-      <div className={`rounded-sm border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
+      <div className={`rounded-[4px] border p-4 ${belowThreshold ? "border-status-warn bg-status-warn-bg/30" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">On hand</p>
         <p className={`text-3xl font-bold tabular-nums ${belowThreshold ? "text-status-warn" : "text-foreground"}`}>
           {currentG >= 1000
@@ -797,7 +797,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
           <button
             onClick={handleReceive}
             disabled={busy || !receiveInput}
-            className="rounded-sm bg-primary text-primary-foreground px-4 py-1.5 text-sm font-medium disabled:opacity-50"
+            className="rounded-[4px] bg-primary text-primary-foreground px-4 py-1.5 text-sm font-medium disabled:opacity-50"
           >
             Receive
           </button>
@@ -835,7 +835,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
           <button
             onClick={() => handleAdjust(-1)}
             disabled={busy || !adjustInput}
-            className="rounded-sm border border-status-warn-edge bg-status-warn-bg text-status-warn px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            className="rounded-[4px] border border-status-warn-edge bg-status-warn-bg text-status-warn px-3 py-1.5 text-xs font-medium disabled:opacity-50"
           >
             − Remove
           </button>

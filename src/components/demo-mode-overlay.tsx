@@ -55,7 +55,7 @@ export function DemoModeOverlay() {
             setRipples((prev) => prev.filter((x) => x.id !== r.id))
           }
           style={{ left: r.x, top: r.y }}
-          className="absolute w-14 h-14 rounded-sm border-2 border-primary bg-primary/15 animate-demo-ripple"
+          className="absolute w-14 h-14 rounded-[4px] border-2 border-primary bg-primary/15 animate-demo-ripple"
         />
       ))}
     </div>

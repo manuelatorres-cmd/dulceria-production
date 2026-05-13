@@ -58,7 +58,7 @@ export function MultiSelectDropdown({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1.5 rounded-sm border px-2.5 py-1.5 text-xs transition-colors ${
+        className={`inline-flex items-center gap-1.5 rounded-[4px] border px-2.5 py-1.5 text-xs transition-colors ${
           selected.size > 0
             ? "border-primary bg-primary/5 font-medium text-foreground"
             : "border-[color:var(--ds-border-warm)] bg-background text-muted-foreground hover:bg-muted"
@@ -68,7 +68,7 @@ export function MultiSelectDropdown({
         <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-20 bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-sm shadow-lg min-w-[200px] max-h-56 overflow-y-auto py-1">
+        <div className="absolute top-full left-0 mt-1 z-20 bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] rounded-[4px] shadow-lg min-w-[200px] max-h-56 overflow-y-auto py-1">
           {options.map((opt) => (
             <label
               key={opt}

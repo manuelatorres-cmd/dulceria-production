@@ -235,7 +235,7 @@ function BackupTab({
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-primary">Backup & Restore</h2>
         {!isCloudConfigured ? (
-          <div className="rounded-sm border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+          <div className="rounded-[4px] border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
             <p>
               <strong>You&apos;re using local-only mode.</strong> All data lives in this browser
               and isn&apos;t synced anywhere.
@@ -268,7 +268,7 @@ function BackupTab({
           <button
             onClick={onExport}
             disabled={exporting}
-            className="w-full rounded-sm bg-primary text-primary-foreground py-2 text-sm font-medium disabled:opacity-50"
+            className="w-full rounded-[4px] bg-primary text-primary-foreground py-2 text-sm font-medium disabled:opacity-50"
           >
             {exporting ? "Exporting…" : "Export backup"}
           </button>
@@ -440,7 +440,7 @@ function DemoDataSection() {
         {state === "idle" && (
           <button
             onClick={handleLoad}
-            className="w-full rounded-sm border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full rounded-[4px] border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             Load demo data
           </button>
@@ -490,7 +490,7 @@ function ClearAllDataSection() {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold text-destructive">Delete All Data</h2>
-      <div className="rounded-sm border border-destructive/30 bg-[color:var(--ds-card-bg)] p-4 space-y-3">
+      <div className="rounded-[4px] border border-destructive/30 bg-[color:var(--ds-card-bg)] p-4 space-y-3">
         <div className="flex items-start gap-3">
           <Trash2 className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
@@ -506,7 +506,7 @@ function ClearAllDataSection() {
         {state === "idle" && (
           <button
             onClick={() => setState("confirm")}
-            className="w-full rounded-sm border border-destructive/30 text-destructive py-2 text-sm font-medium hover:bg-destructive/5 transition-colors"
+            className="w-full rounded-[4px] border border-destructive/30 text-destructive py-2 text-sm font-medium hover:bg-destructive/5 transition-colors"
           >
             Delete all data
           </button>
@@ -519,13 +519,13 @@ function ClearAllDataSection() {
             <div className="flex gap-2">
               <button
                 onClick={handleClear}
-                className="flex-1 rounded-sm bg-destructive text-white py-2 text-sm font-medium"
+                className="flex-1 rounded-[4px] bg-destructive text-white py-2 text-sm font-medium"
               >
                 Yes, delete everything
               </button>
               <button
                 onClick={() => setState("idle")}
-                className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
+                className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
               >
                 Cancel
               </button>
@@ -805,7 +805,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
         <button
           onClick={handleSave}
           disabled={saving || !isDirty}
-          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save buffers & thresholds"}
         </button>
@@ -865,7 +865,7 @@ function PeopleSection({ people, unavailability, knownRoles }: {
       )}
 
       {sorted.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
           No people added yet.
         </p>
       ) : (
@@ -926,7 +926,7 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
   const missing = missingPersonFields(person);
 
   return (
-    <li className={`rounded-sm border bg-[color:var(--ds-card-bg)] overflow-hidden ${person.archived ? "border-[color:var(--ds-border-warm)] opacity-70" : "border-[color:var(--ds-border-warm)]"}`}>
+    <li className={`rounded-[4px] border bg-[color:var(--ds-card-bg)] overflow-hidden ${person.archived ? "border-[color:var(--ds-border-warm)] opacity-70" : "border-[color:var(--ds-border-warm)]"}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button
           onClick={onToggle}
@@ -940,7 +940,7 @@ function PersonCard({ person, unavailability, knownRoles, expanded, onToggle }: 
               {!person.archived && missing.length > 0 && (
                 <span
                   title={`Missing for calculations: ${missing.join(", ")}`}
-                  className="inline-flex items-center gap-1 rounded-sm bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)] text-[10px] font-medium px-1.5 py-0.5"
+                  className="inline-flex items-center gap-1 rounded-[4px] bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)] text-[10px] font-medium px-1.5 py-0.5"
                 >
                   <AlertTriangle className="w-3 h-3" /> {missing.length} missing
                 </span>
@@ -1202,7 +1202,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
   );
 
   return (
-    <div className={`rounded-sm ${isNew ? "border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4" : ""} space-y-3`}>
+    <div className={`rounded-[4px] ${isNew ? "border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-4" : ""} space-y-3`}>
       <div>
         <label className="label">Name</label>
         <input
@@ -1220,7 +1220,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         {roles.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2">
             {roles.map((r) => (
-              <span key={r} className="inline-flex items-center gap-1 rounded-sm bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">
+              <span key={r} className="inline-flex items-center gap-1 rounded-[4px] bg-primary/10 text-primary text-xs font-medium px-2 py-0.5">
                 {r}
                 <button
                   onClick={() => removeRole(r)}
@@ -1251,7 +1251,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
             type="button"
             onClick={() => addRole(roleDraft)}
             disabled={!roleDraft.trim()}
-            className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-sm disabled:opacity-50"
+            className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-sm disabled:opacity-50"
           >
             Add role
           </button>
@@ -1318,7 +1318,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 key={day}
                 type="button"
                 onClick={() => toggleWorkingDay(day)}
-                className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-[4px] border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
@@ -1358,7 +1358,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 key={skill}
                 type="button"
                 onClick={() => toggleSkill(skill)}
-                className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-[4px] border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
@@ -1384,7 +1384,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 key={pr}
                 type="button"
                 onClick={() => setPrimaryRole(active ? "" : pr)}
-                className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-[4px] border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
@@ -1428,7 +1428,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
                 key={c}
                 type="button"
                 onClick={() => setContractType(active ? "" : c)}
-                className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-[4px] border px-3 py-1 text-xs font-medium transition-colors ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
@@ -1469,7 +1469,7 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
           type="checkbox"
           checked={isAdmin}
           onChange={(e) => setIsAdmin(e.target.checked)}
-          className="w-4 h-4 rounded-sm border-[color:var(--ds-border-warm)]"
+          className="w-4 h-4 rounded-[4px] border-[color:var(--ds-border-warm)]"
         />
         <span>Admin — unlocks analytics, full cost breakdown, HACCP incident writes</span>
       </label>
@@ -1478,14 +1478,14 @@ function PersonEditor({ person, knownRoles, onSaved, onCancel }: {
         <button
           onClick={handleSave}
           disabled={saving || !name.trim()}
-          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : isNew ? "Add person" : "Save changes"}
         </button>
         {onCancel && (
           <button
             onClick={onCancel}
-            className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
+            className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
           >
             Cancel
           </button>
@@ -1596,7 +1596,7 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
                     key={t}
                     type="button"
                     onClick={() => setAbsenceType(active ? "" : t)}
-                    className={`rounded-sm border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    className={`rounded-[4px] border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                       active
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
@@ -1616,13 +1616,13 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
             <button
               onClick={handleAdd}
               disabled={!canSave}
-              className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50"
+              className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50"
             >
               {saving ? "Adding…" : "Add"}
             </button>
             <button
               onClick={() => { setAdding(false); setStartDate(""); setEndDate(""); setAbsenceType(""); setNotes(""); }}
-              className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs"
+              className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs"
             >
               Cancel
             </button>
@@ -1756,7 +1756,7 @@ function EquipmentTab() {
       )}
 
       {sorted.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
           No equipment added yet.
         </p>
       ) : (
@@ -1804,7 +1804,7 @@ function EquipmentCard({ equipment: eq, expanded, onToggle }: {
     "text-muted-foreground bg-muted border-[color:var(--ds-border-warm)]";
 
   return (
-    <li className={`rounded-sm border bg-[color:var(--ds-card-bg)] overflow-hidden ${eq.archived ? "opacity-70 border-[color:var(--ds-border-warm)]" : "border-[color:var(--ds-border-warm)]"}`}>
+    <li className={`rounded-[4px] border bg-[color:var(--ds-card-bg)] overflow-hidden ${eq.archived ? "opacity-70 border-[color:var(--ds-border-warm)]" : "border-[color:var(--ds-border-warm)]"}`}>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <button
           onClick={onToggle}
@@ -1822,7 +1822,7 @@ function EquipmentCard({ equipment: eq, expanded, onToggle }: {
             </p>
           </div>
         </button>
-        <span className={`shrink-0 rounded-sm border text-[10px] font-medium px-2 py-0.5 ${availColor}`}>
+        <span className={`shrink-0 rounded-[4px] border text-[10px] font-medium px-2 py-0.5 ${availColor}`}>
           {EQUIPMENT_AVAILABILITY_LABEL[avail]}
         </span>
       </div>
@@ -2109,14 +2109,14 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
         <button
           onClick={handleSave}
           disabled={saving || !name.trim()}
-          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : isNew ? "Add equipment" : "Save changes"}
         </button>
         {onCancel && (
           <button
             onClick={onCancel}
-            className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
+            className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
           >
             Cancel
           </button>
@@ -2208,7 +2208,7 @@ function ProductionStepsTab() {
       </section>
 
       {categories.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
           No product categories yet. Add one under Products → Categories first.
         </p>
       ) : (
@@ -2279,7 +2279,7 @@ function ProductionStepsTab() {
               )}
 
               {stepsForType.length === 0 && !adding ? (
-                <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+                <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
                   No steps yet for {selectedType}. Click Add step to start.
                 </p>
               ) : (
@@ -2649,14 +2649,14 @@ function ProductionStepEditor({ step, productType, knownStepNames, nextSortOrder
         <button
           onClick={handleSave}
           disabled={saving || !name.trim() || activeMinutes === "" || waitingMinutes === ""}
-          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : isNew ? "Add step" : "Save changes"}
         </button>
         {onCancel && (
           <button
             onClick={onCancel}
-            className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
+            className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
           >
             Cancel
           </button>
@@ -2753,13 +2753,13 @@ function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
             <button
               onClick={handleAdd}
               disabled={!canSave}
-              className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving ? "Adding…" : "Add"}
             </button>
             <button
               onClick={() => { setAdding(false); setName(""); setStartDate(""); setEndDate(""); }}
-              className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
+              className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
             >
               Cancel
             </button>
@@ -2768,7 +2768,7 @@ function BlockedDaysSection({ blocked }: { blocked: EventCalendarEntry[] }) {
       )}
 
       {blocked.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+        <p className="text-sm text-muted-foreground py-2 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
           No blocked periods.
         </p>
       ) : (
@@ -2966,7 +2966,7 @@ function PreferencesTab({
           <div />
           <button
             onClick={startEditing}
-            className="flex items-center gap-1.5 rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Pencil className="w-3.5 h-3.5" />
             Edit
@@ -3129,13 +3129,13 @@ function PreferencesTab({
       <div className="flex gap-2">
         <button
           onClick={handleSave}
-          className="flex-1 rounded-sm bg-primary text-primary-foreground py-2 text-sm font-medium"
+          className="flex-1 rounded-[4px] bg-primary text-primary-foreground py-2 text-sm font-medium"
         >
           Save
         </button>
         <button
           onClick={handleCancel}
-          className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
+          className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
         >
           Cancel
         </button>

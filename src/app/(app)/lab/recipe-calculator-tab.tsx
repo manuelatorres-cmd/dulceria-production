@@ -92,7 +92,7 @@ export function RecipeCalculatorTab() {
             <li key={t.id}>
               <button
                 onClick={() => changeCategory(t.id)}
-                className={`w-full text-left px-3 py-2 rounded-sm text-sm transition-colors ${
+                className={`w-full text-left px-3 py-2 rounded-[4px] text-sm transition-colors ${
                   t.id === categoryId
                     ? "bg-primary/5 text-foreground border border-primary/20"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
@@ -154,7 +154,7 @@ export function RecipeCalculatorTab() {
                   onAdd={() => addLineForSlot(slotIdx)}
                 >
                   {slotLines.length > 0 && (
-                    <div className="rounded-sm border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
+                    <div className="rounded-[4px] border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
                       {slotLines.map(({ line, lineIdx }) => {
                         const ing = byId[line.ingredientId];
                         const missing = ing ? missingComposition(ing) : false;
@@ -284,7 +284,7 @@ function SlotCard({
       : "text-muted-foreground";
 
   return (
-    <div className={`rounded-sm border ${tone} bg-[color:var(--ds-card-bg)]`}>
+    <div className={`rounded-[4px] border ${tone} bg-[color:var(--ds-card-bg)]`}>
       <div className="px-4 py-3 flex items-start gap-3">
         <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${iconTone}`} />
         <div className="min-w-0 flex-1">

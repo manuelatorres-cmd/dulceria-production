@@ -286,13 +286,13 @@ export default function ShopifyImportPage() {
         </Link>
 
         {!parsed && !result && (
-          <section className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center space-y-3">
+          <section className="rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center space-y-3">
             <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
             <div>
               <p className="text-sm">Drop your Shopify orders CSV here or</p>
               <button
                 onClick={() => fileRef.current?.click()}
-                className="mt-2 rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium"
+                className="mt-2 rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium"
               >
                 Choose file
               </button>
@@ -325,7 +325,7 @@ export default function ShopifyImportPage() {
         )}
 
         {result && (
-          <div className="rounded-sm border border-status-ok-edge bg-status-ok-bg p-4 flex items-start gap-2">
+          <div className="rounded-[4px] border border-status-ok-edge bg-status-ok-bg p-4 flex items-start gap-2">
             <CheckCircle className="w-4 h-4 text-status-ok mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-status-ok">
@@ -399,7 +399,7 @@ export default function ShopifyImportPage() {
                   <button
                     onClick={handleImport}
                     disabled={importable.orders.length === 0 || importing}
-                    className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+                    className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
                   >
                     {importing
                       ? "Importing…"
@@ -420,7 +420,7 @@ export default function ShopifyImportPage() {
                 return (
                   <li
                     key={o.name}
-                    className={`rounded-sm border bg-[color:var(--ds-card-bg)] p-3 space-y-2 ${isDup ? "border-[color:var(--ds-border-warm)] opacity-60" : excluded.has(o.name) ? "border-[color:var(--ds-border-warm)] opacity-50" : "border-[color:var(--ds-border-warm)]"}`}
+                    className={`rounded-[4px] border bg-[color:var(--ds-card-bg)] p-3 space-y-2 ${isDup ? "border-[color:var(--ds-border-warm)] opacity-60" : excluded.has(o.name) ? "border-[color:var(--ds-border-warm)] opacity-50" : "border-[color:var(--ds-border-warm)]"}`}
                   >
                     <div className="flex items-start gap-2">
                       <input

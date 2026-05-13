@@ -109,7 +109,7 @@ export function AuditTab() {
             <button
               key={opt.id}
               onClick={() => setFilter(opt.id)}
-              className={`px-3 py-1.5 rounded-sm transition-colors ${
+              className={`px-3 py-1.5 rounded-[4px] transition-colors ${
                 filter === opt.id
                   ? "bg-primary/5 text-foreground border border-primary/20"
                   : "text-muted-foreground hover:text-foreground border border-transparent"
@@ -228,7 +228,7 @@ function Tile({ label, value, tone }: { label: string; value: number; tone: "ok"
       ? "border-status-alert-edge bg-status-alert-bg/30 text-status-alert"
       : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-muted-foreground";
   return (
-    <div className={`rounded-sm border ${cls} px-4 py-3`}>
+    <div className={`rounded-[4px] border ${cls} px-4 py-3`}>
       <div className="text-2xl font-medium tabular-nums">{value}</div>
       <div className="text-[11px] uppercase tracking-widest mt-0.5 opacity-90">{label}</div>
     </div>
@@ -305,7 +305,7 @@ function AuditCard({
       {expanded && (
         <div className="border-t border-[color:var(--ds-border-warm)] bg-muted/20 px-4 py-3 space-y-3 text-sm">
           {missingCompositionNames.length > 0 && (
-            <div className="rounded-sm border border-status-alert-edge bg-status-alert-bg/20 px-3 py-2 text-xs">
+            <div className="rounded-[4px] border border-status-alert-edge bg-status-alert-bg/20 px-3 py-2 text-xs">
               <strong className="text-status-alert">Missing composition:</strong>{" "}
               {missingCompositionNames.join(", ")}. Composition % aren&apos;t set on these ingredients — calculator can&apos;t see them.
             </div>

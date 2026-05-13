@@ -443,7 +443,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <span className="truncate">{order.customerName || order.eventName || "(unnamed)"}</span>
               {order.sourceRef && (
                 <span
-                  className="text-[12px] font-mono tabular-nums font-normal text-muted-foreground rounded-sm bg-muted px-2 py-0.5 shrink-0"
+                  className="text-[12px] font-mono tabular-nums font-normal text-muted-foreground rounded-[4px] bg-muted px-2 py-0.5 shrink-0"
                   title="Source order reference (Shopify, etc.)"
                 >
                   {order.sourceRef}
@@ -498,7 +498,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           || linkedCustomer.language
           || linkedCustomer.paymentTerms
         ) && (
-          <div className="rounded-sm border border-[color:var(--ds-border-warm)] bg-muted px-3 py-2 text-xs space-y-1">
+          <div className="rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted px-3 py-2 text-xs space-y-1">
             <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
               <User className="w-3.5 h-3.5" /> Customer preferences
             </div>
@@ -542,7 +542,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {parentOrder && (
           <Link
             href={`/orders/${encodeURIComponent(parentOrder.id!)}`}
-            className="flex items-center gap-2 rounded-sm border border-primary/30 bg-primary/5 px-3 py-2 text-sm hover:bg-primary/10"
+            className="flex items-center gap-2 rounded-[4px] border border-primary/30 bg-primary/5 px-3 py-2 text-sm hover:bg-primary/10"
           >
             <Package className="w-4 h-4 text-primary" />
             <span className="flex-1">
@@ -555,7 +555,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {replenishmentOrder && (
           <Link
             href={`/orders/${encodeURIComponent(replenishmentOrder.id!)}`}
-            className="flex items-center gap-2 rounded-sm border border-status-ok/30 bg-status-ok/5 px-3 py-2 text-sm hover:bg-status-ok/10"
+            className="flex items-center gap-2 rounded-[4px] border border-status-ok/30 bg-status-ok/5 px-3 py-2 text-sm hover:bg-status-ok/10"
           >
             <Package className="w-4 h-4 text-status-ok" />
             <span className="flex-1">
@@ -575,7 +575,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <button
               key={s}
               onClick={() => handleStatusChange(s)}
-              className={`rounded-sm border px-3 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-[4px] border px-3 py-1 text-xs font-medium transition-colors ${
                 order.status === s
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
@@ -693,7 +693,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             {!addingLine && (
               <button
                 onClick={() => setAddingLine(true)}
-                className="flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
+                className="flex items-center gap-1.5 rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
               >
                 <Plus className="w-3.5 h-3.5" /> Add product
               </button>
@@ -736,7 +736,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+            <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
               No products yet.
             </p>
           ) : (
@@ -786,16 +786,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <Trash2 className="w-4 h-4" /> Delete order
             </button>
           ) : (
-            <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+            <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
               <p className="text-sm font-medium text-destructive">Delete this order?</p>
               <p className="text-xs text-muted-foreground">
                 All line items will be removed. This cannot be undone.
               </p>
               <div className="flex gap-2">
-                <button onClick={handleDelete} className="rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium">
+                <button onClick={handleDelete} className="rounded-[4px] bg-destructive text-white px-4 py-2 text-sm font-medium">
                   Yes, delete
                 </button>
-                <button onClick={() => setConfirmDelete(false)} className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm">
+                <button onClick={() => setConfirmDelete(false)} className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm">
                   Cancel
                 </button>
               </div>
@@ -846,7 +846,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
               <ul className="px-5 py-3 space-y-3 max-h-80 overflow-y-auto">
                 {reassignProposals.map((p) => (
-                  <li key={p.orderPlanLinkId} className="rounded-sm border border-[color:var(--ds-border-warm)] p-3 space-y-2">
+                  <li key={p.orderPlanLinkId} className="rounded-[4px] border border-[color:var(--ds-border-warm)] p-3 space-y-2">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="text-sm font-semibold">{p.productName}</p>
                       <span className="text-[11px] tabular-nums text-muted-foreground">
@@ -867,7 +867,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                             key={c.orderItemId}
                             onClick={() => handleReassign(p, c.orderItemId)}
                             disabled={reassignBusy === p.orderPlanLinkId}
-                            className="inline-flex items-center gap-1 rounded-sm border border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-[4px] border border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium disabled:opacity-50"
                             title={`Needs ${c.itemRemainingDemand} pcs · deadline ${c.deadline.slice(0, 10)}`}
                           >
                             → {c.orderLabel} · {c.itemRemainingDemand} pcs needed
@@ -881,7 +881,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2 bg-muted/20">
                 <button
                   onClick={() => setReassignProposals(null)}
-                  className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
+                  className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
                 >
                   Keep order
                 </button>
@@ -890,7 +890,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     setReassignProposals(null);
                     await performDelete();
                   }}
-                  className="rounded-sm bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
+                  className="rounded-[4px] bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
                 >
                   Delete anyway
                 </button>
@@ -1229,11 +1229,11 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>
-        <button onClick={onCancel} className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm">
+        <button onClick={onCancel} className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm">
           Cancel
         </button>
       </div>
@@ -1409,7 +1409,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
               type="button"
               onClick={() => setFulfilmentMode("borrow")}
               disabled={available === 0}
-              className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 font-medium ${
+              className={`inline-flex items-center gap-1 rounded-[4px] border px-2 py-0.5 font-medium ${
                 fulfilmentMode === "borrow"
                   ? "bg-primary text-primary-foreground border-primary"
                   : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1420,7 +1420,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
             <button
               type="button"
               onClick={() => setFulfilmentMode("produce")}
-              className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 font-medium ${
+              className={`inline-flex items-center gap-1 rounded-[4px] border px-2 py-0.5 font-medium ${
                 fulfilmentMode === "produce"
                   ? "bg-primary text-primary-foreground border-primary"
                   : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary"
@@ -1441,10 +1441,10 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
       )}
 
       <div className="flex items-center gap-2">
-        <button onClick={handleAdd} disabled={!canSave} className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
+        <button onClick={handleAdd} disabled={!canSave} className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
           {saving ? "Adding…" : "Add"}
         </button>
-        <button onClick={onCancel} className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs">
+        <button onClick={onCancel} className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs">
           Cancel
         </button>
       </div>
@@ -1599,7 +1599,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
     : short ? "bg-status-alert" : "bg-status-ok";
 
   return (
-    <li className={`rounded-sm border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
+    <li className={`rounded-[4px] border px-3 py-2.5 ${isBorrow ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
       <div className="flex items-center gap-3">
         <span
           className={`w-2 h-2 rounded-full shrink-0 ${feasibilityColor}`}
@@ -1791,7 +1791,7 @@ function OrderLineRow({ item, product, short, resolveProductPrice, links, plansB
                       (Step {progress.index}/{progress.total} {progress.label})
                     </span>
                   )}
-                  <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${PLAN_STATUS_STYLE[status]}`}>
+                  <span className={`rounded-[4px] border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${PLAN_STATUS_STYLE[status]}`}>
                     {PLAN_STATUS_LABEL[status]}
                   </span>
                 </div>
@@ -1860,7 +1860,7 @@ function OrderPackagingSection({ orderId, packaging, packagingUnitCost }: {
         />
       )}
       {lines.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
           No packaging lines. Add ribbons, gift bags, outer boxes, etc.
         </p>
       ) : (
@@ -2012,10 +2012,10 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, packagingUni
         className="input"
       />
       <div className="flex items-center gap-2">
-        <button onClick={handleAdd} disabled={!canSave} className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
+        <button onClick={handleAdd} disabled={!canSave} className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
           {saving ? "Adding…" : "Add"}
         </button>
-        <button onClick={onCancel} className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs">
+        <button onClick={onCancel} className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1 text-xs">
           Done
         </button>
         {addedCount > 0 && (
@@ -2443,7 +2443,7 @@ function PricePaidField({ order, suggestedNet, suggestedGross, vatBreakdown }: {
     <div>
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Price paid</p>
-        <div className="flex gap-0.5 text-[10px] rounded-sm border border-[color:var(--ds-border-warm)] p-0.5">
+        <div className="flex gap-0.5 text-[10px] rounded-[4px] border border-[color:var(--ds-border-warm)] p-0.5">
           {(["net", "gross"] as const).map((m) => (
             <button
               key={m}
@@ -2583,14 +2583,14 @@ function OrderReadyToPackSection({ orderId }: { orderId: string }) {
             <button
               onClick={handleMarkPacked}
               disabled={busy}
-              className="rounded-sm bg-primary text-primary-foreground px-4 py-1.5 text-sm font-medium disabled:opacity-50"
+              className="rounded-[4px] bg-primary text-primary-foreground px-4 py-1.5 text-sm font-medium disabled:opacity-50"
             >
               {busy ? "Packing…" : "Mark as packed"}
             </button>
           </div>
         </div>
       ) : done ? (
-        <div className="rounded-sm border border-status-ok-edge bg-status-ok-bg px-3 py-2 text-xs text-status-ok">
+        <div className="rounded-[4px] border border-status-ok-edge bg-status-ok-bg px-3 py-2 text-xs text-status-ok">
           <p className="font-medium">Packed — {done.pieces} piece{done.pieces === 1 ? "" : "s"} moved out.</p>
           {done.warnings.length > 0 && (
             <ul className="mt-1 space-y-0.5 text-foreground/80">
@@ -2635,7 +2635,7 @@ function OrderScheduleSection({
         <Calendar className="w-4 h-4" /> Production schedule
       </h2>
       {!hasAnySchedule ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
           Not scheduled yet. Open the <Link href="/plan" className="text-primary hover:underline">Plan</Link> to generate production steps for this order.
         </p>
       ) : (
@@ -2755,7 +2755,7 @@ function InlineNewCustomer({
       <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="input text-sm" />
       <div className="flex items-center gap-2">
         <button onClick={handleCreate} disabled={saving || !companyName.trim()}
-          className="rounded-sm bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
+          className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1 text-xs font-medium disabled:opacity-50">
           {saving ? "Creating…" : "Create + link"}
         </button>
         <button onClick={onCancel} className="text-xs text-muted-foreground hover:underline">Cancel</button>
@@ -2966,7 +2966,7 @@ function VariantLinesSection({
         {!adding && (
           <button
             onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
+            className="flex items-center gap-1.5 rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium"
           >
             <Plus className="w-3.5 h-3.5" /> Add variant (gift box)
           </button>
@@ -3167,13 +3167,13 @@ function AddVariantForm({
         <button
           onClick={handleAdd}
           disabled={saving}
-          className="rounded-sm bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+          className="rounded-[4px] bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium disabled:opacity-50"
         >
           {saving ? "Adding…" : "Add variant"}
         </button>
         <button
           onClick={onDone}
-          className="rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-xs"
+          className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1.5 text-xs"
         >
           Cancel
         </button>

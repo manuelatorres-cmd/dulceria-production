@@ -458,7 +458,7 @@ export default function StockAdjustPage() {
           <button
             onClick={handleSave}
             disabled={enteredCount === 0 || saving}
-            className="inline-flex items-center gap-1.5 rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             <Save className="w-3.5 h-3.5" />
             {saving ? "Saving…" : `Save ${enteredCount} adjustment${enteredCount === 1 ? "" : "s"}`}

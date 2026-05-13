@@ -169,7 +169,7 @@ export default function ShoppingPage() {
                     <p className="text-xs text-muted-foreground mb-1.5 ml-1">Ingredients</p>
                     <ul className="space-y-1.5">
                       {pendingIngredients.map((ing) => (
-                        <li key={ing.id} className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 ${ing.outOfStock ? "border-status-alert-edge bg-status-alert-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
+                        <li key={ing.id} className={`flex items-center gap-3 rounded-[4px] border px-3 py-2.5 ${ing.outOfStock ? "border-status-alert-edge bg-status-alert-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
                           <div className={`w-2 h-2 rounded-full shrink-0 ${ing.outOfStock ? "bg-status-alert-edge" : "bg-status-warn-edge"}`} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
@@ -197,7 +197,7 @@ export default function ShoppingPage() {
                             </Link>
                             <button
                               onClick={() => markIngredientOrdered(ing.id!)}
-                              className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-[4px] bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
                               title="Mark as ordered"
                             >
                               <Check className="w-3 h-3" /> Ordered
@@ -232,7 +232,7 @@ export default function ShoppingPage() {
                     <p className="text-xs text-muted-foreground mb-1.5 ml-1">Packaging</p>
                     <ul className="space-y-1.5">
                       {pendingPackaging.map((pkg) => (
-                        <li key={pkg.id} className="flex items-center gap-3 rounded-sm border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
+                        <li key={pkg.id} className="flex items-center gap-3 rounded-[4px] border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
                           <div className="w-2 h-2 rounded-full bg-status-warn-edge shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{pkg.name}</p>
@@ -249,7 +249,7 @@ export default function ShoppingPage() {
                             </Link>
                             <button
                               onClick={() => markPackagingOrdered(pkg.id!)}
-                              className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-[4px] bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
                               title="Mark as ordered"
                             >
                               <Check className="w-3 h-3" /> Ordered
@@ -284,7 +284,7 @@ export default function ShoppingPage() {
                     <p className="text-xs text-muted-foreground mb-1.5 ml-1">Decoration</p>
                     <ul className="space-y-1.5">
                       {pendingMaterials.map((m) => (
-                        <li key={m.id} className={`flex items-center gap-3 rounded-sm border px-3 py-2.5 ${m.outOfStock ? "border-status-alert-edge bg-status-alert-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
+                        <li key={m.id} className={`flex items-center gap-3 rounded-[4px] border px-3 py-2.5 ${m.outOfStock ? "border-status-alert-edge bg-status-alert-bg" : "border-status-warn-edge bg-status-warn-bg"}`}>
                           <span
                             className="w-2 h-2 rounded-full shrink-0 border border-black/10"
                             style={{ backgroundColor: m.color ?? (m.outOfStock ? "#f87171" : "#fbbf24") }}
@@ -315,7 +315,7 @@ export default function ShoppingPage() {
                             </Link>
                             <button
                               onClick={() => markDecorationMaterialOrdered(m.id!)}
-                              className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-[4px] bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
                               title="Mark as ordered"
                             >
                               <Check className="w-3 h-3" /> Ordered
@@ -350,7 +350,7 @@ export default function ShoppingPage() {
                     <p className="text-xs text-muted-foreground mb-1.5 ml-1">Other items</p>
                     <ul className="space-y-1.5">
                       {pendingItems.map((item) => (
-                        <li key={item.id} className="flex items-center gap-3 rounded-sm border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
+                        <li key={item.id} className="flex items-center gap-3 rounded-[4px] border border-status-warn-edge bg-status-warn-bg px-3 py-2.5">
                           <div className="w-2 h-2 rounded-full bg-status-warn-edge shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{item.name}</p>
@@ -369,7 +369,7 @@ export default function ShoppingPage() {
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               onClick={() => markShoppingItemOrdered(item.id!)}
-                              className="inline-flex items-center gap-1 rounded-sm bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-[4px] bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium"
                               title="Mark as ordered"
                             >
                               <Check className="w-3 h-3" /> Ordered
@@ -686,7 +686,7 @@ function PlannedDemandSection() {
       )}
 
       {shortfalls.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-sm">
+        <p className="text-sm text-muted-foreground py-3 text-center border border-dashed border-[color:var(--ds-border-warm)] rounded-[4px]">
           You have enough stock for every open order.
         </p>
       ) : (
@@ -787,7 +787,7 @@ function ShortageBySupplier({
           </div>
         );
       })}
-      <div className="flex items-center justify-between px-3 py-2 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted">
+      <div className="flex items-center justify-between px-3 py-2 rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted">
         <span className="text-[12px] uppercase tracking-[0.08em] text-muted-foreground font-medium">Approx. total to buy</span>
         <span className="text-[14px] tabular-nums font-semibold">≈ {fmt(grandTotal)}</span>
       </div>
@@ -967,7 +967,7 @@ function ReceiveCell({ ingredientId, purchaseUnit, gramsPerUnit }: {
         type="button"
         onClick={cycleUnit}
         title="Click to switch unit"
-        className="text-[10px] px-1.5 py-0.5 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted hover:bg-muted min-w-[28px]"
+        className="text-[10px] px-1.5 py-0.5 rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted hover:bg-muted min-w-[28px]"
       >
         {unitLabel(unitMode)}
       </button>
@@ -975,7 +975,7 @@ function ReceiveCell({ ingredientId, purchaseUnit, gramsPerUnit }: {
         type="button"
         onClick={submit}
         disabled={saving || !val.trim()}
-        className="text-[10px] px-1.5 py-0.5 rounded-sm bg-foreground text-background disabled:opacity-40"
+        className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-foreground text-background disabled:opacity-40"
       >
         Add
       </button>
@@ -1087,7 +1087,7 @@ function IngredientStockBelowThresholdSection() {
         Ingredients currently under the low-stock threshold you set on each ingredient's Stock tab.
         Open the ingredient to Receive more.
       </p>
-      <div className="rounded-sm border border-status-warn/40 bg-status-warn-bg/20 overflow-hidden">
+      <div className="rounded-[4px] border border-status-warn/40 bg-status-warn-bg/20 overflow-hidden">
         <div className="flex items-center px-3 py-2 bg-muted border-b border-[color:var(--ds-border-warm)] text-xs font-semibold text-muted-foreground">
           <span className="flex-1">Ingredient</span>
           <span className="w-24 text-right">On hand</span>

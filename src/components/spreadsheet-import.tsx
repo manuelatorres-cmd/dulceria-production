@@ -127,7 +127,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="w-full rounded-sm border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full rounded-[4px] border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             <span className="flex items-center justify-center gap-2">
               <Upload className="w-4 h-4" />
@@ -220,7 +220,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
             {validCount > 0 ? (
               <button
                 onClick={handleConfirmImport}
-                className="flex-1 rounded-sm bg-primary text-primary-foreground py-2 text-sm font-medium"
+                className="flex-1 rounded-[4px] bg-primary text-primary-foreground py-2 text-sm font-medium"
               >
                 Import {validCount} {config.entityName}{validCount !== 1 ? "s" : ""}
               </button>
@@ -231,7 +231,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
             )}
             <button
               onClick={handleReset}
-              className="rounded-sm border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
+              className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
             >
               Cancel
             </button>
@@ -261,7 +261,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
           </div>
           <button
             onClick={handleReset}
-            className="w-full rounded-sm border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full rounded-[4px] border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             Import more
           </button>
@@ -276,7 +276,7 @@ export function SpreadsheetImport<T>({ config, getExistingKeys, previewColumns, 
           </div>
           <button
             onClick={handleReset}
-            className="w-full rounded-sm border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="w-full rounded-[4px] border border-[color:var(--ds-border-warm)] py-2 text-sm font-medium hover:bg-muted transition-colors"
           >
             Try again
           </button>

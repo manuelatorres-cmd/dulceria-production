@@ -152,7 +152,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <span
-              className="w-5 h-5 rounded-sm border border-black/10 shrink-0"
+              className="w-5 h-5 rounded-[4px] border border-black/10 shrink-0"
               style={{ backgroundColor: material.color ?? "#9ca3af" }}
             />
             <InlineNameEditor
@@ -163,7 +163,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
               className="text-xl font-bold"
             />
             {material.archived && (
-              <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
+              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
                 <Archive className="w-3 h-3" /> Archived
               </span>
             )}
@@ -345,7 +345,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
                 <span className="text-muted-foreground">Colour</span>
                 <div className="flex items-center gap-2">
                   <span
-                    className="w-4 h-4 rounded-sm border border-black/10"
+                    className="w-4 h-4 rounded-[4px] border border-black/10"
                     style={{ backgroundColor: material.color ?? "#9ca3af" }}
                   />
                   <span className="font-mono text-xs">{material.color ?? "—"}</span>
@@ -434,7 +434,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
               ) : (
                 /* Not in use — allow full delete */
                 confirmDelete ? (
-                  <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+                  <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                     <p className="text-sm text-destructive font-medium">Delete this material?</p>
                     <p className="text-xs text-muted-foreground">
                       This cannot be undone.
@@ -442,7 +442,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
                     <div className="flex gap-2">
                       <button
                         onClick={handleDelete}
-                        className="rounded-sm bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
+                        className="rounded-[4px] bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
                       >
                         Yes, delete
                       </button>

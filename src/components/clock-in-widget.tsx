@@ -116,7 +116,7 @@ export function ClockInWidget({ date, linkedPlanId, defaultLocation = "productio
                 <button
                   type="button"
                   onClick={() => person.id && startShift(person.id)}
-                  className="text-xs px-2.5 py-0.5 rounded-sm border border-[color:var(--ds-border-warm)] bg-accent/20 hover:bg-accent/40"
+                  className="text-xs px-2.5 py-0.5 rounded-[4px] border border-[color:var(--ds-border-warm)] bg-accent/20 hover:bg-accent/40"
                 >
                   Start
                 </button>

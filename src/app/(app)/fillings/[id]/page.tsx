@@ -263,7 +263,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
               </span>
             )}
             {filling.archived && (
-              <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1">
+              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1">
                 <Archive className="w-3 h-3" /> Archived
               </span>
             )}
@@ -391,7 +391,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                 {filling.allergens.map((a) => (
                   <span
                     key={a}
-                    className="rounded-sm border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-xs"
+                    className="rounded-[4px] border border-amber-300 bg-amber-50 text-amber-800 px-2 py-0.5 text-xs"
                   >
                     {allergenLabel(a)}
                   </span>
@@ -460,7 +460,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
           {editing && filling.status === "confirmed" && (
-            <div className={`flex items-center justify-between rounded-sm px-3 py-2 mb-2 text-xs ${unlocked ? "bg-warning-muted text-warning border border-warning/30" : "bg-muted text-muted-foreground"}`}>
+            <div className={`flex items-center justify-between rounded-[4px] px-3 py-2 mb-2 text-xs ${unlocked ? "bg-warning-muted text-warning border border-warning/30" : "bg-muted text-muted-foreground"}`}>
               {unlocked ? (
                 <>
                   <span className="flex items-center gap-1.5"><LockOpen aria-hidden="true" className="w-3.5 h-3.5" /> Unlocked — be careful editing a confirmed filling</span>
@@ -558,7 +558,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                     <ul className="space-y-1">
                       {forkImpact.map((r) => (
                         <li key={r.id} className="text-xs font-medium flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-sm bg-primary shrink-0" />
+                          <span className="w-1 h-1 rounded-[4px] bg-primary shrink-0" />
                           {r.name}
                         </li>
                       ))}
@@ -674,7 +674,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                     <ul className="space-y-1">
                       {archiveImpact.multiFillingProducts.map((r) => (
                         <li key={r.id} className="text-xs font-medium flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-sm bg-primary shrink-0" />
+                          <span className="w-1 h-1 rounded-[4px] bg-primary shrink-0" />
                           {r.name}
                         </li>
                       ))}
@@ -740,7 +740,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
           {!filling.archived && !fillingProduced && (
             <>
               {confirmDelete ? (
-                <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+                <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                   <p className="text-sm font-medium text-destructive">Delete this filling?</p>
                   <p className="text-xs text-muted-foreground">This will permanently remove the filling and all its ingredient data. This cannot be undone.</p>
 
@@ -756,7 +756,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                         <ul className="space-y-1">
                           {deleteImpact.multiFillingProducts.map((r) => (
                             <li key={r.id} className="text-xs font-medium flex items-center gap-1.5">
-                              <span className="w-1 h-1 rounded-sm bg-primary shrink-0" />
+                              <span className="w-1 h-1 rounded-[4px] bg-primary shrink-0" />
                               {r.name}
                             </li>
                           ))}
@@ -798,7 +798,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                         <ul className="space-y-1">
                           {deletableProducts.map((r) => (
                             <li key={r.id} className="text-xs font-medium flex items-center gap-1.5">
-                              <span className="w-1 h-1 rounded-sm bg-destructive shrink-0" />
+                              <span className="w-1 h-1 rounded-[4px] bg-destructive shrink-0" />
                               {r.name}
                             </li>
                           ))}
@@ -825,7 +825,7 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
                         });
                         router.replace("/fillings");
                       }}
-                      className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
+                      className="inline-flex items-center justify-center rounded-[4px] bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
                     >
                       Yes, delete filling
                     </button>
@@ -1277,7 +1277,7 @@ function FillingVersionHistoryTab({ versions, currentId }: { versions: import("@
         return (
           <li
             key={v.id}
-            className={`rounded-sm border bg-[color:var(--ds-card-bg)] p-3 ${isCurrent ? "border-primary/40" : "border-[color:var(--ds-border-warm)]"}`}
+            className={`rounded-[4px] border bg-[color:var(--ds-card-bg)] p-3 ${isCurrent ? "border-primary/40" : "border-[color:var(--ds-border-warm)]"}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">

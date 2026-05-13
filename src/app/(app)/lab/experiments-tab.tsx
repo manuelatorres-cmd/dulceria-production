@@ -89,10 +89,10 @@ export function ExperimentsTab() {
         <button
           onClick={() => setCreateMode("blank")}
           title="New blank experiment (n)"
-          className="w-full text-left group rounded-sm border-2 border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all px-5 py-4"
+          className="w-full text-left group rounded-[4px] border-2 border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all px-5 py-4"
         >
           <div className="flex items-start gap-4">
-            <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-sm bg-primary/10 group-hover:bg-primary/20 transition-colors flex items-center justify-center">
+            <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-[4px] bg-primary/10 group-hover:bg-primary/20 transition-colors flex items-center justify-center">
               <FlaskConical className="w-5 h-5 text-primary" />
             </div>
             <div>
@@ -109,7 +109,7 @@ export function ExperimentsTab() {
           className="w-full text-left group rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-primary/30 hover:bg-muted transition-all px-5 py-4"
         >
           <div className="flex items-start gap-4">
-            <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-sm bg-muted group-hover:bg-primary/10 transition-colors flex items-center justify-center">
+            <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-[4px] bg-muted group-hover:bg-primary/10 transition-colors flex items-center justify-center">
               <Layers className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
             <div>
@@ -260,7 +260,7 @@ function CreateForm({
     : newName.trim().length > 0 && !!cloneFillingId && !saving;
 
   return (
-    <div className="mb-6 rounded-sm border border-[color:var(--ds-border-warm)] bg-muted p-4 space-y-3">
+    <div className="mb-6 rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted p-4 space-y-3">
       <p className="text-sm font-medium">
         {mode === "blank" ? "New blank experiment" : "Clone a ganache filling"}
       </p>
@@ -346,7 +346,7 @@ function ExperimentCard({
   if (deleteId === id) {
     return (
       <li>
-        <div className="p-3 rounded-sm border border-destructive/30 bg-destructive/5 text-sm space-y-2">
+        <div className="p-3 rounded-[4px] border border-destructive/30 bg-destructive/5 text-sm space-y-2">
           <p className="font-medium">Delete &ldquo;{exp.name}&rdquo;?</p>
           <p className="text-muted-foreground text-xs">This experiment will be permanently removed.</p>
           <div className="flex gap-3">
@@ -370,7 +370,7 @@ function ExperimentCard({
 
   return (
     <li>
-      <div className={`rounded-sm border transition-colors ${muted ? "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
+      <div className={`rounded-[4px] border transition-colors ${muted ? "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"}`}>
         <div className="px-4 pt-3 pb-2">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -413,14 +413,14 @@ function ExperimentCard({
             <>
               <button
                 onClick={() => router.push(`/calculator/${encodeURIComponent(id)}/run`)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-accent text-primary-foreground text-xs font-semibold hover:bg-accent/90 transition-colors"
               >
                 <Play className="w-3.5 h-3.5" />
                 Make product
               </button>
               <button
                 onClick={() => router.push(`/calculator/${encodeURIComponent(id)}`)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-[color:var(--ds-border-warm)] text-xs text-foreground hover:bg-muted transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] border border-[color:var(--ds-border-warm)] text-xs text-foreground hover:bg-muted transition-colors"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 Edit product
@@ -428,7 +428,7 @@ function ExperimentCard({
               {needsWork && (
                 <button
                   onClick={() => onNewVersion(id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-primary/30 text-xs text-primary hover:bg-primary/5 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] border border-primary/30 text-xs text-primary hover:bg-primary/5 transition-colors"
                 >
                   <GitBranch className="w-3.5 h-3.5" />
                   New version

@@ -539,14 +539,14 @@ export default function ProductCostPage() {
                 placeholder="Search products…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 min-w-[12rem] sm:flex-initial sm:w-72 px-3 py-2 text-sm border border-[color:var(--ds-border-warm)] rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="flex-1 min-w-[12rem] sm:flex-initial sm:w-72 px-3 py-2 text-sm border border-[color:var(--ds-border-warm)] rounded-[4px] bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="whitespace-nowrap">Sort by</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortMode)}
-                  className="px-2 py-2 text-sm border border-[color:var(--ds-border-warm)] rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="px-2 py-2 text-sm border border-[color:var(--ds-border-warm)] rounded-[4px] bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="cost-asc">Cost/product — low→high</option>
                   <option value="cost-desc">Cost/product — high→low</option>
@@ -559,7 +559,7 @@ export default function ProductCostPage() {
                 <select
                   value={productCatFilter}
                   onChange={(e) => setProductCatFilter(e.target.value)}
-                  className="px-2 py-2 text-sm border border-[color:var(--ds-border-warm)] rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 capitalize"
+                  className="px-2 py-2 text-sm border border-[color:var(--ds-border-warm)] rounded-[4px] bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 capitalize"
                 >
                   <option value="">All kinds</option>
                   {availableProductCategories.map((c) => (
@@ -587,7 +587,7 @@ export default function ProductCostPage() {
                   <button
                     key={cat}
                     onClick={() => toggleFillingCat(cat)}
-                    className={`text-[11px] px-2 py-0.5 rounded-sm border font-medium transition-colors ${
+                    className={`text-[11px] px-2 py-0.5 rounded-[4px] border font-medium transition-colors ${
                       active
                         ? catChipClass(cat) + " ring-1 ring-current/40"
                         : "text-muted-foreground bg-background border-[color:var(--ds-border-warm)] hover:bg-muted"
@@ -603,14 +603,14 @@ export default function ProductCostPage() {
         )}
 
         {productsWithCost.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] p-8 text-center">
+          <div className="rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] p-8 text-center">
             <p className="text-muted-foreground text-sm mb-1">No cost data yet</p>
             <p className="text-xs text-muted-foreground/70">
               Open a product and trigger a cost calculation from the Cost tab to get started.
             </p>
           </div>
         ) : (
-          <div className="space-y-px rounded-sm border border-[color:var(--ds-border-warm)] overflow-hidden">
+          <div className="space-y-px rounded-[4px] border border-[color:var(--ds-border-warm)] overflow-hidden">
             {/* Header row */}
             <div className="grid grid-cols-[2rem_1fr_auto_auto] gap-3 items-center px-4 py-2 bg-muted text-xs font-medium text-muted-foreground uppercase tracking-wide">
               <span>#</span>
@@ -698,12 +698,12 @@ export default function ProductCostPage() {
               <span key={cat} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 {cat === "Shell & Cap" ? (
                   <span
-                    className="w-2.5 h-2.5 rounded-sm"
+                    className="w-2.5 h-2.5 rounded-[4px]"
                     style={{ background: "linear-gradient(90deg, #3d1a0a 0%, #d4aa6a 100%)" }}
                     title="Colour varies by coating type"
                   />
                 ) : (
-                  <span className={`w-2.5 h-2.5 rounded-sm ${CAT_BAR_COLOR[cat]}`} />
+                  <span className={`w-2.5 h-2.5 rounded-[4px] ${CAT_BAR_COLOR[cat]}`} />
                 )}
                 {shortCat(cat)}
               </span>
@@ -826,7 +826,7 @@ export default function ProductCostPage() {
             return (
               <span key={category} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span
-                  className={`w-2 h-2 rounded-sm ${shellOverride ? "" : catBarColor(category)}`}
+                  className={`w-2 h-2 rounded-[4px] ${shellOverride ? "" : catBarColor(category)}`}
                   style={shellOverride ? { backgroundColor: shellOverride } : undefined}
                 />
                 {shortCat(category)}
@@ -845,7 +845,7 @@ export default function ProductCostPage() {
             {[...new Set(focusCategories)].map((cat) => (
               <span
                 key={cat}
-                className={`text-xs px-2 py-0.5 rounded-sm border font-medium ${catChipClass(cat)}`}
+                className={`text-xs px-2 py-0.5 rounded-[4px] border font-medium ${catChipClass(cat)}`}
               >
                 {shortCat(cat)}
               </span>
@@ -964,7 +964,7 @@ export default function ProductCostPage() {
                     setCompareSearch("");
                   }
                 }}
-                className="w-full px-3 py-2 text-sm border border-primary/40 rounded-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full px-3 py-2 text-sm border border-primary/40 rounded-[4px] bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               {compareSearchResults.length > 0 && (
                 <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg overflow-hidden">
@@ -992,7 +992,7 @@ export default function ProductCostPage() {
             <button
               onClick={() => setAddingCompare(true)}
               disabled={compareIds.length >= 3}
-              className={`text-sm px-3 py-1.5 rounded-sm border transition-colors ${
+              className={`text-sm px-3 py-1.5 rounded-[4px] border transition-colors ${
                 compareIds.length >= 3
                   ? "border-[color:var(--ds-border-warm)] text-muted-foreground/40 cursor-not-allowed"
                   : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:text-foreground hover:border-primary/40"
@@ -1011,7 +1011,7 @@ export default function ProductCostPage() {
             Comparison
           </h3>
 
-          <div className="overflow-x-auto rounded-sm border border-[color:var(--ds-border-warm)]">
+          <div className="overflow-x-auto rounded-[4px] border border-[color:var(--ds-border-warm)]">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-[color:var(--ds-border-warm)] bg-muted">
@@ -1108,7 +1108,7 @@ export default function ProductCostPage() {
                     key={cat}
                     label={
                       <span className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-sm shrink-0 ${catBarColor(cat)}`} />
+                        <span className={`w-2 h-2 rounded-[4px] shrink-0 ${catBarColor(cat)}`} />
                         {shortCat(cat)}
                       </span>
                     }

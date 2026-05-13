@@ -63,7 +63,7 @@ export function FreezeModal({
         {/* Header — cool icy tint */}
         <div className="bg-gradient-to-b from-sky-50 to-card px-5 pt-5 pb-3">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-9 h-9 rounded-sm bg-sky-500/10 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-[4px] bg-sky-500/10 flex items-center justify-center">
               <Snowflake className="w-5 h-5 text-sky-600" />
             </div>
             <div>
@@ -188,12 +188,12 @@ export function DefrostConfirmModal({
 
         <div className="px-5 pb-3">
           {sellBy ? (
-            <div className="rounded-sm bg-muted border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-foreground">
+            <div className="rounded-[4px] bg-muted border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-foreground">
               New sell-by date: <span className="font-medium">{sellBy}</span>
               <span className="text-muted-foreground"> ({preservedShelfLifeDays} days from today)</span>
             </div>
           ) : (
-            <div className="rounded-sm bg-muted border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-muted-foreground">
+            <div className="rounded-[4px] bg-muted border border-[color:var(--ds-border-warm)] px-3 py-2 text-xs text-muted-foreground">
               No preserved shelf life recorded — defrosting will not set a new sell-by date.
             </div>
           )}
@@ -208,7 +208,7 @@ export function DefrostConfirmModal({
           </button>
           <button
             onClick={onConfirm}
-            className="rounded-sm bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+            className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
           >
             Yes, defrost
           </button>

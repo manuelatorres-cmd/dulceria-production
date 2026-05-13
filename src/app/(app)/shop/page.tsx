@@ -393,9 +393,9 @@ function ShopStockGrid() {
       </div>
 
       <div className="flex items-center gap-3 mb-3 text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.06em" }}>
-        <span><i className="inline-block w-2 h-2 rounded-sm align-middle mr-1" style={{ background: "#d6ead9" }} />ok {okN}</span>
-        <span><i className="inline-block w-2 h-2 rounded-sm align-middle mr-1" style={{ background: "#fdf8e2" }} />low {lowN}</span>
-        <span><i className="inline-block w-2 h-2 rounded-sm align-middle mr-1" style={{ background: "#fdeeea" }} />out {outN}</span>
+        <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "#d6ead9" }} />ok {okN}</span>
+        <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "#fdf8e2" }} />low {lowN}</span>
+        <span><i className="inline-block w-2 h-2 rounded-[4px] align-middle mr-1" style={{ background: "#fdeeea" }} />out {outN}</span>
       </div>
 
       <div className="flex items-center gap-2 mb-3 flex-wrap">

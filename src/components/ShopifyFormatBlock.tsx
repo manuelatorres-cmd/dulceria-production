@@ -33,7 +33,7 @@ export function ShopifyFormatBlock({ entries, per100g }: Props) {
   if (!ingredientHtml && !hasNutrition) return null;
 
   return (
-    <div className="mt-4 rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-muted/20 p-3">
+    <div className="mt-4 rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] bg-muted/20 p-3">
       <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
         Shopify-Format
       </h3>
@@ -117,7 +117,7 @@ function CopyRow({ label, previewHtml, previewText, copyHtml, copyText }: CopyRo
           </button>
         </div>
       </div>
-      <div className="rounded-sm bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] px-2 py-1.5 text-xs leading-relaxed font-mono break-words">
+      <div className="rounded-[4px] bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] px-2 py-1.5 text-xs leading-relaxed font-mono break-words">
         {previewHtml ? (
           <span dangerouslySetInnerHTML={{ __html: previewHtml }} />
         ) : (

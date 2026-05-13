@@ -161,7 +161,7 @@ export default function ProductionPage() {
 
       <div className="px-4 pb-8 space-y-4">
         {visibleDays.length === 0 ? (
-          <div className="rounded-sm border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6 text-center">
+          <div className="rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6 text-center">
             <Calendar className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">
               Nothing scheduled yet. Head to <Link href="/plan" className="text-primary hover:underline">/plan</Link> and click <span className="font-medium">Regenerate plan</span> once you have open orders.
@@ -185,7 +185,7 @@ export default function ProductionPage() {
               return (
                 <section
                   key={day.id ?? day.date}
-                  className={`rounded-sm border overflow-hidden ${
+                  className={`rounded-[4px] border overflow-hidden ${
                     isToday ? "border-primary/40 bg-primary/5" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"
                   }`}
                 >
@@ -198,7 +198,7 @@ export default function ProductionPage() {
                         {DAY_STATUS_LABEL[day.status]}
                       </span>
                       {isToday && (
-                        <span className="text-[10px] uppercase tracking-wide rounded-sm bg-primary text-primary-foreground px-2 py-0.5">
+                        <span className="text-[10px] uppercase tracking-wide rounded-[4px] bg-primary text-primary-foreground px-2 py-0.5">
                           Today
                         </span>
                       )}
@@ -283,7 +283,7 @@ export default function ProductionPage() {
                                     return (
                                       <span
                                         key={stepId}
-                                        className={`rounded-sm border px-1.5 py-0.5 flex items-center gap-1 ${
+                                        className={`rounded-[4px] border px-1.5 py-0.5 flex items-center gap-1 ${
                                           done
                                             ? "border-status-ok/40 bg-status-ok/10 text-status-ok"
                                             : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-muted-foreground"
@@ -324,7 +324,7 @@ export default function ProductionPage() {
         {/* Draft batches with no scheduled days yet — usually because
             the scheduler had warnings (no mould, missing steps, etc.). */}
         {unscheduledDrafts.length > 0 && (
-          <section className="rounded-sm border border-status-warn/40 bg-status-warn-bg/20 p-3 space-y-2">
+          <section className="rounded-[4px] border border-status-warn/40 bg-status-warn-bg/20 p-3 space-y-2">
             <h2 className="text-sm font-semibold text-status-warn flex items-center gap-1.5">
               <Clock className="w-4 h-4" /> Drafts with nothing scheduled
             </h2>
@@ -365,13 +365,13 @@ export default function ProductionPage() {
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => setConfirmDeleteId(null)}
-                  className="text-sm rounded-sm border border-[color:var(--ds-border-warm)] px-3 py-1.5 hover:bg-muted"
+                  className="text-sm rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1.5 hover:bg-muted"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleDelete(confirmDeleteId)}
-                  className="text-sm rounded-sm bg-destructive text-destructive-foreground px-3 py-1.5 hover:opacity-90"
+                  className="text-sm rounded-[4px] bg-destructive text-destructive-foreground px-3 py-1.5 hover:opacity-90"
                 >
                   Delete
                 </button>

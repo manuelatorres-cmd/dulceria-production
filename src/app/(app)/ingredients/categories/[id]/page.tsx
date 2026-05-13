@@ -111,7 +111,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
               className="text-xl font-bold"
             />
             {category.archived && (
-              <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
+              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
                 <Archive className="w-3 h-3" /> Archived
               </span>
             )}
@@ -133,7 +133,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
         {/* Archive / Delete */}
         <section className="pt-4 border-t border-[color:var(--ds-border-warm)]">
           {deleteError && (
-            <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-3 mb-3">
+            <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-3 mb-3">
               <p className="text-xs text-destructive">{deleteError}</p>
             </div>
           )}
@@ -183,7 +183,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
           ) : (
             /* Not in use — allow full delete */
             confirmDelete ? (
-              <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+              <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                 <p className="text-sm text-destructive font-medium">Delete this category?</p>
                 <p className="text-xs text-muted-foreground">
                   No ingredients are currently using it. This cannot be undone.
@@ -191,7 +191,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
                 <div className="flex gap-2">
                   <button
                     onClick={handleHardDelete}
-                    className="rounded-sm bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
+                    className="rounded-[4px] bg-destructive text-destructive-foreground px-4 py-2 text-sm font-medium"
                   >
                     Yes, delete
                   </button>

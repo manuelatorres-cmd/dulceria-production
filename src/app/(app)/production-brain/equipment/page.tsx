@@ -144,7 +144,7 @@ export default function ProductionBrainEquipmentPage() {
               return (
                 <li
                   key={inst.id}
-                  className="rounded-sm border border-[color:var(--ds-border-warm)] bg-muted p-3 text-sm"
+                  className="rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted p-3 text-sm"
                 >
                   <div className="flex items-baseline justify-between">
                     <strong className="tracking-tight">{inst.name}</strong>
@@ -268,7 +268,7 @@ export default function ProductionBrainEquipmentPage() {
             {storage.map((unit) => (
               <li
                 key={unit.id}
-                className="rounded-sm border border-[color:var(--ds-border-warm)] bg-muted p-3 text-sm"
+                className="rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted p-3 text-sm"
               >
                 <div className="flex items-baseline justify-between">
                   <strong className="tracking-tight">{unit.name}</strong>
@@ -304,7 +304,7 @@ export default function ProductionBrainEquipmentPage() {
             {otherInstances.map((inst) => (
               <li
                 key={inst.id}
-                className="rounded-sm border border-[color:var(--ds-border-warm)] bg-muted p-3 text-sm"
+                className="rounded-[4px] border border-[color:var(--ds-border-warm)] bg-muted p-3 text-sm"
               >
                 <div className="flex items-baseline justify-between">
                   <strong className="tracking-tight">{inst.name}</strong>

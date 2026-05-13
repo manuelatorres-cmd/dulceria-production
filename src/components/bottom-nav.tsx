@@ -48,7 +48,7 @@ export function BottomNav() {
             return (
               <span
                 key={item.href}
-                className="flex flex-col items-center gap-1 px-3 py-2 text-xs rounded-sm text-muted-foreground/40 cursor-not-allowed"
+                className="flex flex-col items-center gap-1 px-3 py-2 text-xs rounded-[4px] text-muted-foreground/40 cursor-not-allowed"
               >
                 <item.icon className="w-5 h-5" />
                 <span className="hidden sm:block">{item.label}</span>
@@ -60,7 +60,7 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 px-3 py-2 text-xs rounded-sm transition-colors ${
+              className={`flex flex-col items-center gap-1 px-3 py-2 text-xs rounded-[4px] transition-colors ${
                 isActive
                   ? "text-primary font-medium bg-primary/8"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"

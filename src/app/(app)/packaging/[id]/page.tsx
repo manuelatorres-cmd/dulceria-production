@@ -201,7 +201,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
         {/* Name row — always visible */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-sm bg-muted shrink-0 flex items-center justify-center text-muted-foreground mt-0.5">
+            <div className="w-12 h-12 rounded-[4px] bg-muted shrink-0 flex items-center justify-center text-muted-foreground mt-0.5">
               <Package className="w-6 h-6" />
             </div>
             <div>
@@ -212,7 +212,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                   className="text-xl font-bold"
                 />
                 {pkg.archived && (
-                  <span className="rounded-sm bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
+                  <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
                     <Archive className="w-3 h-3" /> Archived
                   </span>
                 )}
@@ -522,7 +522,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
             <button
               onClick={() => setShowOrderForm(true)}
               disabled={editing}
-              className="w-full rounded-sm border border-dashed border-[color:var(--ds-border-warm)] py-4 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] py-4 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
               Log first purchase
@@ -540,7 +540,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                             await deletePackagingOrder(order.id!);
                             setDeletingOrderId(null);
                           }}
-                          className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-3 py-1.5 text-xs font-medium transition-colors hover:bg-destructive/90"
+                          className="inline-flex items-center justify-center rounded-[4px] bg-destructive text-white px-3 py-1.5 text-xs font-medium transition-colors hover:bg-destructive/90"
                         >
                           Yes, delete
                         </button>
@@ -630,7 +630,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
               </div>
             ) : (
               /* Not in use — allow full delete */
-              <div className="rounded-sm border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+              <div className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                 <p className="text-sm font-medium text-destructive">Delete this packaging?</p>
                 <p className="text-xs text-muted-foreground">
                   This will permanently remove the packaging and all {orders.length} purchase{orders.length !== 1 ? "s" : ""} logged for it. This cannot be undone.
@@ -641,7 +641,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
                       await deletePackaging(packagingId);
                       router.replace("/packaging");
                     }}
-                    className="inline-flex items-center justify-center rounded-sm bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
+                    className="inline-flex items-center justify-center rounded-[4px] bg-destructive text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/90"
                   >
                     Yes, delete packaging
                   </button>
