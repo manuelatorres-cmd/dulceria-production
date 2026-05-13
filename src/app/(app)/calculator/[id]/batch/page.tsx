@@ -16,7 +16,8 @@ import {
   setIngredientLowStock,
 } from "@/lib/hooks";
 import { FILL_FACTOR } from "@/lib/production";
-import { IconChevronLeft as ChevronLeft, IconCircleCheck as CheckCircle } from "@tabler/icons-react";
+import { IconCircleCheck as CheckCircle } from "@tabler/icons-react";
+import { PageHeader } from "@/components/dulceria";
 import { LowStockFlagButton } from "@/components/pantry";
 
 export default function BatchPage({ params }: { params: Promise<{ id: string }> }) {
