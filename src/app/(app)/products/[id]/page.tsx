@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, saveVariant, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductFillingHistory, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, setPlanProductStockStatus, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList, useProductLeadTimeSuggestions, useStockLocationMinimums, saveStockLocationMinimum } from "@/lib/hooks";
-import { SHELL_TECHNIQUES, DECORATION_MATERIAL_TYPE_LABELS, DECORATION_APPLY_AT_OPTIONS, normalizeApplyAt, type ShellDesignStep, type ShellDesignApplyAt, type ProductCostSnapshot, type BreakdownEntry, type ProductFilling, costPerGram, type DecorationMaterial, allergenLabel, type FillMode } from "@/types";
+import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, saveVariant, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductFillingHistory, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, setPlanProductStockStatus, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList, useProductLeadTimeSuggestions, useStockLocationMinimums, saveStockLocationMinimum, useFacilityMayContain } from "@/lib/hooks";
+import { SHELL_TECHNIQUES, DECORATION_MATERIAL_TYPE_LABELS, DECORATION_APPLY_AT_OPTIONS, normalizeApplyAt, COMPOSITION_FIELDS, type ShellDesignStep, type ShellDesignApplyAt, type ProductCostSnapshot, type BreakdownEntry, type ProductFilling, costPerGram, type DecorationMaterial, allergenLabel, type FillMode, type Ingredient, type Filling, type ProductCategory, type FillingIngredient } from "@/types";
 import { colorToCSS } from "@/lib/colors";
 import { deserializeBreakdown, enrichBreakdownLabels, formatCost, costDelta, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
 import { DENSITY_G_PER_ML } from "@/lib/production";
@@ -32,6 +32,7 @@ import {
   DsInlineToggle,
   DsTagInput,
   DsPhotoUpload,
+  ListRow,
   useToast,
 } from "@/components/dulceria";
 import type { Product } from "@/types";
@@ -645,42 +646,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {activeTab === "shell" && (
-        <>
-          {editing ? (
-            <>
-              <ShellDesignSection
-                steps={localShellDesign}
-                onUpdate={setLocalShellDesign}
-                readonly={false}
-              />
-              {saveErrors.length > 0 && (
-                <div className="px-4 pb-3">
-                  <ul className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-3 space-y-1">
-                    {saveErrors.map((err, i) => (
-                      <li key={i} className="text-xs text-destructive">{err}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="px-4 pb-6 flex gap-2">
-                <button onClick={handleSave} className="btn-primary px-4 py-2">Save</button>
-                <button onClick={handleCancel} className="btn-secondary px-4 py-2">Cancel</button>
-              </div>
-            </>
-          ) : (
-            <>
-              {(product.shellDesign ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground py-8 text-center px-4">No shell design steps recorded yet.</p>
-              ) : (
-                <ShellDesignSection
-                  steps={product.shellDesign ?? []}
-                  onUpdate={() => {}}
-                  readonly
-                />
-              )}
-            </>
-          )}
-        </>
+        <ProductShellTab
+          product={product}
+          productCategory={productCategory}
+          shellCapableIngredients={shellCapableIngredients}
+          shellCapableFillings={shellCapableFillings}
+          patchProduct={patchProduct}
+          onSwitchToProductTab={() => switchTab("product")}
+        />
       )}
 
       {activeTab === "fillingHistory" && (
@@ -3097,6 +3070,320 @@ function ProductNutritionTab({ productId, productFillings, market }: { productId
         )}
         <ShopifyFormatBlock entries={ingredientList} per100g={per100g} />
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shell tab — read-only source-type badge (set in Product tab) + composition
+// rollup + allergen chips. Inline-edit per A.2 spec; no edit-mode toggle.
+// ---------------------------------------------------------------------------
+
+function toGramsForComposition(amount: number, unit: string): number | null {
+  if (unit === "g" || unit === "ml") return amount;
+  if (unit === "kg" || unit === "L") return amount * 1000;
+  return null;
+}
+
+function ProductShellTab({
+  product,
+  productCategory,
+  shellCapableIngredients,
+  shellCapableFillings,
+  patchProduct,
+  onSwitchToProductTab,
+}: {
+  product: Product;
+  productCategory: ProductCategory | null | undefined;
+  shellCapableIngredients: Ingredient[];
+  shellCapableFillings: Filling[];
+  patchProduct: (patch: Partial<Product>) => Promise<void>;
+  onSwitchToProductTab: () => void;
+}) {
+  const toast = useToast();
+  const allIngredients = useIngredients(true);
+  const facilityMayContain = useFacilityMayContain();
+
+  const sourceType: "ingredient" | "filling" | null = product.shellIngredientId
+    ? "ingredient"
+    : product.shellFillingId
+      ? "filling"
+      : null;
+
+  const shellIngredient = sourceType === "ingredient"
+    ? shellCapableIngredients.find((i) => i.id === product.shellIngredientId) ?? null
+    : null;
+  const shellFilling = sourceType === "filling"
+    ? shellCapableFillings.find((f) => f.id === product.shellFillingId) ?? null
+    : null;
+
+  const shellFillingItems: FillingIngredient[] = useFillingIngredients(shellFilling?.id);
+
+  const ingMap = useMemo(
+    () => new Map(allIngredients.map((i) => [i.id!, i])),
+    [allIngredients],
+  );
+
+  const composition = useMemo<Record<string, number> | null>(() => {
+    if (shellIngredient) {
+      return {
+        cacaoFat: shellIngredient.cacaoFat ?? 0,
+        sugar: shellIngredient.sugar ?? 0,
+        milkFat: shellIngredient.milkFat ?? 0,
+        water: shellIngredient.water ?? 0,
+        solids: shellIngredient.solids ?? 0,
+        otherFats: shellIngredient.otherFats ?? 0,
+        alcohol: shellIngredient.alcohol ?? 0,
+      };
+    }
+    if (shellFilling && shellFillingItems.length > 0) {
+      let total = 0;
+      const acc = { cacaoFat: 0, sugar: 0, milkFat: 0, water: 0, solids: 0, otherFats: 0, alcohol: 0 };
+      for (const it of shellFillingItems) {
+        if (!it.ingredientId) continue;
+        const ing = ingMap.get(it.ingredientId);
+        if (!ing) continue;
+        const g = toGramsForComposition(it.amount, it.unit);
+        if (g == null || g <= 0) continue;
+        total += g;
+        acc.cacaoFat += (g * (ing.cacaoFat ?? 0)) / 100;
+        acc.sugar += (g * (ing.sugar ?? 0)) / 100;
+        acc.milkFat += (g * (ing.milkFat ?? 0)) / 100;
+        acc.water += (g * (ing.water ?? 0)) / 100;
+        acc.solids += (g * (ing.solids ?? 0)) / 100;
+        acc.otherFats += (g * (ing.otherFats ?? 0)) / 100;
+        acc.alcohol += (g * (ing.alcohol ?? 0)) / 100;
+      }
+      if (total === 0) return null;
+      const k = 100 / total;
+      return {
+        cacaoFat: acc.cacaoFat * k,
+        sugar: acc.sugar * k,
+        milkFat: acc.milkFat * k,
+        water: acc.water * k,
+        solids: acc.solids * k,
+        otherFats: acc.otherFats * k,
+        alcohol: acc.alcohol * k,
+      };
+    }
+    return null;
+  }, [shellIngredient, shellFilling, shellFillingItems, ingMap]);
+
+  const containsAllergens = useMemo(() => {
+    if (shellIngredient) return shellIngredient.allergens ?? [];
+    if (shellFilling) return shellFilling.allergens ?? [];
+    return [];
+  }, [shellIngredient, shellFilling]);
+
+  const mayContainAllergens = useMemo(() => {
+    const inContains = new Set(containsAllergens);
+    return facilityMayContain.filter((a) => !inContains.has(a));
+  }, [facilityMayContain, containsAllergens]);
+
+  const shellPctValue = product.shellPercentage ?? productCategory?.defaultShellPercent ?? 37;
+
+  const ingredientOptions = useMemo(
+    () => shellCapableIngredients.map((i) => ({ value: i.id!, label: i.name })),
+    [shellCapableIngredients],
+  );
+  const fillingOptions = useMemo(
+    () => shellCapableFillings.map((f) => ({ value: f.id!, label: f.name })),
+    [shellCapableFillings],
+  );
+
+  async function saveSourceId(next: string) {
+    if (sourceType === "ingredient") {
+      await patchProduct({ shellIngredientId: next || null, shellFillingId: null });
+    } else if (sourceType === "filling") {
+      await patchProduct({ shellFillingId: next || null, shellIngredientId: null });
+    }
+    toast.success("Shell source saved");
+  }
+
+  async function saveShellPct(next: string) {
+    const n = parseFloat(next);
+    if (isNaN(n) || n < 0 || n > 100) throw new Error("Enter 0–100");
+    await patchProduct({ shellPercentage: n });
+    toast.success("Shell % saved");
+  }
+
+  return (
+    <div className="px-4 pb-6 space-y-4">
+      <Section title="Shell source">
+        <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span className="text-ds-label">Source type</span>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "2px 10px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  border: "0.5px solid var(--ds-border-warm)",
+                  background: "var(--ds-card-bg-hover)",
+                  color: "var(--ds-text-primary)",
+                  fontStyle: sourceType ? "normal" : "italic",
+                }}
+              >
+                {sourceType === "ingredient"
+                  ? "Ingredient (couverture)"
+                  : sourceType === "filling"
+                    ? "Self-made chocolate (filling)"
+                    : "Not set"}
+              </span>
+              <button
+                type="button"
+                onClick={onSwitchToProductTab}
+                style={{
+                  fontSize: 12,
+                  color: "var(--ds-text-muted)",
+                  textDecoration: "underline",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                ← edit in Product tab
+              </button>
+            </div>
+          </div>
+
+          {sourceType === "ingredient" && (
+            <>
+              <DsInlineSelect
+                label="Shell ingredient"
+                value={product.shellIngredientId ?? ""}
+                options={ingredientOptions}
+                onSave={saveSourceId}
+                placeholder="Pick a chocolate ingredient"
+              />
+              <DsInlineField
+                label="Shell %"
+                value={String(shellPctValue)}
+                onSave={saveShellPct}
+                type="number"
+                suffix="%"
+              />
+            </>
+          )}
+          {sourceType === "filling" && (
+            <>
+              <DsInlineSelect
+                label="Shell filling"
+                value={product.shellFillingId ?? ""}
+                options={fillingOptions}
+                onSave={saveSourceId}
+                placeholder="Pick a chocolate filling"
+              />
+              <DsInlineField
+                label="Shell %"
+                value={String(shellPctValue)}
+                onSave={saveShellPct}
+                type="number"
+                suffix="%"
+              />
+            </>
+          )}
+          {sourceType === null && (
+            <p style={{ fontSize: 12, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+              Pick ingredient vs filling in the Product tab first.
+            </p>
+          )}
+        </div>
+      </Section>
+
+      <Section title="Computed" noBody>
+        {composition ? (
+          <div>
+            {COMPOSITION_FIELDS.map(({ key, label }) => (
+              <ListRow
+                key={key}
+                title={label}
+                side={
+                  <span
+                    style={{
+                      fontVariantNumeric: "tabular-nums",
+                      fontSize: 13,
+                      color: "var(--ds-text-primary)",
+                    }}
+                  >
+                    {composition[key].toFixed(1)}%
+                  </span>
+                }
+              />
+            ))}
+          </div>
+        ) : (
+          <p
+            style={{
+              padding: "14px 20px",
+              fontSize: 13,
+              color: "var(--ds-text-muted)",
+              fontStyle: "italic",
+            }}
+          >
+            Pick a shell source to see composition.
+          </p>
+        )}
+        <div style={{ padding: "12px 20px", display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {containsAllergens.map((a) => (
+            <span
+              key={`c-${a}`}
+              style={{
+                display: "inline-flex",
+                padding: "2px 8px",
+                borderRadius: 999,
+                fontSize: 11,
+                border: "1px solid var(--ds-tier-urgent)",
+                color: "var(--ds-tier-urgent)",
+                background: "transparent",
+              }}
+            >
+              {allergenLabel(a)}
+            </span>
+          ))}
+          {mayContainAllergens.map((a) => (
+            <span
+              key={`m-${a}`}
+              style={{
+                display: "inline-flex",
+                padding: "2px 8px",
+                borderRadius: 999,
+                fontSize: 11,
+                border: "1px solid var(--ds-tier-active)",
+                color: "var(--ds-text-primary)",
+                background: "transparent",
+              }}
+            >
+              may contain {allergenLabel(a)}
+            </span>
+          ))}
+          {containsAllergens.length === 0 && mayContainAllergens.length === 0 && (
+            <span
+              style={{
+                fontSize: 12,
+                color: "var(--ds-text-muted)",
+                fontStyle: "italic",
+              }}
+            >
+              No allergens.
+            </span>
+          )}
+        </div>
+        <p
+          style={{
+            padding: "0 20px 14px",
+            fontSize: 11,
+            color: "var(--ds-text-muted)",
+            fontStyle: "italic",
+          }}
+        >
+          Recomputes when source changes.
+        </p>
+      </Section>
     </div>
   );
 }
