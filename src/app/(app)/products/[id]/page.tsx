@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, saveVariant, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductFillingHistory, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, setPlanProductStockStatus, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList, useProductLeadTimeSuggestions, useStockLocationMinimums, saveStockLocationMinimum, useFacilityMayContain } from "@/lib/hooks";
+import { useProduct, useProductFillings, useFillings, useFilling, useMouldsList, useProductCategories, useProductCategory, useCoatings, useShellCapableIngredients, saveProduct, saveVariant, addFillingToProduct, removeFillingFromProduct, updateProductFillingPercentage, updateProductFillingGrams, reorderProductFillings, deleteProduct, duplicateProduct, archiveProduct, unarchiveProduct, hasProductBeenProduced, usePlanProductsForProduct, useProductionPlans, useProductCostSnapshots, useLatestProductCostSnapshot, recalculateProductCost, useIngredients, useFillingIngredients, useFillingIngredientsForFillings, useDecorationMaterials, saveDecorationMaterial, useCurrencySymbol, useMarketRegion, useDefaultFillMode, useShellDesigns, useDecorationCategoryLabels, useProductsList, useProductLeadTimeSuggestions, useStockLocationMinimums, saveStockLocationMinimum, useFacilityMayContain } from "@/lib/hooks";
 import { SHELL_TECHNIQUES, DECORATION_MATERIAL_TYPE_LABELS, DECORATION_APPLY_AT_OPTIONS, normalizeApplyAt, COMPOSITION_FIELDS, type ShellDesignStep, type ShellDesignApplyAt, type ProductCostSnapshot, type BreakdownEntry, type ProductFilling, costPerGram, type DecorationMaterial, allergenLabel, type FillMode, type Ingredient, type Filling, type ProductCategory, type FillingIngredient } from "@/types";
 import { colorToCSS } from "@/lib/colors";
 import { deserializeBreakdown, enrichBreakdownLabels, formatCost, costDelta, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -13,7 +13,7 @@ import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
 import { containsAllergen } from "@/lib/allergenKeywordsDe";
 import { calculateShellWeightG, calculateCapWeightG } from "@/lib/costCalculation";
 import type { MarketRegion } from "@/types";
-import { IconCamera as Camera, IconPlus as Plus, IconX as X, IconSearch as Search, IconTrash as Trash2, IconPencil as Pencil, IconChevronRight as ChevronRight, IconNote as StickyNote, IconRefresh as RefreshCw, IconAlertTriangle as AlertTriangle, IconArrowBackUp as Undo2, IconCopy as Copy, IconArchive as Archive, IconArchiveOff as ArchiveRestore, IconGripVertical as GripVertical, IconSnowflake as Snowflake } from "@tabler/icons-react";
+import { IconCamera as Camera, IconPlus as Plus, IconX as X, IconSearch as Search, IconTrash as Trash2, IconPencil as Pencil, IconChevronRight as ChevronRight, IconRefresh as RefreshCw, IconAlertTriangle as AlertTriangle, IconCopy as Copy, IconArchive as Archive, IconArchiveOff as ArchiveRestore, IconGripVertical as GripVertical } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
@@ -33,6 +33,8 @@ import {
   DsTagInput,
   DsPhotoUpload,
   ListRow,
+  StatusTag,
+  type StatusTagKind,
   useToast,
 } from "@/components/dulceria";
 import type { Product } from "@/types";
@@ -1329,227 +1331,394 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   );
 }
 
+// Phase A.3 — Filling history tab. Sub-pills (All / Active / Past) + search +
+// paginated ListRow per batch (label · filling · date / qty produced/used/remaining /
+// status chip + Open batch).
 function ProductFillingHistorySection({ productId }: { productId: string }) {
-  const history = useProductFillingHistory(productId);
+  const planProducts = usePlanProductsForProduct(productId);
+  const allPlans = useProductionPlans();
+  const productFillings = useProductFillings(productId);
+  const allFillings = useFillings();
+  const [subTab, setSubTab] = useState<"all" | "active" | "past">("all");
+  const [search, setSearch] = useState("");
+  const [visible, setVisible] = useState(30);
 
-  if (history.length === 0) {
+  const planMap = useMemo(() => new Map(allPlans.map((p) => [p.id!, p])), [allPlans]);
+  const fillingMap = useMemo(() => new Map(allFillings.map((f) => [f.id!, f])), [allFillings]);
+  const fillingLabel = useMemo(() => {
+    const names = productFillings
+      .map((pf) => fillingMap.get(pf.fillingId)?.name)
+      .filter((n): n is string => Boolean(n));
+    return names.join(" + ") || "—";
+  }, [productFillings, fillingMap]);
+
+  const rows = useMemo(() => {
+    return planProducts
+      .map((pb) => {
+        const plan = planMap.get(pb.planId);
+        return plan ? { pb, plan } : null;
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((a, b) => {
+        const aT = a.plan.completedAt ?? a.plan.createdAt;
+        const bT = b.plan.completedAt ?? b.plan.createdAt;
+        return new Date(bT).getTime() - new Date(aT).getTime();
+      });
+  }, [planProducts, planMap]);
+
+  const counts = useMemo(() => {
+    let active = 0, past = 0;
+    for (const r of rows) {
+      const s = r.plan.status;
+      if (s === "done" || s === "cancelled" || s === "orphaned") past++;
+      else active++;
+    }
+    return { all: rows.length, active, past };
+  }, [rows]);
+
+  const filtered = useMemo(() => {
+    let list = rows;
+    if (subTab === "active") {
+      list = list.filter((r) => r.plan.status === "draft" || r.plan.status === "active");
+    } else if (subTab === "past") {
+      list = list.filter((r) => r.plan.status === "done" || r.plan.status === "cancelled" || r.plan.status === "orphaned");
+    }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter((r) =>
+        (r.plan.name?.toLowerCase().includes(q) ||
+          r.plan.batchNumber?.toLowerCase().includes(q) ||
+          fillingLabel.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [rows, subTab, search, fillingLabel]);
+
+  const shown = filtered.slice(0, visible);
+
+  if (rows.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-10 text-center px-4">
-        No filling version changes recorded yet.
-      </p>
+      <div className="px-4 pb-8">
+        <p style={{ fontStyle: "italic", color: "var(--ds-text-muted)", textAlign: "center", padding: "40px 0" }}>
+          No batches yet
+        </p>
+      </div>
     );
   }
 
   return (
-    <ul className="space-y-2 px-4 pb-8">
-      {history.map((entry) => {
-        const dateStr = new Date(entry.replacedAt).toLocaleDateString("de-AT", {
-          day: "numeric", month: "short", year: "numeric",
-        });
-        const oldVersion = entry.oldFilling?.version ?? 1;
-        const newVersion = entry.newFilling?.version ?? 1;
-        const fillingName = entry.newFilling?.name ?? entry.oldFilling?.name ?? "Unknown filling";
-        return (
-          <li key={entry.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-medium">{fillingName}</p>
-              <span className="text-xs text-muted-foreground shrink-0">{dateStr}</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              <span className="font-mono">v{oldVersion}</span>
-              {" → "}
-              <span className="font-mono">v{newVersion}</span>
-            </p>
-            {entry.newFilling?.versionNotes && (
-              <p className="text-xs mt-1 text-foreground">{entry.newFilling.versionNotes}</p>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+    <div className="px-4 pb-8" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
+        <DsTabNav
+          variant="pills"
+          tabs={[
+            { id: "all", label: "All", count: counts.all },
+            { id: "active", label: "Active", count: counts.active },
+            { id: "past", label: "Past", count: counts.past },
+          ]}
+          activeTab={subTab}
+          onChange={(id) => { setSubTab(id as "all" | "active" | "past"); setVisible(30); }}
+        />
+        <div
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "4px 10px",
+            border: "0.5px solid var(--ds-border-warm)",
+            background: "var(--ds-card-bg)",
+            borderRadius: 14,
+            minWidth: 200,
+            flex: "0 1 320px",
+          }}
+        >
+          <Search size={13} stroke={1.5} style={{ color: "var(--ds-text-muted)" }} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setVisible(30); }}
+            placeholder="Search batch label or filling…"
+            style={{ fontSize: 12, border: "none", background: "transparent", outline: "none", flex: 1, color: "var(--ds-text-primary)" }}
+          />
+        </div>
+      </div>
+
+      <Section title="Batches" noBody>
+        {shown.length === 0 ? (
+          <p style={{ fontStyle: "italic", color: "var(--ds-text-muted)", textAlign: "center", padding: "32px 0" }}>
+            No batches match
+          </p>
+        ) : (
+          shown.map(({ pb, plan }) => {
+            const produced = pb.actualYield ?? 0;
+            const remaining = pb.currentStock ?? produced;
+            const used = Math.max(0, produced - remaining);
+            const date = new Date(plan.completedAt ?? plan.createdAt);
+            const dateStr = date.toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" });
+            const isDone = plan.status === "done";
+            const isCancelled = plan.status === "cancelled" || plan.status === "orphaned";
+            const chipKind: StatusTagKind = isDone ? "done" : isCancelled ? "overdue" : "scheduled";
+            const chipLabel = isDone ? "Done" : isCancelled ? "Scrapped" : "Active";
+            const href = isDone
+              ? `/production/${plan.id}/summary?from=${encodeURIComponent(`/products/${productId}?tab=fillingHistory`)}`
+              : `/production/${plan.id}?from=${encodeURIComponent(`/products/${productId}?tab=fillingHistory`)}`;
+            return (
+              <ListRow
+                key={pb.id}
+                title={
+                  <span style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
+                    {plan.batchNumber && (
+                      <span style={{ fontFamily: "ui-monospace, SF Mono, monospace", fontSize: 10, padding: "1px 6px", borderRadius: 4, color: "var(--ds-text-muted)", border: "0.5px solid var(--ds-border-warm)" }}>{plan.batchNumber}</span>
+                    )}
+                    <span className="serif" style={{ fontSize: 14 }}>{plan.name}</span>
+                  </span>
+                }
+                meta={
+                  <span style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                    <span>{fillingLabel}</span>
+                    <span>{dateStr}</span>
+                  </span>
+                }
+                secondary={
+                  <span style={{ display: "flex", gap: 14, flexWrap: "wrap", fontVariantNumeric: "tabular-nums" }}>
+                    <span>Produced <strong style={{ color: "var(--ds-text-primary)" }}>{produced}</strong></span>
+                    <span>Used <strong style={{ color: "var(--ds-text-primary)" }}>{used}</strong></span>
+                    <span>Remaining <strong style={{ color: "var(--ds-text-primary)" }}>{remaining}</strong></span>
+                  </span>
+                }
+                side={
+                  <>
+                    <StatusTag kind={chipKind}>{chipLabel}</StatusTag>
+                    <Link href={href} style={{ fontSize: 11, color: "var(--ds-tier-quarter-focus)", display: "inline-flex", alignItems: "center", gap: 2 }}>
+                      Open batch <ChevronRight className="w-3 h-3" />
+                    </Link>
+                  </>
+                }
+              />
+            );
+          })
+        )}
+      </Section>
+
+      {filtered.length > visible && (
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <button
+            type="button"
+            onClick={() => setVisible((v) => v + 30)}
+            style={{
+              padding: "6px 16px", fontSize: 12,
+              border: "0.5px solid var(--ds-border-warm)",
+              background: "var(--ds-card-bg)",
+              color: "var(--ds-text-primary)",
+              borderRadius: 14, cursor: "pointer",
+            }}
+          >
+            Load more · {filtered.length - visible} remaining
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
-const BATCH_STATUS_LABEL: Record<string, string> = { draft: "Not started", active: "In progress", done: "Done" };
-const BATCH_STATUS_STYLE: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  active: "bg-warning-muted text-warning",
-  done: "bg-success-muted text-success",
-};
+function batchDateInputStyle(): React.CSSProperties {
+  return {
+    padding: "3px 8px",
+    fontSize: 11,
+    border: "0.5px solid var(--ds-border-warm)",
+    background: "var(--ds-card-bg)",
+    color: "var(--ds-text-primary)",
+    borderRadius: 12,
+    outline: "none",
+    fontFamily: "inherit",
+  };
+}
 
+// Phase A.4 — Batches tab. 3-col grid (auto-fill min 260px), card per batch with
+// colored left border by status, filter pills + date range toolbar.
 function BatchHistoryTab({ productId }: { productId: string }) {
   const planProducts = usePlanProductsForProduct(productId);
   const allPlans = useProductionPlans();
   const moulds = useMouldsList(true);
-  const [pendingRestore, setPendingRestore] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "active" | "done" | "cancelled">("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const planMap = useMemo(() => new Map(allPlans.map((p) => [p.id!, p])), [allPlans]);
   const mouldMap = useMemo(() => new Map(moulds.map((m) => [m.id!, m])), [moulds]);
 
-  const rows = useMemo(() => {
-    const mapped = planProducts
+  const all = useMemo(() => {
+    return planProducts
       .map((pb) => {
         const plan = planMap.get(pb.planId);
+        if (!plan) return null;
         const mould = mouldMap.get(pb.mouldId);
-        return plan ? { pb, plan, mould } : null;
+        return { pb, plan, mould };
       })
-      .filter((r): r is NonNullable<typeof r> => r !== null);
-
-    const active = mapped
-      .filter((r) => r.plan.status !== "done")
-      .sort((a, b) => new Date(b.plan.createdAt).getTime() - new Date(a.plan.createdAt).getTime());
-
-    const done = mapped
-      .filter((r) => r.plan.status === "done")
+      .filter((r): r is NonNullable<typeof r> => r !== null)
       .sort((a, b) => {
-        const dateA = a.plan.completedAt ? new Date(a.plan.completedAt).getTime() : new Date(a.plan.createdAt).getTime();
-        const dateB = b.plan.completedAt ? new Date(b.plan.completedAt).getTime() : new Date(b.plan.createdAt).getTime();
-        return dateB - dateA;
+        const aT = a.plan.completedAt ?? a.plan.createdAt;
+        const bT = b.plan.completedAt ?? b.plan.createdAt;
+        return new Date(bT).getTime() - new Date(aT).getTime();
       });
-
-    return [...active, ...done];
   }, [planProducts, planMap, mouldMap]);
 
-  if (rows.length === 0) {
+  const counts = useMemo(() => {
+    let active = 0, done = 0, cancelled = 0;
+    for (const r of all) {
+      const s = r.plan.status;
+      if (s === "done") done++;
+      else if (s === "cancelled" || s === "orphaned") cancelled++;
+      else active++;
+    }
+    return { all: all.length, active, done, cancelled };
+  }, [all]);
+
+  const fromMs = fromDate ? new Date(fromDate + "T00:00:00").getTime() : null;
+  const toMs = toDate ? new Date(toDate + "T23:59:59").getTime() : null;
+
+  const filtered = useMemo(() => {
+    return all.filter((r) => {
+      const s = r.plan.status;
+      if (filter === "active" && !(s === "draft" || s === "active")) return false;
+      if (filter === "done" && s !== "done") return false;
+      if (filter === "cancelled" && !(s === "cancelled" || s === "orphaned")) return false;
+      const ms = new Date(r.plan.completedAt ?? r.plan.createdAt).getTime();
+      if (fromMs !== null && ms < fromMs) return false;
+      if (toMs !== null && ms > toMs) return false;
+      return true;
+    });
+  }, [all, filter, fromMs, toMs]);
+
+  if (all.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-10 text-center px-4">
-        This product hasn't been included in any production batch yet.
-      </p>
+      <div className="px-4 pb-8">
+        <p style={{ fontStyle: "italic", color: "var(--ds-text-muted)", textAlign: "center", padding: "40px 0" }}>
+          No batches yet
+        </p>
+      </div>
     );
   }
 
   return (
-    <ul className="space-y-2 px-4 pb-8">
-      {rows.map(({ pb, plan, mould }) => {
-        const planned = mould ? mould.numberOfCavities * pb.quantity : null;
-        const productCount = pb.actualYield ?? planned;
-        const availableCount = pb.currentStock ?? pb.actualYield ?? 0;
-        const frozenCount = pb.frozenQty ?? 0;
-        const fullyFrozen = availableCount <= 0 && frozenCount > 0;
-        const partiallyFrozen = availableCount > 0 && frozenCount > 0;
-        const dateFinished = plan.completedAt
-          ? new Date(plan.completedAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })
-          : null;
-        const isDone = plan.status === "done";
+    <div className="px-4 pb-8" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+        <DsTabNav
+          variant="pills"
+          tabs={[
+            { id: "all", label: "All", count: counts.all },
+            { id: "active", label: "Active", count: counts.active },
+            { id: "done", label: "Done", count: counts.done },
+            { id: "cancelled", label: "Cancelled", count: counts.cancelled },
+          ]}
+          activeTab={filter}
+          onChange={(id) => setFilter(id as "all" | "active" | "done" | "cancelled")}
+        />
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            style={batchDateInputStyle()}
+            aria-label="From date"
+          />
+          <span style={{ color: "var(--ds-text-muted)", fontSize: 11 }}>→</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            style={batchDateInputStyle()}
+            aria-label="To date"
+          />
+        </div>
+      </div>
 
-        return (
-          <li key={pb.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden">
-            {/* Header row */}
-            <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-2">
-              <div className="min-w-0">
-                {plan.batchNumber && (
-                  <span className="font-mono text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{plan.batchNumber}</span>
-                )}
-                <p className="font-medium text-sm mt-0.5 truncate">{plan.name}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <div className="flex items-center gap-1">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${BATCH_STATUS_STYLE[plan.status]}`}>
-                    {BATCH_STATUS_LABEL[plan.status]}
-                  </span>
-                  {isDone && (
-                    pb.stockStatus === "gone" ? (
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">Gone</span>
-                    ) : fullyFrozen ? (
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-200 inline-flex items-center gap-0.5">
-                        <Snowflake className="w-2.5 h-2.5" /> Frozen
-                      </span>
-                    ) : pb.stockStatus === "low" ? (
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-status-warn-bg text-status-warn">Low</span>
-                    ) : (
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-[color:var(--ds-tint-info)] text-primary">In stock</span>
-                    )
-                  )}
-                  {isDone && partiallyFrozen && (
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-200 inline-flex items-center gap-0.5"
-                      title="Some pieces from this batch are in the freezer"
-                    >
-                      <Snowflake className="w-2.5 h-2.5" /> {frozenCount} frozen
-                    </span>
-                  )}
+      {filtered.length === 0 ? (
+        <p style={{ fontStyle: "italic", color: "var(--ds-text-muted)", textAlign: "center", padding: "40px 0" }}>
+          No batches match
+        </p>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gap: 12,
+            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+          }}
+        >
+          {filtered.map(({ pb, plan, mould }) => {
+            const status = plan.status;
+            const isDone = status === "done";
+            const isCancelled = status === "cancelled" || status === "orphaned";
+            const isActive = status === "active";
+            // Spec: mint done / caramel in_production / blush pending / rose cancelled.
+            const borderColor = isDone
+              ? "var(--ds-tier-positive)"
+              : isActive
+              ? "var(--ds-tier-north-star)"
+              : isCancelled
+              ? "var(--ds-tier-urgent)"
+              : "var(--ds-tier-active)";
+            const chipKind: StatusTagKind = isDone
+              ? "done"
+              : isCancelled
+              ? "overdue"
+              : isActive
+              ? "scheduled"
+              : "pending";
+            const chipLabel = isDone ? "Done" : isCancelled ? "Cancelled" : isActive ? "Active" : "Pending";
+            const date = new Date(plan.completedAt ?? plan.createdAt);
+            const dateStr = date.toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" });
+            const productCount = pb.actualYield ?? (mould ? mould.numberOfCavities * pb.quantity : null);
+            const href = isDone
+              ? `/production/${plan.id}/summary?from=${encodeURIComponent(`/products/${productId}?tab=batches`)}`
+              : `/production/${plan.id}?from=${encodeURIComponent(`/products/${productId}?tab=batches`)}`;
+            return (
+              <article
+                key={pb.id}
+                style={{
+                  background: "var(--ds-card-bg)",
+                  border: "0.5px solid var(--ds-border-warm)",
+                  borderLeft: `3px solid ${borderColor}`,
+                  borderRadius: 8,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }}
+              >
+                <header style={{ padding: "12px 16px 10px", borderBottom: "0.5px solid var(--ds-border-warm)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    {plan.batchNumber && (
+                      <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--ds-text-muted)" }}>
+                        {plan.batchNumber}
+                      </div>
+                    )}
+                    <h3 className="serif" style={{ fontSize: 15, margin: "2px 0 0", lineHeight: 1.2 }}>{plan.name}</h3>
+                    <div style={{ fontSize: 11, color: "var(--ds-text-muted)", marginTop: 4 }}>{dateStr}</div>
+                  </div>
+                  <StatusTag kind={chipKind}>{chipLabel}</StatusTag>
+                </header>
+
+                <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--ds-text-primary)", flex: 1 }}>
+                  <div style={{ fontVariantNumeric: "tabular-nums" }}>
+                    <strong>{pb.quantity}</strong> mould{pb.quantity !== 1 ? "s" : ""}
+                    {productCount !== null && (
+                      <span style={{ color: "var(--ds-text-muted)" }}> · {productCount} pieces</span>
+                    )}
+                  </div>
+                  <div style={{ color: "var(--ds-text-muted)" }}>
+                    {mould ? mould.name : "No mould"}
+                  </div>
                 </div>
-                {dateFinished
-                  ? <p className="text-[10px] text-muted-foreground">Finished {dateFinished}</p>
-                  : <p className="text-[10px] text-muted-foreground">{new Date(plan.createdAt).toLocaleDateString("de-AT", { day: "numeric", month: "short", year: "numeric" })}</p>
-                }
-              </div>
-            </div>
 
-            {/* Stats row */}
-            <div className="px-3 pb-2">
-              {mould ? (
-                <p className="text-xs text-muted-foreground">
-                  {mould.name} · {pb.quantity} mould{pb.quantity !== 1 ? "s" : ""}
-                  {productCount !== null && (
-                    <span className="text-foreground font-medium"> · {productCount} products</span>
-                  )}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">{pb.quantity} mould{pb.quantity !== 1 ? "s" : ""}</p>
-              )}
-            </div>
-
-            {/* Notes */}
-            {(plan.notes || pb.notes) && (
-              <div className="px-3 pb-2 space-y-1 border-t border-[color:var(--ds-border-warm)] pt-2">
-                {plan.notes && (
-                  <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                    <StickyNote className="w-3 h-3 shrink-0 mt-px text-muted-foreground/60" />
-                    <span><span className="font-medium text-foreground">Batch:</span> {plan.notes}</span>
-                  </p>
-                )}
-                {pb.notes && (
-                  <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                    <StickyNote className="w-3 h-3 shrink-0 mt-px text-muted-foreground/60" />
-                    <span><span className="font-medium text-foreground">Product:</span> {pb.notes}</span>
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Restore from "gone" — inline confirmation (mirrors Stock page pattern) */}
-            {isDone && pb.stockStatus === "gone" && (
-              pendingRestore === pb.id ? (
-                <div className="px-3 py-2 border-t border-[color:var(--ds-border-warm)] bg-muted flex items-center gap-3">
-                  <p className="text-xs text-muted-foreground flex-1">Restore to in stock?</p>
-                  <button
-                    onClick={() => { setPlanProductStockStatus(pb.id!, undefined); setPendingRestore(null); }}
-                    className="text-xs font-medium text-foreground"
-                  >
-                    Yes
-                  </button>
-                  <button
-                    onClick={() => setPendingRestore(null)}
-                    className="text-xs text-muted-foreground"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setPendingRestore(pb.id!)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground px-3 py-2 border-t border-[color:var(--ds-border-warm)] hover:bg-muted hover:text-foreground transition-colors w-full"
-                >
-                  <Undo2 className="w-3 h-3" />
-                  Restore to stock
-                </button>
-              )
-            )}
-
-            {/* Link to batch */}
-            <Link
-              href={plan.status === "done"
-                ? `/production/${plan.id}/summary?from=${encodeURIComponent(`/products/${productId}?tab=history`)}`
-                : `/production/${plan.id}?from=${encodeURIComponent(`/products/${productId}?tab=history`)}`}
-              className="flex items-center gap-1 text-xs text-primary px-3 py-2 border-t border-[color:var(--ds-border-warm)] hover:bg-muted transition-colors"
-            >
-              View batch <ChevronRight className="w-3 h-3" />
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+                <footer style={{ padding: "8px 16px", borderTop: "0.5px solid var(--ds-border-warm)" }}>
+                  <Link href={href} style={{ fontSize: 12, color: "var(--ds-tier-quarter-focus)", display: "inline-flex", alignItems: "center", gap: 2 }}>
+                    Open day <ChevronRight className="w-3 h-3" />
+                  </Link>
+                </footer>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
