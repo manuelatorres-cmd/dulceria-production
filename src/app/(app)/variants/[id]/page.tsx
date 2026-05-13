@@ -46,6 +46,7 @@ import { IconPlus as Plus, IconSearch as Search, IconX as X, IconTrash as Trash2
 import { BackButton } from "@/components/back-button";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
+import { PageHeader } from "@/components/dulceria";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import Link from "next/link";
 import type { ProductCostSnapshot, Packaging, PackagingOrder, VariantPricingSnapshot, VariantPackaging, Ingredient, VariantKind, OrderChannel } from "@/types";
@@ -650,37 +651,26 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
   useNavigationGuard(isDirty, isNew ? handleConfirmLeave : undefined);
 
   if (variant === undefined) {
-    return <div className="p-6 text-muted-foreground text-sm">Loading...</div>;
+    return <div className="ds p-6 text-muted-foreground text-sm" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>Loading...</div>;
   }
   if (variant === null) {
-    return <div className="p-6 text-muted-foreground text-sm">Variant not found.</div>;
+    return <div className="ds p-6 text-muted-foreground text-sm" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>Variant not found.</div>;
   }
 
   const status = getStatus(variant.startDate, variant.endDate);
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      {/* Back */}
-      <div className="px-4 pt-6 pb-2 space-y-2">
-        <BackButton fallbackHref="/variants" fallbackLabel="All variants" onBack={() => router.back()} />
-        <DetailNav
-          items={[...allVariants].sort((a, b) => a.name.localeCompare(b.name))}
-          currentId={variantId}
-          hrefFor={(v) => `/variants/${encodeURIComponent(v.id!)}`}
-          labelFor={(v) => v.name}
-        />
-      </div>
-
-      <div className="px-4 space-y-6 pb-10">
-        {/* Name row + edit button */}
-        <div className="flex items-start justify-between gap-2">
+      <PageHeader
+        title={
           <InlineNameEditor
             name={variant.name}
             onSave={async (n) => { await saveVariant({ ...variant, name: n }); }}
-            className="text-xl font-bold"
           />
-          {!editing && (
-            <div className="flex items-center gap-1 shrink-0">
+        }
+        actions={
+          !editing ? (
+            <>
               <button
                 onClick={async () => {
                   if (!variant.id) return;
@@ -704,9 +694,21 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
               >
                 <Pencil className="w-4 h-4 text-muted-foreground" />
               </button>
-            </div>
-          )}
-        </div>
+            </>
+          ) : undefined
+        }
+      />
+      <div className="px-4 pt-3 pb-2 space-y-2">
+        <BackButton fallbackHref="/variants" fallbackLabel="All variants" onBack={() => router.back()} />
+        <DetailNav
+          items={[...allVariants].sort((a, b) => a.name.localeCompare(b.name))}
+          currentId={variantId}
+          hrefFor={(v) => `/variants/${encodeURIComponent(v.id!)}`}
+          labelFor={(v) => v.name}
+        />
+      </div>
+
+      <div className="px-4 space-y-6 pb-10">
 
         {/* Edit form */}
         {editing ? (

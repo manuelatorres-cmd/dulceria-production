@@ -20,6 +20,7 @@ import { CategoryPicker } from "@/components/category-picker";
 import { IconPencil as Pencil, IconTrash as Trash2, IconLock as Lock, IconLockOpen as LockOpen, IconGitBranch as GitBranch, IconPlus as Plus, IconSearch as Search, IconCopy as Copy, IconArchiveOff as ArchiveRestore, IconArchive as Archive, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { UsedInPanel } from "@/components/pantry";
+import { PageHeader, StatusTag } from "@/components/dulceria";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { StepListEditor, StepList } from "@/components/step-list-editor";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
@@ -237,7 +238,42 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-6 pb-2 space-y-2">
+      <PageHeader
+        title={
+          <InlineNameEditor
+            name={filling.name}
+            onSave={async (n) => { await saveFilling({ ...filling, name: n }); }}
+            initialEditing={isDuplicate}
+          />
+        }
+        meta={!editing && filling.category ? filling.category : undefined}
+        badges={
+          <>
+            {versionLabel && (
+              <span className="text-xs font-mono bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                {versionLabel}
+              </span>
+            )}
+            {filling.archived && (
+              <StatusTag kind="neutral">
+                <Archive className="w-3 h-3" /> Archived
+              </StatusTag>
+            )}
+          </>
+        }
+        actions={
+          !editing ? (
+            <button
+              onClick={startEditing}
+              aria-label="Edit filling"
+              className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
+            >
+              <Pencil aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
+            </button>
+          ) : undefined
+        }
+      />
+      <div className="px-4 pt-3 pb-2 space-y-2">
         <BackButton fallbackHref="/fillings" fallbackLabel="All fillings" onBack={() => safeBack()} />
         <DetailNav
           items={[...allFillings].sort((a, b) => a.name.localeCompare(b.name))}
@@ -248,43 +284,6 @@ export default function FillingDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       <div className="px-4 pb-4 space-y-4">
-        {/* Name row — always visible, inline-editable via pencil on name */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <InlineNameEditor
-              name={filling.name}
-              onSave={async (n) => { await saveFilling({ ...filling, name: n }); }}
-              className="text-xl font-bold"
-              initialEditing={isDuplicate}
-            />
-            {versionLabel && (
-              <span className="text-xs font-mono bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
-                {versionLabel}
-              </span>
-            )}
-            {filling.archived && (
-              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1">
-                <Archive className="w-3 h-3" /> Archived
-              </span>
-            )}
-          </div>
-          {!editing && (
-            <button
-              onClick={startEditing}
-              aria-label="Edit filling"
-              className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
-            >
-              <Pencil aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-
-        {/* Category subtitle — shown below name in read mode */}
-        {!editing && filling.category && (
-          <p className="text-sm text-primary -mt-2">
-            {filling.category}
-          </p>
-        )}
 
         {editing ? (
           /* ── Edit form (all fields except name) ── */

@@ -13,6 +13,7 @@ import { BackButton } from "@/components/back-button";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
 import { StockStatusPanel } from "@/components/stock-status-panel";
+import { PageHeader, StatusTag } from "@/components/dulceria";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 
 function formatDate(date: Date): string {
@@ -100,7 +101,7 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
 
   if (!pkg) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="ds flex items-center justify-center min-h-screen" style={{ background: "var(--ds-page-bg)" }}>
         <p className="text-muted-foreground">Loading…</p>
       </div>
     );
@@ -185,9 +186,49 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
 
   const latestOrder = orders[0];
 
+  const metaParts: string[] = [];
+  if (!editing) {
+    metaParts.push(`fits ${pkg.capacity} product${pkg.capacity !== 1 ? "s" : ""}`);
+    if (pkg.manufacturer) metaParts.push(pkg.manufacturer);
+    if (latestOrder) metaParts.push(`${sym}${latestOrder.pricePerUnit.toFixed(2)}/unit (latest)`);
+  }
+  const metaText = metaParts.join(" · ");
+
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-6 pb-2 space-y-2">
+      <PageHeader
+        title={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+            <span className="w-7 h-7 rounded-[4px] bg-muted flex items-center justify-center text-muted-foreground">
+              <Package className="w-4 h-4" />
+            </span>
+            <InlineNameEditor
+              name={pkg.name}
+              onSave={async (n) => { await savePackaging({ ...pkg, name: n, updatedAt: new Date() }); }}
+            />
+          </span>
+        }
+        meta={metaText || undefined}
+        badges={
+          pkg.archived ? (
+            <StatusTag kind="neutral">
+              <Archive className="w-3 h-3" /> Archived
+            </StatusTag>
+          ) : undefined
+        }
+        actions={
+          !editing ? (
+            <button
+              onClick={startEditing}
+              className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
+              aria-label="Edit packaging"
+            >
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+            </button>
+          ) : undefined
+        }
+      />
+      <div className="px-4 pt-3 pb-2 space-y-2">
         <BackButton fallbackHref="/packaging" fallbackLabel="All packaging" onBack={() => safeBack()} />
         <DetailNav
           items={[...allPackaging].sort((a, b) => a.name.localeCompare(b.name))}
@@ -198,53 +239,6 @@ export default function PackagingDetailPage({ params }: { params: Promise<{ id: 
       </div>
 
       <div className="px-4 pb-6 space-y-6">
-        {/* Name row — always visible */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-[4px] bg-muted shrink-0 flex items-center justify-center text-muted-foreground mt-0.5">
-              <Package className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <InlineNameEditor
-                  name={pkg.name}
-                  onSave={async (n) => { await savePackaging({ ...pkg, name: n, updatedAt: new Date() }); }}
-                  className="text-xl font-bold"
-                />
-                {pkg.archived && (
-                  <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
-                    <Archive className="w-3 h-3" /> Archived
-                  </span>
-                )}
-              </div>
-              {!editing && (
-                <>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    fits {pkg.capacity} product{pkg.capacity !== 1 ? "s" : ""}
-                  </p>
-                  {pkg.manufacturer && (
-                    <p className="text-sm text-muted-foreground">{pkg.manufacturer}</p>
-                  )}
-                  {latestOrder && (
-                    <p className="text-sm font-medium text-primary mt-1">
-                      {sym}{latestOrder.pricePerUnit.toFixed(2)}/unit
-                      <span className="text-xs text-muted-foreground font-normal ml-1">(latest)</span>
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-          {!editing && (
-            <button
-              onClick={startEditing}
-              className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
-              aria-label="Edit packaging"
-            >
-              <Pencil className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
 
         {/* Stock status — hidden while editing */}
         {!editing && (

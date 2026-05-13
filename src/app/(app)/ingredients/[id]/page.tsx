@@ -13,6 +13,7 @@ import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
 import { StockStatusPanel } from "@/components/stock-status-panel";
+import { PageHeader, StatusTag } from "@/components/dulceria";
 import { getNutrientsByMarket, getNutritionPanelTitle, hasNutritionData, formatNutrientValue, percentDailyValue, getMissingMandatoryNutrients, fillDerivedNutrition } from "@/lib/nutrition";
 import { useMarketRegion } from "@/lib/hooks";
 import Link from "next/link";
@@ -66,7 +67,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
 
   if (!ingredient) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="ds flex items-center justify-center min-h-screen" style={{ background: "var(--ds-page-bg)" }}>
         <p className="text-muted-foreground">Loading…</p>
       </div>
     );
@@ -95,9 +96,46 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
       ? ingredient.purchaseCost / (ingredient.purchaseQty * ingredient.gramsPerUnit)
       : null;
 
+  const subtitleParts: string[] = [];
+  if (!editing) {
+    if (ingredient.manufacturer) subtitleParts.push(ingredient.manufacturer);
+    if (ingredient.brand) subtitleParts.push(ingredient.brand);
+    if (ingredient.vendor) subtitleParts.push(ingredient.vendor);
+    if (ingredient.source) subtitleParts.push(ingredient.source);
+    if (ingredient.category) subtitleParts.push(ingredient.category);
+  }
+  const subtitle = subtitleParts.join(" · ");
+
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-6 pb-2 space-y-2">
+      <PageHeader
+        title={
+          <InlineNameEditor
+            name={ingredient.name}
+            onSave={async (n) => { await saveIngredient({ ...ingredient, name: n }); }}
+          />
+        }
+        meta={subtitle || undefined}
+        badges={
+          ingredient.archived ? (
+            <StatusTag kind="neutral">
+              <Archive className="w-3 h-3" /> Archived
+            </StatusTag>
+          ) : undefined
+        }
+        actions={
+          !editing ? (
+            <button
+              onClick={() => setEditing(true)}
+              className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
+              aria-label="Edit ingredient"
+            >
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+            </button>
+          ) : undefined
+        }
+      />
+      <div className="px-4 pt-3 pb-2 space-y-2">
         <BackButton fallbackHref="/ingredients" fallbackLabel="All ingredients" onBack={() => safeBack()} />
         <DetailNav
           items={[...allIngredients].sort((a, b) => a.name.localeCompare(b.name))}
@@ -108,54 +146,8 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       <div className="px-4 pb-4">
-        {/* Name + edit button — always visible above tabs */}
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="min-w-0 flex-1 flex items-center gap-2">
-            <InlineNameEditor
-              name={ingredient.name}
-              onSave={async (n) => { await saveIngredient({ ...ingredient, name: n }); }}
-              className="text-xl font-bold"
-            />
-            {ingredient.archived && (
-              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
-                <Archive className="w-3 h-3" /> Archived
-              </span>
-            )}
-          </div>
-          {!editing && (
-            <button
-              onClick={() => setEditing(true)}
-              className="p-1.5 rounded-full hover:bg-muted transition-colors shrink-0"
-              aria-label="Edit ingredient"
-            >
-              <Pencil className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-
         {!editing && (
           <>
-            {/* Subtitle — manufacturer, brand, vendor, source, category */}
-            {(ingredient.manufacturer || ingredient.brand || ingredient.vendor || ingredient.source || ingredient.category) && (
-              <div className="mb-3">
-                {ingredient.manufacturer && (
-                  <p className="text-sm text-muted-foreground mt-0.5">{ingredient.manufacturer}</p>
-                )}
-                {ingredient.brand && (
-                  <p className="text-sm text-muted-foreground">{ingredient.brand}</p>
-                )}
-                {ingredient.vendor && (
-                  <p className="text-sm text-muted-foreground">{ingredient.vendor}</p>
-                )}
-                {ingredient.source && (
-                  <p className="text-sm text-muted-foreground">{ingredient.source}</p>
-                )}
-                {ingredient.category && (
-                  <p className="text-sm text-primary mt-0.5">{ingredient.category}</p>
-                )}
-              </div>
-            )}
-
             {/* Stock status */}
             <div className="mb-4">
               <StockStatusPanel
