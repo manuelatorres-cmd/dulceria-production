@@ -23,6 +23,7 @@ import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
+import { DsTabNav } from "@/components/dulceria";
 import Link from "next/link";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 
@@ -69,16 +70,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const market = useMarketRegion();
   const defaultFillMode = useDefaultFillMode();
-  const [activeTab, setActiveTab] = useState<"product" | "shell" | "fillingHistory" | "batches" | "cost" | "nutrition">("product");
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("tab") === "history") setActiveTab("batches");
-    if (params.get("tab") === "shell") setActiveTab("shell");
-    if (params.get("tab") === "fillingHistory") setActiveTab("fillingHistory");
-    if (params.get("tab") === "batches") setActiveTab("batches");
-    if (params.get("tab") === "cost") setActiveTab("cost");
-    if (params.get("tab") === "nutrition") setActiveTab("nutrition");
-  }, []);
+  type ProductTab = "product" | "shell" | "fillingHistory" | "batches" | "cost" | "nutrition";
+  const VALID_TABS: ProductTab[] = ["product", "shell", "fillingHistory", "batches", "cost", "nutrition"];
+  const initialTab: ProductTab = (() => {
+    const raw = searchParams.get("tab");
+    if (raw === "history") return "batches"; // legacy alias
+    return VALID_TABS.includes(raw as ProductTab) ? (raw as ProductTab) : "product";
+  })();
+  const [activeTab, setActiveTab] = useState<ProductTab>(initialTab);
+
+  function switchTab(t: ProductTab) {
+    setActiveTab(t);
+    const sp = new URLSearchParams(Array.from(searchParams.entries()));
+    if (t === "product") sp.delete("tab"); else sp.set("tab", t);
+    const next = sp.toString();
+    router.replace(`/products/${encodeURIComponent(productId)}${next ? `?${next}` : ""}`, { scroll: false });
+  }
 
   const [editing, setEditing] = useState(isNew);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -331,7 +338,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     }
     if (errors.length > 0) {
       setSaveErrors(errors);
-      setActiveTab("product");
+      switchTab("product");
       return;
     }
     setSaveErrors([]);
@@ -600,21 +607,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* Tab strip */}
-      <div className="flex border-b border-[color:var(--ds-border-warm)] mb-4 px-4 overflow-x-auto">
-        {(["product", "shell", "fillingHistory", "batches", "cost", "nutrition"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium whitespace-nowrap -mb-px border-b-2 transition-colors ${
-              activeTab === tab
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {tab === "shell" ? "Shell Design" : tab === "fillingHistory" ? "Filling History" : tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
+      <div className="px-4 mb-4">
+        <DsTabNav
+          tabs={[
+            { id: "product", label: "Product" },
+            { id: "shell", label: "Shell design" },
+            { id: "fillingHistory", label: "Filling history" },
+            { id: "batches", label: "Batches" },
+            { id: "cost", label: "Cost" },
+            { id: "nutrition", label: "Nutrition" },
+          ]}
+          activeTab={activeTab}
+          onChange={(id) => switchTab(id as ProductTab)}
+        />
       </div>
 
       {activeTab === "shell" && (
