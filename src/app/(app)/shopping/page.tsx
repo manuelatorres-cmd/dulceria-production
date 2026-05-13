@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import { computeShoppingNeeds } from "@/lib/shopping-needs";
 import { PageHeader } from "@/components/page-header";
-import { ShoppingCart, Check, ChevronDown, Plus, X, Trash2, AlertTriangle } from "lucide-react";
+import { IconShoppingCart as ShoppingCart, IconCheck as Check, IconChevronDown as ChevronDown, IconPlus as Plus, IconX as X, IconTrash as Trash2, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 import Link from "next/link";
 import { SHOPPING_ITEM_CATEGORIES, DECORATION_MATERIAL_TYPE_LABELS, type ProductFilling, type FillingIngredient } from "@/types";
 

@@ -12,7 +12,7 @@ import {
   useProductionDays,
   useAllProductionDayLineItems,
 } from "@/lib/hooks";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 
 /**
  * Campaign-scoped production view — thin redirector to the canonical

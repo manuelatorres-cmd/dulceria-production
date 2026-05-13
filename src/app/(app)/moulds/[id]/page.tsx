@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, use, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMould, useMoulds, saveMould, deleteMould, archiveMould, unarchiveMould, isMouldInUse, useMouldUsage } from "@/lib/hooks";
 import { UsedInPanel } from "@/components/pantry";
-import { Camera, Pencil, Trash2, Archive, ArchiveRestore } from "lucide-react";
+import { IconCamera as Camera, IconPencil as Pencil, IconTrash as Trash2, IconArchive as Archive, IconArchiveOff as ArchiveRestore } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { DetailNav } from "@/components/detail-nav";
 import { InlineNameEditor } from "@/components/inline-name-editor";

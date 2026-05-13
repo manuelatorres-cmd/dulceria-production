@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2, AlertTriangle, CheckCircle2, AlertCircle, Thermometer, Info, ExternalLink } from "lucide-react";
+import { IconPlus as Plus, IconTrash as Trash2, IconAlertTriangle as AlertTriangle, IconCircleCheckFilled as CheckCircle2, IconAlertCircle as AlertCircle, IconTemperature as Thermometer, IconInfoCircle as Info, IconExternalLink as ExternalLink } from "@tabler/icons-react";
 import { useIngredients } from "@/lib/hooks";
 import { ingredientsForCategories, missingComposition } from "@/lib/lab/ingredients";
 import { RECIPE_TEMPLATES, RECIPE_TEMPLATE_BY_ID, type RecipeCategoryId, type RecipeSlot } from "@/lib/lab/recipe-templates";

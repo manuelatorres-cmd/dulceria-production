@@ -13,7 +13,7 @@ import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
 import { containsAllergen } from "@/lib/allergenKeywordsDe";
 import { calculateShellWeightG, calculateCapWeightG } from "@/lib/costCalculation";
 import type { MarketRegion } from "@/types";
-import { Camera, Plus, X, Search, Trash2, Pencil, ChevronRight, StickyNote, RefreshCw, AlertTriangle, Undo2, Copy, Archive, ArchiveRestore, GripVertical, Snowflake } from "lucide-react";
+import { IconCamera as Camera, IconPlus as Plus, IconX as X, IconSearch as Search, IconTrash as Trash2, IconPencil as Pencil, IconChevronRight as ChevronRight, IconNote as StickyNote, IconRefresh as RefreshCw, IconAlertTriangle as AlertTriangle, IconArrowBackUp as Undo2, IconCopy as Copy, IconArchive as Archive, IconArchiveOff as ArchiveRestore, IconGripVertical as GripVertical, IconSnowflake as Snowflake } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";

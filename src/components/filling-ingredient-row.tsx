@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Filling, FillingIngredient, Ingredient } from "@/types";
 import { deleteFillingIngredient, saveFillingIngredient } from "@/lib/hooks";
-import { GripVertical, Trash2, Lock, Layers } from "lucide-react";
+import { IconGripVertical as GripVertical, IconTrash as Trash2, IconLock as Lock, IconStack as Layers } from "@tabler/icons-react";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
 

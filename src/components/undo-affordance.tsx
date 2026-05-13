@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { IconRotate as RotateCcw } from "@tabler/icons-react";
 import {
   useLastUndoableIngredientMovement,
   undoIngredientStockMovement,

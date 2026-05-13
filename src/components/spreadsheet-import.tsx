@@ -12,7 +12,7 @@
  */
 
 import { useRef, useState, useCallback } from "react";
-import { Download, Upload, AlertTriangle, CheckCircle, X, FileSpreadsheet } from "lucide-react";
+import { IconDownload as Download, IconUpload as Upload, IconAlertTriangle as AlertTriangle, IconCircleCheck as CheckCircle, IconX as X, IconFileSpreadsheet as FileSpreadsheet } from "@tabler/icons-react";
 import type { ImportConfig, ParseResult, ImportResult, ParsedRow } from "@/lib/spreadsheet-import";
 import { parseImport, commitImport, downloadTemplate, formatImportError } from "@/lib/spreadsheet-import";
 

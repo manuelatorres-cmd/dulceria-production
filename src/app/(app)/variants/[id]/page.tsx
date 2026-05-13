@@ -42,7 +42,7 @@ import { calculateProductNutrition, calculateVariantNutrition, getNutrientsByMar
 import { buildVariantIngredientList, type ProductIngredientListInput } from "@/lib/ingredientList";
 import { ShopifyFormatBlock } from "@/components/ShopifyFormatBlock";
 import { containsAllergen } from "@/lib/allergenKeywordsDe";
-import { Plus, Search, X, Trash2, Pencil, Copy, ChevronDown, RefreshCw, AlertTriangle } from "lucide-react";
+import { IconPlus as Plus, IconSearch as Search, IconX as X, IconTrash as Trash2, IconPencil as Pencil, IconCopy as Copy, IconChevronDown as ChevronDown, IconRefresh as RefreshCw, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";

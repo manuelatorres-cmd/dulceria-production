@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { IconChevronDown as ChevronDown } from "@tabler/icons-react";
 import { GroupStockBadge } from "./stock-badge";
 
 /**

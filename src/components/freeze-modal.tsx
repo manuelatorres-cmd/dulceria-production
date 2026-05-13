@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Snowflake } from "lucide-react";
+import { IconSnowflake as Snowflake } from "@tabler/icons-react";
 
 export function FreezeModal({
   title,

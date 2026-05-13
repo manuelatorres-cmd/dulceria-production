@@ -7,7 +7,7 @@ import {
   useOrder, useOrderItems, useProductsList, useProductLocationTotals, shipOnlineOrder,
   useOrderVariantLines, useVariants, useAllVariantPackagings, usePackagingList,
 } from "@/lib/hooks";
-import { ArrowLeft, Printer, Truck } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconPrinter as Printer, IconTruck as Truck } from "@tabler/icons-react";
 
 export default function OnlineOrderPackingSlipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);

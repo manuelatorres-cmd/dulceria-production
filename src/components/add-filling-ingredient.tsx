@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, type SyntheticEvent } from "react";
 import { useIngredients, useFillings, saveFillingIngredient, saveIngredient } from "@/lib/hooks";
-import { Plus } from "lucide-react";
+import { IconPlus as Plus } from "@tabler/icons-react";
 
 interface AddFillingIngredientProps {
   fillingId: string;

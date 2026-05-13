@@ -8,7 +8,7 @@ import {
 } from "@/lib/hooks";
 import { computeCustomerAnalytics } from "@/lib/customerAnalytics";
 import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
-import { Plus, Search, X, Archive, AlertTriangle } from "lucide-react";
+import { IconPlus as Plus, IconSearch as Search, IconX as X, IconArchive as Archive, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 
 export default function CustomersPage() {
   const customers = useCustomers(true);

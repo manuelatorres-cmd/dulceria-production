@@ -9,7 +9,7 @@ import {
 import { calculateFillingAmounts, consolidateSharedFillings } from "@/lib/production";
 import type { ConsolidatedFilling } from "@/lib/production";
 import type { Filling, Mould, PlanProduct } from "@/types";
-import { ArrowLeft } from "lucide-react";
+import { IconArrowLeft as ArrowLeft } from "@tabler/icons-react";
 import Link from "next/link";
 import { LowStockFlagButton } from "@/components/pantry";
 import { StepList } from "@/components/step-list-editor";

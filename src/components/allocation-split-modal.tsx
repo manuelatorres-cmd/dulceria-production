@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Warehouse, Snowflake, Trash2, AlertTriangle } from "lucide-react";
+import { IconBuildingWarehouse as Warehouse, IconSnowflake as Snowflake, IconTrash as Trash2, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 
 export type SurplusDestination = "store" | "freezer" | "waste";
 

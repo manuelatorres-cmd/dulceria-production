@@ -7,7 +7,7 @@ import {
   useOrders, useAllOrderItems, useProductsList,
   useProductLocationTotals, shipOnlineOrder,
 } from "@/lib/hooks";
-import { Upload, FileText, Truck, ShoppingCart } from "lucide-react";
+import { IconUpload as Upload, IconFileText as FileText, IconTruck as Truck, IconShoppingCart as ShoppingCart } from "@tabler/icons-react";
 
 export default function OnlineOrdersPage() {
   const orders = useOrders();

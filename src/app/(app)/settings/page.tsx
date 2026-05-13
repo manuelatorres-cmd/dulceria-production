@@ -10,7 +10,7 @@ import { equipmentAvailability, equipmentReadiness, EQUIPMENT_AVAILABILITY_LABEL
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 import { loadDemoData, isDemoDataLoaded } from "@/lib/seed-demo";
 import { isCloudConfigured } from "@/lib/supabase";
-import { Download, AlertTriangle, CheckCircle, FlaskConical, Video, Printer, Pencil, Trash2, Plus, X, Clock, Archive, ArchiveRestore, ChevronDown, ChevronRight, Copy, GripVertical } from "lucide-react";
+import { IconDownload as Download, IconAlertTriangle as AlertTriangle, IconCircleCheck as CheckCircle, IconFlask as FlaskConical, IconVideo as Video, IconPrinter as Printer, IconPencil as Pencil, IconTrash as Trash2, IconPlus as Plus, IconX as X, IconClock as Clock, IconArchive as Archive, IconArchiveOff as ArchiveRestore, IconChevronDown as ChevronDown, IconChevronRight as ChevronRight, IconCopy as Copy, IconGripVertical as GripVertical } from "@tabler/icons-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useProductsList, useMouldsList, useProductFillingsForProducts, useFillingIngredientsForFillings, useIngredients, saveProductionPlan, savePlanProduct, toggleStep, useFillings, usePlanProducts, generateBatchNumber, useProductStockAlerts, useVariants, useAllVariantProducts, useFillingStockItems, useShelfStableCategoryNames } from "@/lib/hooks";
-import { AlertTriangle, ArrowLeft, Check, ChevronDown, History, PackageX, ShoppingCart } from "lucide-react";
+import { IconAlertTriangle as AlertTriangle, IconArrowLeft as ArrowLeft, IconCheck as Check, IconChevronDown as ChevronDown, IconHistory as History, IconPackageOff as PackageX, IconShoppingCart as ShoppingCart } from "@tabler/icons-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Product, Mould, PlanProduct, FillingPreviousBatch } from "@/types";

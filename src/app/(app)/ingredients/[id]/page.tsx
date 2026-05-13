@@ -7,7 +7,7 @@ import { useIngredient, useIngredients, useIngredientUsage, saveIngredient, dele
 import type { IngredientDeleteCheck } from "@/lib/hooks";
 import { IngredientForm } from "@/components/ingredient-form";
 import { COMPOSITION_FIELDS, allergenLabel, type Ingredient } from "@/types";
-import { Pencil, Layers, Trash2, ChevronDown, X, AlertTriangle, Archive, ArchiveRestore } from "lucide-react";
+import { IconPencil as Pencil, IconStack as Layers, IconTrash as Trash2, IconChevronDown as ChevronDown, IconX as X, IconAlertTriangle as AlertTriangle, IconArchive as Archive, IconArchiveOff as ArchiveRestore } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";

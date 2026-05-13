@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2, AlertTriangle, CheckCircle2, AlertCircle, ExternalLink, Wand2 } from "lucide-react";
+import { IconPlus as Plus, IconTrash as Trash2, IconAlertTriangle as AlertTriangle, IconCircleCheckFilled as CheckCircle2, IconAlertCircle as AlertCircle, IconExternalLink as ExternalLink, IconWand as Wand2 } from "@tabler/icons-react";
 import { useIngredients } from "@/lib/hooks";
 import {
   computeGanacheBreakdown,

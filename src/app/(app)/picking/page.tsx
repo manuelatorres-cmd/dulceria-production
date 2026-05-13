@@ -20,7 +20,7 @@ import {
 } from "@/lib/hooks";
 import { ORDER_CHANNEL_LABELS } from "@/types";
 import type { StockLocation } from "@/types";
-import { Package, AlertTriangle, Check, ExternalLink, Box } from "lucide-react";
+import { IconPackage as Package, IconAlertTriangle as AlertTriangle, IconCheck as Check, IconExternalLink as ExternalLink, IconBox as Box } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 
 type Tab = "pack" | "box";

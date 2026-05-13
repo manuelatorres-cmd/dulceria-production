@@ -8,7 +8,7 @@ import {
   useProductionDays,
   useOrders,
 } from "@/lib/hooks";
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalIcon } from "lucide-react";
+import { IconChevronLeft as ChevronLeft, IconChevronRight as ChevronRight, IconPlus as Plus, IconCalendar as CalIcon } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 
 /**

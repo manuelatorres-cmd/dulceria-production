@@ -9,7 +9,7 @@ import { assertOk } from "@/lib/supabase-query";
 import { useCustomers, saveQuote } from "@/lib/hooks";
 import { quoteFromRow } from "@/lib/hooks";
 import { QUOTE_STATUSES, QUOTE_STATUS_LABELS, type QuoteStatus } from "@/types";
-import { Plus, Search, FileText } from "lucide-react";
+import { IconPlus as Plus, IconSearch as Search, IconFileText as FileText } from "@tabler/icons-react";
 
 export default function QuotesPage() {
   const customers = useCustomers(true);

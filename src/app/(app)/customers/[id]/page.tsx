@@ -16,9 +16,19 @@ import { DetailNav } from "@/components/detail-nav";
 import { computeCustomerAnalytics } from "@/lib/customerAnalytics";
 import { computeMissingRequiredCustomerFields } from "@/lib/customerRequiredFields";
 import {
-  Phone, Mail, Users, ClipboardList, Plus, Trash2, Check, Archive, FileText, AlertTriangle, Tag,
-} from "lucide-react";
-import { ArrowLeft } from "lucide-react";
+  IconPhone as Phone,
+  IconMail as Mail,
+  IconUsers as Users,
+  IconClipboardList as ClipboardList,
+  IconPlus as Plus,
+  IconTrash as Trash2,
+  IconCheck as Check,
+  IconArchive as Archive,
+  IconFileText as FileText,
+  IconAlertTriangle as AlertTriangle,
+  IconTag as Tag,
+} from "@tabler/icons-react";
+import { IconArrowLeft as ArrowLeft } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import {
   CUSTOMER_CONTACT_KINDS, CUSTOMER_CONTACT_LABELS,

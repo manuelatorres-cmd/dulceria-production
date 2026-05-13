@@ -9,7 +9,7 @@ import {
   useFillings,
 } from "@/lib/hooks";
 import { FILL_FACTOR } from "@/lib/production";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { IconChevronLeft as ChevronLeft, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 
 export default function RunBatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = use(params);

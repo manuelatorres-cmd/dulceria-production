@@ -18,7 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import type { ProductFilling, FillingIngredient } from "@/types";
 import { computeWeeklyFillingNeeds } from "@/lib/weeklyFilling";
-import { Flame, Snowflake, Users, ClipboardList, ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { IconFlame as Flame, IconSnowflake as Snowflake, IconUsers as Users, IconClipboardList as ClipboardList, IconArrowLeft as ArrowLeft, IconCircleCheckFilled as CheckCircle2, IconCircleX as XCircle } from "@tabler/icons-react";
 
 const WINDOW_OPTIONS = [
   { label: "Next 7 days", days: 7 },

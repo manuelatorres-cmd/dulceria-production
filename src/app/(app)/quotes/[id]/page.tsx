@@ -10,9 +10,12 @@ import {
 } from "@/lib/hooks";
 import { QUOTE_STATUS_LABELS, type QuoteStatus } from "@/types";
 import {
-  Printer, Check, Trash2, Package,
-} from "lucide-react";
-import { ArrowLeft } from "lucide-react";
+  IconPrinter as Printer,
+  IconCheck as Check,
+  IconTrash as Trash2,
+  IconPackage as Package,
+} from "@tabler/icons-react";
+import { IconArrowLeft as ArrowLeft } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 
 export default function QuoteDetailPage({ params }: { params: Promise<{ id: string }> }) {

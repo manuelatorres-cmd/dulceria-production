@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart, Check } from "lucide-react";
+import { IconShoppingCart as ShoppingCart, IconCheck as Check } from "@tabler/icons-react";
 
 interface StockStatusPanelProps {
   lowStock?: boolean;

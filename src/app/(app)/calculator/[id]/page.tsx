@@ -20,7 +20,7 @@ import { calculateGanacheBalance, checkGanacheBalance, detectChocolateType } fro
 import type { Ingredient } from "@/types";
 import Link from "next/link";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
-import { ChevronLeft, Trash2, Plus, AlertTriangle, CheckCircle, GripVertical, Info, PlayCircle } from "lucide-react";
+import { IconChevronLeft as ChevronLeft, IconTrash as Trash2, IconPlus as Plus, IconAlertTriangle as AlertTriangle, IconCircleCheck as CheckCircle, IconGripVertical as GripVertical, IconInfoCircle as Info, IconPlayerPlay as PlayCircle } from "@tabler/icons-react";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";

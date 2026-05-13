@@ -17,7 +17,7 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSe
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { CategoryPicker } from "@/components/category-picker";
-import { Pencil, Trash2, Lock, LockOpen, GitBranch, Plus, Search, Copy, ArchiveRestore, Archive, AlertTriangle } from "lucide-react";
+import { IconPencil as Pencil, IconTrash as Trash2, IconLock as Lock, IconLockOpen as LockOpen, IconGitBranch as GitBranch, IconPlus as Plus, IconSearch as Search, IconCopy as Copy, IconArchiveOff as ArchiveRestore, IconArchive as Archive, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";

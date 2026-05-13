@@ -1,4 +1,4 @@
-import { Search, SlidersHorizontal, Plus } from "lucide-react";
+import { IconSearch as Search, IconAdjustmentsHorizontal as SlidersHorizontal, IconPlus as Plus } from "@tabler/icons-react";
 
 /**
  * Standard toolbar for pantry list pages: search input + optional filter toggle + add button.

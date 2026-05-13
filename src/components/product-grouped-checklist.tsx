@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckSquare, Square, ChevronDown, ChevronRight } from "lucide-react";
+import { IconSquareCheck as CheckSquare, IconSquare as Square, IconChevronDown as ChevronDown, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 
 /**
  * Aggregates per-batch step rows by productId. Display-only — each

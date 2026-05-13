@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Package } from "lucide-react";
+import { IconPackage as Package } from "@tabler/icons-react";
 
 export type YieldEntry = {
   planProductId: string;

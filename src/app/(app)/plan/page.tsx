@@ -16,7 +16,7 @@ import {
 } from "@/lib/hooks";
 import { capacityConfigStatus, effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import { queryClient } from "@/lib/query-client";
-import { RefreshCw, AlertTriangle, CheckCircle, Flame, Lock } from "lucide-react";
+import { IconRefresh as RefreshCw, IconAlertTriangle as AlertTriangle, IconCircleCheck as CheckCircle, IconFlame as Flame, IconLock as Lock } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { PlanTabs } from "@/components/plan-tabs";
 import { PlanHeader } from "@/components/production-plan/plan-header";

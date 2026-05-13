@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShoppingCart } from "lucide-react";
+import { IconShoppingCart as ShoppingCart } from "@tabler/icons-react";
 
 interface LowStockFlagButtonProps {
   /** Whether the item is already flagged as low stock */

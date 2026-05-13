@@ -7,7 +7,7 @@ import {
   useAllVariantPackagingComponents, useIngredients, useFillings, useMouldsList,
   usePackagingList, useProductCategories, useAllFillingIngredients,
 } from "@/lib/hooks";
-import { AlertTriangle, CheckCircle, ChevronRight } from "lucide-react";
+import { IconAlertTriangle as AlertTriangle, IconCircleCheck as CheckCircle, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 
 const CARD = "bg-white/70 backdrop-blur-2xl border border-white/60 rounded-[18px] p-5 shadow-[0_1px_2px_rgba(16,18,24,0.04),0_8px_24px_rgba(16,18,24,0.05)]";
 const PINK_INK = "text-[#2e4839]";

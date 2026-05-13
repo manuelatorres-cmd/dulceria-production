@@ -22,7 +22,7 @@ import { DECORATION_MATERIAL_TYPE_LABELS, COCOA_BUTTER_TYPES } from "@/types";
 import type { CocoaButterType } from "@/types";
 import { StockStatusPanel } from "@/components/stock-status-panel";
 import { InlineNameEditor } from "@/components/inline-name-editor";
-import { ArrowLeft, Pencil, Trash2, Archive, ArchiveRestore } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconPencil as Pencil, IconTrash as Trash2, IconArchive as Archive, IconArchiveOff as ArchiveRestore } from "@tabler/icons-react";
 import Link from "next/link";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 

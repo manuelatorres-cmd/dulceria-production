@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Droplets, Snowflake } from "lucide-react";
+import { IconDroplets as Droplets, IconSnowflake as Snowflake } from "@tabler/icons-react";
 
 export type LeftoverEntry = {
   fillingId: string;

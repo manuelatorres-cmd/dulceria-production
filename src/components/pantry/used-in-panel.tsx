@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { IconChevronRight as ChevronRight } from "@tabler/icons-react";
 
 export interface UsedInItem {
   id: string;

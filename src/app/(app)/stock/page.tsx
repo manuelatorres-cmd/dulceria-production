@@ -24,9 +24,9 @@ import {
 } from "@/lib/hooks";
 import { STOCK_LOCATION_SHORT_LABELS, STOCK_LOCATIONS, type StockLocation } from "@/types";
 import { TransferModal } from "@/components/transfer-modal";
-import { Move } from "lucide-react";
+import { IconArrowsMove as Move } from "@tabler/icons-react";
 import { PageHeader } from "@/components/page-header";
-import { Search, SlidersHorizontal, X, Plus, ClipboardList, Snowflake, ChevronDown, ChevronRight } from "lucide-react";
+import { IconSearch as Search, IconAdjustmentsHorizontal as SlidersHorizontal, IconX as X, IconPlus as Plus, IconClipboardList as ClipboardList, IconSnowflake as Snowflake, IconChevronDown as ChevronDown, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import type { PlanProduct, ProductionPlan, Product, Mould, FillingStock, StockMovement } from "@/types";
 import { reconcileStockCount } from "@/lib/stockCount";
 import { remainingShelfLifeDays, defrostedSellBy, WEEK_MS } from "@/lib/freezer";

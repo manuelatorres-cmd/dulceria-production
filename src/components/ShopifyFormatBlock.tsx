@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { IconCopy as Copy, IconCheck as Check } from "@tabler/icons-react";
 import type { IngredientListEntry } from "@/lib/ingredientList";
 import type { NutritionData } from "@/lib/nutrition";
 import {

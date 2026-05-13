@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Pencil } from "lucide-react";
+import { IconPencil as Pencil } from "@tabler/icons-react";
 
 interface InlineNameEditorProps {
   name: string;

@@ -52,7 +52,7 @@ import {
   type OrderPlanLink, type ProductionPlan,
   type Order,
 } from "@/types";
-import { Plus, Trash2, X, Pencil, AlertTriangle, Check, Calendar, Package, UserPlus, User, Copy } from "lucide-react";
+import { IconPlus as Plus, IconTrash as Trash2, IconX as X, IconPencil as Pencil, IconAlertTriangle as AlertTriangle, IconCheck as Check, IconCalendar as Calendar, IconPackage as Package, IconUserPlus as UserPlus, IconUser as User, IconCopy as Copy } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { newId } from "@/lib/supabase";
 

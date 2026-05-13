@@ -10,13 +10,13 @@ import {
   useProductsList,
 } from "@/lib/hooks";
 import {
-  Euro,
-  TrendingUp,
-  FileText,
-  BarChart3,
-  ArrowRight,
-  Scale,
-} from "lucide-react";
+  IconCurrencyEuro as Euro,
+  IconTrendingUp as TrendingUp,
+  IconFileText as FileText,
+  IconChartBar as BarChart3,
+  IconArrowRight as ArrowRight,
+  IconScale as Scale,
+} from "@tabler/icons-react";
 
 function formatEuro(n: number): string {
   return "€" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });

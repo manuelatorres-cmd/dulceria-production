@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import { computeLiveShopStatus, dateToIso } from "@/lib/shopHours";
 import type { OrderItem, Order } from "@/types";
-import { Plus, X, Printer, Clock } from "lucide-react";
+import { IconPlus as Plus, IconX as X, IconPrinter as Printer, IconClock as Clock } from "@tabler/icons-react";
 
 const WEEKDAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 

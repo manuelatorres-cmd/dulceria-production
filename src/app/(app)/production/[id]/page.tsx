@@ -20,7 +20,7 @@ import { PackingModal } from "@/components/packing-modal";
 import { generateSteps, calculateFillingAmounts, consolidateSharedFillings, generateBatchSummary, FILL_FACTOR, DENSITY_G_PER_ML } from "@/lib/production";
 import type { Filling, Mould, PlanProduct, Product, DecorationMaterial } from "@/types";
 import { normalizeApplyAt } from "@/types";
-import { RotateCcw, Pencil, Check, X, BookOpen, StickyNote, Plus, ClipboardList, Printer, Play } from "lucide-react";
+import { IconRotate as RotateCcw, IconPencil as Pencil, IconCheck as Check, IconX as X, IconBookmark as BookOpen, IconNote as StickyNote, IconPlus as Plus, IconClipboardList as ClipboardList, IconPrinter as Printer, IconPlayerPlay as Play } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { YieldModal } from "@/components/yield-modal";
 import type { YieldEntry } from "@/components/yield-modal";

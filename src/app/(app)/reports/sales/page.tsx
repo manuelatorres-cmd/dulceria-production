@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { IconArrowLeft as ArrowLeft } from "@tabler/icons-react";
 import { PageHeader } from "@/components/page-header";
 import {
   useStockTransfers,

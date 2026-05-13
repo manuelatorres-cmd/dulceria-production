@@ -16,7 +16,7 @@ import {
   setIngredientLowStock,
 } from "@/lib/hooks";
 import { FILL_FACTOR } from "@/lib/production";
-import { ChevronLeft, CheckCircle } from "lucide-react";
+import { IconChevronLeft as ChevronLeft, IconCircleCheck as CheckCircle } from "@tabler/icons-react";
 import { LowStockFlagButton } from "@/components/pantry";
 
 export default function BatchPage({ params }: { params: Promise<{ id: string }> }) {

@@ -14,14 +14,14 @@ import {
   useProductStockAlerts,
 } from "@/lib/hooks";
 import {
-  Package,
-  Layers,
-  Leaf,
-  Grid3x3,
-  Boxes,
-  ArrowRight,
-  AlertTriangle,
-} from "lucide-react";
+  IconPackage as Package,
+  IconStack as Layers,
+  IconLeaf as Leaf,
+  IconGrid3x3 as Grid3x3,
+  IconBoxMultiple as Boxes,
+  IconArrowRight as ArrowRight,
+  IconAlertTriangle as AlertTriangle,
+} from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 
 export default function PantryPage() {

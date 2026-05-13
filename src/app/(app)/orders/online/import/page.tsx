@@ -11,7 +11,7 @@ import {
   usePackagingList, useProductLocationTotals,
 } from "@/lib/hooks";
 import { parseShopifyCsv, type ShopifyParseResult, type ShopifyParsedOrder } from "@/lib/shopifyImport";
-import { ArrowLeft, Upload, FileWarning, CheckCircle } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconUpload as Upload, IconFileAlert as FileWarning, IconCircleCheck as CheckCircle } from "@tabler/icons-react";
 
 const DEFAULT_LEAD_DAYS = 3;
 

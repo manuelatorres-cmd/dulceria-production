@@ -44,7 +44,7 @@ import {
   type AllocationSplitPoRow,
   type AllocationSplitResult,
 } from "@/components/allocation-split-modal";
-import { Thermometer, X } from "lucide-react";
+import { IconTemperature as Thermometer, IconX as X } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { PlanTabs } from "@/components/plan-tabs";
 import { ProductGroupedChecklist, type ChecklistRow } from "@/components/product-grouped-checklist";

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Plus, Layers, Trash2, FlaskConical, Play, Pencil, GitBranch } from "lucide-react";
+import { IconChevronRight as ChevronRight, IconPlus as Plus, IconStack as Layers, IconTrash as Trash2, IconFlask as FlaskConical, IconPlayerPlay as Play, IconPencil as Pencil, IconGitBranch as GitBranch } from "@tabler/icons-react";
 import { useExperiments, saveExperiment, deleteExperiment, forkExperimentVersion, useFillings } from "@/lib/hooks";
 import { GANACHE_TYPES, type GanacheType } from "@/types";
 

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconCheck as Check } from "@tabler/icons-react";
 import { PageHeader } from "@/components/page-header";
 import {
   useVariants,

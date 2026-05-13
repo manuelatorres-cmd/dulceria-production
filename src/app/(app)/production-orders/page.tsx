@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Plus, Calendar as CalIcon } from "lucide-react";
+import { IconPlus as Plus, IconCalendar as CalIcon } from "@tabler/icons-react";
 import {
   useProductionOrders,
   useAllProductionOrderItems,

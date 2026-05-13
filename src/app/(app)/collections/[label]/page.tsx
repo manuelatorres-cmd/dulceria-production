@@ -2,7 +2,7 @@
 
 import { use, useMemo } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import { useVariants } from "@/lib/hooks";
 import type { Variant } from "@/types";
 

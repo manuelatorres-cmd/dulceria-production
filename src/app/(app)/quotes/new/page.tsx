@@ -15,7 +15,7 @@ import { assertOk } from "@/lib/supabase-query";
 import type { ProductCostSnapshot, PackagingOrder, QuoteItem, Variant, VariantProduct } from "@/types";
 import { computeQuotePricing, checkQuoteFeasibility } from "@/lib/quoteMath";
 import { latestPackagingUnitCost } from "@/lib/variantPricing";
-import { ArrowLeft, Plus, Trash2, FileText, Package, CheckCircle, AlertTriangle } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconPlus as Plus, IconTrash as Trash2, IconFileText as FileText, IconPackage as Package, IconCircleCheck as CheckCircle, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 
 type LineKind = "product" | "box";
 

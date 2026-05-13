@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Package } from "lucide-react";
+import { IconArrowRight as ArrowRight, IconPackage as Package } from "@tabler/icons-react";
 import { STOCK_LOCATION_LABELS, type StockLocation } from "@/types";
 import type { Order } from "@/types";
 

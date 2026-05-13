@@ -14,7 +14,7 @@ import {
   type BoxContentParseResult,
   type BoxContentOrder,
 } from "@/lib/boxContentsImport";
-import { ArrowLeft, Upload, FileWarning, CheckCircle } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconUpload as Upload, IconFileAlert as FileWarning, IconCircleCheck as CheckCircle } from "@tabler/icons-react";
 
 /**
  * Box-builder CSV import — runs AFTER the Shopify orders import. Pairs

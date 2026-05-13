@@ -17,7 +17,7 @@ import {
   type StockAdjustmentItemType, type StockAdjustmentReason,
   type StockLocation,
 } from "@/types";
-import { ArrowLeft, Save, CheckCircle, AlertTriangle, Search, X } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconDeviceFloppy as Save, IconCircleCheck as CheckCircle, IconAlertTriangle as AlertTriangle, IconSearch as Search, IconX as X } from "@tabler/icons-react";
 
 /**
  * Stock adjustment — bulk-list flavour.

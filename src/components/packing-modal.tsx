@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Package } from "lucide-react";
+import { IconPackage as Package } from "@tabler/icons-react";
 import type { Packaging } from "@/types";
 
 /** Records packaging consumption for one unmoulded batch being packed. */

@@ -8,7 +8,7 @@ import {
   savePackagingOrder, deletePackagingOrder,
   setPackagingLowStock, setPackagingOutOfStock, markPackagingOrdered, useCurrencySymbol,
 } from "@/lib/hooks";
-import { Pencil, Trash2, Plus, Package, Archive, ArchiveRestore } from "lucide-react";
+import { IconPencil as Pencil, IconTrash as Trash2, IconPlus as Plus, IconPackage as Package, IconArchive as Archive, IconArchiveOff as ArchiveRestore } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";

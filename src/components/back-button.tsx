@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { IconArrowLeft as ArrowLeft } from "@tabler/icons-react";
 import { useSearchParams } from "next/navigation";
 import { resolveBack } from "@/lib/navContext";
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { IconPlus as Plus, IconTrash as Trash2 } from "@tabler/icons-react";
 import { BackButton } from "@/components/back-button";
 import {
   useProductionOrder,

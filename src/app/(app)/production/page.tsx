@@ -10,7 +10,7 @@ import {
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import { planStepDoneById } from "@/lib/production";
 import { PageHeader } from "@/components/page-header";
-import { Calendar, Clock, Play, CheckCircle, Trash2, ChevronRight } from "lucide-react";
+import { IconCalendar as Calendar, IconClock as Clock, IconPlayerPlay as Play, IconCircleCheck as CheckCircle, IconTrash as Trash2, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import Link from "next/link";
 import { useState, useMemo } from "react";
 import type { PlanProduct, PlanStepStatus, ProductionPlan } from "@/types";

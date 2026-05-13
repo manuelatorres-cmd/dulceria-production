@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { IconX as X } from "@tabler/icons-react";
 
 /**
  * Container for a pantry page's filter section.

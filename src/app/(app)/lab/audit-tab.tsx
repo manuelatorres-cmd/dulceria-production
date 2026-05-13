@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Download, ChevronRight, AlertCircle, AlertTriangle, CheckCircle2, FileWarning } from "lucide-react";
+import { IconDownload as Download, IconChevronRight as ChevronRight, IconAlertCircle as AlertCircle, IconAlertTriangle as AlertTriangle, IconCircleCheckFilled as CheckCircle2, IconFileAlert as FileWarning } from "@tabler/icons-react";
 import { useFillings, useIngredients, useAllFillingIngredients } from "@/lib/hooks";
 import {
   computeGanacheBreakdown,

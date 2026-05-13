@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useProductionPlan } from "@/lib/hooks";
-import { ArrowLeft, Copy, Check } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconCopy as Copy, IconCheck as Check } from "@tabler/icons-react";
 import Link from "next/link";
 
 export default function BatchSummaryPage({ params }: { params: Promise<{ id: string }> }) {

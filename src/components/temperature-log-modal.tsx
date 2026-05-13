@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Thermometer } from "lucide-react";
+import { IconTemperature as Thermometer } from "@tabler/icons-react";
 import type { Equipment } from "@/types";
 import { EQUIPMENT_LOCATION_LABELS } from "@/types";
 

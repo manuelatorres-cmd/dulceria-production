@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown } from "lucide-react";
+import { IconChevronDown as ChevronDown } from "@tabler/icons-react";
 
 /**
  * Multi-select checkbox dropdown — used in filter panels where the option set is

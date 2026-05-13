@@ -12,7 +12,7 @@ import {
 } from "@/lib/hooks";
 import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";
-import { ArrowLeft, Trash2, Archive, ArchiveRestore } from "lucide-react";
+import { IconArrowLeft as ArrowLeft, IconTrash as Trash2, IconArchive as Archive, IconArchiveOff as ArchiveRestore } from "@tabler/icons-react";
 import Link from "next/link";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 
