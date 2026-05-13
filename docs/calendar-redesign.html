@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Calendar — business overview</title>
+<style>
+  :root {
+    --page-bg: #fbf6f1;
+    --card-bg: #ffffff;
+    --card-bg-hover: #f5f0e3;
+    --border-warm: #e8e3d6;
+    --text-primary: #2c2515;
+    --text-muted: #8a7e64;
+    --tier-quarter-focus: #264443;
+    --tier-active: #fbccb9;
+    --tier-urgent: #993556;
+    --tier-positive: #5dcaa5;
+    --semantic-warn: #dab73f;
+    --today-tint: #fdf6e8;
+    
+    --cat-launch: #993556;
+    --cat-seasonal: #fbccb9;
+    --cat-event: #dab73f;
+    --cat-market: #264443;
+    --cat-closure: #8a7e64;
+    --cat-special: #5dcaa5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .serif { font-family: "Playfair Display", Georgia, serif; }
+  
+  .page { padding: 24px 32px 48px; }
+  .page-header { margin-bottom: 16px; }
+  .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .page-header h1 { font-family: "Playfair Display", Georgia, serif; font-size: 28px; font-weight: 600; }
+  .page-header .meta { color: var(--text-muted); font-size: 13px; font-style: italic; margin-top: 2px; }
+  
+  .nav-row { display: flex; gap: 4px; align-items: center; }
+  .nav-btn {
+    width: 32px; height: 32px;
+    border: 0.5px solid var(--border-warm); border-radius: 50%;
+    background: var(--card-bg); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nav-btn:hover { background: var(--card-bg-hover); }
+  .today-btn {
+    padding: 6px 16px; border: 0.5px solid var(--border-warm); border-radius: 16px;
+    background: var(--card-bg); font-size: 13px; cursor: pointer;
+  }
+  
+  .btn {
+    padding: 6px 14px; border: 0.5px solid var(--border-warm); border-radius: 4px;
+    background: var(--card-bg); font-size: 13px; color: var(--text-primary); cursor: pointer;
+  }
+  .btn:hover { background: var(--card-bg-hover); }
+  .btn.primary { background: var(--tier-quarter-focus); color: white; border-color: var(--tier-quarter-focus); }
+  
+  .view-switch {
+    display: flex; border: 0.5px solid var(--border-warm); border-radius: 6px;
+    overflow: hidden; background: var(--card-bg);
+  }
+  .view-switch button {
+    padding: 6px 14px; border: none; background: transparent; cursor: pointer;
+    font-size: 12px; color: var(--text-muted); border-right: 0.5px solid var(--border-warm);
+  }
+  .view-switch button:last-child { border-right: none; }
+  .view-switch button.active { background: var(--tier-quarter-focus); color: white; }
+  
+  .filter-row {
+    display: flex; gap: 6px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .filter-pill {
+    padding: 4px 10px; border: 0.5px solid var(--border-warm); border-radius: 14px;
+    cursor: pointer; font-size: 12px; background: var(--card-bg); color: var(--text-muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .filter-pill:hover { background: var(--card-bg-hover); color: var(--text-primary); }
+  .filter-pill.active { background: var(--tier-quarter-focus); color: white; border-color: var(--tier-quarter-focus); }
+  .filter-pill .swatch { width: 8px; height: 8px; border-radius: 50%; }
+  .filter-pill .count { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
+  .filter-pill.active .count { color: rgba(255,255,255,0.8); }
+  
+  .main-grid {
+    display: grid; grid-template-columns: 1fr 340px; gap: 14px;
+  }
+  
+  .calendar-card {
+    background: var(--card-bg); border: 0.5px solid var(--border-warm); border-radius: 8px; overflow: hidden;
+  }
+  .calendar-header {
+    padding: 14px 18px 10px;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .calendar-title {
+    font-family: "Playfair Display", Georgia, serif; font-size: 22px; font-weight: 600;
+  }
+  .calendar-title .week-info {
+    font-size: 12px; color: var(--text-muted); font-style: italic;
+    margin-left: 8px; font-family: -apple-system, sans-serif; font-weight: 400;
+  }
+  
+  .weekday-row {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    border-bottom: 0.5px solid var(--border-warm);
+  }
+  .weekday-cell {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); font-weight: 600; text-align: center; padding: 8px 0;
+  }
+  
+  .month-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(90px, auto);
+  }
+  
+  .day-cell {
+    border-right: 0.5px solid var(--border-warm); border-bottom: 0.5px solid var(--border-warm);
+    padding: 6px 8px; cursor: pointer; position: relative;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .day-cell:hover { background: var(--card-bg-hover); }
+  .day-cell:nth-child(7n) { border-right: none; }
+  .day-cell.other-month { color: var(--text-muted); opacity: 0.4; }
+  .day-cell.weekend { background: rgba(232, 227, 214, 0.18); }
+  .day-cell.today { background: var(--today-tint); }
+  .day-cell.selected { box-shadow: inset 0 0 0 2px var(--tier-quarter-focus); z-index: 2; }
+  .day-cell.blocked {
+    background: repeating-linear-gradient(
+      135deg,
+      rgba(138, 126, 100, 0.05),
+      rgba(138, 126, 100, 0.05) 6px,
+      rgba(138, 126, 100, 0.12) 6px,
+      rgba(138, 126, 100, 0.12) 12px
+    );
+  }
+  
+  .day-num {
+    font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums;
+  }
+  .day-cell.today .day-num { color: var(--tier-urgent); font-weight: 600; }
+  
+  .day-events {
+    display: flex; flex-direction: column; gap: 2px; flex: 1;
+  }
+  .day-event {
+    font-size: 10px; line-height: 1.25; padding: 2px 6px; border-radius: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  
+  .day-event.span-launch { background: var(--cat-launch); color: white; }
+  .day-event.span-seasonal { background: var(--cat-seasonal); color: var(--text-primary); }
+  .day-event.span-market { background: var(--cat-market); color: white; }
+  
+  .day-event.span-start { border-radius: 3px 0 0 3px; margin-right: -8px; padding-right: 12px; }
+  .day-event.span-mid { border-radius: 0; margin-left: -8px; margin-right: -8px; padding-left: 14px; padding-right: 12px; }
+  .day-event.span-end { border-radius: 0 3px 3px 0; margin-left: -8px; padding-left: 14px; }
+  .day-event.span-only { border-radius: 3px; }
+  
+  .day-event.event {
+    background: rgba(218, 183, 63, 0.15); border-left: 2px solid var(--cat-event);
+    padding-left: 5px;
+  }
+  .day-event.closure {
+    background: rgba(138, 126, 100, 0.12); border-left: 2px solid var(--cat-closure);
+    color: var(--text-muted); padding-left: 5px; font-style: italic;
+  }
+  .day-event.special {
+    background: rgba(93, 202, 165, 0.15); border-left: 2px solid var(--cat-special);
+    padding-left: 5px; font-weight: 500;
+  }
+  
+  .side-panel { display: flex; flex-direction: column; gap: 14px; }
+  
+  .panel-card {
+    background: var(--card-bg); border: 0.5px solid var(--border-warm);
+    border-radius: 8px; overflow: hidden;
+  }
+  
+  .panel-header { padding: 14px 18px 10px; border-bottom: 0.5px solid var(--border-warm); }
+  .panel-title {
+    font-family: "Playfair Display", Georgia, serif; font-size: 15px; font-weight: 600; margin-bottom: 2px;
+  }
+  .panel-title-pre {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); font-weight: 600; margin-bottom: 4px;
+  }
+  .panel-meta { font-size: 11px; color: var(--text-muted); font-style: italic; }
+  .panel-meta .today-pill {
+    background: var(--tier-urgent); color: white;
+    padding: 1px 8px; border-radius: 10px;
+    font-size: 9px; font-weight: 500; margin-left: 6px;
+    font-style: normal; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  
+  .panel-section { padding: 10px 18px; border-bottom: 0.5px solid var(--border-warm); }
+  .panel-section:last-child { border-bottom: none; }
+  
+  .panel-section-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-muted); font-weight: 600; margin-bottom: 6px;
+  }
+  
+  .panel-action {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    cursor: pointer; border-bottom: 0.5px solid var(--border-warm);
+  }
+  .panel-action:last-child { border-bottom: none; }
+  .panel-action:hover .panel-action-title { color: var(--tier-quarter-focus); }
+  .panel-action-icon {
+    width: 18px; height: 18px; color: var(--text-muted); font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .panel-action-title { font-size: 13px; font-weight: 500; }
+  .panel-action-meta { font-size: 11px; color: var(--text-muted); font-style: italic; }
+  
+  .upcoming-item {
+    display: flex; gap: 12px; padding: 10px 0;
+    border-bottom: 0.5px solid var(--border-warm); cursor: pointer;
+  }
+  .upcoming-item:last-child { border-bottom: none; }
+  .upcoming-item:hover .upcoming-title { color: var(--tier-quarter-focus); }
+  
+  .upcoming-date {
+    flex-shrink: 0; width: 44px;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    border-right: 0.5px solid var(--border-warm); padding-right: 10px;
+  }
+  .upcoming-day {
+    font-family: "Playfair Display", Georgia, serif;
+    font-size: 18px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .upcoming-month {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-muted); margin-top: 2px; font-weight: 600;
+  }
+  .upcoming-content { flex: 1; min-width: 0; }
+  .upcoming-title { font-size: 13px; font-weight: 500; line-height: 1.3; }
+  .upcoming-meta { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 1px; }
+  .upcoming-type {
+    display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 8px;
+    text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; margin-top: 3px;
+  }
+  .upcoming-type.launch { background: rgba(153, 53, 86, 0.1); color: var(--cat-launch); }
+  .upcoming-type.seasonal { background: rgba(251, 204, 185, 0.3); color: #7a3a28; }
+  .upcoming-type.event { background: rgba(218, 183, 63, 0.15); color: #8c7420; }
+  .upcoming-type.market { background: rgba(38, 68, 67, 0.1); color: var(--cat-market); }
+  .upcoming-type.special { background: rgba(93, 202, 165, 0.15); color: #3a7a5e; }
+  .upcoming-type.closure { background: rgba(138, 126, 100, 0.15); color: var(--cat-closure); }
+  
+  .now-running {
+    background: var(--card-bg); border: 0.5px solid var(--border-warm);
+    border-left: 3px solid var(--cat-launch); border-radius: 8px;
+    padding: 12px 16px;
+  }
+  .now-running-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--cat-launch); font-weight: 600; margin-bottom: 4px;
+  }
+  .now-running-title {
+    font-family: "Playfair Display", Georgia, serif; font-size: 16px; font-weight: 600; margin-bottom: 2px;
+  }
+  .now-running-meta { font-size: 11px; color: var(--text-muted); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="page">
+  
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <h1>Calendar</h1>
+        <p class="meta">Launches, campaigns, event orders, closures · what's happening in the business</p>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <div class="view-switch">
+          <button>Year</button>
+          <button class="active">Month</button>
+          <button>List</button>
+        </div>
+        <button class="btn primary">+ Add to calendar</button>
+        <div class="nav-row" style="margin-left: 8px;">
+          <button class="nav-btn">‹</button>
+          <button class="today-btn">Today</button>
+          <button class="nav-btn">›</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="filter-row">
+    <div class="filter-pill active">All <span class="count">14</span></div>
+    <div class="filter-pill"><span class="swatch" style="background: var(--cat-launch);"></span>Launches <span class="count">3</span></div>
+    <div class="filter-pill"><span class="swatch" style="background: var(--cat-seasonal);"></span>Seasonal <span class="count">2</span></div>
+    <div class="filter-pill"><span class="swatch" style="background: var(--cat-event);"></span>Event orders <span class="count">4</span></div>
+    <div class="filter-pill"><span class="swatch" style="background: var(--cat-market);"></span>Market events <span class="count">1</span></div>
+    <div class="filter-pill"><span class="swatch" style="background: var(--cat-special);"></span>Special <span class="count">2</span></div>
+    <div class="filter-pill"><span class="swatch" style="background: var(--cat-closure);"></span>Closures <span class="count">2</span></div>
+  </div>
+  
+  <div class="main-grid">
+    
+    <!-- CALENDAR -->
+    <div class="calendar-card">
+      <div class="calendar-header">
+        <div class="calendar-title serif">
+          Mai 2026 <span class="week-info">7 items planned this month · 1 active campaign</span>
+        </div>
+      </div>
+      
+      <div class="weekday-row">
+        <div class="weekday-cell">Mon</div>
+        <div class="weekday-cell">Tue</div>
+        <div class="weekday-cell">Wed</div>
+        <div class="weekday-cell">Thu</div>
+        <div class="weekday-cell">Fri</div>
+        <div class="weekday-cell">Sat</div>
+        <div class="weekday-cell">Sun</div>
+      </div>
+      
+      <div class="month-grid">
+        
+        <!-- Week 18 -->
+        <div class="day-cell other-month"><span class="day-num">27</span></div>
+        <div class="day-cell other-month"><span class="day-num">28</span></div>
+        <div class="day-cell other-month"><span class="day-num">29</span></div>
+        <div class="day-cell other-month">
+          <span class="day-num">30</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-start">Mothersday</div>
+          </div>
+        </div>
+        <div class="day-cell">
+          <span class="day-num">1</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-mid">Mothersday</div>
+          </div>
+        </div>
+        <div class="day-cell weekend">
+          <span class="day-num">2</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-mid">Mothersday</div>
+            <div class="day-event event">Wedding · Anna K.</div>
+          </div>
+        </div>
+        <div class="day-cell weekend">
+          <span class="day-num">3</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-mid">Mothersday</div>
+          </div>
+        </div>
+        
+        <!-- Week 19 -->
+        <div class="day-cell">
+          <span class="day-num">4</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-mid">Mothersday</div>
+          </div>
+        </div>
+        <div class="day-cell">
+          <span class="day-num">5</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-mid">Mothersday</div>
+          </div>
+        </div>
+        <div class="day-cell">
+          <span class="day-num">6</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-mid">Mothersday</div>
+          </div>
+        </div>
+        <div class="day-cell">
+          <span class="day-num">7</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-mid">Mothersday</div>
+          </div>
+        </div>
+        <div class="day-cell">
+          <span class="day-num">8</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-mid">Mothersday</div>
+          </div>
+        </div>
+        <div class="day-cell weekend">
+          <span class="day-num">9</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-mid">Mothersday</div>
+          </div>
+        </div>
+        <div class="day-cell weekend">
+          <span class="day-num">10</span>
+          <div class="day-events">
+            <div class="day-event span-seasonal span-end">Mothersday · ship</div>
+          </div>
+        </div>
+        
+        <!-- Week 20 — TODAY 13 May -->
+        <div class="day-cell"><span class="day-num">11</span></div>
+        <div class="day-cell"><span class="day-num">12</span></div>
+        <div class="day-cell today selected"><span class="day-num">13</span></div>
+        <div class="day-cell"><span class="day-num">14</span></div>
+        <div class="day-cell">
+          <span class="day-num">15</span>
+          <div class="day-events">
+            <div class="day-event event">Birthday · Mike R.</div>
+          </div>
+        </div>
+        <div class="day-cell weekend">
+          <span class="day-num">16</span>
+          <div class="day-events">
+            <div class="day-event event">Wedding · 80 pcs</div>
+          </div>
+        </div>
+        <div class="day-cell weekend blocked">
+          <span class="day-num">17</span>
+          <div class="day-events">
+            <div class="day-event closure">Closed</div>
+          </div>
+        </div>
+        
+        <!-- Week 21 -->
+        <div class="day-cell"><span class="day-num">18</span></div>
+        <div class="day-cell"><span class="day-num">19</span></div>
+        <div class="day-cell"><span class="day-num">20</span></div>
+        <div class="day-cell"><span class="day-num">21</span></div>
+        <div class="day-cell">
+          <span class="day-num">22</span>
+          <div class="day-events">
+            <div class="day-event event">Bachelorette · 24 pcs</div>
+          </div>
+        </div>
+        <div class="day-cell weekend"><span class="day-num">23</span></div>
+        <div class="day-cell weekend blocked">
+          <span class="day-num">24</span>
+          <div class="day-events">
+            <div class="day-event closure">Teaching</div>
+          </div>
+        </div>
+        
+        <!-- Week 22 -->
+        <div class="day-cell"><span class="day-num">25</span></div>
+        <div class="day-cell"><span class="day-num">26</span></div>
+        <div class="day-cell"><span class="day-num">27</span></div>
+        <div class="day-cell"><span class="day-num">28</span></div>
+        <div class="day-cell"><span class="day-num">29</span></div>
+        <div class="day-cell weekend"><span class="day-num">30</span></div>
+        <div class="day-cell weekend"><span class="day-num">31</span></div>
+        
+      </div>
+    </div>
+    
+    <!-- SIDE PANEL -->
+    <div class="side-panel">
+      
+      <div class="now-running">
+        <div class="now-running-label">⏵ Active right now</div>
+        <div class="now-running-title">Bar Launch</div>
+        <div class="now-running-meta">launch · started 4 May · 22 days to 4 Jun launch event</div>
+      </div>
+      
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title-pre">Selected day</div>
+          <div class="panel-title">Wed, 13 May 2026<span class="today-pill" style="margin-left: 4px;">today</span></div>
+          <div class="panel-meta">week 20 · nothing scheduled today</div>
+        </div>
+        
+        <div class="panel-section">
+          <div class="panel-section-label">Add to this day</div>
+          
+          <div class="panel-action">
+            <span class="panel-action-icon">+</span>
+            <div>
+              <div class="panel-action-title">Event order</div>
+              <div class="panel-action-meta">Customer gig on this date</div>
+            </div>
+          </div>
+          
+          <div class="panel-action">
+            <span class="panel-action-icon">⊕</span>
+            <div>
+              <div class="panel-action-title">Campaign / launch</div>
+              <div class="panel-action-meta">Seasonal, limited edition, drop</div>
+            </div>
+          </div>
+          
+          <div class="panel-action">
+            <span class="panel-action-icon">★</span>
+            <div>
+              <div class="panel-action-title">Special day</div>
+              <div class="panel-action-meta">Opening, anniversary, milestone</div>
+            </div>
+          </div>
+          
+          <div class="panel-action">
+            <span class="panel-action-icon">✕</span>
+            <div>
+              <div class="panel-action-title">Block this day</div>
+              <div class="panel-action-meta">Closed, teaching, vacation</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title">Coming up</div>
+          <div class="panel-meta">next 60 days · 8 items</div>
+        </div>
+        
+        <div class="panel-section" style="padding-top: 6px;">
+          
+          <div class="upcoming-item">
+            <div class="upcoming-date">
+              <div class="upcoming-day">16</div>
+              <div class="upcoming-month">May</div>
+            </div>
+            <div class="upcoming-content">
+              <div class="upcoming-title">Wedding · 80 pcs</div>
+              <div class="upcoming-meta">Sarah & Tom · €640 paid · 3 days away</div>
+              <span class="upcoming-type event">Event order</span>
+            </div>
+          </div>
+          
+          <div class="upcoming-item">
+            <div class="upcoming-date">
+              <div class="upcoming-day">17</div>
+              <div class="upcoming-month">May</div>
+            </div>
+            <div class="upcoming-content">
+              <div class="upcoming-title">Closed</div>
+              <div class="upcoming-meta">Sunday · 4 days away</div>
+              <span class="upcoming-type closure">Closure</span>
+            </div>
+          </div>
+          
+          <div class="upcoming-item">
+            <div class="upcoming-date">
+              <div class="upcoming-day">22</div>
+              <div class="upcoming-month">May</div>
+            </div>
+            <div class="upcoming-content">
+              <div class="upcoming-title">Bachelorette · 24 pcs</div>
+              <div class="upcoming-meta">Lisa group · €280 paid · 9 days away</div>
+              <span class="upcoming-type event">Event order</span>
+            </div>
+          </div>
+          
+          <div class="upcoming-item">
+            <div class="upcoming-date">
+              <div class="upcoming-day">24</div>
+              <div class="upcoming-month">May</div>
+            </div>
+            <div class="upcoming-content">
+              <div class="upcoming-title">Closed · teaching</div>
+              <div class="upcoming-meta">VHS workshop · 11 days away</div>
+              <span class="upcoming-type closure">Closure</span>
+            </div>
+          </div>
+          
+          <div class="upcoming-item">
+            <div class="upcoming-date">
+              <div class="upcoming-day">04</div>
+              <div class="upcoming-month">Jun</div>
+            </div>
+            <div class="upcoming-content">
+              <div class="upcoming-title">Bar Launch</div>
+              <div class="upcoming-meta">4 → 7 Jun · 22 days away · 2 products</div>
+              <span class="upcoming-type launch">Launch</span>
+            </div>
+          </div>
+          
+          <div class="upcoming-item">
+            <div class="upcoming-date">
+              <div class="upcoming-day">04</div>
+              <div class="upcoming-month">Jun</div>
+            </div>
+            <div class="upcoming-content">
+              <div class="upcoming-title">Veganmania booth</div>
+              <div class="upcoming-meta">4 → 7 Jun · Wiener Rathauspark · 20 products</div>
+              <span class="upcoming-type market">Market</span>
+            </div>
+          </div>
+          
+          <div class="upcoming-item">
+            <div class="upcoming-date">
+              <div class="upcoming-day">15</div>
+              <div class="upcoming-month">Jun</div>
+            </div>
+            <div class="upcoming-content">
+              <div class="upcoming-title">1060 Wien opening</div>
+              <div class="upcoming-meta">New production space · 33 days away</div>
+              <span class="upcoming-type special">Special</span>
+            </div>
+          </div>
+          
+          <div class="upcoming-item">
+            <div class="upcoming-date">
+              <div class="upcoming-day">28</div>
+              <div class="upcoming-month">Jun</div>
+            </div>
+            <div class="upcoming-content">
+              <div class="upcoming-title">Mid-summer box</div>
+              <div class="upcoming-meta">seasonal · drop date · 46 days away</div>
+              <span class="upcoming-type seasonal">Seasonal</span>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+</div>
+
+</body>
+</html>
