@@ -14,6 +14,7 @@ import { assertOk } from "@/lib/supabase-query";
 import { computeLiveShopStatus, dateToIso } from "@/lib/shopHours";
 import type { OrderItem, Order } from "@/types";
 import { IconPlus as Plus, IconX as X, IconPrinter as Printer, IconClock as Clock } from "@tabler/icons-react";
+import { PageHeader } from "@/components/dulceria";
 
 const WEEKDAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -32,39 +33,30 @@ export default function ShopPage() {
     [hours, closures, now.getMinutes()]);
 
   return (
-    <div className="px-5 py-6 pb-12">
-      {/* Compact header strip */}
-      <header className="flex items-end justify-between flex-wrap gap-3 mb-5">
-        <div>
-          <p className="text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.16em" }}>
-            The Shop
-          </p>
-          <div className="flex items-baseline gap-3 mt-1 flex-wrap">
-            <h1
-              className="text-[30px] leading-none text-foreground"
-              style={{ fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: "-0.018em" }}
-            >
-              Storefront
-            </h1>
-            <LiveStatusInline live={live} />
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/shop/counter" className={`${PINK} text-[12px] px-3.5 py-1.5 rounded-full font-medium`}>
-            Counter
-          </Link>
-          <Link href="/shop/daily-count" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-[color:var(--ds-card-bg)] border border-border text-foreground hover:border-foreground">
-            Daily count
-          </Link>
-          <Link href="/shop/transfer" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-[color:var(--ds-card-bg)] border border-border text-foreground hover:border-foreground">
-            Transfer in
-          </Link>
-          <Link href="/shop/breakage" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-[color:var(--ds-card-bg)] border border-border text-foreground hover:border-foreground">
-            Stock out
-          </Link>
-        </div>
-      </header>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Storefront"
+        meta="The shop — pickups, stock, hours, label printing"
+        badges={<LiveStatusInline live={live} />}
+        actions={
+          <>
+            <Link href="/shop/counter" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium border border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tier-quarter-focus)] text-white">
+              Counter
+            </Link>
+            <Link href="/shop/daily-count" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground">
+              Daily count
+            </Link>
+            <Link href="/shop/transfer" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground">
+              Transfer in
+            </Link>
+            <Link href="/shop/breakage" className="text-[12px] px-3.5 py-1.5 rounded-full font-medium bg-[color:var(--ds-card-bg)] border border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground">
+              Stock out
+            </Link>
+          </>
+        }
+      />
 
+      <div style={{ padding: "16px 32px 40px" }}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="space-y-5">
           <PickupsTodayCard />
@@ -76,6 +68,7 @@ export default function ShopPage() {
           <OpeningHoursCard hours={hours} closures={closures} />
           <LabelPlaceholder />
         </div>
+      </div>
       </div>
     </div>
   );
