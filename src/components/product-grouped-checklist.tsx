@@ -125,7 +125,7 @@ export function ProductGroupedChecklist({
               </div>
               {chips.length > 0 && (
                 <span
-                  className="text-[9.5px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/85 truncate max-w-[120px]"
+                  className="text-[9.5px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[color:var(--ds-card-bg)] truncate max-w-[120px]"
                   style={{ letterSpacing: "0.05em", color: "#1c1d1f" }}
                   title={chips.join(", ")}
                 >

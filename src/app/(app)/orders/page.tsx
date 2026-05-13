@@ -223,7 +223,7 @@ export default function OrdersPage() {
         <div className="ml-auto flex items-center gap-2">
           <Link
             href="/orders/online"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm font-medium hover:bg-white/85 transition"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm font-medium hover:bg-[color:var(--ds-card-bg-hover)] transition"
           >
             <ShoppingBag className="w-3.5 h-3.5" /> Online
           </Link>
@@ -260,7 +260,7 @@ export default function OrdersPage() {
                 className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   filterStatus === s
                     ? "bg-foreground text-background"
-                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-border hover:bg-white/85"
+                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-border hover:bg-[color:var(--ds-card-bg-hover)]"
                 }`}
               >
                 {s === "all" ? "All" : ORDER_STATUS_LABELS[s]}
