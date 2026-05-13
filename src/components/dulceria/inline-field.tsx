@@ -381,6 +381,83 @@ export function DsInlineSelect<T extends string>({
   );
 }
 
+export interface DsInlineToggleProps {
+  label: string;
+  checked: boolean;
+  onChange: (next: boolean) => Promise<unknown> | void;
+  description?: string;
+  disabled?: boolean;
+}
+
+/**
+ * Inline toggle (checkbox-style). Saves immediately on change. The
+ * label is the toggle's affordance; description renders below in muted
+ * italic. No edit-mode toggle — change is committed instantly.
+ */
+export function DsInlineToggle({
+  label,
+  checked,
+  onChange,
+  description,
+  disabled,
+}: DsInlineToggleProps) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputId = useId();
+
+  async function handleToggle(next: boolean) {
+    setSaving(true);
+    setError(null);
+    try {
+      await onChange(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label
+        htmlFor={inputId}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          cursor: disabled ? "default" : "pointer",
+          fontSize: 13,
+          color: "var(--ds-text-primary)",
+          width: "fit-content",
+        }}
+      >
+        <input
+          id={inputId}
+          type="checkbox"
+          checked={checked}
+          disabled={disabled || saving}
+          onChange={(e) => handleToggle(e.target.checked)}
+          style={{ width: 14, height: 14, cursor: disabled ? "default" : "pointer" }}
+        />
+        <span>{label}</span>
+      </label>
+      {description && (
+        <span
+          style={{
+            fontSize: 11,
+            fontStyle: "italic",
+            color: "var(--ds-text-muted)",
+            paddingLeft: 22,
+          }}
+        >
+          {description}
+        </span>
+      )}
+      {error && <FormError>{error}</FormError>}
+    </div>
+  );
+}
+
 function IconButton({
   children,
   onClick,

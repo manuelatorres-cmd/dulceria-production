@@ -23,7 +23,18 @@ import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import { InlineNameEditor } from "@/components/inline-name-editor";
 import { DetailNav } from "@/components/detail-nav";
-import { DsTabNav } from "@/components/dulceria";
+import {
+  DsTabNav,
+  Section,
+  DsInlineField,
+  DsInlineTextarea,
+  DsInlineSelect,
+  DsInlineToggle,
+  DsTagInput,
+  DsPhotoUpload,
+  useToast,
+} from "@/components/dulceria";
+import type { Product } from "@/types";
 import Link from "next/link";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
 
@@ -456,6 +467,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     await removeFillingFromProduct(productFillingId);
   }
 
+  const toast = useToast();
+  // Inline patch helper: each Product-tab field saves on its own.
+  // Supabase update only writes the fields we pass — name is required by
+  // the saveProduct signature, so we always include the current name.
+  async function patchProduct(patch: Partial<Product>) {
+    if (!product) return;
+    await saveProduct({ id: productId, name: product.name, ...patch });
+  }
+
   function handleAddTag(tag: string) {
     const trimmed = tag.trim().toLowerCase();
     if (!trimmed || localTags.includes(trimmed)) return;
@@ -593,13 +613,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   >
                     <Copy aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
                   </button>
-                  <button
-                    onClick={startEditing}
-                    aria-label="Edit product"
-                    className="p-1.5 rounded-full hover:bg-muted transition-colors"
-                  >
-                    <Pencil aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
-                  </button>
+                  {activeTab !== "product" && (
+                    <button
+                      onClick={startEditing}
+                      aria-label="Edit product"
+                      className="p-1.5 rounded-full hover:bg-muted transition-colors"
+                    >
+                      <Pencil aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -680,752 +702,514 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       {activeTab === "product" && (
       <>
 
-      {editing ? (
-        <>
-        {/* --- EDIT MODE --- */}
+      {/* === Phase A.1 — three-column inline-edit body === */}
+      <div className="px-4 pb-6 space-y-4">
+        <div
+          style={{
+            display: "grid",
+            gap: 16,
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            alignItems: "start",
+          }}
+        >
+          {/* Column 1 — Identity */}
+          <Section title="Identity">
+            <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <DsPhotoUpload
+                value={product.photo}
+                aspectRatio={1}
+                onChange={async (url) => {
+                  await patchProduct({ photo: url ?? undefined });
+                  toast.success(url ? "Photo updated" : "Photo removed");
+                }}
+              />
+              <DsInlineField
+                label="Name"
+                value={product.name}
+                onSave={async (v) => {
+                  const next = v.trim();
+                  if (!next) throw new Error("Name cannot be empty");
+                  await patchProduct({ name: next });
+                  toast.success("Name saved");
+                }}
+              />
+              <DsInlineSelect
+                label="Category"
+                value={product.productCategoryId ?? ""}
+                options={[
+                  { value: "", label: "— None —" },
+                  ...productCategories.map((c) => ({ value: c.id!, label: c.name })),
+                ]}
+                onSave={async (v) => {
+                  await patchProduct({ productCategoryId: v || undefined });
+                  toast.success("Category saved");
+                }}
+              />
+              <DsInlineSelect
+                label="Priority tier"
+                value={String(product.priorityTier ?? 2)}
+                options={[
+                  { value: "1", label: "1 · Top seller" },
+                  { value: "2", label: "2 · Normal" },
+                  { value: "3", label: "3 · Nice-to-have" },
+                ]}
+                onSave={async (v) => {
+                  await patchProduct({ priorityTier: parseInt(v, 10) as 1 | 2 | 3 });
+                  toast.success("Priority saved");
+                }}
+              />
+              <DsTagInput
+                label="Aliases · names used externally"
+                values={product.aliases ?? []}
+                onChange={async (next) => {
+                  await patchProduct({ aliases: next.length ? next : undefined });
+                  toast.success("Aliases saved");
+                }}
+              />
+              <DsTagInput
+                label="Tags"
+                values={product.tags ?? []}
+                suggestions={knownTags}
+                onChange={async (next) => {
+                  await patchProduct({ tags: next.length ? next : undefined });
+                  toast.success("Tags saved");
+                }}
+              />
+              <DsInlineTextarea
+                label="Notes"
+                value={product.notes ?? ""}
+                onSave={async (v) => {
+                  await patchProduct({ notes: v.trim() || undefined });
+                  toast.success("Notes saved");
+                }}
+              />
+            </div>
+          </Section>
 
-        {/* Category */}
-        <div className="px-4 pb-4">
-          <label className="label">Category</label>
-          <select
-            value={localProductCategoryId}
-            onChange={(e) => {
-              const newCatId = e.target.value;
-              setLocalProductCategoryId(newCatId);
-              // When switching categories, update shellPercentage to the new category's default
-              const cat = productCategories.find((c) => c.id === newCatId);
-              if (cat) setLocalShellPercentageStr(String(cat.defaultShellPercent));
-              // Auto-tick "Available in shop custom-box builder" when
-              // category is "moulded" — only moulded chocolates fit a
-              // custom box. Other categories default off; user can
-              // tick manually if they ever do.
-              const isMoulded = (cat?.name ?? "").toLowerCase().trim() === "moulded";
-              if (isNew) setLocalIncludedInCustomBoxes(isMoulded);
-            }}
-            className="input capitalize"
-          >
-            <option value="">— None —</option>
-            {productCategories.map((c) => (
-              <option key={c.id} value={c.id} className="capitalize">{c.name}</option>
-            ))}
-          </select>
+          {/* Column 2 — Composition */}
+          <Section title="Composition">
+            <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <DsInlineSelect
+                label="Fill mode"
+                value={product.fillMode ?? defaultFillMode}
+                options={[
+                  { value: "percentage", label: "By percentage" },
+                  { value: "grams", label: "By grams" },
+                ]}
+                onSave={async (v) => {
+                  await patchProduct({ fillMode: v as FillMode });
+                  toast.success("Fill mode saved");
+                }}
+              />
+              <DsInlineSelect
+                label="Shell source"
+                value={
+                  product.shellIngredientId
+                    ? `ing:${product.shellIngredientId}`
+                    : product.shellFillingId
+                      ? `fil:${product.shellFillingId}`
+                      : ""
+                }
+                options={[
+                  { value: "", label: "— None —" },
+                  ...shellCapableIngredients.map((ing) => ({
+                    value: `ing:${ing.id!}`,
+                    label: `Ingredient · ${ing.name}`,
+                  })),
+                  ...shellCapableFillings.map((f) => ({
+                    value: `fil:${f.id!}`,
+                    label: `Self-made · ${f.name}`,
+                  })),
+                ]}
+                onSave={async (v) => {
+                  if (!v) {
+                    await patchProduct({ shellIngredientId: null, shellFillingId: null });
+                  } else if (v.startsWith("ing:")) {
+                    await patchProduct({ shellIngredientId: v.slice(4), shellFillingId: null });
+                  } else if (v.startsWith("fil:")) {
+                    await patchProduct({ shellIngredientId: null, shellFillingId: v.slice(4) });
+                  }
+                  toast.success("Shell source saved");
+                }}
+              />
+              {(product.fillMode ?? defaultFillMode) === "percentage" && (
+                <DsInlineField
+                  label="Shell %"
+                  type="number"
+                  suffix="%"
+                  value={
+                    product.shellPercentage != null
+                      ? String(product.shellPercentage)
+                      : productCategory?.defaultShellPercent != null
+                        ? String(productCategory.defaultShellPercent)
+                        : ""
+                  }
+                  validate={(v) => {
+                    const n = parseFloat(v);
+                    if (isNaN(n)) return "Must be a number";
+                    if (productCategory) {
+                      if (n < productCategory.shellPercentMin || n > productCategory.shellPercentMax) {
+                        return `Out of range ${productCategory.shellPercentMin}–${productCategory.shellPercentMax}%`;
+                      }
+                    }
+                    return true;
+                  }}
+                  onSave={async (v) => {
+                    const n = parseFloat(v);
+                    await patchProduct({ shellPercentage: isNaN(n) ? undefined : n });
+                    toast.success("Shell % saved");
+                  }}
+                />
+              )}
+              <DsInlineField
+                label="Coating (legacy)"
+                value={product.coating ?? ""}
+                onSave={async (v) => {
+                  await patchProduct({ coating: v.trim() || undefined });
+                  toast.success("Coating saved");
+                }}
+              />
+              <div>
+                <DsInlineSelect
+                  label="Default mould"
+                  value={product.defaultMouldId ?? ""}
+                  options={[
+                    { value: "", label: "— No default —" },
+                    ...allMoulds.map((m) => ({
+                      value: m.id!,
+                      label: `${m.name} (${m.cavityWeightG} g · ${m.numberOfCavities} cav.)`,
+                    })),
+                  ]}
+                  onSave={async (v) => {
+                    await patchProduct({ defaultMouldId: v || undefined });
+                    toast.success("Mould saved");
+                  }}
+                />
+                {(() => {
+                  if (!product.defaultMouldId) return null;
+                  const mould = allMoulds.find((m) => m.id === product.defaultMouldId);
+                  if (!mould) return null;
+                  const totalFillGrams = productFillings.reduce((sum, pf) => sum + (pf.fillGrams ?? 0), 0);
+                  return (
+                    <p
+                      style={{
+                        marginTop: 4,
+                        fontSize: 11,
+                        fontStyle: "italic",
+                        color: "var(--ds-text-muted)",
+                      }}
+                    >
+                      filling grams / cavity = {totalFillGrams.toFixed(1)} g
+                      {" · cavity total "}
+                      {mould.cavityWeightG} g
+                    </p>
+                  );
+                })()}
+              </div>
+              <DsInlineField
+                label="Default batch qty"
+                type="number"
+                value={String(product.defaultBatchQty ?? 1)}
+                onSave={async (v) => {
+                  const n = Math.max(1, parseInt(v, 10) || 1);
+                  await patchProduct({ defaultBatchQty: n });
+                  toast.success("Batch qty saved");
+                }}
+              />
+              <div>
+                <span className="text-ds-label">Shell design</span>
+                <p style={{ marginTop: 4, fontSize: 13, color: "var(--ds-text-primary)" }}>
+                  {(product.shellDesign ?? []).length === 0 ? (
+                    <em style={{ color: "var(--ds-text-muted)" }}>No steps yet — </em>
+                  ) : (
+                    `${(product.shellDesign ?? []).length} step${(product.shellDesign ?? []).length === 1 ? "" : "s"} · `
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => switchTab("shell")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--ds-tier-quarter-focus)",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      padding: 0,
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Edit steps →
+                  </button>
+                </p>
+              </div>
+            </div>
+          </Section>
+
+          {/* Column 3 — Commercial */}
+          <Section title="Commercial">
+            <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <DsInlineField
+                  label="Shelf life (weeks)"
+                  value={product.shelfLifeWeeks ?? ""}
+                  onSave={async (v) => {
+                    await patchProduct({ shelfLifeWeeks: v.trim() || undefined });
+                    toast.success("Shelf life saved");
+                  }}
+                />
+                {recommendedShelfLife && (
+                  <p style={{ marginTop: 4, fontSize: 11, color: "var(--ds-text-muted)" }}>
+                    Suggested: {recommendedShelfLife.weeks} wks (limited by {recommendedShelfLife.fillingName})
+                  </p>
+                )}
+              </div>
+              <div>
+                <DsInlineField
+                  label="Lead time (days)"
+                  type="number"
+                  value={product.leadTimeDays != null ? String(product.leadTimeDays) : ""}
+                  onSave={async (v) => {
+                    const n = parseInt(v, 10);
+                    await patchProduct({ leadTimeDays: isNaN(n) || n < 0 ? undefined : n });
+                    toast.success("Lead time saved");
+                  }}
+                />
+                {suggestedLeadTime != null && (
+                  <p style={{ marginTop: 4, fontSize: 11, color: "var(--ds-text-muted)" }}>
+                    Suggested: {suggestedLeadTime} day{suggestedLeadTime === 1 ? "" : "s"} — production steps ÷ team capacity
+                  </p>
+                )}
+              </div>
+              <DsInlineField
+                label="Default VAT (%)"
+                type="number"
+                suffix="%"
+                value={product.defaultVatRate != null ? String(product.defaultVatRate) : ""}
+                onSave={async (v) => {
+                  const n = parseFloat(v);
+                  await patchProduct({ defaultVatRate: isNaN(n) || n < 0 ? undefined : n });
+                  toast.success("VAT saved");
+                }}
+              />
+              <DsInlineField
+                label="Default discount on seconds (%)"
+                type="number"
+                suffix="%"
+                value={
+                  product.defaultDiscountPercentSeconds != null
+                    ? String(product.defaultDiscountPercentSeconds)
+                    : ""
+                }
+                onSave={async (v) => {
+                  const n = parseFloat(v);
+                  await patchProduct({
+                    defaultDiscountPercentSeconds: isNaN(n) || n < 0 ? undefined : n,
+                  });
+                  toast.success("Discount saved");
+                }}
+              />
+              <DsInlineField
+                label="Min stock — store"
+                type="number"
+                value={minStoreRow?.minimumUnits != null ? String(minStoreRow.minimumUnits) : ""}
+                onSave={async (v) => {
+                  const n = parseInt(v, 10);
+                  if (isNaN(n) || n < 0) throw new Error("Must be a non-negative number");
+                  await saveStockLocationMinimum({
+                    id: minStoreRow?.id,
+                    productId,
+                    location: "store",
+                    minimumUnits: n,
+                  });
+                  toast.success("Min stock — store saved");
+                }}
+              />
+              <DsInlineField
+                label="Min stock — production"
+                type="number"
+                value={minProdRow?.minimumUnits != null ? String(minProdRow.minimumUnits) : ""}
+                onSave={async (v) => {
+                  const n = parseInt(v, 10);
+                  if (isNaN(n) || n < 0) throw new Error("Must be a non-negative number");
+                  await saveStockLocationMinimum({
+                    id: minProdRow?.id,
+                    productId,
+                    location: "production",
+                    minimumUnits: n,
+                  });
+                  toast.success("Min stock — production saved");
+                }}
+              />
+              <DsInlineToggle
+                label="Available in shop custom-box builder"
+                checked={!!product.includedInCustomBoxes}
+                onChange={async (next) => {
+                  await patchProduct({ includedInCustomBoxes: next });
+                  toast.success("Custom-box flag saved");
+                }}
+              />
+              <DsInlineToggle
+                label={'Can be sold as "seconds" (B-ware)'}
+                description="Typically only bars."
+                checked={!!product.secondsAllowed}
+                onChange={async (next) => {
+                  await patchProduct({ secondsAllowed: next });
+                  toast.success("Seconds flag saved");
+                }}
+              />
+              <DsInlineToggle
+                label="Skip from auto-replen"
+                description="Limited / campaign-only — manual production order."
+                checked={!!product.excludeFromReplen}
+                onChange={async (next) => {
+                  await patchProduct({ excludeFromReplen: next });
+                  toast.success("Replen flag saved");
+                }}
+              />
+            </div>
+          </Section>
         </div>
 
-        {/* Shell chocolate + percentage */}
+        {/* Allergens (aggregated) — read-only */}
+        {productAllergens.length > 0 && (
+          <Section title="Allergens">
+            <div style={{ padding: "0 20px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {productAllergens.map((a) => (
+                  <span
+                    key={a}
+                    style={{
+                      border: "0.5px solid var(--ds-semantic-warn)",
+                      background: "var(--ds-tint-warn)",
+                      color: "var(--ds-semantic-warn)",
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      fontSize: 11,
+                    }}
+                  >
+                    {allergenLabel(a)}
+                  </span>
+                ))}
+              </div>
+              <p style={{ marginTop: 6, fontSize: 11, fontStyle: "italic", color: "var(--ds-text-muted)" }}>
+                Aggregated from the shell chocolate and every filling&apos;s ingredients.
+              </p>
+            </div>
+          </Section>
+        )}
+
+        {/* Fillings — kept inline (always-editable). Out-of-A.1-scope detail. */}
         {(() => {
-          const shellPct = parseFloat(localShellPercentageStr) || 0;
-          const selectedCategory = productCategories.find((c) => c.id === localProductCategoryId);
-
-          // In grams mode, derive shell % from fillGrams on the productFillings
-          const isGramsMode = localFillMode === "grams";
-          let derivedShellPct: number | null = null;
-          let derivedShellLabel: string | null = null;
-          let derivedOutOfRange = false;
-          if (isGramsMode) {
-            const mould = allMoulds.find((m) => m.id === localMouldId);
-            if (!mould) {
-              derivedShellLabel = "Set a mould to see derived shell %";
-            } else {
-              const totalFillGrams = productFillings.reduce((sum, pf) => sum + (pf.fillGrams ?? 0), 0);
-              derivedShellPct = deriveShellPercentageFromGrams(mould.cavityWeightG, totalFillGrams, DENSITY_G_PER_ML);
-              derivedShellLabel = `${derivedShellPct}% (derived from fill grams)`;
-              if (selectedCategory && (derivedShellPct < selectedCategory.shellPercentMin || derivedShellPct > selectedCategory.shellPercentMax)) {
-                derivedOutOfRange = true;
-              }
-            }
-          }
-
-          // In grams mode use derived shell %; in percentage mode use the explicit input
-          const effectiveShellPct = isGramsMode && derivedShellPct !== null ? derivedShellPct : shellPct;
-          const showShellIngredient = effectiveShellPct > 0;
-
+          const effShellPct = product.shellPercentage ?? productCategory?.defaultShellPercent ?? 37;
+          if (effShellPct >= 100) return null;
           return (
-            <div className="px-4 pb-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                {showShellIngredient && (
-                  <div>
-                    <label className="label">Shell source</label>
-                    {shellCapableIngredients.length === 0 && shellCapableFillings.length === 0 ? (
-                      <p className="text-xs text-warning mt-1">
-                        No shell-capable chocolates available. Create an ingredient with the &quot;Shell-capable&quot; flag or a filling in the &quot;Chocolate&quot; category first.
-                      </p>
+            <Section
+              title={`Fillings (${productFillings.length})`}
+              action={
+                <span style={{ display: "inline-flex", gap: 12 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAssign(true)}
+                    style={{
+                      fontSize: 11,
+                      color: "var(--ds-tier-quarter-focus)",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontWeight: 500,
+                    }}
+                  >
+                    + Assign filling
+                  </button>
+                  <Link href="/fillings" style={{ fontSize: 11, color: "var(--ds-text-muted)", textDecoration: "underline" }}>
+                    Create new
+                  </Link>
+                </span>
+              }
+            >
+              <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+                {showAssign && (
+                  <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={fillingSearch}
+                        onChange={(e) => setFillingSearch(e.target.value)}
+                        placeholder="Search fillings to assign..."
+                        autoFocus
+                        className="input !pl-8"
+                      />
+                    </div>
+                    {filteredAvailable.length > 0 ? (
+                      <ul className="max-h-48 overflow-y-auto space-y-1">
+                        {filteredAvailable.map((filling) => (
+                          <li key={filling.id}>
+                            <button
+                              onClick={() => handleAssignFilling(filling.id!)}
+                              className="w-full text-left rounded-full px-2 py-1.5 hover:bg-muted transition-colors"
+                            >
+                              <span className="text-sm font-medium">{filling.name}</span>
+                              {(filling.category || filling.description) && (
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {[filling.category, filling.description].filter(Boolean).join(" · ")}
+                                </div>
+                              )}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     ) : (
-                      <select
-                        value={
-                          localShellIngredientId
-                            ? `ing:${localShellIngredientId}`
-                            : localShellFillingId
-                              ? `fil:${localShellFillingId}`
-                              : ""
-                        }
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (!v) {
-                            setLocalShellIngredientId("");
-                            setLocalShellFillingId("");
-                          } else if (v.startsWith("ing:")) {
-                            setLocalShellIngredientId(v.slice(4));
-                            setLocalShellFillingId("");
-                          } else if (v.startsWith("fil:")) {
-                            setLocalShellIngredientId("");
-                            setLocalShellFillingId(v.slice(4));
-                          }
-                        }}
-                        className="input"
-                      >
-                        <option value="">— None —</option>
-                        {shellCapableIngredients.length > 0 && (
-                          <optgroup label="Chocolate ingredients">
-                            {shellCapableIngredients.map((ing) => (
-                              <option key={ing.id} value={`ing:${ing.id}`}>{ing.name}</option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {shellCapableFillings.length > 0 && (
-                          <optgroup label="Self-made chocolate (fillings · category Chocolate)">
-                            {shellCapableFillings.map((f) => (
-                              <option key={f.id} value={`fil:${f.id}`}>{f.name}</option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </select>
+                      <p className="text-xs text-muted-foreground py-2 text-center">
+                        {availableFillings.length === 0
+                          ? "All fillings are already assigned."
+                          : "No fillings match your search."}
+                      </p>
                     )}
+                    <button
+                      onClick={() => { setShowAssign(false); setFillingSearch(""); }}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 )}
-                <div>
-                  <label className="label">Shell %</label>
-                  {isGramsMode ? (
-                    <>
-                      <p className={`text-sm mt-1 py-1.5 ${derivedOutOfRange ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                        {derivedShellLabel}
-                      </p>
-                      {selectedCategory && derivedShellPct !== null && (
-                        <p className={`text-xs mt-1 ${derivedOutOfRange ? "text-destructive" : "text-muted-foreground"}`}>
-                          {derivedOutOfRange
-                            ? `Out of range: ${selectedCategory.shellPercentMin}%–${selectedCategory.shellPercentMax}%. Adjust fill grams or mould.`
-                            : `Range: ${selectedCategory.shellPercentMin}%–${selectedCategory.shellPercentMax}%`}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <input
-                        type="number"
-                        min={selectedCategory?.shellPercentMin ?? 0}
-                        max={selectedCategory?.shellPercentMax ?? 100}
-                        step="1"
-                        value={localShellPercentageStr}
-                        onChange={(e) => setLocalShellPercentageStr(e.target.value)}
-                        className="input w-24"
-                      />
-                      {selectedCategory && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Range: {selectedCategory.shellPercentMin}%–{selectedCategory.shellPercentMax}%
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
+                {productFillings.length === 0 && !showAssign ? (
+                  <p className="text-muted-foreground text-sm py-4 text-center">
+                    No fillings assigned yet. Assign an existing filling or create a new one.
+                  </p>
+                ) : (
+                  <>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFillingDragEnd}>
+                      <SortableContext items={productFillings.map((bl) => bl.id!)} strategy={verticalListSortingStrategy}>
+                        <ul className="space-y-2">
+                          {productFillings.map((bl) => (
+                            <SortableProductFillingRow
+                              key={bl.id}
+                              productFilling={bl}
+                              fillMode={product.fillMode ?? defaultFillMode}
+                              onRemove={() => handleRemoveFilling(bl.id!)}
+                              onUpdatePercentage={(pct) => updateProductFillingPercentage(bl.id!, pct)}
+                              onUpdateGrams={(g) => updateProductFillingGrams(bl.id!, g)}
+                            />
+                          ))}
+                        </ul>
+                      </SortableContext>
+                    </DndContext>
+                    {productFillings.length > 1 && (product.fillMode ?? defaultFillMode) !== "grams" && (
+                      <FillBar productFillings={productFillings.map((bl) => ({
+                        ...bl,
+                        fillingName: allFillings.find((l) => l.id === bl.fillingId)?.name ?? "Filling",
+                      }))} />
+                    )}
+                  </>
+                )}
               </div>
-            </div>
+            </Section>
           );
         })()}
+      </div>
 
-        {/* Tags */}
-        <div className="px-4 pb-4">
-          <label className="label">Tags</label>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {localTags.map((tag) => (
-              <span key={tag} className="inline-flex items-center gap-1 rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2.5 py-0.5 text-xs font-medium capitalize">
-                {tag}
-                <button onClick={() => handleRemoveTag(tag)} aria-label={`Remove tag ${tag}`}>
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              list="product-tag-suggestions"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddTag(tagInput); } }}
-              placeholder="Add tag (e.g. christmas)"
-              className="input"
-            />
-            {knownTags.length > 0 && (
-              <datalist id="product-tag-suggestions">
-                {knownTags.filter((t) => !localTags.includes(t)).map((t) => (
-                  <option key={t} value={t} />
-                ))}
-              </datalist>
-            )}
-            <button
-              onClick={() => handleAddTag(tagInput)}
-              disabled={!tagInput.trim()}
-              className="btn-primary px-3 py-1.5"
-            >
-              Add
-            </button>
-          </div>
-        </div>
-
-        {/* Aliases — alt names used by importers (Shopify, etc.) */}
-        <div className="px-4 pb-4">
-          <label className="label">Aliases · names used externally</label>
-          <p className="text-[11px] text-muted-foreground mb-2">
-            E.g. Shopify storefront title, German label, abbreviation. Importers match these against incoming line items.
-          </p>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {localAliases.map((a) => (
-              <span key={a} className="inline-flex items-center gap-1 rounded-[4px] bg-muted text-foreground px-2.5 py-0.5 text-xs">
-                {a}
-                <button
-                  onClick={() => setLocalAliases(localAliases.filter((x) => x !== a))}
-                  aria-label={`Remove alias ${a}`}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={aliasInput}
-              onChange={(e) => setAliasInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  const v = aliasInput.trim();
-                  if (v && !localAliases.some((x) => x.toLowerCase() === v.toLowerCase())) {
-                    setLocalAliases([...localAliases, v]);
-                  }
-                  setAliasInput("");
-                }
-              }}
-              placeholder="Add alias (e.g. Erdbeer-Nougat)"
-              className="input"
-            />
-            <button
-              onClick={() => {
-                const v = aliasInput.trim();
-                if (v && !localAliases.some((x) => x.toLowerCase() === v.toLowerCase())) {
-                  setLocalAliases([...localAliases, v]);
-                }
-                setAliasInput("");
-              }}
-              disabled={!aliasInput.trim()}
-              className="btn-primary px-3 py-1.5"
-            >
-              Add
-            </button>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div className="px-4 pb-4">
-          <label className="label">Notes</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Tasting notes, storage tips, variations…"
-            rows={3}
-            className="input"
-          />
-        </div>
-
-        {/* Shelf life + low-stock threshold */}
-        <div className="px-4 pb-4 flex gap-4 flex-wrap">
-          <div>
-            <label className="label">Shelf life (weeks)</label>
-            <input
-              type="text"
-              value={localShelfLife}
-              onChange={(e) => setLocalShelfLife(e.target.value)}
-              placeholder={recommendedShelfLife ? String(recommendedShelfLife.weeks) : "e.g. 4 or 4–6…"}
-              className="input w-32"
-            />
-            {recommendedShelfLife && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Suggested: <button
-                  type="button"
-                  onClick={() => setLocalShelfLife(String(recommendedShelfLife.weeks))}
-                  className="text-primary font-medium hover:underline"
-                >{recommendedShelfLife.weeks} weeks</button>
-                <span className="ml-1">— based on {recommendedShelfLife.fillingName}</span>
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="label">Minimum on hand · per location</label>
-            <div className="flex items-end gap-3 flex-wrap">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-0.5">Shop store</p>
-                <input
-                  type="number"
-                  min={0}
-                  value={localMinStore || (minStoreRow?.minimumUnits ?? "")}
-                  onChange={(e) => setLocalMinStore(e.target.value)}
-                  placeholder="e.g. 8"
-                  className="input w-24"
-                />
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground mb-0.5">Production</p>
-                <input
-                  type="number"
-                  min={0}
-                  value={localMinProduction || (minProdRow?.minimumUnits ?? "")}
-                  onChange={(e) => setLocalMinProduction(e.target.value)}
-                  placeholder="e.g. 4"
-                  className="input w-24"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Replenishment engine triggers a batch when stock at that location falls below the minimum.
-            </p>
-          </div>
-          {/* Priority tier · Default VAT · Lead time — grouped on one row */}
-          <div className="flex flex-wrap gap-x-6 gap-y-3">
-            <div>
-              <label className="label">Priority tier</label>
-              <div className="flex gap-1.5">
-                {([1, 2, 3] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setLocalPriorityTier(t)}
-                    className={`rounded-[4px] border px-2.5 py-1 text-xs font-medium transition-colors ${
-                      localPriorityTier === t
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)] hover:bg-muted"
-                    }`}
-                    title={t === 1 ? "Top seller — never displaced" : t === 2 ? "Normal" : "Nice-to-have — displaced first when tight"}
-                  >
-                    {t === 1 ? "1 · Top" : t === 2 ? "2 · Normal" : "3 · Nice-to-have"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="label">Default VAT (%)</label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                step="0.1"
-                value={localDefaultVatRate}
-                onChange={(e) => setLocalDefaultVatRate(e.target.value)}
-                placeholder="10"
-                className="input w-20"
-              />
-            </div>
-            <div>
-              <label className="label">Lead time (days)</label>
-              <input
-                type="number"
-                min={0}
-                value={localLeadTimeDays}
-                onChange={(e) => setLocalLeadTimeDays(e.target.value)}
-                placeholder="2"
-                className="input w-20"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={localIncludedInCustomBoxes}
-                onChange={(e) => setLocalIncludedInCustomBoxes(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span>Available in shop custom-box builder</span>
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={localSecondsAllowed}
-                onChange={(e) => setLocalSecondsAllowed(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span>Can be sold as &quot;seconds&quot; (B-ware) — typically only bars</span>
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={localExcludeFromReplen}
-                onChange={(e) => setLocalExcludeFromReplen(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span>Skip from auto-replen — limited / campaign-only (manual production order)</span>
-            </label>
-            {localSecondsAllowed && (
-              <div className="ml-6">
-                <label className="label">Default seconds discount (%)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="1"
-                  value={localDefaultDiscountPercentSeconds}
-                  onChange={(e) => setLocalDefaultDiscountPercentSeconds(e.target.value)}
-                  placeholder="e.g. 30"
-                  className="input w-24"
-                />
-              </div>
-            )}
-          </div>
-          {suggestedLeadTime != null && (
-            <p className="text-xs text-muted-foreground -mt-1">
-              Lead-time suggestion:{" "}
-              <button
-                type="button"
-                onClick={() => setLocalLeadTimeDays(String(suggestedLeadTime))}
-                className="text-primary font-medium hover:underline"
-              >
-                {suggestedLeadTime} day{suggestedLeadTime === 1 ? "" : "s"}
-              </button>{" "}
-              — derived from production steps ÷ team capacity.
-            </p>
-          )}
-        </div>
-
-        {/* Fill mode toggle + fillings — hidden when shell % = 100 (pure shell product, e.g. plain bar) */}
-        {(parseFloat(localShellPercentageStr) || 0) < 100 && (
-        <>
-        {/* Fill mode toggle */}
-        <div className="px-4 pb-4">
-          <label className="label">Fill mode</label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setLocalFillMode("percentage")}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${localFillMode === "percentage" ? "bg-accent text-accent-foreground" : "border border-[color:var(--ds-border-warm)]"}`}
-            >
-              By percentage
-            </button>
-            <button
-              type="button"
-              onClick={() => setLocalFillMode("grams")}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${localFillMode === "grams" ? "bg-accent text-accent-foreground" : "border border-[color:var(--ds-border-warm)]"}`}
-            >
-              By grams
-            </button>
-          </div>
-        </div>
-        <div className="px-4 space-y-3 pb-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              Fillings ({productFillings.length})
-            </h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowAssign(true)}
-                className="flex items-center gap-1 text-xs text-primary font-medium"
-              >
-                <Plus className="w-3.5 h-3.5" /> Assign filling
-              </button>
-              <Link
-                href="/fillings"
-                className="text-xs text-muted-foreground underline"
-              >
-                Create new filling
-              </Link>
-            </div>
-          </div>
-
-          {/* Assign existing filling picker */}
-          {showAssign && (
-            <div className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-3 space-y-2">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={fillingSearch}
-                  onChange={(e) => setFillingSearch(e.target.value)}
-                  placeholder="Search fillings to assign..."
-                  autoFocus
-                  className="input !pl-8"
-                />
-              </div>
-              {filteredAvailable.length > 0 ? (
-                <ul className="max-h-48 overflow-y-auto space-y-1">
-                  {filteredAvailable.map((filling) => (
-                    <li key={filling.id}>
-                      <button
-                        onClick={() => handleAssignFilling(filling.id!)}
-                        className="w-full text-left rounded-full px-2 py-1.5 hover:bg-muted transition-colors"
-                      >
-                        <span className="text-sm font-medium">{filling.name}</span>
-                        {(filling.category || filling.description) && (
-                          <div className="text-xs text-muted-foreground truncate">
-                            {[filling.category, filling.description].filter(Boolean).join(" · ")}
-                          </div>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-muted-foreground py-2 text-center">
-                  {availableFillings.length === 0
-                    ? "All fillings are already assigned."
-                    : "No fillings match your search."}
-                </p>
-              )}
-              <button
-                onClick={() => { setShowAssign(false); setFillingSearch(""); }}
-                className="text-xs text-muted-foreground"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {/* Assigned fillings */}
-          {productFillings.length === 0 && !showAssign ? (
-            <p className="text-muted-foreground text-sm py-4 text-center">
-              No fillings assigned yet. Assign an existing filling or create a new one.
-            </p>
-          ) : (
-            <>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFillingDragEnd}>
-                <SortableContext items={productFillings.map((bl) => bl.id!)} strategy={verticalListSortingStrategy}>
-                  <ul className="space-y-2">
-                    {productFillings.map((bl) => (
-                      <SortableProductFillingRow
-                        key={bl.id}
-                        productFilling={bl}
-                        fillMode={localFillMode}
-                        onRemove={() => handleRemoveFilling(bl.id!)}
-                        onUpdatePercentage={(pct) => updateProductFillingPercentage(bl.id!, pct)}
-                        onUpdateGrams={(g) => updateProductFillingGrams(bl.id!, g)}
-                      />
-                    ))}
-                  </ul>
-                </SortableContext>
-              </DndContext>
-              {productFillings.length > 1 && localFillMode !== "grams" && (
-                <FillBar productFillings={productFillings.map((bl) => ({
-                  ...bl,
-                  fillingName: allFillings.find((l) => l.id === bl.fillingId)?.name ?? "Filling",
-                }))} />
-              )}
-            </>
-          )}
-        </div>
-        </>
-        )}
-
-        {/* Production defaults */}
-        <div className="px-4 pb-6 space-y-3 border-t border-[color:var(--ds-border-warm)] pt-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Production defaults</h2>
-          <div className="space-y-2">
-            <div>
-              <label className="label">
-                Default mould{localFillMode === "grams" && <span className="text-destructive"> *</span>}
-              </label>
-              <select
-                value={localMouldId}
-                onChange={(e) => setLocalMouldId(e.target.value)}
-                className="input"
-              >
-                <option value="">— No default mould —</option>
-                {allMoulds.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({m.cavityWeightG} g · {m.numberOfCavities} cavities)
-                  </option>
-                ))}
-              </select>
-              {localFillMode === "grams" && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Required in By grams mode — cavity weight is used to derive shell %.
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="label">Default batch quantity</label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={batchQtyInput}
-                onChange={(e) => setBatchQtyInput(e.target.value)}
-                className="input w-32"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Validation errors */}
-        {saveErrors.length > 0 && (
-          <div className="px-4 pb-3">
-            <ul className="rounded-[4px] border border-destructive/30 bg-destructive/5 p-3 space-y-1">
-              {saveErrors.map((err, i) => (
-                <li key={i} className="text-xs text-destructive">{err}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Save / Cancel */}
-        <div className="px-4 pb-6 flex gap-2">
-          <button onClick={handleSave} className="btn-primary px-4 py-2">Save</button>
-          <button onClick={handleCancel} className="btn-secondary px-4 py-2">Cancel</button>
-        </div>
-        </>
-      ) : (
-        <>
-        {/* --- VIEW MODE --- */}
-
-        {/* Category + Shell info */}
-        {(productCategory || product.shellIngredientId || product.shellFillingId) && (
-          <div className="px-4 pb-4 flex flex-wrap gap-2">
-            {productCategory && (
-              <span className="rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2.5 py-0.5 text-xs font-medium capitalize">{productCategory.name}</span>
-            )}
-            {product.shellIngredientId && (() => {
-              const shellIng = shellCapableIngredients.find((i) => i.id === product.shellIngredientId);
-              return shellIng ? (
-                <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-xs font-medium">
-                  {shellIng.name} · {product.shellPercentage ?? 37}%
-                </span>
-              ) : null;
-            })()}
-            {product.shellFillingId && (() => {
-              const shellFil = allFillings.find((f) => f.id === product.shellFillingId);
-              return shellFil ? (
-                <span className="rounded-[4px] bg-[var(--accent-lilac-bg)] text-[var(--accent-lilac-ink)] px-2.5 py-0.5 text-xs font-medium">
-                  {shellFil.name} (self-made) · {product.shellPercentage ?? 37}%
-                </span>
-              ) : null;
-            })()}
-          </div>
-        )}
-
-        {/* Tags */}
-        {(product.tags ?? []).length > 0 && (
-          <div className="px-4 pb-4 flex flex-wrap gap-1.5">
-            {(product.tags ?? []).map((tag) => (
-              <span key={tag} className="rounded-[4px] bg-[color:var(--ds-tint-info)] text-primary px-2.5 py-0.5 text-xs font-medium capitalize">{tag}</span>
-            ))}
-          </div>
-        )}
-
-        {/* Allergens (aggregated from shell + fillings) */}
-        {productAllergens.length > 0 && (
-          <div className="px-4 pb-4">
-            <h2 className="text-sm font-medium text-muted-foreground mb-1">Allergens</h2>
-            <div className="flex flex-wrap gap-1">
-              {productAllergens.map((a) => (
-                <span
-                  key={a}
-                  className="rounded-[4px] border border-[color:var(--ds-semantic-warn)] bg-[color:var(--ds-tint-warn)] text-[color:var(--ds-semantic-warn)] px-2 py-0.5 text-xs"
-                >
-                  {allergenLabel(a)}
-                </span>
-              ))}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Aggregated from the shell chocolate and every filling&apos;s
-              ingredients. Updates automatically when you change fillings
-              or edit ingredient allergens.
-            </p>
-          </div>
-        )}
-
-        {/* Notes */}
-        {product.notes && (
-          <div className="px-4 pb-4">
-            <h2 className="text-sm font-medium text-muted-foreground mb-1">Notes</h2>
-            <p className="text-sm whitespace-pre-wrap">{product.notes}</p>
-          </div>
-        )}
-
-        {/* Shelf life */}
-        {(product.shelfLifeWeeks || recommendedShelfLife) && (
-          <div className="px-4 pb-4 flex gap-8 flex-wrap">
-            <div>
-              <h2 className="text-sm font-medium text-muted-foreground mb-1">Shelf life</h2>
-              {product.shelfLifeWeeks ? (
-                <>
-                  <p className="text-sm">{product.shelfLifeWeeks} weeks</p>
-                  {recommendedShelfLife && parseFloat(product.shelfLifeWeeks) > recommendedShelfLife.weeks && (
-                    <p className="text-xs text-status-warn mt-0.5">
-                      Note: {recommendedShelfLife.fillingName} has a {recommendedShelfLife.weeks}-week shelf life
-                    </p>
-                  )}
-                </>
-              ) : recommendedShelfLife ? (
-                <p className="text-xs text-muted-foreground">
-                  Suggested: {recommendedShelfLife.weeks} weeks (based on {recommendedShelfLife.fillingName})
-                </p>
-              ) : null}
-            </div>
-          </div>
-        )}
-
-        {/* Fillings */}
-        <div className="px-4 space-y-3 pb-6">
-          <h2 className="text-sm font-medium text-muted-foreground">
-            Fillings ({productFillings.length})
-          </h2>
-          {productFillings.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-4 text-center">
-              No fillings assigned yet.
-            </p>
-          ) : (
-            <>
-              <ul className="space-y-2">
-                {productFillings.map((bl) => (
-                  <ProductFillingRow
-                    key={bl.id}
-                    productFilling={bl}
-                    fillMode={product?.fillMode ?? defaultFillMode}
-                    onRemove={() => {}}
-                    onUpdatePercentage={() => {}}
-                    onUpdateGrams={() => {}}
-                    readonly
-                  />
-                ))}
-              </ul>
-              {productFillings.length > 1 && (
-                <FillBar productFillings={productFillings.map((bl) => ({
-                  ...bl,
-                  fillingName: allFillings.find((l) => l.id === bl.fillingId)?.name ?? "Filling",
-                }))} />
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Production defaults — read-only */}
-        {(product.defaultMouldId || (product.defaultBatchQty && product.defaultBatchQty > 1)) && (
-          <div className="px-4 pb-6 space-y-2 border-t border-[color:var(--ds-border-warm)] pt-4">
-            <h2 className="text-sm font-medium text-muted-foreground">Production defaults</h2>
-            {product.defaultMouldId && (
-              <p className="text-sm">
-                <span className="text-muted-foreground">Mould:</span>{" "}
-                {allMoulds.find((m) => m.id === product.defaultMouldId)?.name ?? "Unknown"}
-              </p>
-            )}
-            {product.defaultBatchQty && product.defaultBatchQty > 1 && (
-              <p className="text-sm">
-                <span className="text-muted-foreground">Batch qty:</span> {product.defaultBatchQty}
-              </p>
-            )}
-          </div>
-        )}
-        </>
-      )}
-
-      {/* Delete product — always accessible */}
-      {!editing && (
+      {/* Delete / Archive / Duplicate — always visible (was gated on !editing) */}
       <div className="px-4 pb-8 border-t border-[color:var(--ds-border-warm)] pt-4 space-y-4">
         {/* Duplicate */}
         {showDuplicatePanel ? (
@@ -1565,7 +1349,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           )
         )}
       </div>
-      )}
 
       </>
       )}

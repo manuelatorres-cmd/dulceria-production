@@ -44,9 +44,11 @@ export {
   DsInlineField,
   DsInlineTextarea,
   DsInlineSelect,
+  DsInlineToggle,
   type DsInlineFieldProps,
   type DsInlineTextareaProps,
   type DsInlineSelectProps,
+  type DsInlineToggleProps,
 } from "./inline-field";
 export { DsTagInput, type DsTagInputProps } from "./tag-input";
 export { DsPhotoUpload, type DsPhotoUploadProps } from "./photo-upload";
