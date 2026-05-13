@@ -251,11 +251,19 @@ export default function PricingPage() {
         )}
 
         {/* Variant cards */}
-        <div className="space-y-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {sorted.map((item) => {
             const cId = item.variant.id ?? "";
             return (
-              <div key={cId} className="rounded-sm border border-border bg-card overflow-hidden">
+              <div
+                key={cId}
+                style={{
+                  background: "var(--ds-card-bg)",
+                  border: "0.5px solid var(--ds-border-warm)",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                }}
+              >
                 {/* Variant header */}
                 <div className="px-4 pt-3.5 pb-2 flex items-start justify-between">
                   <div className="min-w-0">
