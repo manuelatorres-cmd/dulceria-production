@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useProductsList, useFillings, useIngredients } from "@/lib/hooks";
+import { PageHeader } from "@/components/dulceria";
 
 const CARDS = [
   {
@@ -62,14 +63,13 @@ function LibraryHint() {
 
 export default function LibraryPage() {
   return (
-    <div className="p-6 max-w-2xl">
-      <h1 className="font-[family-name:var(--font-display)] text-2xl sm:text-3xl text-foreground mb-1">
-        The Library
-      </h1>
-      <p className="text-muted-foreground mb-2">
-        Your products, fillings, ingredients, and moulds — all in one place.
-      </p>
-      <div className="text-xs text-muted-foreground/70 mb-8 min-h-[1.25rem]">
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="The library"
+        meta="Your products, fillings, ingredients, and moulds — all in one place"
+      />
+      <div className="px-6 pb-10 max-w-2xl">
+      <div className="text-xs text-muted-foreground/70 mb-6 min-h-[1.25rem]">
         <LibraryHint />
       </div>
 
@@ -108,6 +108,7 @@ export default function LibraryPage() {
             </Link>
           );
         })}
+      </div>
       </div>
     </div>
   );
