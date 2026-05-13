@@ -83,7 +83,7 @@ export function FilterChipGroup(props: FilterChipGroupProps) {
             onClick={() => handleClick(opt.value)}
             className={`px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
               isActive(opt.value)
-                ? "bg-foreground text-background border border-foreground"
+                ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border border-foreground"
                 : "border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-foreground/40 hover:bg-muted"
             }`}
             style={{ borderRadius: 3 }}

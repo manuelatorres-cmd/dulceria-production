@@ -84,7 +84,7 @@ export function ListToolbar({
           onClick={onToggleFilters}
           className={`relative border px-3 h-[38px] transition-colors ${
             filterPanelOpen
-              ? "bg-foreground text-background border-foreground"
+              ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
               : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:border-foreground"
           }`}
           style={{ borderRadius: 4 }}
@@ -109,7 +109,7 @@ export function ListToolbar({
         onClick={onAdd}
         title={addTitle}
         aria-label={addAriaLabel}
-        className="bg-foreground text-background px-3 h-[38px] hover:opacity-90 transition-opacity"
+        className="bg-[color:var(--ds-tier-quarter-focus)] text-white px-3 h-[38px] hover:opacity-90 transition-opacity"
         style={{ borderRadius: 4 }}
       >
         <Plus className="w-4 h-4" />

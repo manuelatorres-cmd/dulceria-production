@@ -1782,7 +1782,7 @@ function WeekView(props: {
               </button>
               <button
                 onClick={() => applyDrop(false)}
-                className="rounded-full bg-foreground text-background px-4 py-1.5 text-[12px] font-medium"
+                className="rounded-full bg-[color:var(--ds-tier-quarter-focus)] text-white px-4 py-1.5 text-[12px] font-medium"
               >
                 Move (unlocked)
               </button>
@@ -2410,7 +2410,7 @@ function ScheduledPanel({
                 className={
                   "inline-flex items-baseline gap-1.5 text-[11px] px-2.5 py-1 rounded-full border transition " +
                   (checked
-                    ? "bg-foreground text-background border-foreground"
+                    ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                     : "border-[color:var(--ds-border-warm)] hover:opacity-90")
                 }
                 style={!checked ? { background: tint.bg, color: tint.ink } : undefined}
@@ -2528,7 +2528,7 @@ function ScheduledPanel({
                         className={
                           "inline-flex items-baseline gap-1.5 text-[10.5px] px-2 py-0.5 rounded-full border transition " +
                           (checked
-                            ? "bg-foreground text-background border-foreground"
+                            ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                             : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] hover:opacity-90 text-foreground")
                         }
                         title={`Earliest day · ${s.earliestDate}${ft ? ` · ${ft}` : ""}`}
@@ -2881,7 +2881,7 @@ function DemandByUrgency({
               className={
                 "text-[11px] px-2.5 py-0.5 rounded-full border transition " +
                 (active
-                  ? "bg-foreground text-background border-foreground"
+                  ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                   : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
               }
               style={!active && tint ? { background: tint.bg, color: tint.ink, borderColor: tint.bg } : undefined}

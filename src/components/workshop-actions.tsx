@@ -371,7 +371,7 @@ function ContaminateModal({ onClose }: { onClose: () => void }) {
             className={
               "flex-1 border px-3 py-1.5 text-[12px] capitalize " +
               (decision === d
-                ? "bg-foreground text-background border-foreground"
+                ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                 : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] hover:border-foreground")
             }
             style={{ borderRadius: 3 }}

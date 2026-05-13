@@ -975,7 +975,7 @@ function ReceiveCell({ ingredientId, purchaseUnit, gramsPerUnit }: {
         type="button"
         onClick={submit}
         disabled={saving || !val.trim()}
-        className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-foreground text-background disabled:opacity-40"
+        className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[color:var(--ds-tier-quarter-focus)] text-white disabled:opacity-40"
       >
         Add
       </button>

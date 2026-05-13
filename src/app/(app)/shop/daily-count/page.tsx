@@ -381,7 +381,7 @@ export default function DailyCountPage() {
                   className={
                     "rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors capitalize " +
                     (active
-                      ? "bg-foreground text-background"
+                      ? "bg-[color:var(--ds-tier-quarter-focus)] text-white"
                       : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:border-foreground")
                   }
                 >
@@ -408,7 +408,7 @@ export default function DailyCountPage() {
           className={
             "rounded-full px-3 py-1 text-[12px] font-medium border " +
             (tab === "variants"
-              ? "bg-foreground text-background border-foreground"
+              ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
               : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] hover:border-foreground")
           }
         >
@@ -419,7 +419,7 @@ export default function DailyCountPage() {
           className={
             "rounded-full px-3 py-1 text-[12px] font-medium border " +
             (tab === "count"
-              ? "bg-foreground text-background border-foreground"
+              ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
               : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] hover:border-foreground")
           }
         >

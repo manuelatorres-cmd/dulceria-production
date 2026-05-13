@@ -134,7 +134,7 @@ export default function OnlineOrdersPage() {
                   className={
                     "text-[11.5px] px-2.5 py-0.5 rounded-full border transition " +
                     (deliveryFilter === k
-                      ? "bg-foreground text-background border-foreground"
+                      ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                       : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
                   }
                 >

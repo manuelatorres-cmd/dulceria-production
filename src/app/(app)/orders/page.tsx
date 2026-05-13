@@ -230,7 +230,7 @@ export default function OrdersPage() {
           {!adding && (
             <button
               onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-3 py-1.5 text-sm font-medium hover:opacity-90 transition"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--ds-tier-quarter-focus)] text-white px-3 py-1.5 text-sm font-medium hover:opacity-90 transition"
             >
               <Plus className="w-3.5 h-3.5" /> New order
             </button>
@@ -259,7 +259,7 @@ export default function OrdersPage() {
                 onClick={() => setFilterStatus(s)}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   filterStatus === s
-                    ? "bg-foreground text-background"
+                    ? "bg-[color:var(--ds-tier-quarter-focus)] text-white"
                     : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-[color:var(--ds-card-bg-hover)]"
                 }`}
               >

@@ -419,7 +419,7 @@ export default function FillingConsolidationPage() {
                                 setCookedGrams(String(need.toCookBufferedG));
                                 setCookedNotes("");
                               }}
-                              className="mt-1.5 inline-flex items-center gap-1 text-[10.5px] px-2 py-1 rounded-[4px] bg-foreground text-background hover:opacity-90"
+                              className="mt-1.5 inline-flex items-center gap-1 text-[10.5px] px-2 py-1 rounded-[4px] bg-[color:var(--ds-tier-quarter-focus)] text-white hover:opacity-90"
                               title="Add this batch to filling stock + deduct ingredients"
                             >
                               <CheckCircle2 className="w-3 h-3" /> Mark as cooked
@@ -553,7 +553,7 @@ export default function FillingConsolidationPage() {
                 type="button"
                 onClick={applyCooked}
                 disabled={cookedSaving || !cookedGrams.trim()}
-                className="text-[12px] px-3 py-1.5 rounded-[4px] bg-foreground text-background disabled:opacity-50"
+                className="text-[12px] px-3 py-1.5 rounded-[4px] bg-[color:var(--ds-tier-quarter-focus)] text-white disabled:opacity-50"
               >
                 {cookedSaving ? "Saving…" : "Mark cooked + deduct ingredients"}
               </button>

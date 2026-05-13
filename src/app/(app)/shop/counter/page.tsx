@@ -137,7 +137,7 @@ export default function ShopCounterPage() {
                   className={
                     "w-5 h-5 inline-flex items-center justify-center text-[10px] font-medium border " +
                     (on
-                      ? "bg-foreground text-background border-foreground"
+                      ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                       : done
                         ? "bg-[color:var(--accent-terracotta-bg)] border-[color:var(--accent-terracotta-ink)] text-[color:var(--accent-terracotta-ink)]"
                         : "bg-[color:var(--ds-card-bg)] text-muted-foreground border-[color:var(--ds-border-warm)]")
@@ -194,7 +194,7 @@ export default function ShopCounterPage() {
                 className={
                   "text-center border transition-colors " +
                   (boxSize === size
-                    ? "bg-foreground text-background border-foreground"
+                    ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                     : "bg-[color:var(--ds-card-bg)] text-foreground border-[color:var(--ds-border-warm)] hover:border-foreground")
                 }
                 style={{

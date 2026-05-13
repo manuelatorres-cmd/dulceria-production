@@ -125,7 +125,7 @@ export function MachineLoadModal({
                 className={
                   "flex-1 border px-3 py-1.5 text-[12px] capitalize disabled:opacity-40 " +
                   (action === a
-                    ? "bg-foreground text-background border-foreground"
+                    ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                     : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] hover:border-foreground")
                 }
                 style={{ borderRadius: 3 }}

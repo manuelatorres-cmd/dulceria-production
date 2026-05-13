@@ -525,7 +525,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex flex-wrap gap-2">
             <Link
               href={`/orders/${encodeURIComponent(orderId)}/production`}
-              className="inline-flex items-center gap-2 rounded-[6px] bg-foreground text-background px-4 py-2.5 text-sm font-medium hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-[6px] bg-[color:var(--ds-tier-quarter-focus)] text-white px-4 py-2.5 text-sm font-medium hover:opacity-90"
             >
               <Calendar className="w-4 h-4" /> Production schedule →
             </Link>

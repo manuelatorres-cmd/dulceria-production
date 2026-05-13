@@ -3064,7 +3064,7 @@ function FillBar({ productFillings }: { productFillings: { id?: string; fillingI
             className="absolute -top-7 z-10 pointer-events-none"
             style={{ left: `${offsets[hoveredIdx]}%`, transform: "translateX(-50%)" }}
           >
-            <div className="rounded bg-foreground text-background text-[10px] font-medium px-1.5 py-0.5 whitespace-nowrap">
+            <div className="rounded bg-[color:var(--ds-tier-quarter-focus)] text-white text-[10px] font-medium px-1.5 py-0.5 whitespace-nowrap">
               {productFillings[hoveredIdx].fillingName} · {productFillings[hoveredIdx].fillPercentage}%
             </div>
           </div>

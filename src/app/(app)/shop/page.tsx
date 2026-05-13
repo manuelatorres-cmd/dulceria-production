@@ -406,7 +406,7 @@ function ShopStockGrid() {
             className={
               "text-[11px] px-2.5 py-0.5 rounded-full border transition " +
               (filter === k
-                ? "bg-foreground text-background border-foreground"
+                ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                 : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] text-foreground hover:border-foreground")
             }
           >

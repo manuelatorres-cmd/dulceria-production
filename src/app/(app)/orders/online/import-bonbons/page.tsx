@@ -320,7 +320,7 @@ export default function BoxContentsImportPage() {
                                   onClick={() => toggleSkip(o.orderRef, i)}
                                   className={`text-[11px] px-2 py-1 rounded-[4px] border transition ${
                                     skipped
-                                      ? "bg-foreground text-background border-foreground"
+                                      ? "bg-[color:var(--ds-tier-quarter-focus)] text-white border-[color:var(--ds-tier-quarter-focus)]"
                                       : "bg-[color:var(--ds-card-bg)] border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-foreground"
                                   }`}
                                 >

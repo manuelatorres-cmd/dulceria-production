@@ -389,7 +389,7 @@ function NewUnitForm({ hasAny }: { hasAny: boolean }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[12px] px-3 py-1.5 rounded-[4px] bg-foreground text-background"
+        className="text-[12px] px-3 py-1.5 rounded-[4px] bg-[color:var(--ds-tier-quarter-focus)] text-white"
       >
         + Add cold storage unit
       </button>
@@ -480,7 +480,7 @@ function NewUnitForm({ hasAny }: { hasAny: boolean }) {
           type="button"
           onClick={submit}
           disabled={busy || !name.trim()}
-          className="text-[12px] px-3 py-1.5 rounded-[4px] bg-foreground text-background disabled:opacity-50"
+          className="text-[12px] px-3 py-1.5 rounded-[4px] bg-[color:var(--ds-tier-quarter-focus)] text-white disabled:opacity-50"
         >
           {busy ? "Saving…" : "Add unit"}
         </button>

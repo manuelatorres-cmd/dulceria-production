@@ -60,14 +60,14 @@ export default function PickingPage() {
         <button
           type="button"
           onClick={() => setTab("pack")}
-          className={"px-4 py-1.5 transition " + (tab === "pack" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
+          className={"px-4 py-1.5 transition " + (tab === "pack" ? "bg-[color:var(--ds-tier-quarter-focus)] text-white" : "text-muted-foreground hover:text-foreground")}
         >
           Pack & ship
         </button>
         <button
           type="button"
           onClick={() => setTab("box")}
-          className={"px-4 py-1.5 transition " + (tab === "box" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
+          className={"px-4 py-1.5 transition " + (tab === "box" ? "bg-[color:var(--ds-tier-quarter-focus)] text-white" : "text-muted-foreground hover:text-foreground")}
         >
           Box up
         </button>
@@ -221,7 +221,7 @@ function PackTab() {
                 type="button"
                 onClick={() => handlePack(o.id!)}
                 disabled={isBusy}
-                className="rounded-full px-3 py-1.5 text-xs font-medium bg-foreground text-background hover:opacity-90 disabled:opacity-50 shrink-0"
+                className="rounded-full px-3 py-1.5 text-xs font-medium bg-[color:var(--ds-tier-quarter-focus)] text-white hover:opacity-90 disabled:opacity-50 shrink-0"
               >
                 {isBusy ? "Packing…" : "Pack & ship"}
               </button>
@@ -550,7 +550,7 @@ function BoxTab() {
                 type="button"
                 onClick={() => handleBoxUp(vp.id!)}
                 disabled={isBusy || count <= 0 || count > max}
-                className="rounded-full px-3 py-1 text-xs font-medium bg-foreground text-background hover:opacity-90 disabled:opacity-50"
+                className="rounded-full px-3 py-1 text-xs font-medium bg-[color:var(--ds-tier-quarter-focus)] text-white hover:opacity-90 disabled:opacity-50"
               >
                 {isBusy ? "Boxing…" : "Box up"}
               </button>

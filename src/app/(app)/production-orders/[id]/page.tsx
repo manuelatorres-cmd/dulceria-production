@@ -169,7 +169,7 @@ export default function ProductionOrderDetailPage({
           <div className="flex justify-end items-center gap-1.5 -mb-1">
             {editing ? (
               <>
-                <button onClick={save} disabled={saving} className="rounded-full bg-foreground text-background px-3 py-1 text-[11.5px] font-medium disabled:opacity-50">
+                <button onClick={save} disabled={saving} className="rounded-full bg-[color:var(--ds-tier-quarter-focus)] text-white px-3 py-1 text-[11.5px] font-medium disabled:opacity-50">
                   {saving ? "Saving…" : "Save"}
                 </button>
                 <button onClick={cancelEdit} className="rounded-full border border-[color:var(--ds-border-warm)] px-3 py-1 text-[11.5px]">

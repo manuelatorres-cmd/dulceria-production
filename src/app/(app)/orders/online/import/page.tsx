@@ -619,7 +619,7 @@ export default function ShopifyImportPage() {
                                       className={
                                         "px-2.5 py-0.5 transition " +
                                         (!isBorrow
-                                          ? "bg-foreground text-background"
+                                          ? "bg-[color:var(--ds-tier-quarter-focus)] text-white"
                                           : "text-muted-foreground hover:text-foreground")
                                       }
                                     >
