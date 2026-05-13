@@ -2843,7 +2843,7 @@ function DemandByUrgency({
         </div>
         <div className="flex items-center gap-2 text-[11px]">
           {totalOverdue > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-[#fdeeea] text-[var(--accent-blush-ink)] tabular-nums">
+            <span className="px-2 py-0.5 rounded-full bg-[var(--accent-blush-bg)] text-[var(--accent-blush-ink)] tabular-nums">
               {totalOverdue} overdue
             </span>
           )}

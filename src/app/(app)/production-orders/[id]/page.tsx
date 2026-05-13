@@ -175,7 +175,7 @@ export default function ProductionOrderDetailPage({
                       try { await markProductionOrderDone(order.id!); }
                       catch (e) { alert(e instanceof Error ? e.message : "Failed"); }
                     }}
-                    className="rounded-full bg-[#eff3ec] text-[#5c7050] border border-[var(--accent-mint-edge)] px-3 py-1 text-[11.5px] font-medium hover:bg-[#e6ede0]"
+                    className="rounded-full bg-[var(--accent-sage-bg)] text-[#5c7050] border border-[var(--accent-mint-edge)] px-3 py-1 text-[11.5px] font-medium hover:bg-[#e6ede0]"
                   >
                     Mark done
                   </button>

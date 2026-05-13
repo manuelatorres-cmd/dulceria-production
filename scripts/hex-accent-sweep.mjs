@@ -25,6 +25,10 @@ const REPLACEMENTS = [
   ['[#4a6b5b]', '[var(--accent-mint-ink)]'],
   ['[#3d5b4d]', '[var(--ds-tier-quarter-focus)]'],
   ['[#fef9e6]', '[var(--accent-butter-bg)]'],
+  ['[#fdeeea]', '[var(--accent-blush-bg)]'],
+  ['[#fdf1e2]', '[var(--accent-peach-bg)]'],
+  ['[#f3eef6]', '[var(--accent-lilac-bg)]'],
+  ['[#eff3ec]', '[var(--accent-sage-bg)]'],
 ];
 
 const SKIP = [
