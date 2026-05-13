@@ -134,9 +134,9 @@ export default function ShoppingPage() {
   }
 
   return (
-    <div>
-      <PageHeader title="Shopping List" meta="Items to reorder for the workshop" />
-      <div className="px-4 pb-8 space-y-4">
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader title="Shopping list" meta="Items to reorder for the workshop" />
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 16 }}>
 
         <IngredientStockBelowThresholdSection />
 
