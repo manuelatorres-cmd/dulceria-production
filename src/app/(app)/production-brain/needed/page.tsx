@@ -17,7 +17,7 @@ import {
   useMoulds,
 } from "@/lib/hooks";
 import { ORDER_CHANNEL_LABELS } from "@/types";
-import { BackButton } from "@/components/back-button";
+import { PageHeader } from "@/components/dulceria";
 import {
   IconSquareCheck as CheckSquare,
   IconSquare as Square,
@@ -239,22 +239,12 @@ export default function NeededPage() {
   }
 
   return (
-    <div>
-      <div className="mb-2">
-        <BackButton />
-      </div>
-      <div className="flex items-baseline gap-3 mb-4 flex-wrap">
-        <h1
-          className="text-3xl"
-          style={{ fontFamily: "var(--font-serif)", fontWeight: 400, letterSpacing: "-0.02em" }}
-        >
-          Needed
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Pick open orders to see what's needed vs what's on stock and already planned.
-        </p>
-      </div>
-
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+      <PageHeader
+        title="Needed"
+        meta="Pick open orders to see what's needed vs what's on stock and already planned"
+      />
+      <div style={{ padding: "16px 32px 40px" }}>
       <div className="grid grid-cols-1 lg:grid-cols-[280px,1fr] gap-4">
         <div className="rounded-lg border border-border bg-card p-3">
           <div className="flex items-baseline justify-between mb-2">
@@ -379,6 +369,7 @@ export default function NeededPage() {
             </>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
