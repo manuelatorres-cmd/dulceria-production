@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useNotifications,
   approveNotification,
@@ -46,10 +46,7 @@ export default function NotificationsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Notifications"
-        description="Decisions and alerts the brain has queued for you. Review at your own pace."
-      />
+      <PageHeader title="Notifications" meta="Decisions and alerts the brain has queued for you. Review at your own pace." />
 
       <div className="flex flex-wrap gap-3 mb-5 items-baseline">
         <span

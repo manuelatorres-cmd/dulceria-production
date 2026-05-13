@@ -13,7 +13,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useProductsList,
   useProductLocationTotals,
@@ -116,11 +116,7 @@ export default function ShopCounterPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Shop · Counter"
-        accent="Custom box"
-        description="Pick size, choose bonbons, print label, close. Aim for under 60 seconds per sale."
-      />
+      <PageHeader title="Shop · Counter" meta={"Custom box" + " · " + "Pick size, choose bonbons, print label, close. Aim for under 60 seconds per sale."} />
 
       <div className="flex items-center justify-between gap-3 mb-6">
         <ol

@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
 import { computeShoppingNeeds } from "@/lib/shopping-needs";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import { IconShoppingCart as ShoppingCart, IconCheck as Check, IconChevronDown as ChevronDown, IconPlus as Plus, IconX as X, IconTrash as Trash2, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 import Link from "next/link";
 import { SHOPPING_ITEM_CATEGORIES, DECORATION_MATERIAL_TYPE_LABELS, type ProductFilling, type FillingIngredient } from "@/types";
@@ -135,7 +135,7 @@ export default function ShoppingPage() {
 
   return (
     <div>
-      <PageHeader title="Shopping List" description="Items to reorder for the workshop" />
+      <PageHeader title="Shopping List" meta="Items to reorder for the workshop" />
       <div className="px-4 pb-8 space-y-4">
 
         <IngredientStockBelowThresholdSection />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useReplenishmentProposals,
   useCampaigns,
@@ -87,10 +87,7 @@ export default function ProductionBrainDashboardPage() {
       <div className="px-4 pt-4">
         <BackButton />
       </div>
-      <PageHeader
-        title="Production Brain — Dashboard"
-        description="Strategic overview: pipeline, alerts, replenishment proposals, capacity outlook."
-      />
+      <PageHeader title="Production Brain — Dashboard" meta="Strategic overview: pipeline, alerts, replenishment proposals, capacity outlook." />
 
       {/* Engine controls */}
       <section className="flex flex-wrap items-center gap-3 mb-5">

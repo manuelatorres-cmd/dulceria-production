@@ -25,7 +25,7 @@ import {
 import { STOCK_LOCATION_SHORT_LABELS, STOCK_LOCATIONS, type StockLocation } from "@/types";
 import { TransferModal } from "@/components/transfer-modal";
 import { IconArrowsMove as Move } from "@tabler/icons-react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import { IconSearch as Search, IconAdjustmentsHorizontal as SlidersHorizontal, IconX as X, IconPlus as Plus, IconClipboardList as ClipboardList, IconSnowflake as Snowflake, IconChevronDown as ChevronDown, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import type { PlanProduct, ProductionPlan, Product, Mould, FillingStock, StockMovement } from "@/types";
 import { reconcileStockCount } from "@/lib/stockCount";
@@ -114,7 +114,7 @@ export default function StockPage() {
 
   return (
     <div>
-      <PageHeader title="Stock" description="Track what's still in stock" />
+      <PageHeader title="Stock" meta="Track what's still in stock" />
 
       {/* Tab strip + adjust link */}
       <div className="px-4 pb-3 flex items-center gap-2">

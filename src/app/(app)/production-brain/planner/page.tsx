@@ -17,7 +17,7 @@ import {
   DragOverlay,
   pointerWithin,
 } from "@dnd-kit/core";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useReplenishmentProposals,
   useCampaigns,
@@ -131,10 +131,7 @@ export default function ProductionBrainPlannerPage() {
         <div className="px-4 pt-4">
           <BackButton />
         </div>
-        <PageHeader
-          title="Planner"
-          description="Drag a proposal onto a day to schedule it. Campaigns + holidays shown across the top. Brain runs daily + on order changes."
-        />
+        <PageHeader title="Planner" meta="Drag a proposal onto a day to schedule it. Campaigns + holidays shown across the top. Brain runs daily + on order changes." />
 
         {err ? (
           <div

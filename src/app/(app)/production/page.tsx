@@ -9,7 +9,7 @@ import {
 } from "@/lib/hooks";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import { planStepDoneById } from "@/lib/production";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import { IconCalendar as Calendar, IconClock as Clock, IconPlayerPlay as Play, IconCircleCheck as CheckCircle, IconTrash as Trash2, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import Link from "next/link";
 import { useState, useMemo } from "react";
@@ -157,10 +157,7 @@ export default function ProductionPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Production"
-        description="Daily view — today plus upcoming. Click a batch to check off steps."
-      />
+      <PageHeader title="Production" meta="Daily view — today plus upcoming. Click a batch to check off steps." />
 
       <div className="px-4 pb-8 space-y-4">
         {visibleDays.length === 0 ? (

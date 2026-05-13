@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useEquipmentInstances,
   useMachineLoads,
@@ -126,10 +126,7 @@ export default function ProductionBrainEquipmentPage() {
       <div className="px-4 pt-4">
         <BackButton />
       </div>
-      <PageHeader
-        title="Equipment"
-        description="Live workshop snapshot — machines, mould pool, cold storage."
-      />
+      <PageHeader title="Equipment" meta="Live workshop snapshot — machines, mould pool, cold storage." />
 
       {/* Tempering + melting pots */}
       <section className="rounded-sm border border-border bg-card p-4 mb-4">

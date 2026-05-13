@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useProductsList, useMouldsList, useIngredients, useCurrencySymbol, useProductCategoryMap } from "@/lib/hooks";
 import { deserializeBreakdown } from "@/lib/costCalculation";
 import { getProductFillingCategories, rankSimilarProducts } from "@/lib/productSimilarity";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import type { Filling, ProductFilling, ProductCostSnapshot, Mould, Ingredient, BreakdownEntry } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -527,10 +527,7 @@ export default function ProductCostPage() {
   if (!focusId) {
     return (
       <div className="p-4 sm:p-6 max-w-3xl">
-        <PageHeader
-          title="Product Cost Analysis"
-          description="Analyse and compare the cost of your products."
-        />
+        <PageHeader title="Product Cost Analysis" meta="Analyse and compare the cost of your products." />
 
         {/* Search + Sort + Filters */}
         {productsWithCost.length > 0 && (

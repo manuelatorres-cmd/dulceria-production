@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useProductsList, useOrders, importOnlineOrders, appendProductAliases,
   appendVariantAliases,
@@ -279,7 +279,7 @@ export default function ShopifyImportPage() {
 
   return (
     <div>
-      <PageHeader title="Import Shopify orders" description="Upload a Shopify orders CSV export" />
+      <PageHeader title="Import Shopify orders" meta="Upload a Shopify orders CSV export" />
       <div className="px-4 pb-10 space-y-5">
         <Link href="/orders/online" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-3.5 h-3.5" /> Online orders

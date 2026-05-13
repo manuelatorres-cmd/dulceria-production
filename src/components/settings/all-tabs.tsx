@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useMemo } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import { exportBackup, importBackup, clearAllData } from "@/lib/backup";
 import { useMarketRegion, setMarketRegion, useFacilityMayContain, setFacilityMayContain, useCurrency, setCurrency, useDefaultFillMode, setDefaultFillMode, useIngredients, useFillings, useMouldsList, useProductCategories, useCapacityConfig, saveCapacityConfig, useBlockedDays, saveEventCalendarEntry, deleteEventCalendarEntry, usePeople, savePerson, deletePerson, archivePerson, usePersonUnavailability, savePersonUnavailability, deletePersonUnavailability, useEquipment, saveEquipment, deleteEquipment, archiveEquipment, useProductionSteps, saveProductionStep, deleteProductionStep, reorderProductionSteps } from "@/lib/hooks";
 import { getAllergensByRegion, allergenLabel, CURRENCIES, MARKET_LABEL_RULES, WEEKDAYS, EQUIPMENT_KINDS, EQUIPMENT_KIND_LABELS, EQUIPMENT_LOCATIONS, EQUIPMENT_LOCATION_LABELS, PRIMARY_ROLES, ABSENCE_TYPES, ABSENCE_TYPE_LABELS, type CurrencyCode, type MarketRegion, type FillMode, type CapacityConfig, type Weekday, type EventCalendarEntry, type Person, type PersonUnavailability, type Equipment, type EquipmentKind, type ProductionStep, type PrimaryRole, type AbsenceType } from "@/types";
@@ -119,7 +119,7 @@ export function SettingsAllTabs({ initialTab = "capacity" }: { initialTab?: Tab 
 
   return (
     <div>
-      <PageHeader title="Settings" description="Backup, restore, and preferences" />
+      <PageHeader title="Settings" meta="Backup, restore, and preferences" />
 
       {/* Tab strip — order reflects frequency of use (2026-04-24 per
           Manuela): capacity/steps/equipment are the daily/weekly knobs,

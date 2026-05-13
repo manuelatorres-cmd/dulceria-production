@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useProductsList,
   useOrders,
@@ -162,10 +162,7 @@ export default function BoxContentsImportPage() {
         </button>
       </div>
 
-      <PageHeader
-        title="Import box contents"
-        description="After the Shopify orders import — upload the box-builder CSV with each order's chocolate picks. Pairs by Order Number."
-      />
+      <PageHeader title="Import box contents" meta="After the Shopify orders import — upload the box-builder CSV with each order's chocolate picks. Pairs by Order Number." />
 
       <div className="px-4 pb-10 space-y-5">
         {!parsed && !result && (

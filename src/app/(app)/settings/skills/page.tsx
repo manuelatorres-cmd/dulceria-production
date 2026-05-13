@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import { usePeople, savePerson } from "@/lib/hooks";
 
 /**
@@ -76,11 +76,7 @@ export default function SkillsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Skills"
-        accent="Settings"
-        description="Tag each person with the skills they're trained on. The brain uses these to gate step assignment + labor-cost math."
-      />
+      <PageHeader title="Skills" meta={"Settings" + " · " + "Tag each person with the skills they're trained on. The brain uses these to gate step assignment + labor-cost math."} />
 
       <section
         className="border border-border bg-card p-4 mb-5"

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useOrders, useAllOrderItems, useProductsList,
   useProductLocationTotals, shipOnlineOrder,
@@ -67,7 +67,7 @@ export default function OnlineOrdersPage() {
 
   return (
     <div>
-      <PageHeader title="Online orders" description="Shopify orders + production storage fulfilment" />
+      <PageHeader title="Online orders" meta="Shopify orders + production storage fulfilment" />
 
       <div className="px-4 pb-10 space-y-5">
         <div className="flex items-center justify-between">

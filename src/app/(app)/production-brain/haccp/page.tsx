@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useColdStorageUnits,
   useTemperatureReadings,
@@ -32,10 +32,7 @@ export default function ProductionBrainHaccpPage() {
       <div className="px-4 pt-4">
         <BackButton />
       </div>
-      <PageHeader
-        title="HACCP"
-        description="Temperature logs per cold storage unit + open incidents."
-      />
+      <PageHeader title="HACCP" meta="Temperature logs per cold storage unit + open incidents." />
 
       <section className="rounded-sm border border-border bg-card p-4 mb-4">
         <NewUnitForm hasAny={units.length > 0} />

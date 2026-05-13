@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useOrders,
   useAllOrderItems,
@@ -88,11 +88,7 @@ export default function MonthlyReviewPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Monthly review"
-        accent="Reports"
-        description="Auto-generated snapshot. Pick any month to scan key metrics side-by-side with the month before."
-      />
+      <PageHeader title="Monthly review" meta={"Reports" + " · " + "Auto-generated snapshot. Pick any month to scan key metrics side-by-side with the month before."} />
 
       <div className="flex items-center gap-3 mb-6">
         <label className="text-[10px] uppercase text-muted-foreground" style={{ letterSpacing: "0.12em" }}>

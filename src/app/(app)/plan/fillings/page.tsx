@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useOrders, useAllOrderItems, useProductsList, useMouldsList,
   useFillings, useFillingCategories, useCapacityConfig, useFillingStockItems,
@@ -208,10 +208,7 @@ export default function FillingConsolidationPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Weekly filling cooking list"
-        description="What to cook across every active order in the window"
-      />
+      <PageHeader title="Weekly filling cooking list" meta="What to cook across every active order in the window" />
 
       <div className="px-4 pb-8 space-y-5">
         <button onClick={() => router.back()} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">

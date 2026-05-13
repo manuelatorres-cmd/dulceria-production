@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useProductsList,
   useFillings,
@@ -85,10 +85,7 @@ export default function PantryPage() {
       <div className="px-4 pt-4">
         <BackButton />
       </div>
-      <PageHeader
-        title="Pantry"
-        description="Products, fillings, ingredients, moulds, packaging — the building blocks."
-      />
+      <PageHeader title="Pantry" meta="Products, fillings, ingredients, moulds, packaging — the building blocks." />
 
       <div className="px-4 pb-10 space-y-5">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

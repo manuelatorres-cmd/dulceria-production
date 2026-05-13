@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IconArrowLeft as ArrowLeft } from "@tabler/icons-react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useStockTransfers,
   useOrders,
@@ -262,10 +262,7 @@ export default function SalesReportPage() {
         </button>
       </div>
 
-      <PageHeader
-        title="Sales report"
-        description="Weekly roll-up: pieces sold, given away, wasted. Counter walk-ins + orders + booth events combined."
-      />
+      <PageHeader title="Sales report" meta="Weekly roll-up: pieces sold, given away, wasted. Counter walk-ins + orders + booth events combined." />
 
       {/* Range picker */}
       <div className="px-4 mb-5">

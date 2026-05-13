@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconArrowLeft as ArrowLeft, IconCheck as Check } from "@tabler/icons-react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useVariants,
   useAllVariantPackagings,
@@ -349,11 +349,7 @@ export default function DailyCountPage() {
         </button>
       </div>
 
-      <PageHeader
-        title="Daily count"
-        accent="Shop"
-        description="End-of-day reconciliation. Tab 1: bulk-enter variant + single-product sales. Tab 2: count bonbons left on the shelf — variance gets a reason."
-      />
+      <PageHeader title="Daily count" meta={"Shop" + " · " + "End-of-day reconciliation. Tab 1: bulk-enter variant + single-product sales. Tab 2: count bonbons left on the shelf — variance gets a reason."} />
 
       {/* Category chip row — applies to BOTH tabs. Filters variant
           sizes (by composition products) on tab 1 and the bonbon

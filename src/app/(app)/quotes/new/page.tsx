@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useCustomers, useProductsList, usePackagingList, useCapacityConfig,
   saveQuote, useAllProductionDayLineItems, useProductionDays,
@@ -282,10 +282,7 @@ function NewQuotePageInner() {
 
   return (
     <div>
-      <PageHeader
-        title={isWhatIf ? "What-If quote" : "New quote"}
-        description="B2B pricing calculator with cost breakdown and feasibility check"
-      />
+      <PageHeader title={isWhatIf ? "What-If quote" : "New quote"} meta="B2B pricing calculator with cost breakdown and feasibility check" />
       <div className="px-4 pb-10 space-y-5">
         <Link href="/quotes" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-3.5 h-3.5" /> All quotes

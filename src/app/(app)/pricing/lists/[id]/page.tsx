@@ -4,7 +4,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconArrowLeft as ArrowLeft } from "@tabler/icons-react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   usePriceList,
   savePriceList,
@@ -126,12 +126,7 @@ export default function PriceListDetailPage({
 
       <PageHeader
         title={name || "Untitled price list"}
-        accent={customerCount > 0 ? `${customerCount} customer${customerCount === 1 ? "" : "s"}` : "Unassigned"}
-        description={
-          list.defaultDiscountPercent !== undefined
-            ? `Blanket −${list.defaultDiscountPercent}% off retail`
-            : undefined
-        }
+        meta={`${customerCount > 0 ? `${customerCount} customer${customerCount === 1 ? "" : "s"}` : "Unassigned"}${list.defaultDiscountPercent !== undefined ? ` · Blanket −${list.defaultDiscountPercent}% off retail` : ""}`}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">

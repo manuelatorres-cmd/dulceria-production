@@ -12,7 +12,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { assertOk } from "@/lib/supabase-query";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import Link from "next/link";
 import type { Variant, VariantPackaging, Packaging, PackagingOrder, ProductCostSnapshot, VariantProduct } from "@/types";
 import {

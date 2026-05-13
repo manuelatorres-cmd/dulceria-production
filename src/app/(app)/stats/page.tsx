@@ -9,7 +9,7 @@ import {
   useVariants,
 } from "@/lib/hooks";
 import { useAllVariantProducts } from "@/lib/hooks";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import type { VariantProduct } from "@/types";
 
 type ProductionEvent = {
@@ -417,7 +417,7 @@ export default function StatsPage() {
           ))}
         </div>
       )}
-      <PageHeader title="Production Stats" description="Historical output across batches, products, and variants." />
+      <PageHeader title="Production Stats" meta="Historical output across batches, products, and variants." />
 
       <div className="px-4 pb-10 space-y-6">
         {/* Filters */}

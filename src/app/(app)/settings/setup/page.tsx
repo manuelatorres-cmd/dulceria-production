@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useProductsList,
   usePeople,
@@ -193,11 +193,7 @@ export default function SetupWizardPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Setup"
-        accent="First-run wizard"
-        description="Data the brain needs before it can schedule properly. Fill each section or dismiss entries you don't plan to use yet."
-      />
+      <PageHeader title="Setup" meta={"First-run wizard" + " · " + "Data the brain needs before it can schedule properly. Fill each section or dismiss entries you don't plan to use yet."} />
 
       <section
         className="mb-6 border border-border bg-card p-4"

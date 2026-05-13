@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/dulceria";
 import {
   useProductsList, useFillings, usePackagingList, useIngredients,
   useVariants, useAllVariantPackagings,
@@ -274,7 +274,7 @@ export default function StockAdjustPage() {
 
   return (
     <div>
-      <PageHeader title="Stock adjustment" description="Bulk-enter opening balances, recounts, breakage. One audit log." />
+      <PageHeader title="Stock adjustment" meta="Bulk-enter opening balances, recounts, breakage. One audit log." />
       <div className="px-4 pb-10 space-y-4">
         <button onClick={() => router.back()} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-3.5 h-3.5" /> Back
