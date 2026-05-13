@@ -364,7 +364,7 @@ function NewPlanContent() {
           {!fromPlanId && (
             <button
               onClick={() => setIsPastBatch((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors ${isPastBatch ? "border-primary bg-[color:var(--ds-tint-info)] text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
+              className={`inline-flex items-center gap-1.5 rounded-[6px] border px-2.5 py-1 text-xs transition-colors ${isPastBatch ? "border-primary bg-[color:var(--ds-tint-info)] text-primary font-medium" : "border-[color:var(--ds-border-warm)] text-muted-foreground"}`}
               title="Log a batch that already happened"
             >
               <History className="w-3.5 h-3.5" aria-hidden="true" />
@@ -974,7 +974,7 @@ function BatchSizesPhase({
                     (available OR frozen). Frozen-only stock requires opting in via
                     the "Include frozen" toggle below. */}
                 {anyStock && (
-                  <div className="flex shrink-0 rounded-md border border-[color:var(--ds-border-warm)] overflow-hidden text-xs">
+                  <div className="flex shrink-0 rounded-[6px] border border-[color:var(--ds-border-warm)] overflow-hidden text-xs">
                     <button
                       onClick={() => onUpdatePreviousBatch(fillingId, null)}
                       className={`px-2.5 py-1 transition-colors ${!usingPrevious ? "bg-accent text-accent-foreground font-medium" : "bg-[color:var(--ds-card-bg)] text-muted-foreground hover:bg-muted"}`}
@@ -1011,7 +1011,7 @@ function BatchSizesPhase({
                 const expired = remaining !== null && remaining <= 0;
                 const borderCls = expired ? "border-status-alert/30 bg-status-alert/5" : "border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)]";
                 return (
-                <div className={`rounded-md border px-2.5 py-1.5 ${borderCls}`}>
+                <div className={`rounded-[6px] border px-2.5 py-1.5 ${borderCls}`}>
                   <p className={`text-xs font-medium ${expired ? "text-status-alert" : "text-primary"}`}>
                     {availableG > 0 && <>{Math.round(availableG)}g in stock</>}
                     {availableG > 0 && frozenG > 0 && <span className="text-muted-foreground font-normal"> · </span>}
@@ -1057,7 +1057,7 @@ function BatchSizesPhase({
                         onUpdateMultiplier(fillingId, Math.max(newMultiplier, 0.01));
                         setInputStrings((prev) => { const next = { ...prev }; delete next[fillingId]; return next; });
                       }}
-                      className="w-20 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-20 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <span className="text-xs text-muted-foreground">g</span>
                   </div>
@@ -1081,7 +1081,7 @@ function BatchSizesPhase({
                 const borderCls = expired ? "border-status-alert/30 bg-status-alert/5" : "border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)]";
                 return (
                 <div className="space-y-2">
-                  <div className={`rounded-md border px-2.5 py-2 ${borderCls}`}>
+                  <div className={`rounded-[6px] border px-2.5 py-2 ${borderCls}`}>
                     <p className={`text-sm font-medium tabular-nums ${expired ? "text-status-alert" : "text-primary"}`}>
                       {Math.round(effectiveStockG)}g available
                       {includeFrozen && frozenG > 0 && (
@@ -1101,7 +1101,7 @@ function BatchSizesPhase({
                   </div>
                   {/* Include-frozen toggle — appears whenever frozen stock exists for this filling */}
                   {frozenG > 0 && (
-                    <label className="flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50/50 px-2.5 py-2 cursor-pointer">
+                    <label className="flex items-start gap-2 rounded-[6px] border border-sky-200 bg-sky-50/50 px-2.5 py-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={includeFrozen}
@@ -1146,7 +1146,7 @@ function BatchSizesPhase({
                               onUpdateMultiplier(fillingId, Math.max(newMultiplier, 0.01));
                               setInputStrings((prev) => { const next = { ...prev }; delete next[fillingId]; return next; });
                             }}
-                            className="w-20 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-20 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <span className="text-xs text-muted-foreground">g</span>
                         </div>

@@ -131,7 +131,7 @@ function PackTab() {
 
   if (ready.length === 0) {
     return (
-      <div className="rounded-lg border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
+      <div className="rounded-[8px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
         <Package className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
           No orders ready to pack. New online imports + B2B / event orders with allocated
@@ -153,7 +153,7 @@ function PackTab() {
           <li
             key={o.id}
             className={
-              "rounded-lg border p-3 flex items-start gap-3 transition " +
+              "rounded-[8px] border p-3 flex items-start gap-3 transition " +
               (completed
                 ? "border-status-ok-bg bg-status-ok-bg/30"
                 : err
@@ -437,7 +437,7 @@ function BoxTab() {
 
   if (boxableVps.length === 0) {
     return (
-      <div className="rounded-lg border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
+      <div className="rounded-[8px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
         <Box className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
           No boxed variants defined. Add a variant size with packaging + product composition on /variants/[id] to enable box-up here.
@@ -470,7 +470,7 @@ function BoxTab() {
           <li
             key={vp.id}
             className={
-              "rounded-lg border p-3 transition " +
+              "rounded-[8px] border p-3 transition " +
               (err
                 ? "border-status-blush-bg bg-status-blush-bg/30"
                 : succ > 0

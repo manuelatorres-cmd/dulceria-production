@@ -1029,7 +1029,7 @@ function CampaignEditor({
                           const checked = productIds.includes(p.id ?? "");
                           return (
                             <li key={p.id}>
-                              <label className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[color:var(--ds-card-bg)] text-[13px] cursor-pointer">
+                              <label className="flex items-center gap-2 px-2 py-1.5 rounded-[6px] hover:bg-[color:var(--ds-card-bg)] text-[13px] cursor-pointer">
                                 <input
                                   type="checkbox"
                                   className="w-3.5 h-3.5"

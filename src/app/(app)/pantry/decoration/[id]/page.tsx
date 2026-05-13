@@ -200,7 +200,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
             <div>
               <label className="label">Type</label>
               {decorationCategories.length === 0 ? (
-                <div className="rounded-md border border-status-warn-edge bg-status-warn-bg px-3 py-2 text-xs text-status-warn">
+                <div className="rounded-[6px] border border-status-warn-edge bg-status-warn-bg px-3 py-2 text-xs text-status-warn">
                   No decoration categories exist yet.{" "}
                   <Link
                     href="/pantry/decoration/categories"
@@ -252,7 +252,7 @@ export default function DecorationMaterialPage({ params }: { params: Promise<{ i
                   type="color"
                   value={color}
                   onChange={(e) => setColor(e.target.value)}
-                  className="w-10 h-10 rounded-md border border-[color:var(--ds-border-warm)] cursor-pointer p-0.5"
+                  className="w-10 h-10 rounded-[6px] border border-[color:var(--ds-border-warm)] cursor-pointer p-0.5"
                   title="Pick colour"
                 />
                 <span className="text-sm text-muted-foreground font-mono">{color}</span>

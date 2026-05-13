@@ -58,14 +58,14 @@ export function UsedInPanel({ singular, plural, items, emptyMessage, className }
                     alt={item.name}
                     width={32}
                     height={32}
-                    className="w-8 h-8 rounded-md object-cover shrink-0"
+                    className="w-8 h-8 rounded-[6px] object-cover shrink-0"
                   />
                 ) : item.icon ? (
                   <span className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5 flex items-center">
                     {item.icon}
                   </span>
                 ) : (
-                  <div className="w-8 h-8 rounded-md bg-muted shrink-0 flex items-center justify-center text-muted-foreground text-sm font-medium">
+                  <div className="w-8 h-8 rounded-[6px] bg-muted shrink-0 flex items-center justify-center text-muted-foreground text-sm font-medium">
                     {item.name.charAt(0)}
                   </div>
                 )}

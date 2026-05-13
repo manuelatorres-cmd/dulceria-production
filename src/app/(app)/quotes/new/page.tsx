@@ -386,7 +386,7 @@ function NewQuotePageInner() {
           ) : (
             <ul className="space-y-2">
               {lines.map((line, i) => (
-                <li key={i} className="rounded-md border border-[color:var(--ds-border-warm)] bg-background p-3 space-y-2">
+                <li key={i} className="rounded-[6px] border border-[color:var(--ds-border-warm)] bg-background p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-medium text-muted-foreground uppercase">
                       {line.kind === "box" ? "Box line" : "Product line"}
@@ -555,7 +555,7 @@ function NewQuotePageInner() {
           )}
 
           {/* Breakdown */}
-          <div className="rounded-md border border-[color:var(--ds-border-warm)] bg-background p-3 space-y-1.5 text-sm">
+          <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] bg-background p-3 space-y-1.5 text-sm">
             <Row label="Ingredients + decoration" value={`€${pricing.breakdown.ingredientsCost.toFixed(2)}`} />
             {pricing.breakdown.packagingCost > 0 && (
               <Row label="Packaging" value={`€${pricing.breakdown.packagingCost.toFixed(2)}`} />

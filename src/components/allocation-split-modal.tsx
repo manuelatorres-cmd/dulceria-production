@@ -179,7 +179,7 @@ export function AllocationSplitModal({
             </p>
           )}
           {isOverproduction && (
-            <div className="mt-2 rounded-md border border-amber-400 bg-amber-100/80 px-2.5 py-1.5 flex items-start gap-2">
+            <div className="mt-2 rounded-[6px] border border-amber-400 bg-amber-100/80 px-2.5 py-1.5 flex items-start gap-2">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
               <p className="text-xs text-amber-900 leading-snug">
                 <span className="font-semibold">Overproduction:</span>{" "}
@@ -231,7 +231,7 @@ export function AllocationSplitModal({
                       const n = parseInt(e.target.value, 10);
                       setFor(r.key, isNaN(n) ? 0 : n);
                     }}
-                    className="flex-1 h-8 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="flex-1 h-8 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-center text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
                     type="button"
@@ -329,7 +329,7 @@ function DestinationChoice({ icon, label, active, onClick }: {
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-xs ${
+      className={`flex items-center justify-center gap-1 rounded-[6px] border px-2 py-1.5 text-xs ${
         active
           ? "bg-primary text-primary-foreground border-primary"
           : "border-[color:var(--ds-border-warm)] text-muted-foreground hover:border-primary hover:text-primary"

@@ -712,7 +712,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             if (!anyUnlinked) return null;
             if (order.status !== "pending" && order.status !== "in_production") return null;
             return (
-              <div className="mb-2 rounded-md border border-dashed border-[color:var(--ds-border-warm)] bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              <div className="mb-2 rounded-[6px] border border-dashed border-[color:var(--ds-border-warm)] bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                 Pending — not yet scheduled.{" "}
                 <Link href="/plan" className="text-primary hover:underline">Regenerate plan</Link>{" "}
                 to schedule the produce-fresh lines.
@@ -1043,7 +1043,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
         </label>
         {customerId ? (
           <div className="flex items-center gap-2">
-            <div className="flex-1 rounded-md border border-[color:var(--ds-border-warm)] bg-muted px-3 py-1.5 text-sm">
+            <div className="flex-1 rounded-[6px] border border-[color:var(--ds-border-warm)] bg-muted px-3 py-1.5 text-sm">
               {customerName || "(linked)"}
             </div>
             <button
@@ -1069,7 +1069,7 @@ function OrderEditForm({ order, onSaved, onCancel }: {
               autoComplete="off"
             />
             {customerListOpen && (
-              <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-64 overflow-y-auto">
+              <div className="absolute z-20 left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-64 overflow-y-auto">
                 {customerMatches.map((c) => {
                   const miss = computeMissingRequiredCustomerFields(c);
                   return (
@@ -1343,7 +1343,7 @@ function AddOrderLine({ orderId, nextSortOrder, products, resolveProductPrice, a
             autoComplete="off"
           />
           {pickerOpen && matches.length > 0 && (
-            <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
+            <div className="absolute z-20 left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
               {matches.map((p) => {
                 const r = resolveProductPrice(p.id!);
                 return (
@@ -1962,7 +1962,7 @@ function AddOrderPackagingLine({ orderId, nextSortOrder, packaging, packagingUni
             autoComplete="off"
           />
           {pickerOpen && matches.length > 0 && (
-            <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
+            <div className="absolute z-20 left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
               {matches.map((p) => {
                 const cost = packagingUnitCost.get(p.id!);
                 return (
@@ -2313,7 +2313,7 @@ function OrderSummaryCard({
           (no alarm icon). Yellow / red keep the AlertTriangle and the
           multi-line shortfall breakdown. */}
       {feasibility.severity === "green" ? (
-        <div className={`rounded-md border px-3 py-1.5 flex items-center gap-2 text-xs ${sevColor}`}>
+        <div className={`rounded-[6px] border px-3 py-1.5 flex items-center gap-2 text-xs ${sevColor}`}>
           <Check className="w-3.5 h-3.5 shrink-0" />
           <span className="font-medium">{feasibility.summary}</span>
           <span className="opacity-70">
@@ -2321,7 +2321,7 @@ function OrderSummaryCard({
           </span>
         </div>
       ) : (
-        <div className={`rounded-md border px-3 py-2 flex items-start gap-2 ${sevColor}`}>
+        <div className={`rounded-[6px] border px-3 py-2 flex items-start gap-2 ${sevColor}`}>
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">{feasibility.summary}</p>

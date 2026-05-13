@@ -1197,7 +1197,7 @@ function FillingCostTab({
 
       {/* Warnings */}
       {missingPricing > 0 && (
-        <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
           <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
           <p className="text-xs text-status-warn">
             {missingPricing} ingredient{missingPricing > 1 ? "s have" : " has"} no pricing data —
@@ -1206,7 +1206,7 @@ function FillingCostTab({
         </div>
       )}
       {nonMassUnits > 0 && (
-        <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
           <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
           <p className="text-xs text-status-warn">
             {nonMassUnits} ingredient{nonMassUnits > 1 ? "s use" : " uses"} a non-mass unit and

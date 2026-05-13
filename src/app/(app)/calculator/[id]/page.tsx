@@ -201,7 +201,7 @@ function AddIngredientForm({
           className="input w-full"
         />
         {trimmed && !selectedId && (filtered.length > 0 || showCreate) && (
-          <ul className="mt-1 max-h-40 overflow-y-auto rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
+          <ul className="mt-1 max-h-40 overflow-y-auto rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
             {filtered.map((ing, idx) => (
               <li key={ing.id}>
                 <button
@@ -517,7 +517,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
       )}
 
       {experiment.status === "to_improve" && (
-        <div className="mb-4 flex items-center gap-2 text-sm text-status-warn bg-status-warn-bg border border-status-warn-edge rounded-md px-3 py-2">
+        <div className="mb-4 flex items-center gap-2 text-sm text-status-warn bg-status-warn-bg border border-status-warn-edge rounded-[6px] px-3 py-2">
           <AlertTriangle className="w-4 h-4 shrink-0 text-status-warn" />
           <span className="flex-1">Marked for improvement. Tweak the product, then create a new version.</span>
           <button onClick={handleNewVersion} className="text-xs font-medium text-primary hover:underline whitespace-nowrap">
@@ -527,7 +527,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
       )}
 
       {experiment.status === "promoted" && experiment.promotedFillingId && (
-        <div className="mb-4 flex items-center gap-2 text-sm text-status-ok bg-status-ok-bg border border-status-ok-edge rounded-md px-3 py-2">
+        <div className="mb-4 flex items-center gap-2 text-sm text-status-ok bg-status-ok-bg border border-status-ok-edge rounded-[6px] px-3 py-2">
           <CheckCircle className="w-4 h-4 shrink-0" />
           <span className="flex-1">Promoted to filling.</span>
           <button onClick={() => router.push(`/fillings/${encodeURIComponent(experiment.promotedFillingId!)}`)} className="text-xs underline">
@@ -635,7 +635,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
           const ing = ingredientMap.get(ei.ingredientId);
           return !ing || (ing.cacaoFat === 0 && ing.sugar === 0 && ing.milkFat === 0 && ing.water === 0 && ing.solids === 0 && ing.otherFats === 0);
         }) && (
-          <div className="flex items-start gap-2 mb-3 text-xs text-status-warn bg-status-warn-bg border border-status-warn-edge rounded-md px-3 py-2">
+          <div className="flex items-start gap-2 mb-3 text-xs text-status-warn bg-status-warn-bg border border-status-warn-edge rounded-[6px] px-3 py-2">
             <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-status-warn" />
             <span>One or more ingredients have no composition data — the balance below is incomplete. Tap the warning icon next to each ingredient to fill in its composition.</span>
           </div>
@@ -708,7 +708,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
           </h2>
           <ul className="space-y-2">
             {check.warnings.map((w, i) => (
-              <li key={i} className="text-xs text-stone-600 bg-stone-50 border border-stone-200 rounded-md px-3 py-2">
+              <li key={i} className="text-xs text-stone-600 bg-stone-50 border border-stone-200 rounded-[6px] px-3 py-2">
                 {w}
               </li>
             ))}
@@ -717,7 +717,7 @@ export default function ExperimentPage({ params }: { params: Promise<{ id: strin
       )}
 
       {check && check.warnings.length === 0 && balance && (
-        <div className="mb-6 flex items-center gap-2 text-sm text-status-ok bg-status-ok-bg border border-status-ok-edge rounded-md px-3 py-2">
+        <div className="mb-6 flex items-center gap-2 text-sm text-status-ok bg-status-ok-bg border border-status-ok-edge rounded-[6px] px-3 py-2">
           <CheckCircle className="w-4 h-4 shrink-0" />
           All components within target range.
         </div>

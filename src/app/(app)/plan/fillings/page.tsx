@@ -436,7 +436,7 @@ export default function FillingConsolidationPage() {
                             <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
                               <ClipboardList className="w-3 h-3" /> Ingredients for this batch
                             </p>
-                            <ul className="divide-y divide-border rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
+                            <ul className="divide-y divide-border rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
                               {need.scaledIngredients.map((si, i) => {
                                 const ing = ingredientById.get(si.ingredientId);
                                 const st = ingStatusById.get(si.ingredientId);
@@ -471,7 +471,7 @@ export default function FillingConsolidationPage() {
                           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
                             Needed for
                           </p>
-                          <ul className="divide-y divide-border rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
+                          <ul className="divide-y divide-border rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
                             {need.usedBy.map((u, i) => (
                               <li key={`${u.orderId}-${i}`} className="flex items-center justify-between px-2.5 py-1.5 text-xs gap-2">
                                 <div className="min-w-0">

@@ -195,7 +195,7 @@ export default function OnlineOrdersPage() {
                         <ShipButton orderId={o.id!} disabled={lineShortfall} />
                       </div>
                     </div>
-                    <ul className="mt-2 divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
+                    <ul className="mt-2 divide-y divide-border rounded-[6px] border border-[color:var(--ds-border-warm)]">
                       {lines.map((it) => {
                         const avail = locationTotals.get(it.productId)?.production ?? 0;
                         const short = Math.max(0, it.quantity - avail);

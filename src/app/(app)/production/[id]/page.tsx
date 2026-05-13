@@ -891,7 +891,7 @@ function PlanContent({
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleRenamePlan(); if (e.key === "Escape") setEditingName(false); }}
-                  className="flex-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <button onClick={handleRenamePlan} className="p-1 rounded-full hover:bg-muted"><Check className="w-4 h-4 text-primary" /></button>
                 <button onClick={() => setEditingName(false)} className="p-1 rounded-full hover:bg-muted"><X className="w-4 h-4 text-muted-foreground" /></button>
@@ -1209,7 +1209,7 @@ function PlanContent({
                         }, 0);
                         if (mouldsMissingWeight.length > 0) {
                           temperingPanel = (
-                            <div className="mt-2 mb-3 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2.5 text-xs text-status-warn">
+                            <div className="mt-2 mb-3 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2.5 text-xs text-status-warn">
                               <p className="font-semibold text-status-warn text-[10px] uppercase tracking-wide mb-1">Seeding method</p>
                               <p>Set <strong>Cavity weight (g)</strong> on {mouldsMissingWeight.join(", ")} to see chocolate amounts.</p>
                             </div>
@@ -1222,7 +1222,7 @@ function PlanContent({
                           const silkPct = isDark ? 1 : 2;
                           const silkG = Math.round(totalG * silkPct / 100);
                           temperingPanel = (
-                            <div className="mt-2 mb-3 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2.5 text-xs space-y-1.5">
+                            <div className="mt-2 mb-3 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2.5 text-xs space-y-1.5">
                               <p className="font-semibold text-status-warn uppercase tracking-wide text-[10px]">Seeding method — chocolate amounts</p>
                               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-status-warn">
                                 <span className="text-muted-foreground">Total chocolate</span><span className="font-medium">{totalG} g</span>
@@ -1348,7 +1348,7 @@ function PlanContent({
                       onKeyDown={(e) => { if (e.key === "Escape") setEditingProductNoteId(null); }}
                       placeholder="What happened with this product…"
                       rows={3}
-                      className="w-full rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                      className="w-full rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-2 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                     />
                   ) : pb.notes ? (
                     <button

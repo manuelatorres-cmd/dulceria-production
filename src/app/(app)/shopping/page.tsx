@@ -672,7 +672,7 @@ function PlannedDemandSection() {
       </p>
 
       {warnings.length > 0 && (
-        <div className="rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2 space-y-1">
+        <div className="rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2 space-y-1">
           {warnings.slice(0, 5).map((w, i) => (
             <div key={i} className="flex items-start gap-2 text-xs text-status-warn">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />

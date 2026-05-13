@@ -435,7 +435,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               </p>
             )}
             {analytics.seasonalSuggestion && (
-              <div className="mt-3 rounded-md bg-[color:var(--ds-tint-info)] border border-[color:var(--ds-tier-quarter-focus)] px-3 py-2 text-xs text-foreground">
+              <div className="mt-3 rounded-[6px] bg-[color:var(--ds-tint-info)] border border-[color:var(--ds-tier-quarter-focus)] px-3 py-2 text-xs text-foreground">
                 <p className="font-medium text-primary">Seasonal reminder</p>
                 <p className="mt-0.5">{analytics.seasonalSuggestion.note}</p>
                 <button
@@ -464,7 +464,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             <h2 className="text-sm font-semibold text-primary flex items-center gap-1.5"><Users className="w-4 h-4" /> Contact log</h2>
             <span className="text-xs text-muted-foreground">{contacts.length} {contacts.length === 1 ? "entry" : "entries"}</span>
           </div>
-          <div className="rounded-md border border-[color:var(--ds-border-warm)] p-3 space-y-2">
+          <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] p-3 space-y-2">
             <div className="flex gap-2 flex-wrap">
               {CUSTOMER_CONTACT_KINDS.map((k) => (
                 <button
@@ -502,7 +502,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {contacts.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No contact log entries yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
+            <ul className="divide-y divide-border rounded-[6px] border border-[color:var(--ds-border-warm)]">
               {contacts.map((c) => (
                 <li key={c.id} className="px-3 py-2 text-sm">
                   <div className="flex items-start justify-between gap-2">
@@ -539,7 +539,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               {followups.filter((f) => !f.completedAt).length} open
             </span>
           </div>
-          <div className="rounded-md border border-[color:var(--ds-border-warm)] p-3 space-y-2">
+          <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] p-3 space-y-2">
             <div className="flex gap-2 flex-wrap">
               <input
                 type="date"
@@ -565,7 +565,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {followups.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No follow-ups yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
+            <ul className="divide-y divide-border rounded-[6px] border border-[color:var(--ds-border-warm)]">
               {followups.map((f) => {
                 const overdue = !f.completedAt && new Date(f.dueDate) < new Date(new Date().toISOString().slice(0, 10));
                 return (
@@ -613,7 +613,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {customerOrders.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No orders linked to this customer yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
+            <ul className="divide-y divide-border rounded-[6px] border border-[color:var(--ds-border-warm)]">
               {customerOrders.map((o) => {
                 const items = itemsByOrder.get(o.id!) ?? [];
                 const value = items.reduce((acc, it) => acc + (it.unitPrice ?? 0) * it.quantity, 0);
@@ -655,7 +655,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {quotes.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No quotes yet.</p>
           ) : (
-            <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
+            <ul className="divide-y divide-border rounded-[6px] border border-[color:var(--ds-border-warm)]">
               {quotes.map((q) => (
                 <li key={q.id}>
                   <Link href={`/quotes/${encodeURIComponent(q.id!)}`} className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted text-sm">
@@ -749,7 +749,7 @@ function CustomerProductPricesSection({
       </div>
 
       {adding && (
-        <div className="rounded-md border border-[color:var(--ds-border-warm)] p-3 space-y-2">
+        <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] p-3 space-y-2">
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
               <select value={productId} onChange={(e) => setProductId(e.target.value)} className="input text-sm">
@@ -787,7 +787,7 @@ function CustomerProductPricesSection({
           No custom prices. The customer pays the price list / default.
         </p>
       ) : (
-        <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
+        <ul className="divide-y divide-border rounded-[6px] border border-[color:var(--ds-border-warm)]">
           {prices.map((p) => (
             <li key={p.id} className="flex items-center gap-3 px-3 py-2">
               <div className="flex-1 min-w-0">

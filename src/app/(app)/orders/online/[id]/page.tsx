@@ -119,7 +119,7 @@ export default function OnlineOrderPackingSlipPage({ params }: { params: Promise
             </div>
           </div>
 
-          <div className="rounded-md bg-muted p-3">
+          <div className="rounded-[6px] bg-muted p-3">
             <p className="text-xs text-muted-foreground">Ship to</p>
             <p className="text-sm font-semibold">{order.customerName ?? "—"}</p>
             {order.deliveryAddress && <p className="text-xs whitespace-pre-line">{order.deliveryAddress}</p>}

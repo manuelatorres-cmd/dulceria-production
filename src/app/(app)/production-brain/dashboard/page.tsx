@@ -263,7 +263,7 @@ export default function ProductionBrainDashboardPage() {
                   {campaigns.slice(0, 6).map((c) => (
                     <li
                       key={c.id}
-                      className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted px-2 py-1.5 text-xs flex items-center justify-between"
+                      className="rounded-[6px] border border-[color:var(--ds-border-warm)] bg-muted px-2 py-1.5 text-xs flex items-center justify-between"
                     >
                       <span>
                         <strong>{c.name}</strong>{" "}
@@ -355,7 +355,7 @@ function ProposalRow({
         ? "bg-status-warn-bg text-status-warn"
         : "bg-muted text-muted-foreground";
   return (
-    <li className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted px-2 py-1.5 text-xs flex items-center justify-between">
+    <li className="rounded-[6px] border border-[color:var(--ds-border-warm)] bg-muted px-2 py-1.5 text-xs flex items-center justify-between">
       <span className="truncate">
         <strong>{productName ?? proposal.productId.slice(0, 8)}</strong>{" "}
         <span className="text-muted-foreground">

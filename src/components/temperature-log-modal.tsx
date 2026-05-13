@@ -137,7 +137,7 @@ export function TemperatureLogModal({
               return (
                 <div
                   key={device.id}
-                  className={`rounded-md border p-2.5 ${
+                  className={`rounded-[6px] border p-2.5 ${
                     needsNote
                       ? "border-status-alert-edge bg-status-alert-bg"
                       : hasReading && !inRange

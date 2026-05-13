@@ -862,7 +862,7 @@ function ProductStockTab() {
                 </div>
               )}
               {pendingCountConfirm?.productId === group.productId && (
-                <div className="mt-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-2.5 py-2 text-xs">
+                <div className="mt-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-2.5 py-2 text-xs">
                   <p className="text-foreground">
                     Saving <span className="font-semibold">{pendingCountConfirm.newTotal} pcs</span> will
                     mark {pendingCountConfirm.goneBatchLabels.length === 1 ? "1 batch" : `${pendingCountConfirm.goneBatchLabels.length} batches`} as gone:{" "}

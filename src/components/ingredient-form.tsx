@@ -520,7 +520,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
                       setSubIngredients((prev) => prev.filter((_, j) => j !== i));
                       onDirtyChange?.(true);
                     }}
-                    className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-muted transition-colors shrink-0"
+                    className="p-2 rounded-[6px] text-muted-foreground hover:text-destructive hover:bg-muted transition-colors shrink-0"
                     aria-label="Remove sub-ingredient"
                   >
                     ×
@@ -684,7 +684,7 @@ export function IngredientForm({ ingredient, manufacturers = [], brands = [], ve
           </div>
 
           {derivedCostPerGram !== null && (
-            <div className="rounded-md bg-[color:var(--ds-tint-info)] border border-[color:var(--ds-tier-quarter-focus)] px-3 py-2 flex items-baseline gap-2">
+            <div className="rounded-[6px] bg-[color:var(--ds-tint-info)] border border-[color:var(--ds-tier-quarter-focus)] px-3 py-2 flex items-baseline gap-2">
               <span className="text-xs text-muted-foreground">Cost per gram:</span>
               <span className="text-sm font-semibold text-primary">
                 {sym}{derivedCostPerGram < 0.01

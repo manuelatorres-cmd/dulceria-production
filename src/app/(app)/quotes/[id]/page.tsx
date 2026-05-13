@@ -214,7 +214,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
 
           {/* Recipient */}
           {customer && (
-            <div className="rounded-md bg-muted p-3">
+            <div className="rounded-[6px] bg-muted p-3">
               <p className="text-xs text-muted-foreground">For</p>
               <p className="text-sm font-semibold">{customer.companyName}</p>
               {customer.contactName && <p className="text-xs">{customer.contactName}</p>}
@@ -291,7 +291,7 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
 
           {/* Feasibility */}
           {quote.feasibilityNote && (
-            <div className={`rounded-md p-3 text-xs ${quote.feasible ? "bg-status-ok-bg text-status-ok" : "bg-status-warn-bg text-status-warn"}`}>
+            <div className={`rounded-[6px] p-3 text-xs ${quote.feasible ? "bg-status-ok-bg text-status-ok" : "bg-status-warn-bg text-status-warn"}`}>
               <p className="font-semibold">{quote.feasible ? "Feasibility: OK" : "Capacity warning"}</p>
               <p className="mt-0.5">{quote.feasibilityNote}</p>
             </div>

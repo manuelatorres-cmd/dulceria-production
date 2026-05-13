@@ -355,7 +355,7 @@ export default function IngredientDetailPage({ params }: { params: Promise<{ id:
                     {priceHistoryExpanded && (
                       <ul className="space-y-1 ml-6">
                         {priceHistory.map((entry) => (
-                          <li key={entry.id} className="rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2">
+                          <li key={entry.id} className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2">
                             <div className="flex justify-between items-baseline gap-2">
                               <span className="text-sm font-medium text-primary">
                                 {sym}{entry.costPerGram < 0.01 ? entry.costPerGram.toFixed(4) : entry.costPerGram.toFixed(3)}/g
@@ -775,7 +775,7 @@ function IngredientStockPanel({ ingredientId }: { ingredientId: string }) {
       </div>
 
       {err && (
-        <div className="rounded-md border border-status-alert-edge bg-status-alert-bg px-3 py-2 text-xs text-status-alert">
+        <div className="rounded-[6px] border border-status-alert-edge bg-status-alert-bg px-3 py-2 text-xs text-status-alert">
           {err}
         </div>
       )}

@@ -1306,7 +1306,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     Which chocolate is sold loose?
                   </p>
                   {!hasVariantProducts ? (
-                    <p className="text-[11px] text-status-warn border border-dashed border-status-warn-edge rounded-md px-2 py-2">
+                    <p className="text-[11px] text-status-warn border border-dashed border-status-warn-edge rounded-[6px] px-2 py-2">
                       Add at least one product to this variant first (use the <strong>Products</strong> section above).
                     </p>
                   ) : (
@@ -1344,11 +1344,11 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
                     </span>
                   </p>
                   {!hasVariantProducts ? (
-                    <p className="text-[11px] text-status-warn border border-dashed border-status-warn-edge rounded-md px-2 py-2">
+                    <p className="text-[11px] text-status-warn border border-dashed border-status-warn-edge rounded-[6px] px-2 py-2">
                       Add at least one product to this variant first (use the <strong>Products</strong> section above), then configure the box qty here.
                     </p>
                   ) : (
-                    <div className="rounded-md border border-[color:var(--ds-border-warm)] bg-background/50 p-2 space-y-1.5">
+                    <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] bg-background/50 p-2 space-y-1.5">
                       {variantProducts.map((vp) => {
                         const name = productMap.get(vp.productId) ?? vp.productId;
                         const qty = newBoxQtys[vp.productId] ?? 0;
@@ -1414,7 +1414,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
           })()}
 
           {hasMissingIngredientPricing && (
-            <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2 mb-3">
+            <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2 mb-3">
               <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
               <p className="text-xs text-status-warn">
                 Some ingredients in this variant&apos;s products have no pricing data — margin calculations may be understated. Check individual product cost tabs.
@@ -1433,7 +1433,7 @@ export default function VariantDetailPage({ params }: { params: Promise<{ id: st
              * card. Still list each saved size with its price and composition
              * so the user can see and manage what they've configured. */
             <div className="space-y-3">
-              <div className="text-xs text-muted-foreground border border-dashed border-[color:var(--ds-border-warm)] rounded-md px-3 py-2">
+              <div className="text-xs text-muted-foreground border border-dashed border-[color:var(--ds-border-warm)] rounded-[6px] px-3 py-2">
                 Margin details hidden — products need a default mould and costed ingredients for
                 cost/margin math. Box prices and composition still shown below.
               </div>

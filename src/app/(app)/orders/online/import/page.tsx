@@ -312,13 +312,13 @@ export default function ShopifyImportPage() {
         )}
 
         {error && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive">
+          <div className="rounded-[6px] bg-destructive/10 border border-destructive/30 px-3 py-2 text-xs text-destructive">
             {error}
           </div>
         )}
 
         {parsed && parsed.missingRequiredColumns.length > 0 && (
-          <div className="rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2 text-xs text-status-warn">
+          <div className="rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2 text-xs text-status-warn">
             <FileWarning className="w-4 h-4 inline mr-1" />
             Missing required columns: <code>{parsed.missingRequiredColumns.join(", ")}</code>. This doesn&apos;t look like a Shopify orders export.
           </div>
@@ -456,7 +456,7 @@ export default function ShopifyImportPage() {
                         {o.lineItems.length} item{o.lineItems.length === 1 ? "" : "s"}
                       </span>
                     </div>
-                    <ul className="divide-y divide-border rounded-md border border-[color:var(--ds-border-warm)]">
+                    <ul className="divide-y divide-border rounded-[6px] border border-[color:var(--ds-border-warm)]">
                       {o.lineItems.map((li, i) => {
                         const pick = getPick(o.name, i, li);
                         const dec = pick ? decodePicker(pick) : null;

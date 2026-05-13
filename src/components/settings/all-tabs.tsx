@@ -449,19 +449,19 @@ function DemoDataSection() {
           <div className="py-2 text-center text-sm text-muted-foreground">Loading…</div>
         )}
         {state === "done" && (
-          <div className="flex items-start gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-status-ok-bg border border-status-ok-edge px-3 py-2">
             <CheckCircle className="w-4 h-4 text-status-ok shrink-0 mt-0.5" />
             <p className="text-xs text-status-ok">{message}</p>
           </div>
         )}
         {state === "already" && (
-          <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
             <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
             <p className="text-xs text-status-warn">Demo data is already loaded.</p>
           </div>
         )}
         {state === "error" && (
-          <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-destructive/10 border border-destructive/20 px-3 py-2">
             <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
             <p className="text-xs text-destructive">{message}</p>
           </div>
@@ -512,7 +512,7 @@ function ClearAllDataSection() {
           </button>
         )}
         {state === "confirm" && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 space-y-3">
+          <div className="rounded-[6px] bg-destructive/10 border border-destructive/20 p-3 space-y-3">
             <p className="text-sm text-destructive font-medium">
               Are you sure? This will permanently delete everything.
             </p>
@@ -536,13 +536,13 @@ function ClearAllDataSection() {
           <div className="py-2 text-center text-sm text-muted-foreground">Deleting…</div>
         )}
         {state === "done" && (
-          <div className="flex items-start gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-status-ok-bg border border-status-ok-edge px-3 py-2">
             <CheckCircle className="w-4 h-4 text-status-ok shrink-0 mt-0.5" />
             <p className="text-xs text-status-ok">{message}</p>
           </div>
         )}
         {state === "error" && (
-          <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-destructive/10 border border-destructive/20 px-3 py-2">
             <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
             <p className="text-xs text-destructive">{message}</p>
           </div>
@@ -649,7 +649,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
           every field is set.
         </p>
         {!status.isComplete && (
-          <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
             <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
             <p className="text-xs text-status-warn">
               Missing: {status.missing.join(", ")}
@@ -657,7 +657,7 @@ function CapacityTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => voi
           </div>
         )}
         {status.isComplete && (
-          <div className="flex items-start gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-status-ok-bg border border-status-ok-edge px-3 py-2">
             <CheckCircle className="w-4 h-4 text-status-ok shrink-0 mt-0.5" />
             <p className="text-xs text-status-ok">All fields set — the scheduler can run.</p>
           </div>
@@ -1575,7 +1575,7 @@ function PersonUnavailabilityEditor({ personId, unavailability }: {
       </div>
 
       {adding && (
-        <div className="rounded-md border border-[color:var(--ds-border-warm)] bg-muted p-3 space-y-2">
+        <div className="rounded-[6px] border border-[color:var(--ds-border-warm)] bg-muted p-3 space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="label">Start</label>
@@ -1710,21 +1710,21 @@ function EquipmentTab() {
           Availability below is derived from active production — not set here.
         </p>
         {equipment.filter((e) => !e.archived).length === 0 ? (
-          <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
             <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
             <p className="text-xs text-status-warn">
               Add at least one piece of equipment so the scheduler has something to assign work to.
             </p>
           </div>
         ) : readiness.isComplete ? (
-          <div className="flex items-start gap-2 rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-status-ok-bg border border-status-ok-edge px-3 py-2">
             <CheckCircle className="w-4 h-4 text-status-ok shrink-0 mt-0.5" />
             <p className="text-xs text-status-ok">
               All equipment has quantity + throughput set — the scheduler can use it.
             </p>
           </div>
         ) : (
-          <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+          <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
             <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
             <p className="text-xs text-status-warn">
               {readiness.incompleteCount} equipment item{readiness.incompleteCount > 1 ? "s" : ""} missing quantity or kg/hour.
@@ -2054,7 +2054,7 @@ function EquipmentEditor({ equipment, onSaved, onCancel }: {
 
       {/* HACCP temperature tracking — applies to fridges, freezers, chocolate
           storage, and any other device that needs a daily temperature check. */}
-      <div className="rounded-md bg-muted border border-[color:var(--ds-border-warm)] p-3 space-y-2">
+      <div className="rounded-[6px] bg-muted border border-[color:var(--ds-border-warm)] p-3 space-y-2">
         <label className="flex items-center gap-2 text-sm font-medium">
           <input
             type="checkbox"
@@ -3027,7 +3027,7 @@ function PreferencesTab({
           <select
             value={draftCurrency}
             onChange={(e) => setDraftCurrency(e.target.value as CurrencyCode)}
-            className="w-full rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm"
+            className="w-full rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm"
           >
             {CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>{c.label}</option>
@@ -3048,7 +3048,7 @@ function PreferencesTab({
           <select
             value={draftRegion}
             onChange={(e) => setDraftRegion(e.target.value as MarketRegion)}
-            className="w-full rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm"
+            className="w-full rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm"
           >
             {(Object.entries(MARKET_LABEL_RULES) as [MarketRegion, typeof MARKET_LABEL_RULES["EU"]][]).map(([code, r]) => (
               <option key={code} value={code}>{r.label}</option>
@@ -3072,7 +3072,7 @@ function PreferencesTab({
           <select
             value={draftFillMode}
             onChange={(e) => setDraftFillMode(e.target.value as FillMode)}
-            className="w-full rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm"
+            className="w-full rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-2 text-sm"
           >
             <option value="percentage">By percentage</option>
             <option value="grams">By grams</option>

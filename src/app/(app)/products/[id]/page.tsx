@@ -2055,7 +2055,7 @@ function ProductCostTab({
 
       {/* Warnings */}
       {!hasMould && (
-        <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
           <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
           <p className="text-xs text-status-warn">
             Set a <strong>default mould</strong> on this product to enable cost calculation.
@@ -2063,7 +2063,7 @@ function ProductCostTab({
         </div>
       )}
       {hasMould && !hasShell && (
-        <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
           <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
           <p className="text-xs text-status-warn">
             No shell chocolate set — shell and cap costs are excluded. Pick one on the
@@ -2072,7 +2072,7 @@ function ProductCostTab({
         </div>
       )}
       {hasMould && hasShell && !shellPriced && (
-        <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
           <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
           <p className="text-xs text-status-warn">
             Shell chocolate <strong>{shellIngredient!.name}</strong> has no pricing data —
@@ -2081,7 +2081,7 @@ function ProductCostTab({
         </div>
       )}
       {missingPricingIngredients.length > 0 && (
-        <div className="flex items-start gap-2 rounded-md bg-status-warn-bg border border-status-warn-edge px-3 py-2">
+        <div className="flex items-start gap-2 rounded-[6px] bg-status-warn-bg border border-status-warn-edge px-3 py-2">
           <AlertTriangle className="w-4 h-4 text-status-warn shrink-0 mt-0.5" />
           <div className="text-xs text-status-warn">
             <p><strong>{missingPricingIngredients.length} ingredient{missingPricingIngredients.length > 1 ? "s" : ""}</strong> have no pricing data — cost may be understated:</p>
@@ -2103,7 +2103,7 @@ function ProductCostTab({
         <div>
           <div className="flex items-center justify-between mb-2 gap-3">
             <h2 className="text-sm font-semibold text-primary">Current breakdown</h2>
-            <div className="inline-flex rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-0.5 text-xs">
+            <div className="inline-flex rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-0.5 text-xs">
               <button
                 onClick={() => setBreakdownView("grouped")}
                 className={`px-2.5 py-1 rounded transition-colors ${breakdownView === "grouped" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
@@ -2431,7 +2431,7 @@ function CostHistoryChart({ snapshots, sym = "€" }: { snapshots: ProductCostSn
       {/* Tooltip */}
       {tooltip && (
         <div
-          className="absolute z-10 pointer-events-none rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-md px-2.5 py-1.5 text-xs"
+          className="absolute z-10 pointer-events-none rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-md px-2.5 py-1.5 text-xs"
           style={{
             left: Math.min(tooltip.x / W * 100, 70) + "%",
             top: (tooltip.y / 120 * 100) + "%",

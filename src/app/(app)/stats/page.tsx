@@ -466,7 +466,7 @@ export default function StatsPage() {
                 <select
                   value={variantFilter}
                   onChange={(e) => setVariantFilter(e.target.value)}
-                  className="text-sm border border-[color:var(--ds-border-warm)] rounded-md px-2 py-1.5 bg-background"
+                  className="text-sm border border-[color:var(--ds-border-warm)] rounded-[6px] px-2 py-1.5 bg-background"
                 >
                   <option value="">All variants</option>
                   {variants.map((c) => (
@@ -478,7 +478,7 @@ export default function StatsPage() {
                 <select
                   value={productFilter}
                   onChange={(e) => setProductFilter(e.target.value)}
-                  className="text-sm border border-[color:var(--ds-border-warm)] rounded-md px-2 py-1.5 bg-background max-w-[14rem]"
+                  className="text-sm border border-[color:var(--ds-border-warm)] rounded-[6px] px-2 py-1.5 bg-background max-w-[14rem]"
                 >
                   <option value="">All products</option>
                   {producedProducts.map((p) => (

@@ -1283,7 +1283,7 @@ function PartialStockPrompt({ lines, onApply, onCancel }: {
                 <button
                   type="button"
                   onClick={() => setDecision(l.key, "split")}
-                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs ${
+                  className={`flex-1 rounded-[6px] border px-3 py-1.5 text-xs ${
                     l.decision === "split"
                       ? "bg-primary text-primary-foreground border-primary"
                       : "border-[color:var(--ds-border-warm)] text-foreground hover:border-primary hover:text-primary"
@@ -1294,7 +1294,7 @@ function PartialStockPrompt({ lines, onApply, onCancel }: {
                 <button
                   type="button"
                   onClick={() => setDecision(l.key, "reduce")}
-                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs ${
+                  className={`flex-1 rounded-[6px] border px-3 py-1.5 text-xs ${
                     l.decision === "reduce"
                       ? "bg-primary text-primary-foreground border-primary"
                       : "border-[color:var(--ds-border-warm)] text-foreground hover:border-primary hover:text-primary"

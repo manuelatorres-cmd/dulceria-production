@@ -111,7 +111,7 @@ export function ProductPicker({
         autoComplete="off"
       />
       {open && matches.length > 0 && (
-        <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
+        <div className="absolute z-20 left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg max-h-56 overflow-y-auto">
           {matches.map((p) => {
             const price = priceForProduct?.(p.id!);
             const isSelected = p.id === selectedProductId;
@@ -132,7 +132,7 @@ export function ProductPicker({
         </div>
       )}
       {open && matches.length === 0 && query.trim().length > 0 && (
-        <div className="absolute z-20 left-0 right-0 mt-1 rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg px-3 py-2 text-xs text-muted-foreground">
+        <div className="absolute z-20 left-0 right-0 mt-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-lg px-3 py-2 text-xs text-muted-foreground">
           No matching products.
         </div>
       )}

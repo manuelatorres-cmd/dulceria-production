@@ -467,7 +467,7 @@ export default function StockAdjustPage() {
 
         {result && (
           result.error ? (
-            <div className="rounded-md bg-status-alert-bg border border-status-alert-edge px-3 py-2">
+            <div className="rounded-[6px] bg-status-alert-bg border border-status-alert-edge px-3 py-2">
               <div className="flex items-start gap-2 text-xs text-status-alert">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="flex-1">
@@ -479,7 +479,7 @@ export default function StockAdjustPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-md bg-status-ok-bg border border-status-ok-edge px-3 py-2">
+            <div className="rounded-[6px] bg-status-ok-bg border border-status-ok-edge px-3 py-2">
               <div className="flex items-start gap-2 text-xs text-status-ok">
                 <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>

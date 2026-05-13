@@ -179,7 +179,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
   }
 
   return (
-    <form onSubmit={handleAdd} className="mt-2 p-2 rounded-md border border-[color:var(--ds-border-warm)] bg-muted space-y-2">
+    <form onSubmit={handleAdd} className="mt-2 p-2 rounded-[6px] border border-[color:var(--ds-border-warm)] bg-muted space-y-2">
       {/* Kind toggle — ingredient OR an existing filling used as a
           sub-component. Flipping resets the current selection so the
           search behaves sensibly for the new source. */}
@@ -218,7 +218,7 @@ export function AddFillingIngredient({ fillingId, onAdded }: AddFillingIngredien
           className="input"
         />
         {trimmedSearch && !selectedId && (filtered.length > 0 || showCreateOption) && (
-          <ul ref={listRef} className="mt-1 max-h-40 overflow-y-auto rounded-md border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
+          <ul ref={listRef} className="mt-1 max-h-40 overflow-y-auto rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]">
             {filtered.map((item, idx) => (
               <li key={item.id}>
                 <button

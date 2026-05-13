@@ -1929,7 +1929,7 @@ export default function DailyV2Page() {
                 );
               })()}
             </div>
-            <div className="h-2 rounded-md overflow-hidden mb-4" style={{ background: "rgba(29,36,33,0.08)" }}>
+            <div className="h-2 rounded-[6px] overflow-hidden mb-4" style={{ background: "rgba(29,36,33,0.08)" }}>
               <div
                 className="h-full"
                 style={{
