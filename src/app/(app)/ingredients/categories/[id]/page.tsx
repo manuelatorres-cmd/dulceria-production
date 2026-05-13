@@ -12,6 +12,7 @@ import {
 } from "@/lib/hooks";
 import { UsedInPanel } from "@/components/pantry";
 import { InlineNameEditor } from "@/components/inline-name-editor";
+import { PageHeader, StatusTag } from "@/components/dulceria";
 import { IconArrowLeft as ArrowLeft, IconTrash as Trash2, IconArchive as Archive, IconArchiveOff as ArchiveRestore } from "@tabler/icons-react";
 import Link from "next/link";
 import { useNavigationGuard } from "@/lib/useNavigationGuard";
@@ -85,38 +86,20 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <div className="px-4 pt-6 pb-2">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft aria-hidden="true" className="w-4 h-4" /> Back
-        </button>
-      </div>
+      <PageHeader
+        title={
+          <InlineNameEditor
+            name={category.name}
+            onSave={async (n) => {
+              await saveIngredientCategory({ id: category.id, name: n, archived: category.archived });
+            }}
+          />
+        }
+        meta={`${inUseCount} ingredient${inUseCount === 1 ? "" : "s"} in this category`}
+        badges={category.archived ? <StatusTag kind="done">Archived</StatusTag> : undefined}
+      />
 
-      <div className="px-4 pb-6 space-y-6 max-w-lg">
-
-        {/* Name row */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1 flex items-center gap-2">
-            <InlineNameEditor
-              name={category.name}
-              onSave={async (n) => {
-                await saveIngredientCategory({
-                  id: category.id,
-                  name: n,
-                  archived: category.archived,
-                });
-              }}
-              className="text-xl font-bold"
-            />
-            {category.archived && (
-              <span className="rounded-[4px] bg-muted text-muted-foreground px-2.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shrink-0">
-                <Archive className="w-3 h-3" /> Archived
-              </span>
-            )}
-          </div>
-        </div>
+      <div style={{ padding: "16px 32px 40px" }} className="space-y-6 max-w-lg">
 
         {/* Used in panel */}
         <UsedInPanel
