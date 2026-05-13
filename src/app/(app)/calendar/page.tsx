@@ -312,7 +312,7 @@ function MonthGrid({
   const cellSize = large ? "min-h-[62px]" : "min-h-[38px]";
   const dayFont = large ? "text-[13px]" : "text-[11px]";
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="grid grid-cols-7 gap-1 mb-1">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((l) => (
           <span

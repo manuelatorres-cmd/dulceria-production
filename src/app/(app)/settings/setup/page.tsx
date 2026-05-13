@@ -192,7 +192,7 @@ export default function SetupWizardPage() {
   const totalGaps = sections.reduce((s, sec) => s + sec.count, 0);
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Setup" meta={"First-run wizard" + " · " + "Data the brain needs before it can schedule properly. Fill each section or dismiss entries you don't plan to use yet."} />
 
       <section

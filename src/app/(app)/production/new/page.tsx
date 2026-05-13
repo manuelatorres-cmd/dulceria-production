@@ -354,7 +354,7 @@ function NewPlanContent() {
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="px-4 pt-6 pb-2">
         <Link href="/production" className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-3">
           <ArrowLeft className="w-4 h-4" /> Production

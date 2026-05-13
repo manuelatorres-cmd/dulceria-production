@@ -84,7 +84,7 @@ export default function IngredientCategoryDetailPage({ params }: { params: Promi
   const isChocolate = category.name === "Chocolate";
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="px-4 pt-6 pb-2">
         <button
           onClick={() => router.back()}

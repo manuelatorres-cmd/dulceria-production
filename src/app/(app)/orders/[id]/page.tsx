@@ -430,7 +430,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="px-4 pt-6 pb-2">
         <BackButton fallbackHref="/orders" fallbackLabel="All orders" onBack={() => router.back()} />
       </div>

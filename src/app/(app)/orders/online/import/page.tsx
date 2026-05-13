@@ -278,7 +278,7 @@ export default function ShopifyImportPage() {
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Import Shopify orders" meta="Upload a Shopify orders CSV export" />
       <div className="px-4 pb-10 space-y-5">
         <Link href="/orders/online" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">

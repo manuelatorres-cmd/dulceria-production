@@ -123,7 +123,7 @@ export default function ShellDesignDetailPage({ params }: { params: Promise<{ id
   const currentApplyAt = DECORATION_APPLY_AT_OPTIONS.find((o) => o.value === normalizedPhase);
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <div className="px-4 pt-6 pb-2">
         <button
           onClick={() => router.back()}

@@ -75,7 +75,7 @@ export default function SkillsPage() {
   }
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Skills" meta={"Settings" + " · " + "Tag each person with the skills they're trained on. The brain uses these to gate step assignment + labor-cost math."} />
 
       <section

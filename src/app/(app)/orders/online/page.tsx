@@ -66,7 +66,7 @@ export default function OnlineOrdersPage() {
   const totalShort = combinedDemand.reduce((a, r) => a + r.short, 0);
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Online orders" meta="Shopify orders + production storage fulfilment" />
 
       <div className="px-4 pb-10 space-y-5">

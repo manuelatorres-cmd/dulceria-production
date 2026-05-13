@@ -321,7 +321,7 @@ function ScaledProductCard({ title, subtitle, rows }: { title: string; subtitle:
 
 function RatingRow({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <label className="text-xs text-muted-foreground block mb-1.5">{label}</label>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((n) => (

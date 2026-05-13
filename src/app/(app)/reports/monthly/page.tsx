@@ -87,7 +87,7 @@ export default function MonthlyReviewPage() {
   const prevRevenue = revenueByChannelPrev.reduce((s, r) => s + r.gross, 0);
 
   return (
-    <div>
+    <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Monthly review" meta={"Reports" + " · " + "Auto-generated snapshot. Pick any month to scan key metrics side-by-side with the month before."} />
 
       <div className="flex items-center gap-3 mb-6">
