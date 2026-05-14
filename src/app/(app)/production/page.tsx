@@ -9,17 +9,17 @@ import {
 } from "@/lib/hooks";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import { planStepDoneById } from "@/lib/production";
-import { PageHeader } from "@/components/dulceria";
-import { IconCalendar as Calendar, IconClock as Clock, IconPlayerPlay as Play, IconCircleCheck as CheckCircle, IconTrash as Trash2, IconChevronRight as ChevronRight } from "@tabler/icons-react";
+import { PageHeader, Section, ListRow, StatusTag, DsDialog, type ListRowTier, type StatusTagKind } from "@/components/dulceria";
+import { IconCalendar as Calendar, IconClock as Clock, IconCircleCheck as CheckCircle, IconTrash as Trash2, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import Link from "next/link";
 import { useState, useMemo } from "react";
 import type { PlanProduct, PlanStepStatus, ProductionPlan } from "@/types";
 
-const LEVEL_STYLE: Record<"ok" | "warn" | "critical" | "over", string> = {
-  ok: "bg-status-ok-bg/40 text-status-ok",
-  warn: "bg-status-warn-bg/40 text-status-warn",
-  critical: "bg-destructive/10 text-destructive",
-  over: "bg-destructive/20 text-destructive",
+const LEVEL_COLOR: Record<"ok" | "warn" | "critical" | "over", string> = {
+  ok: "var(--ds-tier-positive)",
+  warn: "var(--ds-semantic-warn)",
+  critical: "var(--ds-tier-urgent)",
+  over: "var(--ds-tier-urgent)",
 };
 
 const DAY_STATUS_LABEL: Record<"draft" | "active" | "done", string> = {
@@ -28,10 +28,10 @@ const DAY_STATUS_LABEL: Record<"draft" | "active" | "done", string> = {
   done: "Closed",
 };
 
-const DAY_STATUS_STYLE: Record<"draft" | "active" | "done", string> = {
-  draft: "bg-muted text-muted-foreground",
-  active: "bg-[color:var(--ds-tint-info)] text-primary",
-  done: "bg-status-ok/10 text-status-ok",
+const DAY_STATUS_TAG: Record<"draft" | "active" | "done", StatusTagKind> = {
+  draft: "neutral",
+  active: "scheduled",
+  done: "done",
 };
 
 export default function ProductionPage() {
@@ -159,227 +159,251 @@ export default function ProductionPage() {
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
       <PageHeader title="Production" meta="Daily view — today plus upcoming. Click a batch to check off steps." />
 
-      <div className="px-4 pb-8 space-y-4">
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 16 }}>
         {visibleDays.length === 0 ? (
-          <div className="rounded-[4px] border border-dashed border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-6 text-center">
-            <Calendar className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">
-              Nothing scheduled yet. Head to <Link href="/plan" className="text-primary hover:underline">/plan</Link> and click <span className="font-medium">Regenerate plan</span> once you have open orders.
+          <Section title="Nothing scheduled">
+            <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", textAlign: "center" }}>
+              <Calendar size={20} style={{ display: "block", margin: "0 auto 8px", color: "var(--ds-text-muted)" }} />
+              Nothing scheduled yet. Head to{" "}
+              <Link href="/plan" style={{ color: "var(--ds-tier-quarter-focus)", textDecoration: "underline" }}>/plan</Link>{" "}
+              and click <strong style={{ color: "var(--ds-text-primary)", fontWeight: 500 }}>Regenerate plan</strong> once you have open orders.
             </p>
-          </div>
+          </Section>
         ) : (
-          <div className="space-y-4">
-            {visibleDays.map((day) => {
-              const items = (day.id ? lineItemsByDay.get(day.id) ?? [] : []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
-              const dayDate = new Date(day.date + "T12:00:00");
-              const avail = effectiveDailyCapacityMinutes(dayDate, config, people, unavailability, blockedDays);
-              const used = items.reduce((s, li) => s + li.plannedMinutes, 0);
-              const util = avail > 0 ? (used / avail) * 100 : 0;
-              const level: "ok" | "warn" | "critical" | "over" =
-                avail === 0 && used > 0 ? "over"
-                : used > avail ? "over"
-                : util >= (config?.criticalThresholdPercent ?? 100) ? "critical"
-                : util >= (config?.warnThresholdPercent ?? 100) ? "warn"
-                : "ok";
-              const isToday = day.date === todayIso;
-              return (
-                <section
-                  key={day.id ?? day.date}
-                  className={`rounded-[4px] border overflow-hidden ${
-                    isToday ? "border-[color:var(--ds-tier-quarter-focus)] bg-[color:var(--ds-tint-info)]" : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)]"
-                  }`}
-                >
-                  <header className="px-4 py-3 border-b border-[color:var(--ds-border-warm)] flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <h2 className="text-sm font-semibold">
-                        {formatDayLabel(day.date, todayIso)}
-                      </h2>
-                      <span className={`text-[10px] uppercase tracking-wide rounded-full px-2 py-0.5 ${DAY_STATUS_STYLE[day.status]}`}>
-                        {DAY_STATUS_LABEL[day.status]}
-                      </span>
-                      {isToday && (
-                        <span className="text-[10px] uppercase tracking-wide rounded-[4px] bg-primary text-primary-foreground px-2 py-0.5">
-                          Today
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-muted-foreground tabular-nums">
-                        {items.length} batch{items.length === 1 ? "" : "es"}
-                      </span>
-                      <span className={`rounded-full px-2 py-0.5 tabular-nums ${LEVEL_STYLE[level]}`}>
-                        {used}/{avail} min · {Math.round(util)}%
-                      </span>
-                    </div>
-                  </header>
+          visibleDays.map((day) => {
+            const items = (day.id ? lineItemsByDay.get(day.id) ?? [] : []).slice().sort((a, b) => a.sortOrder - b.sortOrder);
+            const dayDate = new Date(day.date + "T12:00:00");
+            const avail = effectiveDailyCapacityMinutes(dayDate, config, people, unavailability, blockedDays);
+            const used = items.reduce((s, li) => s + li.plannedMinutes, 0);
+            const util = avail > 0 ? (used / avail) * 100 : 0;
+            const level: "ok" | "warn" | "critical" | "over" =
+              avail === 0 && used > 0 ? "over"
+              : used > avail ? "over"
+              : util >= (config?.criticalThresholdPercent ?? 100) ? "critical"
+              : util >= (config?.warnThresholdPercent ?? 100) ? "warn"
+              : "ok";
+            const isToday = day.date === todayIso;
+            return (
+              <Section
+                key={day.id ?? day.date}
+                title={
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span>{formatDayLabel(day.date, todayIso)}</span>
+                    <StatusTag kind={DAY_STATUS_TAG[day.status]}>{DAY_STATUS_LABEL[day.status]}</StatusTag>
+                    {isToday && <StatusTag kind="ready">Today</StatusTag>}
+                  </span>
+                }
+                action={
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                    <span style={{ color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                      {items.length} batch{items.length === 1 ? "" : "es"}
+                    </span>
+                    <span style={{
+                      padding: "2px 8px", borderRadius: 12,
+                      border: `0.5px solid ${LEVEL_COLOR[level]}`,
+                      color: LEVEL_COLOR[level],
+                      fontVariantNumeric: "tabular-nums", fontWeight: 500,
+                    }}>
+                      {used}/{avail} min · {Math.round(util)}%
+                    </span>
+                  </span>
+                }
+                noBody
+              >
+                {items.length === 0 ? (
+                  <p style={{ padding: "12px 20px", fontSize: 12, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+                    No batches on this day.
+                  </p>
+                ) : (
+                  items.map((li) => {
+                    const plan = planMap.get(li.planId);
+                    if (!plan) return null;
+                    const pps = planProductsByPlan.get(li.planId) ?? [];
+                    const productNames = [...new Set(pps.map((pp) => productMap.get(pp.productId)?.name ?? pp.productId))];
+                    const totalMoulds = pps.reduce((s, pp) => s + pp.quantity, 0);
+                    const mouldSummary = pps.map((pp) => mouldMap.get(pp.mouldId ?? "")?.name).filter(Boolean);
+                    const totalPieces = pps.reduce((s, pp) => {
+                      const cavities = mouldMap.get(pp.mouldId ?? "")?.numberOfCavities ?? 0;
+                      return s + cavities * pp.quantity;
+                    }, 0);
+                    const links = linksByPlan.get(li.planId) ?? [];
+                    const orderRefs = [...new Set(
+                      links.map((l) => {
+                        const item = orderItemById.get(l.orderItemId);
+                        const order = item ? orderMap.get(item.orderId) : undefined;
+                        return order?.customerName ?? order?.eventName ?? null;
+                      }).filter(Boolean) as string[],
+                    )];
+                    const orderedStepIds = [...li.stepIds].sort((a, b) => {
+                      const sa = stepById.get(a)?.sortOrder ?? 0;
+                      const sb = stepById.get(b)?.sortOrder ?? 0;
+                      return sa - sb;
+                    });
+                    const stepsDone = orderedStepIds.filter((sid) => stepDoneFor(li.planId, sid)).length;
+                    const allStepsDone = stepsDone === orderedStepIds.length && orderedStepIds.length > 0;
+                    const tier: ListRowTier = plan.status === "done" ? "done"
+                      : plan.status === "cancelled" ? "parked"
+                      : allStepsDone ? "positive"
+                      : stepsDone > 0 ? "active"
+                      : "default";
 
-                  {items.length === 0 ? (
-                    <p className="px-4 py-3 text-xs text-muted-foreground">No batches on this day.</p>
-                  ) : (
-                    <ul className="divide-y divide-border">
-                      {items.map((li) => {
-                        const plan = planMap.get(li.planId);
-                        if (!plan) return null;
-                        const pps = planProductsByPlan.get(li.planId) ?? [];
-                        const productNames = [...new Set(pps.map((pp) => productMap.get(pp.productId)?.name ?? pp.productId))];
-                        const totalMoulds = pps.reduce((s, pp) => s + pp.quantity, 0);
-                        const mouldSummary = pps.map((pp) => mouldMap.get(pp.mouldId ?? "")?.name).filter(Boolean);
-                        const totalPieces = pps.reduce((s, pp) => {
-                          const cavities = mouldMap.get(pp.mouldId ?? "")?.numberOfCavities ?? 0;
-                          return s + cavities * pp.quantity;
-                        }, 0);
-                        const links = linksByPlan.get(li.planId) ?? [];
-                        const orderRefs = [...new Set(
-                          links.map((l) => {
-                            const item = orderItemById.get(l.orderItemId);
-                            const order = item ? orderMap.get(item.orderId) : undefined;
-                            return order?.customerName ?? order?.eventName ?? null;
-                          }).filter(Boolean) as string[],
-                        )];
-                        const orderedStepIds = [...li.stepIds].sort((a, b) => {
-                          const sa = stepById.get(a)?.sortOrder ?? 0;
-                          const sb = stepById.get(b)?.sortOrder ?? 0;
-                          return sa - sb;
-                        });
-                        const stepsDone = orderedStepIds.filter((sid) => stepDoneFor(li.planId, sid)).length;
-
-                        return (
-                          <li key={li.id ?? `${li.productionDayId}-${li.planId}`} className="px-4 py-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <Link
-                                href={`/production/${encodeURIComponent(plan.id!)}`}
-                                className="flex-1 min-w-0 group"
-                              >
-                                <div className="flex items-center gap-2 flex-wrap mb-1">
-                                  <span className="text-sm font-medium truncate">
-                                    {productNames.length === 1 ? productNames[0] : `${productNames.length} products`}
+                    return (
+                      <Link
+                        key={li.id ?? `${li.productionDayId}-${li.planId}`}
+                        href={`/production/${encodeURIComponent(plan.id!)}`}
+                        style={{ display: "block", color: "inherit", textDecoration: "none" }}
+                      >
+                        <ListRow
+                          tier={tier}
+                          title={
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span>{productNames.length === 1 ? productNames[0] : `${productNames.length} products`}</span>
+                              {plan.batchNumber && (
+                                <span style={{
+                                  fontFamily: "var(--font-mono, monospace)", fontSize: 10,
+                                  color: "var(--ds-text-muted)",
+                                  background: "var(--ds-card-bg-hover, rgba(0,0,0,0.04))",
+                                  padding: "1px 6px", borderRadius: 4,
+                                }}>
+                                  {plan.batchNumber}
+                                </span>
+                              )}
+                              {totalMoulds > 0 && (
+                                <span style={{ fontSize: 11, fontWeight: 400, color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                                  · {totalMoulds} mould{totalMoulds === 1 ? "" : "s"} · {totalPieces} pcs
+                                </span>
+                              )}
+                            </span>
+                          }
+                          meta={
+                            <>
+                              {orderRefs.length > 0 && (
+                                <span>for {orderRefs.join(", ")}</span>
+                              )}
+                              {orderRefs.length > 0 && mouldSummary.length > 0 && " · "}
+                              {mouldSummary.length > 0 && (
+                                <span>Mould: {mouldSummary.join(", ")}</span>
+                              )}
+                            </>
+                          }
+                          secondary={
+                            <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 4 }}>
+                              {orderedStepIds.map((stepId) => {
+                                const step = stepById.get(stepId);
+                                const done = stepDoneFor(li.planId, stepId);
+                                return (
+                                  <span
+                                    key={stepId}
+                                    style={{
+                                      display: "inline-flex", alignItems: "center", gap: 3,
+                                      padding: "1px 6px", borderRadius: 4, fontSize: 10,
+                                      border: `0.5px solid ${done ? "var(--ds-tier-positive)" : "var(--ds-border-warm)"}`,
+                                      background: done ? "var(--ds-tint-ok, rgba(78,165,138,0.08))" : "var(--ds-card-bg)",
+                                      color: done ? "var(--ds-tier-positive)" : "var(--ds-text-muted)",
+                                    }}
+                                  >
+                                    {done && <CheckCircle size={10} />}
+                                    {step?.name ?? stepId}
                                   </span>
-                                  {plan.batchNumber && (
-                                    <span className="font-mono text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                      {plan.batchNumber}
-                                    </span>
-                                  )}
-                                  {totalMoulds > 0 && (
-                                    <span className="text-[11px] text-muted-foreground">
-                                      {totalMoulds} mould{totalMoulds === 1 ? "" : "s"} · {totalPieces} pcs
-                                    </span>
-                                  )}
-                                  <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
-                                {orderRefs.length > 0 && (
-                                  <p className="text-[11px] text-muted-foreground truncate mb-1">
-                                    for {orderRefs.join(", ")}
-                                  </p>
-                                )}
-                                {mouldSummary.length > 0 && (
-                                  <p className="text-[11px] text-muted-foreground truncate mb-1">
-                                    Mould: {mouldSummary.join(", ")}
-                                  </p>
-                                )}
-                                <div className="flex flex-wrap gap-1 text-[10px]">
-                                  {orderedStepIds.map((stepId) => {
-                                    const step = stepById.get(stepId);
-                                    const done = stepDoneFor(li.planId, stepId);
-                                    return (
-                                      <span
-                                        key={stepId}
-                                        className={`rounded-[4px] border px-1.5 py-0.5 flex items-center gap-1 ${
-                                          done
-                                            ? "border-status-ok/40 bg-status-ok/10 text-status-ok"
-                                            : "border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] text-muted-foreground"
-                                        }`}
-                                      >
-                                        {done && <CheckCircle className="w-2.5 h-2.5" />}
-                                        {step?.name ?? stepId}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                                <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
-                                  {stepsDone}/{orderedStepIds.length} steps · {li.plannedMinutes}m
-                                </p>
-                              </Link>
+                                );
+                              })}
+                            </span>
+                          }
+                          side={
+                            <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                              <span style={{ fontSize: 11, color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                                {stepsDone}/{orderedStepIds.length} steps · {li.plannedMinutes}m
+                              </span>
                               {plan.status === "draft" && (
                                 <button
-                                  onClick={(e) => { e.preventDefault(); setConfirmDeleteId(plan.id!); }}
-                                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDeleteId(plan.id!); }}
                                   aria-label="Delete batch"
                                   title="Delete batch"
+                                  style={{
+                                    padding: 4, background: "transparent", border: "none",
+                                    color: "var(--ds-text-muted)", cursor: "pointer",
+                                  }}
+                                  className="hover:[color:var(--ds-tier-urgent)]"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 size={13} />
                                 </button>
                               )}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </section>
-              );
-            })}
-          </div>
+                              <ChevronRight size={12} style={{ color: "var(--ds-text-muted)", opacity: 0.5 }} />
+                            </span>
+                          }
+                        />
+                      </Link>
+                    );
+                  })
+                )}
+              </Section>
+            );
+          })
         )}
 
-        {/* Draft batches with no scheduled days yet — usually because
-            the scheduler had warnings (no mould, missing steps, etc.). */}
+        {/* Draft batches with no scheduled days yet — surfaced so they
+            don't get lost when the scheduler had warnings. */}
         {unscheduledDrafts.length > 0 && (
-          <section className="rounded-[4px] border border-status-warn/40 bg-status-warn-bg/20 p-3 space-y-2">
-            <h2 className="text-sm font-semibold text-status-warn flex items-center gap-1.5">
-              <Clock className="w-4 h-4" /> Drafts with nothing scheduled
-            </h2>
-            <ul className="space-y-1.5">
-              {unscheduledDrafts.map((plan) => (
-                <li key={plan.id} className="flex items-center justify-between text-xs">
-                  <Link href={`/production/${encodeURIComponent(plan.id!)}`} className="flex-1 hover:underline truncate">
-                    {plan.name}
-                    {plan.batchNumber && (
-                      <span className="ml-2 font-mono text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                        {plan.batchNumber}
-                      </span>
-                    )}
+          <Section
+            title={
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--ds-semantic-warn)" }}>
+                <Clock size={14} /> Drafts with nothing scheduled
+              </span>
+            }
+            noBody
+          >
+            {unscheduledDrafts.map((plan) => (
+              <ListRow
+                key={plan.id}
+                tier="parked"
+                title={
+                  <Link
+                    href={`/production/${encodeURIComponent(plan.id!)}`}
+                    style={{ color: "inherit", textDecoration: "none" }}
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <span>{plan.name}</span>
+                      {plan.batchNumber && (
+                        <span style={{
+                          fontFamily: "var(--font-mono, monospace)", fontSize: 10,
+                          color: "var(--ds-text-muted)",
+                          background: "var(--ds-card-bg-hover, rgba(0,0,0,0.04))",
+                          padding: "1px 6px", borderRadius: 4,
+                        }}>
+                          {plan.batchNumber}
+                        </span>
+                      )}
+                    </span>
                   </Link>
+                }
+                side={
                   <button
                     onClick={() => setConfirmDeleteId(plan.id!)}
-                    className="text-muted-foreground hover:text-destructive ml-2"
                     aria-label="Delete batch"
                     title="Delete batch"
+                    style={{
+                      padding: 4, background: "transparent", border: "none",
+                      color: "var(--ds-text-muted)", cursor: "pointer",
+                    }}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 size={13} />
                   </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {/* Delete confirmation */}
-        {confirmDeleteId && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDeleteId(null)} />
-            <div className="relative w-full max-w-sm rounded border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl p-5 space-y-3">
-              <h3 className="text-base font-bold">Delete batch?</h3>
-              <p className="text-sm text-muted-foreground">
-                This removes the batch and its scheduling. Step progress and stock movements remain. Deleting does NOT touch the orders it was serving.
-              </p>
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  onClick={() => setConfirmDeleteId(null)}
-                  className="text-sm rounded-[4px] border border-[color:var(--ds-border-warm)] px-3 py-1.5 hover:bg-muted"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDelete(confirmDeleteId)}
-                  className="text-sm rounded-[4px] bg-destructive text-destructive-foreground px-3 py-1.5 hover:opacity-90"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
+                }
+              />
+            ))}
+          </Section>
         )}
       </div>
+
+      <DsDialog
+        open={!!confirmDeleteId}
+        title="Delete batch?"
+        description="This removes the batch and its scheduling. Step progress and stock movements remain. Deleting does NOT touch the orders it was serving."
+        tone="destructive"
+        confirmLabel="Delete"
+        onConfirm={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

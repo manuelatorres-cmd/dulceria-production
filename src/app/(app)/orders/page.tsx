@@ -36,11 +36,7 @@ import {
   IconBuildingWarehouse as Warehouse,
   IconFlame as Flame,
 } from "@tabler/icons-react";
-import { ListRow, StatusTag, PageHeader, type ListRowTier, type StatusTagKind } from "@/components/dulceria";
-
-/* iOS-glass design tokens — match /dashboard, /plan, /production-brain. */
-const CARD = "bg-[color:var(--ds-card-bg)] border-[0.5px] border-[color:var(--ds-border-warm)] rounded-[8px] p-4";
-const SECTION_TITLE = "text-[10px] tracking-[0.08em] uppercase text-muted-foreground font-semibold mb-3 flex items-center gap-2";
+import { ListRow, StatusTag, PageHeader, Section, DsTabNav, DsButton, type ListRowTier, type StatusTagKind } from "@/components/dulceria";
 
 const STATUS_STYLE: Record<OrderStatus, string> = {
   pending:       "bg-[var(--accent-butter-bg)] text-[var(--accent-butter-ink)]",
@@ -217,67 +213,63 @@ export default function OrdersPage() {
           <>
             <Link
               href="/orders/online"
-              className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-sm font-medium hover:bg-[color:var(--ds-card-bg-hover)] transition"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "4px 12px", fontSize: 13,
+                border: "0.5px solid var(--ds-border-warm)", borderRadius: 4,
+                background: "var(--ds-card-bg)", color: "var(--ds-text-primary)",
+                textDecoration: "none",
+              }}
+              className="hover:bg-[color:var(--ds-card-bg-hover)]"
             >
-              <ShoppingBag className="w-3.5 h-3.5" /> Online
+              <ShoppingBag size={13} /> Online
             </Link>
             {!adding && (
-              <button
-                onClick={() => setAdding(true)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--ds-tier-quarter-focus)] text-white px-3 py-1.5 text-sm font-medium hover:opacity-90 transition"
-              >
-                <Plus className="w-3.5 h-3.5" /> New order
-              </button>
+              <DsButton variant="primary" size="sm" onClick={() => setAdding(true)}>
+                <Plus size={13} style={{ marginRight: 4, verticalAlign: "-2px" }} /> New order
+              </DsButton>
             )}
           </>
         }
       />
-      <div className="px-4 pt-3 pb-6">
-      <div className={CARD + " mb-4"}>
-        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-          <div className="relative flex-1 max-w-xs min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Search + status pills toolbar — flat, no card wrapper */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ position: "relative", flex: "1 1 200px", maxWidth: 320 }}>
+            <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ds-text-muted)" }} />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by customer or event"
-              className="input !pl-8 text-sm"
+              style={{
+                width: "100%", padding: "6px 10px 6px 30px", fontSize: 13,
+                border: "0.5px solid var(--ds-border-warm)", borderRadius: 4,
+                background: "var(--ds-card-bg)", color: "var(--ds-text-primary)",
+                outline: "none",
+              }}
             />
           </div>
-          {/* Status tabs as pastel chips, count badges reflect the
-              unfiltered-by-search totals. */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {(["all", ...ORDER_STATUSES] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setFilterStatus(s)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  filterStatus === s
-                    ? "bg-[color:var(--ds-tier-quarter-focus)] text-white"
-                    : "bg-[color:var(--ds-card-bg)] text-muted-foreground border border-[color:var(--ds-border-warm)] hover:bg-[color:var(--ds-card-bg-hover)]"
-                }`}
-              >
-                {s === "all" ? "All" : ORDER_STATUS_LABELS[s]}
-                <span className="ml-1.5 opacity-70 tabular-nums">
-                  {statusCounts[s]}
-                </span>
-              </button>
-            ))}
-          </div>
+          <DsTabNav
+            variant="pills"
+            tabs={(["all", ...ORDER_STATUSES] as const).map((s) => ({
+              id: s,
+              label: s === "all" ? "All" : ORDER_STATUS_LABELS[s],
+              count: statusCounts[s],
+            }))}
+            activeTab={filterStatus}
+            onChange={(id) => setFilterStatus(id as FilterStatus)}
+          />
         </div>
-      </div>
-
-      <div className="space-y-4">
 
         {adding && <NewOrderForm onSaved={() => setAdding(false)} onCancel={() => setAdding(false)} />}
 
         {filtered.length === 0 ? (
-          <div className={CARD + " text-center"}>
-            <p className="text-sm text-muted-foreground py-4">
-              {orders.length === 0 ? "No orders yet." : "No orders match the filters."}
+          <Section title={orders.length === 0 ? "No orders yet" : "No matches"}>
+            <p style={{ padding: "12px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic", textAlign: "center" }}>
+              {orders.length === 0 ? "No orders yet. Click “New order” to add one." : "No orders match the filters."}
             </p>
-          </div>
+          </Section>
         ) : (() => {
           // Section orders by channel so online / b2b / event / shop
           // each read as their own block. Within each, sorted by
@@ -297,14 +289,19 @@ export default function OrdersPage() {
               ),
             }));
           return sections.map(({ channel, orders: chOrders }) => (
-            <section key={channel} className={CARD}>
-              <h2 className={SECTION_TITLE}>
-                <span>{ORDER_CHANNEL_LABELS[channel]}</span>
-                <span className="opacity-60 tabular-nums normal-case font-normal">
-                  · {chOrders.length}
+            <Section
+              key={channel}
+              title={
+                <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+                  <span>{ORDER_CHANNEL_LABELS[channel]}</span>
+                  <span style={{ fontSize: 11, fontWeight: 400, color: "var(--ds-text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                    · {chOrders.length}
+                  </span>
                 </span>
-              </h2>
-              <ul className="space-y-2">
+              }
+              noBody
+            >
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {chOrders.map((order) => {
               const items = itemsByOrder.get(order.id!) ?? [];
               const lineCount = items.length;
@@ -453,10 +450,9 @@ export default function OrdersPage() {
               );
             })}
               </ul>
-            </section>
+            </Section>
           ));
         })()}
-      </div>
       </div>
     </div>
   );

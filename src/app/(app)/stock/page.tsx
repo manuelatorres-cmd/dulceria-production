@@ -25,7 +25,7 @@ import {
 import { STOCK_LOCATION_SHORT_LABELS, STOCK_LOCATIONS, type StockLocation } from "@/types";
 import { TransferModal } from "@/components/transfer-modal";
 import { IconArrowsMove as Move } from "@tabler/icons-react";
-import { PageHeader } from "@/components/dulceria";
+import { PageHeader, DsTabNav } from "@/components/dulceria";
 import { IconSearch as Search, IconAdjustmentsHorizontal as SlidersHorizontal, IconX as X, IconPlus as Plus, IconClipboardList as ClipboardList, IconSnowflake as Snowflake, IconChevronDown as ChevronDown, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import type { PlanProduct, ProductionPlan, Product, Mould, FillingStock, StockMovement } from "@/types";
 import { reconcileStockCount } from "@/lib/stockCount";
@@ -114,32 +114,39 @@ export default function StockPage() {
 
   return (
     <div className="ds" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-      <PageHeader title="Stock" meta="Track what's still in stock" />
+      <PageHeader
+        title="Stock"
+        meta="Track what's still in stock"
+        actions={
+          <Link
+            href="/stock/adjust"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "4px 12px", fontSize: 12, fontWeight: 500,
+              border: "0.5px solid var(--ds-border-warm)", borderRadius: 4,
+              background: "var(--ds-card-bg)", color: "var(--ds-text-primary)",
+              textDecoration: "none",
+            }}
+            className="hover:[border-color:var(--ds-tier-quarter-focus)] hover:[color:var(--ds-tier-quarter-focus)]"
+            title="Opening balance, recounts, breakage"
+          >
+            Adjust stock →
+          </Link>
+        }
+      />
 
-      {/* Tab strip + adjust link */}
-      <div className="px-4 pb-3 flex items-center gap-2">
-        <div className="flex gap-1">
-          {(["products", "boxes", "fillings", "movements"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                activeTab === tab
-                  ? "bg-accent text-accent-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab === "products" ? "Products" : tab === "boxes" ? "Boxes" : tab === "fillings" ? "Fillings" : "Movements"}
-            </button>
-          ))}
-        </div>
-        <Link
-          href="/stock/adjust"
-          className="ml-auto inline-flex items-center gap-1 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3 py-1.5 text-xs font-medium hover:border-primary hover:text-primary"
-          title="Opening balance, recounts, breakage"
-        >
-          Adjust stock →
-        </Link>
+      <div style={{ padding: "0 32px 12px" }}>
+        <DsTabNav
+          variant="pills"
+          tabs={[
+            { id: "products", label: "Products" },
+            { id: "boxes", label: "Boxes" },
+            { id: "fillings", label: "Fillings" },
+            { id: "movements", label: "Movements" },
+          ]}
+          activeTab={activeTab}
+          onChange={(id) => setActiveTab(id as typeof activeTab)}
+        />
       </div>
 
       {activeTab === "products" ? (

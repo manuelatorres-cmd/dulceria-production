@@ -21,7 +21,7 @@ import {
 import { ORDER_CHANNEL_LABELS } from "@/types";
 import type { StockLocation } from "@/types";
 import { IconPackage as Package, IconAlertTriangle as AlertTriangle, IconCheck as Check, IconExternalLink as ExternalLink, IconBox as Box } from "@tabler/icons-react";
-import { PageHeader } from "@/components/dulceria";
+import { PageHeader, Section, DsTabNav } from "@/components/dulceria";
 
 type Tab = "pack" | "box";
 
@@ -45,25 +45,17 @@ export default function PickingPage() {
         title="Picking"
         meta="Ship ready orders + assemble boxed inventory"
       />
-      <div className="px-6 pt-3 pb-5 max-w-5xl mx-auto">
-      <div className="inline-flex rounded-full border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] overflow-hidden text-sm mb-4">
-        <button
-          type="button"
-          onClick={() => setTab("pack")}
-          className={"px-4 py-1.5 transition " + (tab === "pack" ? "bg-[color:var(--ds-tier-quarter-focus)] text-white" : "text-muted-foreground hover:text-foreground")}
-        >
-          Pack & ship
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("box")}
-          className={"px-4 py-1.5 transition " + (tab === "box" ? "bg-[color:var(--ds-tier-quarter-focus)] text-white" : "text-muted-foreground hover:text-foreground")}
-        >
-          Box up
-        </button>
-      </div>
-
-      {tab === "pack" ? <PackTab /> : <BoxTab />}
+      <div style={{ padding: "16px 32px 40px", display: "flex", flexDirection: "column", gap: 16, maxWidth: 960, margin: "0 auto", width: "100%" }}>
+        <DsTabNav
+          variant="pills"
+          tabs={[
+            { id: "pack", label: "Pack & ship" },
+            { id: "box", label: "Box up" },
+          ]}
+          activeTab={tab}
+          onChange={(id) => setTab(id as Tab)}
+        />
+        {tab === "pack" ? <PackTab /> : <BoxTab />}
       </div>
     </div>
   );
@@ -122,18 +114,21 @@ function PackTab() {
 
   if (ready.length === 0) {
     return (
-      <div className="rounded-[8px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
-        <Package className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          No orders ready to pack. New online imports + B2B / event orders with allocated
-          stock will appear here automatically.
-        </p>
-      </div>
+      <Section title="Ready to pack">
+        <div style={{ padding: "32px 20px", textAlign: "center" }}>
+          <Package size={28} style={{ display: "block", margin: "0 auto 8px", color: "var(--ds-text-muted)" }} />
+          <p style={{ fontSize: 13, color: "var(--ds-text-muted)" }}>
+            No orders ready to pack. New online imports + B2B / event orders with allocated
+            stock will appear here automatically.
+          </p>
+        </div>
+      </Section>
     );
   }
 
   return (
-    <ul className="space-y-2">
+    <Section title="Ready to pack" action={`${ready.length} order${ready.length === 1 ? "" : "s"}`}>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
       {ready.map((o) => {
         const orderItems = itemsByOrder.get(o.id!) ?? [];
         const totalPieces = orderItems.reduce((s, it) => s + (it.quantity ?? 0), 0);
@@ -220,7 +215,8 @@ function PackTab() {
           </li>
         );
       })}
-    </ul>
+      </ul>
+    </Section>
   );
 }
 
@@ -428,17 +424,20 @@ function BoxTab() {
 
   if (boxableVps.length === 0) {
     return (
-      <div className="rounded-[8px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] p-8 text-center">
-        <Box className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          No boxed variants defined. Add a variant size with packaging + product composition on /variants/[id] to enable box-up here.
-        </p>
-      </div>
+      <Section title="Box up">
+        <div style={{ padding: "32px 20px", textAlign: "center" }}>
+          <Box size={28} style={{ display: "block", margin: "0 auto 8px", color: "var(--ds-text-muted)" }} />
+          <p style={{ fontSize: 13, color: "var(--ds-text-muted)" }}>
+            No boxed variants defined. Add a variant size with packaging + product composition on /variants/[id] to enable box-up here.
+          </p>
+        </div>
+      </Section>
     );
   }
 
   return (
-    <ul className="space-y-2">
+    <Section title="Box up" action={`${boxableVps.length} variant${boxableVps.length === 1 ? "" : "s"}`}>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
       {boxableVps.map((vp) => {
         const variant = variantById.get(vp.variantId);
         const comp = compByVp.get(vp.id!) ?? [];
@@ -561,6 +560,7 @@ function BoxTab() {
           </li>
         );
       })}
-    </ul>
+      </ul>
+    </Section>
   );
 }
