@@ -204,7 +204,7 @@ function PlanContent({
   planId, plan, planProducts, productNames, productsMap, fillingsMap, mouldsMap, statusMap, productIds,
 }: {
   planId: string;
-  plan: { id?: string; batchNumber?: string; batchSummary?: string; name: string; status: "draft" | "active" | "done" | "cancelled" | "orphaned"; notes?: string; fillingOverrides?: string; fillingPreviousBatches?: string; createdAt: Date; updatedAt: Date; completedAt?: Date; surplusDestination?: "store" | "freezer" | "waste" };
+  plan: { id?: string; batchNumber?: string; batchSummary?: string; name: string; status: "draft" | "active" | "done" | "cancelled" | "orphaned"; notes?: string; issuesNotes?: string; fillingOverrides?: string; fillingPreviousBatches?: string; createdAt: Date; updatedAt: Date; completedAt?: Date; surplusDestination?: "store" | "freezer" | "waste" };
   planProducts: PlanProduct[];
   productNames: Map<string, string>;
   productsMap: Map<string, Product>;
@@ -1563,8 +1563,12 @@ function PlanContent({
                         <>
                           <span>{mould?.name ?? "—"}</span>
                           {minutes > 0 && <> · ~{minutes} min</>}
-                          <> · </>
-                          <span style={{ fontStyle: "italic" }}>unassigned ✗</span>
+                          {pp.assignedPersonId && people.find((p) => p.id === pp.assignedPersonId) && (
+                            <> · {people.find((p) => p.id === pp.assignedPersonId)?.name}</>
+                          )}
+                          {!pp.assignedPersonId && (
+                            <> · <span style={{ fontStyle: "italic", color: "var(--ds-text-muted)" }}>unassigned</span></>
+                          )}
                         </>
                       }
                       side={
@@ -1611,8 +1615,7 @@ function PlanContent({
             </Section>
 
             <p style={{ fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
-              ✗ Per-batch assignee + drag-drop reorder via grip handle are deferred —
-              schema lacks <code>planProducts.assignedPersonId</code>; reorder uses ▲▼ for now.
+              ✗ True drag-drop reorder via grip handle is deferred — ▲▼ swap-sortOrder shipped for now.
             </p>
           </div>
         )}
@@ -2167,7 +2170,8 @@ function PlanContent({
                       <th style={{ textAlign: "left", padding: "8px 20px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Batch</th>
                       <th style={{ textAlign: "right", padding: "8px 12px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Planned</th>
                       <th style={{ textAlign: "right", padding: "8px 12px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Actual</th>
-                      <th style={{ textAlign: "right", padding: "8px 20px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Variance</th>
+                      <th style={{ textAlign: "right", padding: "8px 12px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Variance</th>
+                      <th style={{ textAlign: "left", padding: "8px 20px", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ds-text-muted)", fontWeight: 500 }}>Reason</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2185,8 +2189,26 @@ function PlanContent({
                           </td>
                           <td style={{ padding: "10px 12px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{planned}</td>
                           <td style={{ padding: "10px 12px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{actual ?? "—"}</td>
-                          <td style={{ padding: "10px 20px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: variance == null ? "var(--ds-text-muted)" : variance < 0 ? "var(--ds-tier-urgent)" : variance > 0 ? "var(--ds-tier-positive)" : "var(--ds-text-primary)" }}>
+                          <td style={{ padding: "10px 12px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: variance == null ? "var(--ds-text-muted)" : variance < 0 ? "var(--ds-tier-urgent)" : variance > 0 ? "var(--ds-tier-positive)" : "var(--ds-text-primary)" }}>
                             {variance == null ? "—" : variance > 0 ? `+${variance}` : variance}
+                          </td>
+                          <td style={{ padding: "6px 20px" }}>
+                            <input
+                              type="text"
+                              defaultValue={pp.varianceReason ?? ""}
+                              onBlur={async (e) => {
+                                const next = e.target.value.trim() || undefined;
+                                if (next === (pp.varianceReason ?? undefined)) return;
+                                await savePlanProduct({ ...pp, varianceReason: next });
+                              }}
+                              placeholder={variance != null && variance !== 0 ? "Why?" : "—"}
+                              style={{
+                                width: "100%", padding: "4px 8px", fontSize: 12,
+                                border: "0.5px solid var(--ds-border-warm)", borderRadius: 4,
+                                background: "var(--ds-card-bg)", color: "var(--ds-text-primary)",
+                                outline: "none",
+                              }}
+                            />
                           </td>
                         </tr>
                       );
@@ -2194,9 +2216,6 @@ function PlanContent({
                   </tbody>
                 </table>
               )}
-              <p style={{ padding: "8px 20px 0", fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
-                ✗ Variance reason field deferred — no <code>planProducts.varianceReason</code> column yet.
-              </p>
             </Section>
 
             {planProducts.length > 0 && (
@@ -2264,19 +2283,15 @@ function PlanContent({
                   }}
                   placeholder="What happened today — temperature swings, supplier delays, anything noteworthy."
                 />
-                <div>
-                  <DsInlineTextarea
-                    label="Issues encountered"
-                    value=""
-                    onSave={async () => { /* no-op until schema lands */ }}
-                    disabled
-                    placeholder="✗ Deferred — needs plan.issuesNotes column"
-                  />
-                  <p style={{ marginTop: 4, fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
-                    ✗ Separate issues field deferred — no <code>plan.issuesNotes</code> column yet.
-                    For now log issues in Day notes above.
-                  </p>
-                </div>
+                <DsInlineTextarea
+                  label="Issues encountered"
+                  value={plan.issuesNotes ?? ""}
+                  onSave={async (v) => {
+                    const trimmed = (v as string).trim();
+                    await saveProductionPlan({ ...plan as any, id: plan.id, issuesNotes: trimmed || undefined });
+                  }}
+                  placeholder="What broke, what slowed us down, what to fix next time."
+                />
               </div>
             </Section>
 
@@ -2389,6 +2404,20 @@ function PlanContent({
                   await savePlanProduct({ ...pp, quantity: q });
                 }}
               />
+              <DsInlineSelect
+                label="Assignee"
+                value={pp.assignedPersonId ?? ""}
+                onSave={async (v) => {
+                  await savePlanProduct({ ...pp, assignedPersonId: (v as string) || undefined });
+                }}
+                options={[
+                  { value: "", label: "— unassigned —" },
+                  ...people
+                    .filter((p) => !p.archived)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((p) => ({ value: p.id!, label: p.name })),
+                ]}
+              />
               <DsInlineTextarea
                 label="Batch notes"
                 value={pp.notes ?? ""}
@@ -2399,9 +2428,6 @@ function PlanContent({
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
                 <DsButton onClick={() => setEditingPlanProductId(null)}>Close</DsButton>
               </div>
-              <p style={{ fontSize: 10, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
-                ✗ Assignee picker deferred — schema lacks <code>planProducts.assignedPersonId</code>.
-              </p>
             </div>
           );
         })()}

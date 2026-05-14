@@ -487,6 +487,10 @@ export interface ProductionPlan {
    *  Set by the user via drag-drop in /plan week view + "Lock"
    *  confirmation. Cleared by the "Unpin" button on the same row. */
   pinnedDate?: string | null;
+  /** Free-text "issues encountered today" written during /production/[id]
+   *  Wrap up step. Kept distinct from `notes` (which doubles as a batch-
+   *  level sticky note). Migration 0089. */
+  issuesNotes?: string;
 }
 
 /**
@@ -537,6 +541,13 @@ export interface PlanProduct {
   /** Timestamp of the most recent defrost (ms). Sell-by date for defrosted pieces
    *  becomes `defrostedAt + preservedShelfLifeDays`. */
   defrostedAt?: number;
+  /** Person responsible for this batch. Free-text reference to people.id —
+   *  surfaced in /production/[id] Plan step. Migration 0089. */
+  assignedPersonId?: string;
+  /** Operator note explaining why actualYield ≠ planned (broken pieces,
+   *  overfilled moulds, bloom, etc.). Captured in /production/[id] Wrap up
+   *  step. Migration 0089. */
+  varianceReason?: string;
 }
 
 // Step completion is keyed by a deterministic string derived at runtime.
