@@ -1021,3 +1021,71 @@ Redesigned grid of decoration material color swatches (150px min) grouped by typ
 ---
 
 End audit.
+
+---
+
+## Status update — 2026-05-14
+
+Audit findings about legacy iOS-glass chrome are now mostly **stale**. Sweep
+on 2026-05-14 confirmed:
+
+- Every page-level `*/page.tsx` under `src/app/(app)/` imports from
+  `@/components/dulceria` — PageHeader / DsTabNav / Section / ListRow /
+  StatusTag / DsButton / etc. are universal.
+- `backdrop-blur` no longer appears in any page chrome. Remaining
+  `backdrop-blur` references live only in **10 legacy modal components**
+  under `src/components/`: allocation-split, temperature-log, workshop-
+  actions, machine-load, transfer, surplus, packing, leftover, freeze,
+  yield. Those modals still function correctly; refitting them to
+  `DsDialog` / `DsDrawer` is a cosmetic-only follow-up.
+
+### Today's shipped refits (2026-05-14)
+
+- `/orders` — toolbar flattened, channel sections wrap in `Section`
+  noBody, "New order" uses `DsButton`. Tabs migrated to `DsTabNav`
+  variant=pills.
+- `/picking` — bespoke rounded-full tab strip → `DsTabNav` pills;
+  PackTab + BoxTab outputs wrapped in `Section` with count action.
+- `/production` (list) — per-day iOS-glass section divs → `Section`
+  + `StatusTag` (day-status + Today chip); capacity chip moved to
+  Section action; batches render as `ListRow`; delete confirm via
+  `DsDialog`.
+- `/stock` — bespoke rounded-full tab strip → `DsTabNav` pills;
+  "Adjust stock" link moved to `PageHeader.actions`.
+- `/lab/audit-tab` — Phase F.1 (covered separately in
+  MEGA_PAGES_BATCH.md).
+
+### Pages confirmed already DS-clean (no work required)
+
+`/dashboard`, `/workshop`, `/campaigns`, `/campaigns/[id]`,
+`/production-orders`, `/production-brain/*` (hub, planner, daily,
+needed, equipment, haccp, manual, dashboard), `/plan` views,
+`/shop/*` (six pages — counter / daily-count / transfer / breakage /
+count / landing), `/customers`, `/quotes`, `/subscriptions`,
+`/observatory`, `/reports/*`, `/pricing`, `/stats`, `/imports`,
+`/lab/*`, `/audit`, `/shopping`, `/wall`, `/settings*`, and every
+detail page (products, fillings, ingredients, moulds, packaging,
+variants, decoration, orders, production).
+
+### What's actually still open
+
+1. **Modal DsDialog/DsDrawer migration** — 10 modal components still
+   use bespoke `backdrop-blur` shells (functional, not blocking).
+2. **Schema-blocked migrations** — see MEGA_PAGES_BATCH.md ✗ list:
+   `planStepStatus.startedAt`, `planStepStatus.personId`,
+   `mouldPoolInstance.dryingState`, `calibrations` table,
+   `productionDayLineItems.actuallyWorked`, `productionDayNotes`
+   table, `planProducts.varianceReason` + `assignedPersonId`,
+   `plan.issuesNotes`, equipment occupancy writes, real
+   cost-per-product aggregation.
+3. **Workflow rebuilds** (separate specs):
+   - WEEKLY_PLAN_REDESIGN_SPEC.md — 5-phase rebuild of
+     `/production-brain/plan` (most views already shipped per
+     handover 2026-04-30; phases 1-3 likely done, phases 4-5
+     verify).
+   - MANUAL_PLANNER_V2_SPEC.md — 5-phase rebuild of
+     `/production-brain/manual`.
+4. **Settings physical split** — `_section-impls.tsx` (~2800 LOC)
+   still holds the per-tab bodies. Subroute wiring + provider in
+   place; move bodies into the named `*-section.tsx` files for the
+   final physical split.
