@@ -563,6 +563,15 @@ export interface PlanStepStatus {
   stepKey: string;
   done: boolean;
   doneAt?: Date;
+  /** Timestamp when this step first transitioned to in-progress.
+   *  Drives elapsed-time display on /production-brain/daily +
+   *  the wizard step-detail drawer. Migration 0090. */
+  startedAt?: Date;
+  /** Person actively working this step (free-text reference to
+   *  people.id). Migration 0090. */
+  personId?: string;
+  /** Timestamp when the step was paused. Cleared on resume. Migration 0090. */
+  pausedAt?: Date;
 }
 
 // --- Ingredient Stock ---
@@ -2126,6 +2135,42 @@ export interface ProductionDay {
   };
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+/** Free-text notes scribbled throughout a production day — one row per
+ *  productionDay. Distinct from `productionDays.summary` (close-of-day
+ *  snapshot) so mid-day edits don't collide with the close-out write.
+ *  Migration 0091. */
+export interface ProductionDayNotes {
+  id?: string;
+  productionDayId: string;
+  notes: string;
+  updatedAt?: Date;
+  updatedBy?: string;
+}
+
+export const CALIBRATION_OUTCOMES = ["ok", "out_of_tolerance", "adjusted", "retired"] as const;
+export type CalibrationOutcome = (typeof CALIBRATION_OUTCOMES)[number];
+
+export const CALIBRATION_CADENCES = ["monthly", "quarterly", "annual", "ad_hoc"] as const;
+export type CalibrationCadence = (typeof CALIBRATION_CADENCES)[number];
+
+/** Periodic equipment calibration event — scale tare, thermometer
+ *  ice-point verification, etc. Distinct from HaccpTemperatureLog
+ *  (daily fridge/freezer readings). Migration 0092. */
+export interface Calibration {
+  id?: string;
+  equipmentId: string;
+  calibratedAt: Date;
+  calibratedBy?: string;
+  outcome: CalibrationOutcome;
+  cadence: CalibrationCadence;
+  nextDueAt?: Date;
+  referenceValue?: number;
+  measuredValue?: number;
+  deltaTolerance?: number;
+  notes?: string;
+  createdAt?: Date;
 }
 
 /** One temperature reading against a piece of equipment. */

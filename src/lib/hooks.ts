@@ -2622,6 +2622,82 @@ export async function toggleStep(planId: string, stepKey: string, done: boolean)
   queryClient.invalidateQueries({ queryKey: ["plan-step-statuses"] });
 }
 
+/** Mark a step in-progress + stamp `startedAt` (or pause it / resume).
+ *  Idempotent — repeated `start` calls leave the original timestamp.
+ *  Migration 0090 adds the underlying columns. */
+export async function setPlanStepRunState(
+  planId: string,
+  stepKey: string,
+  state: "start" | "pause" | "resume",
+): Promise<void> {
+  const existing = assertOkMaybe(
+    await supabase.from("planStepStatus")
+      .select("*")
+      .eq("planId", planId)
+      .eq("stepKey", stepKey)
+      .maybeSingle(),
+  ) as PlanStepStatus | null;
+  const now = new Date();
+  if (existing) {
+    const patch: Record<string, unknown> = {};
+    if (state === "start") {
+      if (!existing.startedAt) patch.startedAt = now;
+      patch.pausedAt = null;
+    } else if (state === "pause") {
+      patch.pausedAt = now;
+    } else {
+      patch.pausedAt = null;
+    }
+    const { error } = await supabase
+      .from("planStepStatus")
+      .update(patch)
+      .eq("id", existing.id!);
+    if (error) throw error;
+  } else if (state === "start") {
+    const { error } = await supabase.from("planStepStatus").insert({
+      id: newId(),
+      planId,
+      stepKey,
+      done: false,
+      startedAt: now,
+    });
+    if (error) throw error;
+  }
+  queryClient.invalidateQueries({ queryKey: ["plan-step-statuses"] });
+}
+
+/** Assign / unassign a person to a step. `personId = null` clears. */
+export async function setPlanStepPerson(
+  planId: string,
+  stepKey: string,
+  personId: string | null,
+): Promise<void> {
+  const existing = assertOkMaybe(
+    await supabase.from("planStepStatus")
+      .select("*")
+      .eq("planId", planId)
+      .eq("stepKey", stepKey)
+      .maybeSingle(),
+  ) as PlanStepStatus | null;
+  if (existing) {
+    const { error } = await supabase
+      .from("planStepStatus")
+      .update({ personId })
+      .eq("id", existing.id!);
+    if (error) throw error;
+  } else if (personId) {
+    const { error } = await supabase.from("planStepStatus").insert({
+      id: newId(),
+      planId,
+      stepKey,
+      done: false,
+      personId,
+    });
+    if (error) throw error;
+  }
+  queryClient.invalidateQueries({ queryKey: ["plan-step-statuses"] });
+}
+
 // --- User Preferences (single-row config, synced via Supabase) ---
 
 const DEFAULT_PREFERENCES: Omit<UserPreferences, "id"> = {

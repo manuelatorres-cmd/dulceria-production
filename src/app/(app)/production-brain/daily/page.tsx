@@ -122,6 +122,8 @@ export default function DailyV2Page() {
   const allLineItems = useAllProductionDayLineItems();
   const todayDay = useTodayProductionDay();
   const people = usePeople(false);
+  const peopleById = useMemo(() => new Map(people.map((p) => [p.id!, p])), [people]);
+  const nowMs = Date.now();
   const unavailability = usePersonUnavailability();
   const equipmentInstances = useEquipmentInstances();
   const equipment = useEquipment();
@@ -1377,27 +1379,47 @@ export default function DailyV2Page() {
                       {rightNow.current.mouldName}
                     </span>
                     <span style={{ opacity: 0.7 }}>· {rightNow.current.batchLabel}</span>
-                    {/* Assignee chip — ✗ deferred (PlanStepStatus has no personId). */}
-                    <span
-                      title="Assignee per step — deferred (mig: add personId on planStepStatus)"
-                      style={{
-                        background: "var(--accent-terracotta-bg)",
-                        color: "var(--accent-terracotta-ink)",
-                        padding: "1px 8px",
-                        borderRadius: 999,
-                        fontSize: 11,
-                        opacity: 0.55,
-                      }}
-                    >
-                      unassigned ✗
-                    </span>
-                    {/* Started / elapsed — ✗ deferred (PlanStepStatus has no startedAt). */}
-                    <span
-                      title="Started + elapsed timer — deferred (mig: add startedAt on planStepStatus)"
-                      style={{ opacity: 0.55, fontVariantNumeric: "tabular-nums" }}
-                    >
-                      started — · elapsed —  ✗
-                    </span>
+                    {(() => {
+                      // Look up the live planStepStatus row for this batch's
+                      // active phase. We prefix-match because stepKeys carry
+                      // a per-pp suffix (e.g. polishing-<ppId>). Latest match
+                      // by startedAt wins.
+                      const prefix = `${rightNow.current.phase}-${rightNow.current.ppId}`;
+                      type S = import("@/types").PlanStepStatus;
+                      const status = (allStatuses as S[])
+                        .filter((s) => s.planId === rightNow.current!.planId
+                          && (s.stepKey === prefix || s.stepKey.startsWith(`${prefix}-`)))
+                        .sort((a, b) => {
+                          const ta = a.startedAt ? new Date(a.startedAt).getTime() : 0;
+                          const tb = b.startedAt ? new Date(b.startedAt).getTime() : 0;
+                          return tb - ta;
+                        })[0];
+                      const person = status?.personId ? peopleById.get(status.personId) : null;
+                      const startedAt = status?.startedAt ? new Date(status.startedAt) : null;
+                      const elapsedMin = startedAt
+                        ? Math.max(0, Math.round((nowMs - startedAt.getTime()) / 60000))
+                        : null;
+                      return (
+                        <>
+                          <span
+                            style={{
+                              background: person ? "var(--accent-terracotta-bg)" : "var(--ds-card-bg-hover, rgba(0,0,0,0.04))",
+                              color: person ? "var(--accent-terracotta-ink)" : "var(--ds-text-muted)",
+                              padding: "1px 8px",
+                              borderRadius: 999,
+                              fontSize: 11,
+                            }}
+                          >
+                            {person ? person.name : "unassigned"}
+                          </span>
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                            {startedAt
+                              ? `started ${startedAt.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" })} · elapsed ${elapsedMin}m`
+                              : "not started"}
+                          </span>
+                        </>
+                      );
+                    })()}
                   </div>
                   <div className="h-1.5 rounded-[3px] overflow-hidden mt-3" style={{ background: "rgba(0,0,0,0.06)" }}>
                     <div

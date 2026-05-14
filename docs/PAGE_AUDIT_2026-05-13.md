@@ -1069,23 +1069,37 @@ variants, decoration, orders, production).
 
 ### What's actually still open
 
-1. **Modal DsDialog/DsDrawer migration** — 10 modal components still
-   use bespoke `backdrop-blur` shells (functional, not blocking).
-2. **Schema-blocked migrations** — see MEGA_PAGES_BATCH.md ✗ list:
-   `planStepStatus.startedAt`, `planStepStatus.personId`,
-   `mouldPoolInstance.dryingState`, `calibrations` table,
-   `productionDayLineItems.actuallyWorked`, `productionDayNotes`
-   table, `planProducts.varianceReason` + `assignedPersonId`,
-   `plan.issuesNotes`, equipment occupancy writes, real
-   cost-per-product aggregation.
-3. **Workflow rebuilds** (separate specs):
+1. **Modal DsDialog/DsDrawer migration** — ✓ shipped 2026-05-14.
+   `DsModalShell` introduced; all 10 workflow modals (packing, yield,
+   leftover, freeze, transfer, surplus, allocation-split, machine-load,
+   temperature-log, workshop-actions) converted. Zero `backdrop-blur`
+   in the src tree.
+2. **Schema migrations** — ✓ batch 0089–0092 shipped 2026-05-14:
+   - 0089: `planProducts.assignedPersonId` + `.varianceReason`,
+     `productionPlans.issuesNotes` (wired into Plan / Wrap up steps)
+   - 0090: `planStepStatus.startedAt` + `.personId` + `.pausedAt`
+     (wired into Right-now card on /production-brain/daily)
+   - 0091: `productionDayNotes` table (schema only — UI follow-up)
+   - 0092: `calibrations` table (schema only — UI follow-up)
+3. **Still open (schema-only, UI deferred)**:
+   - `mouldPoolInstance.dryingState` (3-state mould pool dot)
+   - Real cost-per-product aggregation for `/reports/monthly`
+     margin (placeholder still `null`)
+   - Equipment occupancy writes (`currentPlanId`/`occupiedSince`/
+     `expectedFreeAt` columns exist; scheduler doesn't write them)
+   - Day-notes UI on `/production-brain/plan` day drawer (table now
+     exists via 0091, just needs upsert wiring)
+   - Calibrations UI on `/production-brain/haccp` (table now
+     exists via 0092, just needs list + form)
+4. **Workflow rebuilds** (separate specs):
    - WEEKLY_PLAN_REDESIGN_SPEC.md — 5-phase rebuild of
      `/production-brain/plan` (most views already shipped per
      handover 2026-04-30; phases 1-3 likely done, phases 4-5
      verify).
    - MANUAL_PLANNER_V2_SPEC.md — 5-phase rebuild of
      `/production-brain/manual`.
-4. **Settings physical split** — `_section-impls.tsx` (~2800 LOC)
-   still holds the per-tab bodies. Subroute wiring + provider in
-   place; move bodies into the named `*-section.tsx` files for the
-   final physical split.
+5. **Settings physical split** — `_section-impls.tsx` (~2800 LOC)
+   still holds the per-tab bodies. Surface contract met (provider +
+   subroutes + thin re-export files + `all-tabs.tsx` deleted); the
+   physical body split is mechanical and intentionally deferred
+   because the underscore-prefixed module reads as a private helper.
