@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { IconArrowRight as ArrowRight, IconPackage as Package } from "@tabler/icons-react";
 import { STOCK_LOCATION_LABELS, type StockLocation } from "@/types";
 import type { Order } from "@/types";
+import { DsModalShell, DsButton } from "@/components/dulceria";
 
 /** Per-batch transfer dialog. Shows the current per-location distribution of
  *  a single batch, lets the user move a quantity from one location to another,
@@ -59,14 +60,6 @@ export function TransferModal({
     qtyRef.current?.select();
   }, []);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && !busy) onCancel();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onCancel, busy]);
-
   const available = distribution[from] ?? 0;
   const qtyNum = parseInt(qty, 10);
   const invalidQty = !Number.isFinite(qtyNum) || qtyNum <= 0 || qtyNum > available;
@@ -94,24 +87,23 @@ export function TransferModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={busy ? undefined : onCancel} />
-      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-9 h-9 rounded-[4px] bg-[color:var(--ds-tint-info)] flex items-center justify-center">
-              <Package className="w-5 h-5 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-base font-bold text-foreground truncate">Move stock</h3>
-              <p className="text-xs text-muted-foreground truncate">
-                {productName}{batchLabel ? ` · ${batchLabel}` : ""}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-5 py-3 space-y-3">
+    <DsModalShell
+      open
+      title="Move stock"
+      subtitle={`${productName}${batchLabel ? ` · ${batchLabel}` : ""}`}
+      icon={<Package size={15} />}
+      busy={busy}
+      onClose={onCancel}
+      footer={
+        <>
+          <DsButton onClick={onCancel} disabled={busy}>Cancel</DsButton>
+          <DsButton variant="primary" onClick={handleConfirm} disabled={!canConfirm || busy}>
+            {busy ? "Moving…" : "Move"}
+          </DsButton>
+        </>
+      }
+    >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
             <div>
               <label className="block text-[11px] text-muted-foreground mb-1">From</label>
@@ -198,28 +190,10 @@ export function TransferModal({
           </div>
 
           {sameLocation && (
-            <p className="text-[11px] text-status-warn">From and To can&apos;t be the same location.</p>
+            <p style={{ fontSize: 11, color: "var(--ds-semantic-warn)" }}>From and To can&apos;t be the same location.</p>
           )}
-          {error && <p className="text-[11px] text-status-alert">{error}</p>}
+          {error && <p style={{ fontSize: 11, color: "var(--ds-tier-urgent)" }}>{error}</p>}
         </div>
-
-        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex gap-2 justify-end">
-          <button
-            onClick={onCancel}
-            disabled={busy}
-            className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!canConfirm || busy}
-            className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {busy ? "Moving…" : "Move"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </DsModalShell>
   );
 }

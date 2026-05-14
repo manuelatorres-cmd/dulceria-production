@@ -54,3 +54,4 @@ export { DsTagInput, type DsTagInputProps } from "./tag-input";
 export { DsPhotoUpload, type DsPhotoUploadProps } from "./photo-upload";
 export { DsDialog, type DsDialogTone } from "./dialog";
 export { DsDrawer } from "./drawer";
+export { DsModalShell } from "./modal-shell";

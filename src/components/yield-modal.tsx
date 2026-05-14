@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IconPackage as Package } from "@tabler/icons-react";
+import { DsModalShell, DsButton } from "@/components/dulceria";
 
 export type YieldEntry = {
   planProductId: string;
@@ -77,43 +78,23 @@ export function YieldModal({ entries, mode = "batch", onConfirm, onCancel, cance
   const unaccounted = totalMax - totalAccounted;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-        onClick={onCancel}
-      />
-
-      <div
-        className="relative w-full max-w-lg mx-4 mb-4 sm:mb-0 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden"
-        style={{ borderRadius: 4 }}
-      >
-        <div className="bg-[color:var(--accent-peach-bg)] px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)]">
-          <div className="flex items-center gap-3 mb-1">
-            <div
-              className="w-9 h-9 bg-[color:var(--ds-card-bg)] flex items-center justify-center border border-[color:var(--ds-border-warm)]"
-              style={{ borderRadius: 3 }}
-            >
-              <Package className="w-5 h-5 text-foreground" />
-            </div>
-            <div>
-              <h3
-                className="text-[17px]"
-                style={{
-                  fontFamily: "var(--font-serif)",
-                  fontWeight: 500,
-                  letterSpacing: "-0.015em",
-                }}
-              >
-                {mode === "single" ? "Fresh from the mould" : "Batch complete"}
-              </h3>
-              <p className="text-[11.5px] text-muted-foreground">
-                Split the yield between intact, seconds, and scrap.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-5 py-4 space-y-5 max-h-[70vh] overflow-y-auto">
+    <DsModalShell
+      open
+      width={560}
+      title={mode === "single" ? "Fresh from the mould" : "Batch complete"}
+      subtitle="Split the yield between intact, seconds, and scrap."
+      icon={<Package size={15} />}
+      onClose={onCancel}
+      footer={
+        <>
+          <DsButton onClick={onCancel}>{cancelLabel ?? "Cancel"}</DsButton>
+          <DsButton variant="primary" onClick={() => onConfirm(localEntries)} disabled={unaccounted > 0}>
+            Add to stock
+          </DsButton>
+        </>
+      }
+    >
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {localEntries.map((entry, idx) => {
             const max = entry.totalProducts;
             const accounted =
@@ -217,63 +198,39 @@ export function YieldModal({ entries, mode = "batch", onConfirm, onCancel, cance
           })}
         </div>
 
-        <div className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] grid grid-cols-3 gap-3 text-[11px] text-muted-foreground">
+        <div style={{
+          marginTop: 8, paddingTop: 12,
+          borderTop: "0.5px solid var(--ds-border-warm)",
+          display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12,
+          fontSize: 11, color: "var(--ds-text-muted)",
+        }}>
           <div>
-            <span
-              className="uppercase"
-              style={{ letterSpacing: "0.1em" }}
-            >
-              Intact
-            </span>{" "}
-            <span className="text-foreground font-medium tabular-nums">
+            <span style={{ textTransform: "uppercase", letterSpacing: "0.1em" }}>Intact</span>{" "}
+            <span style={{ color: "var(--ds-text-primary)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
               {totalIntact}
             </span>
           </div>
           <div>
-            <span
-              className="uppercase"
-              style={{ letterSpacing: "0.1em" }}
-            >
-              Seconds
-            </span>{" "}
-            <span className="text-foreground font-medium tabular-nums">
+            <span style={{ textTransform: "uppercase", letterSpacing: "0.1em" }}>Seconds</span>{" "}
+            <span style={{ color: "var(--ds-text-primary)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
               {totalSeconds}
             </span>
           </div>
           <div>
-            <span
-              className="uppercase"
-              style={{ letterSpacing: "0.1em" }}
-            >
-              Scrap
-            </span>{" "}
-            <span className="text-foreground font-medium tabular-nums">
+            <span style={{ textTransform: "uppercase", letterSpacing: "0.1em" }}>Scrap</span>{" "}
+            <span style={{ color: "var(--ds-text-primary)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
               {totalScrap}
             </span>
           </div>
           {unaccounted !== 0 ? (
-            <div className="col-span-3 text-[11px] text-status-warn">
+            <div style={{ gridColumn: "1 / -1", color: "var(--ds-semantic-warn)" }}>
               {unaccounted > 0
                 ? `${unaccounted} pieces unaccounted — enter them before confirming.`
                 : `${Math.abs(unaccounted)} over target.`}
             </div>
           ) : null}
         </div>
-
-        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex gap-2 justify-end">
-          <button onClick={onCancel} className="btn-secondary">
-            {cancelLabel ?? "Cancel"}
-          </button>
-          <button
-            onClick={() => onConfirm(localEntries)}
-            className="btn-primary"
-            disabled={unaccounted > 0}
-          >
-            Add to stock
-          </button>
-        </div>
-      </div>
-    </div>
+    </DsModalShell>
   );
 }
 

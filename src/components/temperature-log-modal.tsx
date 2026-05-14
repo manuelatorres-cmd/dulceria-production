@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { IconTemperature as Thermometer } from "@tabler/icons-react";
 import type { Equipment } from "@/types";
 import { EQUIPMENT_LOCATION_LABELS } from "@/types";
+import { DsModalShell, DsButton } from "@/components/dulceria";
 
 export interface TemperatureEntryDraft {
   equipmentId: string;
@@ -102,24 +103,43 @@ export function TemperatureLogModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
-      <div className="relative w-full max-w-xl mx-4 mb-4 sm:mb-0 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden max-h-[85vh] flex flex-col">
-        <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-[4px] bg-[color:var(--ds-tint-info)] flex items-center justify-center">
-              <Thermometer className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold">Daily temperature check</h3>
-              <p className="text-xs text-muted-foreground">
-                Record a reading for each device before starting production — HACCP compliance.
-              </p>
+    <DsModalShell
+      open
+      width={640}
+      title="Daily temperature check"
+      subtitle="Record a reading for each device before starting production — HACCP compliance."
+      icon={<Thermometer size={15} />}
+      busy={saving}
+      onClose={() => { /* no close — must save or snooze */ }}
+      footer={
+        !snoozing ? (
+          <>
+            <DsButton onClick={() => setSnoozing(true)} disabled={saving}>Snooze for today</DsButton>
+            <DsButton variant="primary" onClick={handleSave} disabled={!canSave || sorted.length === 0}>
+              {saving ? "Saving…" : "Save readings"}
+            </DsButton>
+          </>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+            <input
+              type="text"
+              value={snoozeReason}
+              onChange={(e) => setSnoozeReason(e.target.value)}
+              placeholder="Reason for skipping (required)"
+              className="input text-sm"
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <DsButton onClick={() => setSnoozing(false)}>Cancel</DsButton>
+              <DsButton variant="primary" onClick={handleSnooze} disabled={!snoozeReason.trim() || saving}>
+                Confirm snooze
+              </DsButton>
             </div>
           </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+        )
+      }
+    >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {sorted.length === 0 ? (
             <p className="text-sm text-muted-foreground italic py-6 text-center">
               No equipment is marked &quot;requires daily temperature check&quot;. Enable it in Settings → Equipment.
@@ -178,55 +198,12 @@ export function TemperatureLogModal({
           )}
         </div>
 
-        {error && <p className="px-5 text-[11px] text-status-alert">{error}</p>}
-
-        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] shrink-0 space-y-2">
-          {!snoozing ? (
-            <div className="flex items-center justify-between gap-2">
-              <button
-                onClick={() => setSnoozing(true)}
-                disabled={saving}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Snooze for today
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={!canSave || sorted.length === 0}
-                className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
-              >
-                {saving ? "Saving…" : "Save readings"}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={snoozeReason}
-                onChange={(e) => setSnoozeReason(e.target.value)}
-                placeholder="Reason for skipping (required)"
-                className="input text-sm"
-                autoFocus
-              />
-              <div className="flex gap-2 justify-end">
-                <button onClick={() => setSnoozing(false)} className="text-xs text-muted-foreground">Cancel</button>
-                <button
-                  onClick={handleSnooze}
-                  disabled={!snoozeReason.trim() || saving}
-                  className="rounded-full bg-status-warn text-white px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-                >
-                  Confirm snooze
-                </button>
-              </div>
-            </div>
-          )}
-          {outOfRangeMissingNote && (
-            <p className="text-[11px] text-status-alert">
-              Out-of-range readings need a note before you can save.
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
+        {error && <p style={{ marginTop: 8, fontSize: 11, color: "var(--ds-tier-urgent)" }}>{error}</p>}
+        {outOfRangeMissingNote && (
+          <p style={{ marginTop: 8, fontSize: 11, color: "var(--ds-tier-urgent)" }}>
+            Out-of-range readings need a note before you can save.
+          </p>
+        )}
+    </DsModalShell>
   );
 }

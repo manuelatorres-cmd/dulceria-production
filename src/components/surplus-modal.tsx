@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { IconBuildingWarehouse as Warehouse, IconSnowflake as Snowflake, IconTrash as Trash2 } from "@tabler/icons-react";
+import { DsModalShell, DsButton } from "@/components/dulceria";
 
 export type SurplusDestination = "store" | "freezer" | "waste";
 
@@ -21,64 +22,43 @@ export function SurplusModal({ surplusPieces, onConfirm, onCancel }: {
 }) {
   const [pending, setPending] = useState<SurplusDestination | null>(null);
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onCancel]);
-
   function select(d: SurplusDestination) {
     setPending(d);
     onConfirm(d);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
-      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3">
-          <h3 className="text-base font-bold text-foreground">Surplus: {surplusPieces} piece{surplusPieces === 1 ? "" : "s"}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            This batch produced more than the linked orders need. Where should the extras go?
-          </p>
-        </div>
-
-        <div className="px-5 py-4 space-y-2">
-          <SurplusChoice
-            icon={<Warehouse className="w-5 h-5" />}
-            label="Send to Store"
-            description="Available for walk-in sales."
-            onClick={() => select("store")}
-            active={pending === "store"}
-          />
-          <SurplusChoice
-            icon={<Snowflake className="w-5 h-5" />}
-            label="Freeze"
-            description="Preserve for a future order."
-            onClick={() => select("freezer")}
-            active={pending === "freezer"}
-          />
-          <SurplusChoice
-            icon={<Trash2 className="w-5 h-5" />}
-            label="Waste"
-            description="Log as production loss."
-            onClick={() => select("waste")}
-            active={pending === "waste"}
-          />
-        </div>
-
-        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex justify-end">
-          <button
-            onClick={onCancel}
-            className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-          >
-            Decide later
-          </button>
-        </div>
+    <DsModalShell
+      open
+      title={`Surplus: ${surplusPieces} piece${surplusPieces === 1 ? "" : "s"}`}
+      subtitle="This batch produced more than the linked orders need. Where should the extras go?"
+      onClose={onCancel}
+      footer={<DsButton onClick={onCancel}>Decide later</DsButton>}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <SurplusChoice
+          icon={<Warehouse size={18} />}
+          label="Send to Store"
+          description="Available for walk-in sales."
+          onClick={() => select("store")}
+          active={pending === "store"}
+        />
+        <SurplusChoice
+          icon={<Snowflake size={18} />}
+          label="Freeze"
+          description="Preserve for a future order."
+          onClick={() => select("freezer")}
+          active={pending === "freezer"}
+        />
+        <SurplusChoice
+          icon={<Trash2 size={18} />}
+          label="Waste"
+          description="Log as production loss."
+          onClick={() => select("waste")}
+          active={pending === "waste"}
+        />
       </div>
-    </div>
+    </DsModalShell>
   );
 }
 

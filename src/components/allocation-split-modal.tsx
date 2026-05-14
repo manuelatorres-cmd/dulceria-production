@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { IconBuildingWarehouse as Warehouse, IconSnowflake as Snowflake, IconTrash as Trash2, IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
+import { DsModalShell, DsButton } from "@/components/dulceria";
 
 export type SurplusDestination = "store" | "freezer" | "waste";
 
@@ -159,38 +160,44 @@ export function AllocationSplitModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onCancel} />
-      <div className="relative w-full max-w-lg rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
-        <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3 border-b border-[color:var(--ds-border-warm)]">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-foreground">
-              Split yield across orders
-            </h3>
-            <span className="text-sm tabular-nums font-medium">
-              {totalYield} piece{totalYield === 1 ? "" : "s"}
-            </span>
-          </div>
-          {shortfallMode && (
-            <p className="text-xs text-status-warn mt-1 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" />
-              Yield is {totalRequested - totalYield} short of the total committed ({totalRequested}).
-              Decide which orders bear the shortfall.
+    <DsModalShell
+      open
+      width={580}
+      title="Split yield across orders"
+      subtitle={`${totalYield} piece${totalYield === 1 ? "" : "s"}`}
+      onClose={onCancel}
+      footer={
+        <>
+          <DsButton onClick={onCancel}>Back</DsButton>
+          <DsButton variant="primary" onClick={handleConfirm} disabled={!canConfirm}>
+            Save allocation
+          </DsButton>
+        </>
+      }
+    >
+        {shortfallMode && (
+          <p style={{ fontSize: 11, color: "var(--ds-semantic-warn)", marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
+            <AlertTriangle size={12} />
+            Yield is {totalRequested - totalYield} short of the total committed ({totalRequested}). Decide which orders bear the shortfall.
+          </p>
+        )}
+        {isOverproduction && (
+          <div style={{
+            marginBottom: 10, padding: "8px 10px", borderRadius: 6,
+            border: "0.5px solid var(--ds-semantic-warn)",
+            background: "rgba(240, 180, 60, 0.08)",
+            display: "flex", alignItems: "flex-start", gap: 6,
+          }}>
+            <AlertTriangle size={14} style={{ color: "var(--ds-semantic-warn)", flexShrink: 0, marginTop: 1 }} />
+            <p style={{ fontSize: 11, color: "var(--ds-semantic-warn)", lineHeight: 1.4, margin: 0 }}>
+              <strong style={{ fontWeight: 600 }}>Overproduction:</strong>{" "}
+              {overproductionAmount} extra piece{overproductionAmount === 1 ? "" : "s"} beyond what's committed
+              ({totalRequested}). Pick a destination for the surplus below — don't leave it silent.
             </p>
-          )}
-          {isOverproduction && (
-            <div className="mt-2 rounded-[6px] border border-amber-400 bg-amber-100/80 px-2.5 py-1.5 flex items-start gap-2">
-              <AlertTriangle className="w-3.5 h-3.5 text-[color:var(--ds-semantic-warn)] shrink-0 mt-0.5" />
-              <p className="text-xs text-[color:var(--ds-semantic-warn)] leading-snug">
-                <span className="font-semibold">Overproduction:</span>{" "}
-                {overproductionAmount} extra piece{overproductionAmount === 1 ? "" : "s"} beyond what's committed
-                ({totalRequested}). Pick a destination for the surplus below — don't leave it silent.
-              </p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        <ul className="px-5 py-3 space-y-3 max-h-72 overflow-y-auto">
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12, maxHeight: 320, overflowY: "auto" }}>
           {allRows.map((r) => {
             const v = delivered[r.key] ?? 0;
             const short = v < r.row.requested;
@@ -290,32 +297,13 @@ export function AllocationSplitModal({
             </div>
           )}
           {overDelivered && (
-            <p className="text-[11px] text-destructive flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" />
+            <p style={{ fontSize: 11, color: "var(--ds-tier-urgent)", display: "flex", alignItems: "center", gap: 4 }}>
+              <AlertTriangle size={12} />
               Allocated {sumDelivered} but only {totalYield} made it out. Reduce a row.
             </p>
           )}
         </div>
-
-        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-[4px] border border-[color:var(--ds-border-warm)] px-4 py-2 text-sm"
-          >
-            Back
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={!canConfirm}
-            className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50"
-          >
-            Save allocation
-          </button>
-        </div>
-      </div>
-    </div>
+    </DsModalShell>
   );
 }
 

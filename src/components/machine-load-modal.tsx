@@ -8,6 +8,7 @@ import {
 } from "@/lib/hooks";
 import { newId } from "@/lib/supabase";
 import type { EquipmentInstance, MachineLoad } from "@/types";
+import { DsModalShell, DsButton } from "@/components/dulceria";
 
 /**
  * Modal for loading/unloading/switching chocolate in a tempering
@@ -86,34 +87,32 @@ export function MachineLoadModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-        onClick={onClose}
-      />
-      <div
-        className="relative w-full max-w-md mx-4 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl"
-        style={{ borderRadius: 4 }}
-      >
-        <header className="px-5 pt-4 pb-3 border-b border-[color:var(--ds-border-warm)]">
-          <h3
-            className="text-[16px]"
-            style={{
-              fontFamily: "var(--font-serif)",
-              fontWeight: 500,
-              letterSpacing: "-0.015em",
-            }}
+    <DsModalShell
+      open
+      title={instance.name}
+      subtitle={activeLoad ? "Currently loaded — manage chocolate" : "Idle — load chocolate"}
+      busy={busy}
+      onClose={onClose}
+      footer={
+        <>
+          <DsButton onClick={onClose} disabled={busy}>Cancel</DsButton>
+          <DsButton
+            variant="primary"
+            onClick={apply}
+            disabled={busy || (action !== "drain" && !ingredientId)}
           >
-            {instance.name}
-          </h3>
-          <p className="text-[11px] text-muted-foreground">
-            {activeLoad
-              ? `Currently loaded — manage chocolate`
-              : `Idle — load chocolate`}
-          </p>
-        </header>
-
-        <div className="px-5 py-4 space-y-3">
+            {busy
+              ? "…"
+              : action === "load"
+                ? "Load chocolate"
+                : action === "drain"
+                  ? "Drain"
+                  : "Switch"}
+          </DsButton>
+        </>
+      }
+    >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Action picker */}
           <div className="flex gap-2">
             {(["load", "drain", "switch"] as const).map((a) => (
@@ -172,27 +171,6 @@ export function MachineLoadModal({
             </>
           )}
         </div>
-
-        <footer className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="btn-secondary">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={apply}
-            disabled={busy || (action !== "drain" && !ingredientId)}
-            className="btn-primary"
-          >
-            {busy
-              ? "…"
-              : action === "load"
-                ? "Load chocolate"
-                : action === "drain"
-                  ? "Drain"
-                  : "Switch"}
-          </button>
-        </footer>
-      </div>
-    </div>
+    </DsModalShell>
   );
 }

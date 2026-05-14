@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IconDroplets as Droplets, IconSnowflake as Snowflake } from "@tabler/icons-react";
+import { DsModalShell, DsButton } from "@/components/dulceria";
 
 export type LeftoverEntry = {
   fillingId: string;
@@ -48,14 +49,6 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
     firstInputRef.current?.select();
   }, []);
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onSkip();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onSkip]);
-
   function buildResults(freeze: boolean): LeftoverResult[] {
     return entries
       .filter((e) => (localValues[e.fillingId] ?? 0) > 0)
@@ -87,31 +80,25 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
   const anyPositive = entries.some((e) => (localValues[e.fillingId] ?? 0) > 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onSkip} />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 mb-4 sm:mb-0 rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-b from-amber-50 to-card px-5 pt-5 pb-3">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-9 h-9 rounded-[4px] bg-[color:var(--ds-tint-info)] flex items-center justify-center">
-              <Droplets className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-foreground">
-                Any leftover filling?
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Weigh what&apos;s left and we&apos;ll track it for next time
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="px-5 py-3 space-y-3">
+    <DsModalShell
+      open
+      title="Any leftover filling?"
+      subtitle="Weigh what's left and we'll track it for next time"
+      icon={<Droplets size={15} />}
+      onClose={onSkip}
+      footer={
+        <>
+          <DsButton onClick={onSkip}>No leftover</DsButton>
+          <DsButton onClick={handleFreeze} disabled={!anyPositive}>
+            <Snowflake size={13} style={{ marginRight: 4, verticalAlign: "-2px" }} /> Freeze leftover
+          </DsButton>
+          <DsButton variant="primary" onClick={handleConfirm} disabled={!anyPositive}>
+            Save leftover
+          </DsButton>
+        </>
+      }
+    >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {entries.map((entry, idx) => {
             const value = localValues[entry.fillingId] ?? 0;
             return (
@@ -170,31 +157,6 @@ export function LeftoverModal({ entries, onConfirm, onSkip }: {
             );
           })}
         </div>
-
-        {/* Actions */}
-        <div className="px-5 py-4 border-t border-[color:var(--ds-border-warm)] flex flex-wrap gap-2 justify-end">
-          <button
-            onClick={onSkip}
-            className="rounded-[6px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-          >
-            No leftover
-          </button>
-          <button
-            onClick={handleFreeze}
-            disabled={!anyPositive}
-            className="rounded-[4px] border border-sky-200 bg-white px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
-          >
-            <Snowflake className="w-4 h-4" /> Freeze leftover
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!anyPositive}
-            className="rounded-[4px] bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            Save leftover
-          </button>
-        </div>
-      </div>
-    </div>
+    </DsModalShell>
   );
 }

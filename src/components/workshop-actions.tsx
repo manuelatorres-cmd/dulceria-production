@@ -18,6 +18,7 @@ import {
   saveNotification,
 } from "@/lib/hooks";
 import { newId } from "@/lib/supabase";
+import { DsModalShell } from "@/components/dulceria";
 import type { ProductionPlan } from "@/types";
 
 type ActiveModal = "pause" | "sick" | "contaminate" | "substitute" | null;
@@ -87,34 +88,14 @@ function ModalShell({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
-      <div
-        className="relative w-full max-w-md mx-4 border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] shadow-xl"
-        style={{ borderRadius: 4 }}
-      >
-        <header className="px-5 pt-4 pb-3 border-b border-[color:var(--ds-border-warm)]">
-          <h3
-            className="text-[16px]"
-            style={{
-              fontFamily: "var(--font-serif)",
-              fontWeight: 500,
-              letterSpacing: "-0.015em",
-            }}
-          >
-            {title}
-          </h3>
-        </header>
-        <div className="px-5 py-4 space-y-3">{children}</div>
-        <footer className="px-5 py-3 border-t border-[color:var(--ds-border-warm)] flex justify-end gap-2">
-          {footer ?? (
-            <button type="button" onClick={onClose} className="btn-secondary">
-              Close
-            </button>
-          )}
-        </footer>
-      </div>
-    </div>
+    <DsModalShell
+      open
+      title={title}
+      onClose={onClose}
+      footer={footer ?? <button type="button" onClick={onClose} className="btn-secondary">Close</button>}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>{children}</div>
+    </DsModalShell>
   );
 }
 
