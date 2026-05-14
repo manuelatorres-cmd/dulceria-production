@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, VariantStockLocation, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, VariantStockLocation, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun, ProductionDayNotes, Calibration } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, CHANNEL_FULFILMENT_DEFAULTS, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, type FulfilmentMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -12590,6 +12590,108 @@ export async function saveColdStorageUnit(
   if (error) throw error;
   queryClient.invalidateQueries({ queryKey: ["coldStorageUnits"] });
   return id;
+}
+
+// =====================================================================
+// Production Brain — productionDayNotes (mig 0091)
+// =====================================================================
+
+export function useProductionDayNotes(
+  productionDayId: string | undefined,
+): ProductionDayNotes | null {
+  const { data } = useQuery({
+    queryKey: ["productionDayNotes", productionDayId ?? ""],
+    enabled: !!productionDayId,
+    queryFn: async () =>
+      assertOkMaybe(
+        await supabase
+          .from("productionDayNotes")
+          .select("*")
+          .eq("productionDayId", productionDayId!)
+          .maybeSingle(),
+      ) as ProductionDayNotes | null,
+  });
+  return data ?? null;
+}
+
+export async function saveProductionDayNotes(args: {
+  productionDayId: string;
+  notes: string;
+  updatedBy?: string;
+}): Promise<void> {
+  const trimmed = args.notes.trim();
+  // Upsert by productionDayId. We selected a unique index on the
+  // column so PostgREST happily upserts on conflict.
+  const existing = assertOkMaybe(
+    await supabase
+      .from("productionDayNotes")
+      .select("id")
+      .eq("productionDayId", args.productionDayId)
+      .maybeSingle(),
+  ) as { id?: string } | null;
+  if (existing?.id) {
+    if (!trimmed) {
+      const { error } = await supabase
+        .from("productionDayNotes")
+        .delete()
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from("productionDayNotes")
+        .update({ notes: trimmed, updatedAt: new Date(), updatedBy: args.updatedBy ?? null })
+        .eq("id", existing.id);
+      if (error) throw error;
+    }
+  } else if (trimmed) {
+    const { error } = await supabase.from("productionDayNotes").insert({
+      id: newId(),
+      productionDayId: args.productionDayId,
+      notes: trimmed,
+      updatedAt: new Date(),
+      updatedBy: args.updatedBy ?? null,
+    });
+    if (error) throw error;
+  }
+  queryClient.invalidateQueries({ queryKey: ["productionDayNotes"] });
+}
+
+// =====================================================================
+// Production Brain — calibrations (mig 0092)
+// =====================================================================
+
+export function useCalibrations(equipmentId?: string): Calibration[] {
+  const { data } = useQuery({
+    queryKey: ["calibrations", equipmentId ?? "all"],
+    queryFn: async () => {
+      let q = supabase.from("calibrations").select("*");
+      if (equipmentId) q = q.eq("equipmentId", equipmentId);
+      const rows = assertOk(await q) as Calibration[];
+      return rows.sort((a, b) =>
+        new Date(b.calibratedAt).getTime() - new Date(a.calibratedAt).getTime(),
+      );
+    },
+  });
+  return data ?? [];
+}
+
+export async function saveCalibration(
+  row: Omit<Calibration, "id" | "createdAt"> & { id?: string },
+): Promise<string> {
+  const id = row.id ?? newId();
+  const payload = { ...row, id };
+  const { error } = await supabase
+    .from("calibrations")
+    .upsert(payload, { onConflict: "id" });
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["calibrations"] });
+  return id;
+}
+
+export async function deleteCalibration(id: string): Promise<void> {
+  const { error } = await supabase.from("calibrations").delete().eq("id", id);
+  if (error) throw error;
+  queryClient.invalidateQueries({ queryKey: ["calibrations"] });
 }
 
 // =====================================================================

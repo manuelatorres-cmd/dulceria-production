@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader, Section } from "@/components/dulceria";
+import { PageHeader, Section, ListRow, StatusTag, DsButton } from "@/components/dulceria";
 import {
   useColdStorageUnits,
   useTemperatureReadings,
@@ -10,9 +10,13 @@ import {
   saveHaccpIncident,
   usePeople,
   saveColdStorageUnit,
+  useEquipment,
+  useCalibrations,
+  saveCalibration,
+  deleteCalibration,
 } from "@/lib/hooks";
-import type { ColdStorageUnit, TemperatureReading } from "@/types";
-import { COLD_STORAGE_LOCATIONS, COLD_STORAGE_TYPES } from "@/types";
+import type { ColdStorageUnit, TemperatureReading, Calibration, CalibrationCadence, CalibrationOutcome } from "@/types";
+import { COLD_STORAGE_LOCATIONS, COLD_STORAGE_TYPES, CALIBRATION_CADENCES, CALIBRATION_OUTCOMES } from "@/types";
 
 /**
  * Production Brain · HACCP (phase 3 UI)
@@ -80,6 +84,8 @@ export default function ProductionBrainHaccpPage() {
             </ul>
           </Section>
         )}
+
+        <CalibrationsSection />
       </div>
     </div>
   );
@@ -488,3 +494,240 @@ function NewUnitForm({ hasAny }: { hasAny: boolean }) {
     </div>
   );
 }
+
+/** Calibration history + add-new form. Backed by migration 0092
+ *  calibrations table. Renders one ListRow per past calibration with
+ *  outcome chip + next-due chip; an inline add row at the top accepts
+ *  equipment + measured value + outcome + cadence. */
+function CalibrationsSection() {
+  const equipment = useEquipment(false);
+  const calibrations = useCalibrations();
+  const people = usePeople(false);
+
+  const equipmentById = useMemo(() => new Map(equipment.map((e) => [e.id!, e])), [equipment]);
+  const peopleById = useMemo(() => new Map(people.map((p) => [p.id!, p])), [people]);
+
+  // New-row form state.
+  const [equipmentId, setEquipmentId] = useState("");
+  const [outcome, setOutcome] = useState<CalibrationOutcome>("ok");
+  const [cadence, setCadence] = useState<CalibrationCadence>("monthly");
+  const [measuredValue, setMeasuredValue] = useState("");
+  const [referenceValue, setReferenceValue] = useState("");
+  const [calibratedBy, setCalibratedBy] = useState("");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const sorted = useMemo(
+    () => [...calibrations].sort((a, b) =>
+      new Date(b.calibratedAt).getTime() - new Date(a.calibratedAt).getTime(),
+    ),
+    [calibrations],
+  );
+
+  // Next-due chip per row. Surfaced separately in the meta line so the
+  // operator can scan upcoming work without opening each row.
+  function dueChipFor(c: Calibration): { label: string; kind: "ready" | "pending" | "overdue" } | null {
+    if (!c.nextDueAt) return null;
+    const due = new Date(c.nextDueAt);
+    const days = Math.round((due.getTime() - Date.now()) / 86_400_000);
+    if (days < 0) return { label: `overdue ${Math.abs(days)}d`, kind: "overdue" };
+    if (days <= 7) return { label: `due in ${days}d`, kind: "pending" };
+    return { label: `due ${due.toLocaleDateString("de-AT", { day: "numeric", month: "short" })}`, kind: "ready" };
+  }
+
+  function suggestNextDueFromCadence(c: CalibrationCadence): Date | undefined {
+    const now = new Date();
+    if (c === "monthly") return new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    if (c === "quarterly") return new Date(now.getFullYear(), now.getMonth() + 3, now.getDate());
+    if (c === "annual") return new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+    return undefined;
+  }
+
+  async function submit() {
+    if (!equipmentId) return;
+    setBusy(true);
+    try {
+      await saveCalibration({
+        equipmentId,
+        calibratedAt: new Date(),
+        calibratedBy: calibratedBy || undefined,
+        outcome,
+        cadence,
+        nextDueAt: suggestNextDueFromCadence(cadence),
+        measuredValue: measuredValue ? Number(measuredValue) : undefined,
+        referenceValue: referenceValue ? Number(referenceValue) : undefined,
+        notes: notes.trim() || undefined,
+      });
+      setMeasuredValue("");
+      setReferenceValue("");
+      setNotes("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const outcomeTagKind: Record<CalibrationOutcome, "ready" | "pending" | "overdue" | "done" | "neutral"> = {
+    ok: "ready",
+    out_of_tolerance: "overdue",
+    adjusted: "pending",
+    retired: "neutral",
+  };
+
+  return (
+    <Section
+      title={`Calibrations · ${sorted.length}`}
+      action={
+        equipment.length === 0
+          ? <span style={{ fontSize: 11, color: "var(--ds-text-muted)" }}>No equipment configured</span>
+          : null
+      }
+      noBody
+    >
+      {/* New-row form */}
+      {equipment.length > 0 && (
+        <div style={{
+          padding: "12px 16px", borderBottom: "0.5px solid var(--ds-border-warm)",
+          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8,
+          background: "var(--ds-card-bg-hover, rgba(0,0,0,0.02))",
+        }}>
+          <select
+            value={equipmentId}
+            onChange={(e) => setEquipmentId(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">Equipment…</option>
+            {equipment.map((eq) => (
+              <option key={eq.id} value={eq.id}>{eq.name}</option>
+            ))}
+          </select>
+          <select
+            value={outcome}
+            onChange={(e) => setOutcome(e.target.value as CalibrationOutcome)}
+            style={inputStyle}
+          >
+            {CALIBRATION_OUTCOMES.map((o) => (
+              <option key={o} value={o}>{o.replace(/_/g, " ")}</option>
+            ))}
+          </select>
+          <select
+            value={cadence}
+            onChange={(e) => setCadence(e.target.value as CalibrationCadence)}
+            style={inputStyle}
+          >
+            {CALIBRATION_CADENCES.map((c) => (
+              <option key={c} value={c}>{c.replace(/_/g, " ")}</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            step="0.001"
+            value={referenceValue}
+            onChange={(e) => setReferenceValue(e.target.value)}
+            placeholder="Reference"
+            style={inputStyle}
+          />
+          <input
+            type="number"
+            step="0.001"
+            value={measuredValue}
+            onChange={(e) => setMeasuredValue(e.target.value)}
+            placeholder="Measured"
+            style={inputStyle}
+          />
+          <select
+            value={calibratedBy}
+            onChange={(e) => setCalibratedBy(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">By…</option>
+            {people.filter((p) => !p.archived).map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            style={{ ...inputStyle, gridColumn: "span 2" }}
+          />
+          <DsButton
+            variant="primary"
+            size="sm"
+            onClick={submit}
+            disabled={!equipmentId || busy}
+          >
+            {busy ? "Saving…" : "Log calibration"}
+          </DsButton>
+        </div>
+      )}
+
+      {sorted.length === 0 ? (
+        <p style={{ padding: "16px 20px", fontSize: 13, color: "var(--ds-text-muted)", fontStyle: "italic" }}>
+          No calibrations logged yet. Use the row above to record a tare check, ice-point verification, or any periodic device-accuracy event.
+        </p>
+      ) : (
+        sorted.map((c) => {
+          const eq = equipmentById.get(c.equipmentId);
+          const due = dueChipFor(c);
+          const person = c.calibratedBy ? peopleById.get(c.calibratedBy) : null;
+          const tierKind = c.outcome === "out_of_tolerance" ? "urgent"
+            : c.outcome === "adjusted" ? "active"
+            : c.outcome === "retired" ? "parked"
+            : "positive";
+          return (
+            <ListRow
+              key={c.id}
+              tier={tierKind}
+              title={
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span>{eq?.name ?? "Unknown equipment"}</span>
+                  <StatusTag kind={outcomeTagKind[c.outcome]}>{c.outcome.replace(/_/g, " ")}</StatusTag>
+                  {due && <StatusTag kind={due.kind}>{due.label}</StatusTag>}
+                </span>
+              }
+              meta={
+                <>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                    {new Date(c.calibratedAt).toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" })}
+                  </span>
+                  {" · "}
+                  <span style={{ textTransform: "capitalize" }}>{c.cadence.replace(/_/g, " ")}</span>
+                  {person && <> · {person.name}</>}
+                  {(c.measuredValue != null || c.referenceValue != null) && (
+                    <> · ref {c.referenceValue ?? "—"} / meas {c.measuredValue ?? "—"}</>
+                  )}
+                </>
+              }
+              secondary={c.notes ? <span style={{ fontStyle: "italic" }}>{c.notes}</span> : undefined}
+              side={
+                <button
+                  onClick={() => c.id && deleteCalibration(c.id)}
+                  aria-label="Delete calibration"
+                  style={{
+                    fontSize: 11, padding: "2px 8px",
+                    background: "transparent",
+                    border: "0.5px solid var(--ds-border-warm)", borderRadius: 12,
+                    color: "var(--ds-text-muted)", cursor: "pointer",
+                  }}
+                >
+                  Delete
+                </button>
+              }
+            />
+          );
+        })
+      )}
+    </Section>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  padding: "6px 10px",
+  fontSize: 12,
+  border: "0.5px solid var(--ds-border-warm)",
+  borderRadius: 4,
+  background: "var(--ds-card-bg)",
+  color: "var(--ds-text-primary)",
+  outline: "none",
+};

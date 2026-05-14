@@ -11,6 +11,8 @@ import {
   useProductionDays,
   useAllProductionDayLineItems,
   useTodayProductionDay,
+  useProductionDayNotes,
+  saveProductionDayNotes,
   usePeople,
   usePersonUnavailability,
   useEquipmentInstances,
@@ -1327,6 +1329,10 @@ export default function DailyV2Page() {
         </Link>
       </div>
 
+      {todayDayId && (
+        <DayNotesStrip productionDayId={todayDayId} />
+      )}
+
       {/* ───── Two-column body ───── */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
         {/* LEFT COLUMN — Right-now + Phase cards */}
@@ -2021,5 +2027,50 @@ function FilterOptionRow({
         </span>
       )}
     </button>
+  );
+}
+
+/** Day-level free-text notes strip. Persists to `productionDayNotes`
+ *  (migration 0091). Save-on-blur to keep the workflow zero-click. */
+function DayNotesStrip({ productionDayId }: { productionDayId: string }) {
+  const row = useProductionDayNotes(productionDayId);
+  const [draft, setDraft] = useState<string>(row?.notes ?? "");
+  const [busy, setBusy] = useState(false);
+  // Reseed when the day changes (operator navigated to a different
+  // date) or the row loads in async.
+  useEffect(() => { setDraft(row?.notes ?? ""); }, [row?.notes, productionDayId]);
+
+  async function commit() {
+    if (draft === (row?.notes ?? "")) return;
+    setBusy(true);
+    try { await saveProductionDayNotes({ productionDayId, notes: draft }); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div
+      className="mb-4 rounded-[8px] border-[0.5px] border-[color:var(--ds-border-warm)] bg-[color:var(--ds-card-bg)] px-3.5 py-2.5"
+      style={{ display: "flex", flexDirection: "column", gap: 4 }}
+    >
+      <span style={{
+        fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em",
+        color: "var(--ds-text-muted)", fontWeight: 600,
+      }}>
+        Day notes {busy && <span style={{ fontWeight: 400, opacity: 0.6 }}>· saving…</span>}
+      </span>
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        placeholder="Notes for today — supplier delays, equipment hiccups, anything to log."
+        rows={2}
+        style={{
+          width: "100%", padding: "4px 0", fontSize: 12,
+          background: "transparent", border: "none", outline: "none",
+          resize: "vertical", fontFamily: "inherit", lineHeight: 1.5,
+          color: "var(--ds-text-primary)",
+        }}
+      />
+    </div>
   );
 }
