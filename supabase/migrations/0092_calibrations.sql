@@ -15,7 +15,7 @@
 
 create table if not exists public.calibrations (
   id text primary key,
-  "equipmentId" text not null references public.equipment (id) on delete cascade,
+  "equipmentId" uuid not null references public.equipment (id) on delete cascade,
   "calibratedAt" timestamptz not null,
   "calibratedBy" text,
   -- "ok" / "out_of_tolerance" / "adjusted" / "retired"

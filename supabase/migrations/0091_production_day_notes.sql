@@ -15,7 +15,7 @@
 
 create table if not exists public."productionDayNotes" (
   id text primary key,
-  "productionDayId" text not null references public."productionDays" (id) on delete cascade,
+  "productionDayId" uuid not null references public."productionDays" (id) on delete cascade,
   notes text not null default '',
   "updatedAt" timestamptz not null default now(),
   "updatedBy" text
