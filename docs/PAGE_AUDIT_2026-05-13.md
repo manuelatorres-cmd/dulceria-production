@@ -1081,16 +1081,29 @@ variants, decoration, orders, production).
      (wired into Right-now card on /production-brain/daily)
    - 0091: `productionDayNotes` table (schema only — UI follow-up)
    - 0092: `calibrations` table (schema only — UI follow-up)
-3. **Still open (schema-only, UI deferred)**:
-   - `mouldPoolInstance.dryingState` (3-state mould pool dot)
+3. **Still open**:
    - Real cost-per-product aggregation for `/reports/monthly`
-     margin (placeholder still `null`)
+     margin (placeholder still `null`) — needs ingredient
+     consumption × purchase-price walk per product
    - Equipment occupancy writes (`currentPlanId`/`occupiedSince`/
-     `expectedFreeAt` columns exist; scheduler doesn't write them)
-   - Day-notes UI on `/production-brain/plan` day drawer (table now
-     exists via 0091, just needs upsert wiring)
-   - Calibrations UI on `/production-brain/haccp` (table now
-     exists via 0092, just needs list + form)
+     `expectedFreeAt` columns exist; scheduler doesn't write them) —
+     needs scheduler integration
+4. **Resolved without schema change**:
+   - `mouldPoolInstance.dryingState` — existing `currentState` enum
+     (available / loaded / filled / sealed / needs-wash /
+     in-deep-wash / retired / broken) maps cleanly:
+     sealed = drying, available = free, loaded|filled = in-use,
+     needs-wash|in-deep-wash|broken = blocked. The 3-state pool
+     visualization on /production-brain/daily side rail already
+     uses this mapping.
+   - Day-notes UI — ✓ shipped 2026-05-14 on /production-brain/daily
+     via `DayNotesStrip` (save-on-blur textarea) + new hooks
+     `useProductionDayNotes` + `saveProductionDayNotes`.
+   - Calibrations UI — ✓ shipped 2026-05-14 on
+     /production-brain/haccp via `CalibrationsSection` (inline add
+     row + ListRow history with severity tier + StatusTag outcome /
+     next-due chips) + new hooks `useCalibrations` +
+     `saveCalibration` + `deleteCalibration`.
 4. **Workflow rebuilds** (separate specs):
    - WEEKLY_PLAN_REDESIGN_SPEC.md — 5-phase rebuild of
      `/production-brain/plan` (most views already shipped per
