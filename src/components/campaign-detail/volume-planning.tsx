@@ -6,9 +6,12 @@ import {
   saveCampaign,
   saveProductionOrder,
   saveProductionOrderItem,
-  useAllVariantProducts,
+  useAllVariantPackagingProducts,
+  useAllVariantPackagings,
+  usePackagingList,
   useProductionOrders,
   useAllProductionOrderItems,
+  useVariants,
 } from "@/lib/hooks";
 import type { Campaign, Product } from "@/types";
 import {
@@ -18,6 +21,8 @@ import {
   IconCheck,
   IconX,
   IconAlertTriangle,
+  IconChevronDown,
+  IconChevronRight,
 } from "@tabler/icons-react";
 
 interface Props {
@@ -26,17 +31,18 @@ interface Props {
 }
 
 interface ResolvedRow {
-  productId: string;
-  productName: string;
+  vpId: string;
+  variantName: string;
+  packagingLabel: string;
+  capacity: number;
   units: number;
   unitPrice: number;
   rowRevenue: number;
-  /** True when a productTarget references a product that no longer exists. */
+  /** True when the variant or packaging row no longer exists / is archived. */
   missing: boolean;
 }
 
 function formatEuro(n: number): string {
-  // Plain de-AT style: "€ 3.750,50". Use Intl for safety on negatives.
   return new Intl.NumberFormat("de-AT", {
     style: "currency",
     currency: "EUR",
@@ -46,48 +52,96 @@ function formatEuro(n: number): string {
 }
 
 export function VolumePlanning({ campaign, products }: Props) {
-  const variantProducts = useAllVariantProducts();
+  const variants = useVariants();
+  const variantPackagings = useAllVariantPackagings();
+  const variantPackagingProducts = useAllVariantPackagingProducts();
+  const packagings = usePackagingList(true);
   const productionOrders = useProductionOrders();
   const productionOrderItems = useAllProductionOrderItems();
 
-  // Per-product list price = max(unitPrice) across variant lines.
-  const priceByProduct = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const vp of variantProducts) {
-      const px = typeof vp.unitPrice === "number" ? vp.unitPrice : 0;
-      if (px <= 0) continue;
-      const cur = m.get(vp.productId) ?? 0;
-      if (px > cur) m.set(vp.productId, px);
-    }
-    return m;
-  }, [variantProducts]);
-
+  const variantById = useMemo(
+    () => new Map(variants.map((v) => [v.id!, v])),
+    [variants],
+  );
+  const packagingById = useMemo(
+    () => new Map(packagings.map((p) => [p.id!, p])),
+    [packagings],
+  );
+  const vpById = useMemo(
+    () => new Map(variantPackagings.map((vp) => [vp.id!, vp])),
+    [variantPackagings],
+  );
   const productById = useMemo(
     () => new Map(products.map((p) => [p.id!, p])),
     [products],
   );
 
-  // ─── View-mode rows ──────────────────────────────────────────────
-  const rows = useMemo<ResolvedRow[]>(() => {
-    const targets = campaign.productTargets ?? {};
-    return Object.entries(targets).map(([productId, units]) => {
-      const product = productById.get(productId);
-      const unitPrice = priceByProduct.get(productId) ?? 0;
+  // Per-vp composition: vpId → list of {productId, qty}
+  const compositionByVp = useMemo(() => {
+    const m = new Map<string, Array<{ productId: string; qty: number }>>();
+    for (const r of variantPackagingProducts) {
+      const list = m.get(r.variantPackagingId) ?? [];
+      list.push({ productId: r.productId, qty: r.qty });
+      m.set(r.variantPackagingId, list);
+    }
+    return m;
+  }, [variantPackagingProducts]);
+
+  function capacityOf(vpId: string): number {
+    return (compositionByVp.get(vpId) ?? []).reduce((s, r) => s + r.qty, 0);
+  }
+
+  function buildRow(vpId: string, units: number): ResolvedRow {
+    const vp = vpById.get(vpId);
+    if (!vp) {
       return {
-        productId,
-        productName: product?.name ?? `SKU ${productId.slice(0, 6)}`,
-        units: Number(units) || 0,
-        unitPrice,
-        rowRevenue: (Number(units) || 0) * unitPrice,
-        missing: !product || !!product.archived,
+        vpId,
+        variantName: `Missing variant size ${vpId.slice(0, 6)}`,
+        packagingLabel: "",
+        capacity: 0,
+        units,
+        unitPrice: 0,
+        rowRevenue: 0,
+        missing: true,
       };
-    });
-  }, [campaign.productTargets, productById, priceByProduct]);
+    }
+    const variant = variantById.get(vp.variantId);
+    const packaging = vp.packagingId ? packagingById.get(vp.packagingId) : null;
+    const cap = capacityOf(vpId);
+    const price = vp.price ?? vp.sellPrice ?? 0;
+    return {
+      vpId,
+      variantName: variant?.name ?? `SKU ${vp.variantId.slice(0, 6)}`,
+      packagingLabel: packaging
+        ? `${packaging.name}${cap > 0 ? ` · ${cap} pcs` : ""}`
+        : cap > 0
+          ? `Loose · ${cap} pcs`
+          : "Loose",
+      capacity: cap,
+      units,
+      unitPrice: price,
+      rowRevenue: units * price,
+      missing: !variant,
+    };
+  }
+
+  // ─── View-mode rows (variant-size targets) ────────────────────────
+  const rows = useMemo<ResolvedRow[]>(() => {
+    const targets = campaign.variantPackagingTargets ?? {};
+    return Object.entries(targets)
+      .map(([vpId, units]) => buildRow(vpId, Number(units) || 0))
+      .sort((a, b) => a.variantName.localeCompare(b.variantName));
+  }, [campaign.variantPackagingTargets, vpById, variantById, packagingById, compositionByVp]);
 
   const totalUnits = rows.reduce((s, r) => s + r.units, 0);
   const projectedRevenue = rows.reduce((s, r) => s + r.rowRevenue, 0);
   const revenueTarget =
     typeof campaign.revenueTarget === "number" ? campaign.revenueTarget : null;
+
+  // Legacy product-level targets (read-only display when present + no
+  // variant-level targets yet). Helps users see what they had before.
+  const legacyProductTargets = campaign.productTargets ?? {};
+  const hasLegacy = Object.keys(legacyProductTargets).length > 0;
 
   // ─── Edit mode state ─────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
@@ -96,34 +150,50 @@ export function VolumePlanning({ campaign, products }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [showProductExpansion, setShowProductExpansion] = useState(false);
 
   useEffect(() => {
-    setDraftTargets({ ...(campaign.productTargets ?? {}) });
+    setDraftTargets({ ...(campaign.variantPackagingTargets ?? {}) });
     setDraftRevenueTarget(
       typeof campaign.revenueTarget === "number" ? String(campaign.revenueTarget) : "",
     );
-  }, [campaign.productTargets, campaign.revenueTarget, editing]);
+  }, [campaign.variantPackagingTargets, campaign.revenueTarget, editing]);
 
   const draftRows = useMemo<ResolvedRow[]>(() => {
-    return Object.entries(draftTargets).map(([productId, units]) => {
-      const product = productById.get(productId);
-      const unitPrice = priceByProduct.get(productId) ?? 0;
-      return {
-        productId,
-        productName: product?.name ?? `SKU ${productId.slice(0, 6)}`,
-        units: Number(units) || 0,
-        unitPrice,
-        rowRevenue: (Number(units) || 0) * unitPrice,
-        missing: !product || !!product.archived,
-      };
-    });
-  }, [draftTargets, productById, priceByProduct]);
+    return Object.entries(draftTargets)
+      .map(([vpId, units]) => buildRow(vpId, Number(units) || 0))
+      .sort((a, b) => a.variantName.localeCompare(b.variantName));
+  }, [draftTargets, vpById, variantById, packagingById, compositionByVp]);
+
   const draftTotalUnits = draftRows.reduce((s, r) => s + r.units, 0);
   const draftProjected = draftRows.reduce((s, r) => s + r.rowRevenue, 0);
   const draftRevenueTargetNum = parseFloat(draftRevenueTarget);
   const draftRevenueTargetValid =
     draftRevenueTarget === "" ||
     (!Number.isNaN(draftRevenueTargetNum) && draftRevenueTargetNum >= 0);
+
+  // Computed product expansion — sum (units × qty) per product across
+  // all selected variant sizes. This is what the Production Order will
+  // actually contain.
+  const productExpansion = useMemo(() => {
+    const sourceRows = editing ? draftRows : rows;
+    const totals = new Map<string, number>();
+    for (const r of sourceRows) {
+      if (r.missing || r.units <= 0) continue;
+      const comp = compositionByVp.get(r.vpId) ?? [];
+      for (const c of comp) {
+        const prev = totals.get(c.productId) ?? 0;
+        totals.set(c.productId, prev + c.qty * r.units);
+      }
+    }
+    return Array.from(totals.entries())
+      .map(([productId, pieces]) => ({
+        productId,
+        productName: productById.get(productId)?.name ?? `SKU ${productId.slice(0, 6)}`,
+        pieces,
+      }))
+      .sort((a, b) => a.productName.localeCompare(b.productName));
+  }, [editing, draftRows, rows, compositionByVp, productById]);
 
   async function handleSave() {
     if (!campaign.id) return;
@@ -135,19 +205,24 @@ export function VolumePlanning({ campaign, products }: Props) {
     setSaveError(null);
     try {
       const cleaned: Record<string, number> = {};
-      for (const [pid, n] of Object.entries(draftTargets)) {
+      for (const [vpId, n] of Object.entries(draftTargets)) {
         const v = Math.floor(Number(n) || 0);
-        if (v > 0) cleaned[pid] = v;
+        if (v > 0) cleaned[vpId] = v;
       }
-      const nextProductIds = Array.from(
-        new Set([...(campaign.productIds ?? []), ...Object.keys(cleaned)]),
-      );
+      // Keep productIds in sync with the expansion so /campaigns
+      // overview + replenishment scheduler still see this campaign as
+      // covering the products they care about.
+      const expandedProductIds = new Set<string>(campaign.productIds ?? []);
+      for (const vpId of Object.keys(cleaned)) {
+        const comp = compositionByVp.get(vpId) ?? [];
+        for (const c of comp) expandedProductIds.add(c.productId);
+      }
       const revTarget =
         draftRevenueTarget === "" ? undefined : Number(draftRevenueTargetNum);
       await saveCampaign({
         ...campaign,
-        productTargets: cleaned,
-        productIds: nextProductIds,
+        variantPackagingTargets: cleaned,
+        productIds: Array.from(expandedProductIds),
         revenueTarget: revTarget,
       });
       setEditing(false);
@@ -161,14 +236,14 @@ export function VolumePlanning({ campaign, products }: Props) {
     setEditing(false);
     setSaveError(null);
   }
-  function setUnitsForProduct(productId: string, value: number) {
-    setDraftTargets((cur) => ({ ...cur, [productId]: Math.max(0, Math.floor(value || 0)) }));
+  function setUnitsForVp(vpId: string, value: number) {
+    setDraftTargets((cur) => ({ ...cur, [vpId]: Math.max(0, Math.floor(value || 0)) }));
   }
-  function removeProductFromTargets(productId: string) {
-    if (!confirm(`Remove this SKU from the campaign target?`)) return;
+  function removeVpFromTargets(vpId: string) {
+    if (!confirm(`Remove this variant size from the campaign target?`)) return;
     setDraftTargets((cur) => {
       const next = { ...cur };
-      delete next[productId];
+      delete next[vpId];
       return next;
     });
   }
@@ -188,8 +263,8 @@ export function VolumePlanning({ campaign, products }: Props) {
 
   async function handleCreatePo() {
     if (!campaign.id) return;
-    if (rows.length === 0) {
-      setPoError("Add at least one product target before creating a Production Order.");
+    if (productExpansion.length === 0) {
+      setPoError("Add at least one variant-size target before creating a Production Order.");
       return;
     }
     setPoBusy(true);
@@ -206,13 +281,14 @@ export function VolumePlanning({ campaign, products }: Props) {
         targetLocation: null,
         notes: `Auto-created from campaign Volume planning · ${new Date().toLocaleDateString("de-AT")}`,
       });
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i];
-        if (r.missing) continue;
+      // Persist the per-product piece totals (expansion of variant
+      // selections × VariantPackagingProduct.qty).
+      for (let i = 0; i < productExpansion.length; i++) {
+        const p = productExpansion[i];
         await saveProductionOrderItem({
           productionOrderId: poId,
-          productId: r.productId,
-          targetUnits: r.units,
+          productId: p.productId,
+          targetUnits: p.pieces,
           sortOrder: i,
         });
       }
@@ -232,14 +308,25 @@ export function VolumePlanning({ campaign, products }: Props) {
     ? productionOrderItems.filter((it) => it.productionOrderId === linkedPoId).length
     : 0;
 
-  // ─── Add SKU picker ──────────────────────────────────────────────
-  const productsAvailable = useMemo(() => {
+  // ─── Variant-size picker ─────────────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
+  const vpsAvailable = useMemo(() => {
     const taken = new Set(Object.keys(draftTargets));
-    return products
-      .filter((p) => !p.archived)
-      .filter((p) => !taken.has(p.id!))
-      .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
-  }, [products, draftTargets]);
+    return variantPackagings
+      .filter((vp) => !taken.has(vp.id!))
+      .filter((vp) => {
+        const variant = variantById.get(vp.variantId);
+        if (!variant) return false;
+        // Hide variants whose sale window has ended.
+        if (variant.endDate && variant.endDate < today) return false;
+        return true;
+      })
+      .map((vp) => buildRow(vp.id!, 0))
+      .sort((a, b) => {
+        const v = a.variantName.localeCompare(b.variantName);
+        return v !== 0 ? v : a.packagingLabel.localeCompare(b.packagingLabel);
+      });
+  }, [variantPackagings, draftTargets, variantById, packagingById, compositionByVp, today]);
 
   // ─── Render helpers ──────────────────────────────────────────────
   const showRows = editing ? draftRows : rows;
@@ -263,6 +350,8 @@ export function VolumePlanning({ campaign, products }: Props) {
       statusColor = "var(--ds-tier-urgent)";
     }
   }
+
+  const totalPiecesForPo = productExpansion.reduce((s, p) => s + p.pieces, 0);
 
   return (
     <section
@@ -290,7 +379,7 @@ export function VolumePlanning({ campaign, products }: Props) {
         <div>
           <h2 className="text-ds-card-title">Volume planning</h2>
           <p className="text-ds-meta" style={{ marginTop: 2 }}>
-            Target units × list price → projected revenue.
+            Pick variant sizes (e.g. PB Cups · 1 cup of 15) → expands to product piece counts at PO creation.
           </p>
         </div>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -369,6 +458,27 @@ export function VolumePlanning({ campaign, products }: Props) {
         </p>
       )}
 
+      {/* Legacy productTargets banner — show only when there are
+          legacy entries AND no new variant-size targets yet, so users
+          know where their old data is and can migrate. */}
+      {hasLegacy && rows.length === 0 && !editing && (
+        <div
+          style={{
+            padding: "10px 20px",
+            fontSize: 12,
+            color: "var(--ds-text-muted)",
+            background: "var(--ds-tint-info)",
+            borderBottom: "0.5px solid var(--ds-border-warm)",
+          }}
+        >
+          <strong style={{ color: "var(--ds-text-primary)" }}>Legacy product-level targets:</strong>{" "}
+          {Object.entries(legacyProductTargets)
+            .map(([pid, n]) => `${productById.get(pid)?.name ?? pid.slice(0, 6)}: ${n}`)
+            .join(" · ")}
+          . Click Edit mode to re-pick at variant-size level.
+        </div>
+      )}
+
       {/* Table */}
       {showRows.length === 0 ? (
         <p
@@ -379,8 +489,8 @@ export function VolumePlanning({ campaign, products }: Props) {
             fontStyle: "italic",
           }}
         >
-          No product targets yet.
-          {editing && " Click \"+ Add product target\" below."}
+          No variant-size targets yet.
+          {editing && " Click \"+ Add variant size\" below."}
         </p>
       ) : (
         <div style={{ padding: "8px 0" }}>
@@ -399,7 +509,7 @@ export function VolumePlanning({ campaign, products }: Props) {
               fontWeight: 600,
             }}
           >
-            <span>SKU</span>
+            <span>Variant size</span>
             <span style={{ textAlign: "right" }}>Units</span>
             <span style={{ textAlign: "right" }}>Price</span>
             <span style={{ textAlign: "right" }}>Revenue if sold</span>
@@ -407,7 +517,7 @@ export function VolumePlanning({ campaign, products }: Props) {
           </div>
           {showRows.map((row) => (
             <div
-              key={row.productId}
+              key={row.vpId}
               style={{
                 display: "grid",
                 gridTemplateColumns: editing
@@ -422,23 +532,32 @@ export function VolumePlanning({ campaign, products }: Props) {
             >
               <span
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
+                  display: "flex",
+                  flexDirection: "column",
                   color: row.missing ? "var(--ds-tier-urgent)" : "var(--ds-text-primary)",
-                  fontWeight: 500,
                   overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
                 }}
               >
-                {row.missing && <IconAlertTriangle size={14} stroke={1.5} />}
-                {row.productName}
-                {row.missing && (
-                  <span className="text-ds-meta" style={{ fontSize: 10 }}>
-                    SKU missing
-                  </span>
-                )}
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontWeight: 500,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {row.missing && <IconAlertTriangle size={14} stroke={1.5} />}
+                  {row.variantName}
+                </span>
+                <span
+                  className="text-ds-meta"
+                  style={{ fontSize: 11, fontStyle: "normal" }}
+                >
+                  {row.packagingLabel}
+                </span>
               </span>
               {editing ? (
                 <input
@@ -446,7 +565,7 @@ export function VolumePlanning({ campaign, products }: Props) {
                   min={0}
                   value={row.units}
                   onChange={(e) =>
-                    setUnitsForProduct(row.productId, Number(e.target.value) || 0)
+                    setUnitsForVp(row.vpId, Number(e.target.value) || 0)
                   }
                   style={{
                     fontSize: 13,
@@ -457,6 +576,7 @@ export function VolumePlanning({ campaign, products }: Props) {
                     borderRadius: 4,
                     padding: "2px 6px",
                     fontVariantNumeric: "tabular-nums",
+                    height: "fit-content",
                   }}
                 />
               ) : (
@@ -475,7 +595,7 @@ export function VolumePlanning({ campaign, products }: Props) {
                   fontVariantNumeric: "tabular-nums",
                   color: row.unitPrice <= 0 ? "var(--ds-semantic-warn)" : "var(--ds-text-primary)",
                 }}
-                title={row.unitPrice <= 0 ? "No retail price set on any variant" : undefined}
+                title={row.unitPrice <= 0 ? "No price set on this variant size" : undefined}
               >
                 {row.unitPrice > 0 ? formatEuro(row.unitPrice) : "—"}
               </span>
@@ -490,15 +610,15 @@ export function VolumePlanning({ campaign, products }: Props) {
               {editing && (
                 <button
                   type="button"
-                  onClick={() => removeProductFromTargets(row.productId)}
-                  aria-label="remove SKU"
+                  onClick={() => removeVpFromTargets(row.vpId)}
+                  aria-label="remove variant size"
                   style={{
                     color: "var(--ds-text-muted)",
                     background: "transparent",
                     border: "none",
                     cursor: "pointer",
                   }}
-                  title="Remove this SKU"
+                  title="Remove this variant size"
                 >
                   <IconTrash size={14} stroke={1.5} />
                 </button>
@@ -528,15 +648,15 @@ export function VolumePlanning({ campaign, products }: Props) {
                 cursor: "pointer",
               }}
             >
-              <IconPlus size={14} stroke={1.5} /> Add product target
+              <IconPlus size={14} stroke={1.5} /> Add variant size
             </button>
           ) : (
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <select
                 onChange={(e) => {
-                  const pid = e.target.value;
-                  if (!pid) return;
-                  setUnitsForProduct(pid, 1);
+                  const vpId = e.target.value;
+                  if (!vpId) return;
+                  setUnitsForVp(vpId, 1);
                   setPickerOpen(false);
                 }}
                 style={{
@@ -546,14 +666,14 @@ export function VolumePlanning({ campaign, products }: Props) {
                   background: "var(--ds-card-bg)",
                   borderRadius: 4,
                   color: "var(--ds-text-primary)",
-                  minWidth: 240,
+                  minWidth: 320,
                 }}
                 defaultValue=""
               >
-                <option value="">— pick a product —</option>
-                {productsAvailable.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
+                <option value="">— pick a variant size —</option>
+                {vpsAvailable.map((row) => (
+                  <option key={row.vpId} value={row.vpId}>
+                    {row.variantName} · {row.packagingLabel}
                   </option>
                 ))}
               </select>
@@ -575,6 +695,83 @@ export function VolumePlanning({ campaign, products }: Props) {
         </div>
       )}
 
+      {/* Product expansion (read-only) — what the PO will actually contain */}
+      {showRows.length > 0 && productExpansion.length > 0 && (
+        <div style={{ borderTop: "0.5px solid var(--ds-border-warm)" }}>
+          <button
+            type="button"
+            onClick={() => setShowProductExpansion((s) => !s)}
+            style={{
+              width: "100%",
+              padding: "10px 20px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: "var(--ds-text-muted)",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            {showProductExpansion ? (
+              <IconChevronDown size={14} stroke={1.5} />
+            ) : (
+              <IconChevronRight size={14} stroke={1.5} />
+            )}
+            <span>
+              Expands to <strong style={{ color: "var(--ds-text-primary)" }}>{totalPiecesForPo}</strong> product piece
+              {totalPiecesForPo === 1 ? "" : "s"} across <strong style={{ color: "var(--ds-text-primary)" }}>{productExpansion.length}</strong> product
+              {productExpansion.length === 1 ? "" : "s"}
+            </span>
+          </button>
+          {showProductExpansion && (
+            <div style={{ padding: "0 20px 12px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 110px",
+                  gap: 8,
+                  padding: "4px 0",
+                  fontSize: 11,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  color: "var(--ds-text-muted)",
+                  fontWeight: 600,
+                }}
+              >
+                <span>Product</span>
+                <span style={{ textAlign: "right" }}>Pieces</span>
+              </div>
+              {productExpansion.map((p) => (
+                <div
+                  key={p.productId}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 110px",
+                    gap: 8,
+                    padding: "4px 0",
+                    fontSize: 12,
+                    borderTop: "0.5px solid var(--ds-border-warm)",
+                  }}
+                >
+                  <span>{p.productName}</span>
+                  <span
+                    style={{
+                      textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {p.pieces}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Totals */}
       <div
         style={{
@@ -588,7 +785,7 @@ export function VolumePlanning({ campaign, products }: Props) {
         }}
       >
         <div>
-          <p className="text-ds-label">Total units</p>
+          <p className="text-ds-label">Total units (variant sizes)</p>
           <p
             style={{
               fontSize: 20,
@@ -710,14 +907,14 @@ export function VolumePlanning({ campaign, products }: Props) {
         ) : (
           <>
             <span className="text-ds-meta">
-              {rows.length === 0
-                ? "Add at least one product target to create a Production Order."
-                : "Create a Production Order to feed the auto-planner. Open /plan?view=weekly → Regenerate to schedule the batches."}
+              {productExpansion.length === 0
+                ? "Add at least one variant-size target to create a Production Order."
+                : `Create a Production Order with ${totalPiecesForPo} piece${totalPiecesForPo === 1 ? "" : "s"} across ${productExpansion.length} product${productExpansion.length === 1 ? "" : "s"}. Open /plan?view=weekly → Regenerate to schedule the batches.`}
             </span>
             <button
               type="button"
               onClick={handleCreatePo}
-              disabled={rows.length === 0 || poBusy}
+              disabled={productExpansion.length === 0 || poBusy}
               style={{
                 padding: "6px 14px",
                 fontSize: 12,
@@ -725,8 +922,8 @@ export function VolumePlanning({ campaign, products }: Props) {
                 background: "var(--ds-tier-quarter-focus)",
                 color: "#ffffff",
                 borderRadius: 4,
-                opacity: rows.length === 0 || poBusy ? 0.55 : 1,
-                cursor: rows.length === 0 || poBusy ? "not-allowed" : "pointer",
+                opacity: productExpansion.length === 0 || poBusy ? 0.55 : 1,
+                cursor: productExpansion.length === 0 || poBusy ? "not-allowed" : "pointer",
                 fontWeight: 500,
               }}
             >

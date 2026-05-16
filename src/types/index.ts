@@ -2491,8 +2491,15 @@ export interface Campaign {
    *  needs its own target quantity. */
   targetTotalUnits?: number;
   /** Per-product target units. Map of `productId → units`. Drives
-   *  campaign-replenishment scheduling per product. Migration 0063. */
+   *  campaign-replenishment scheduling per product. Migration 0063.
+   *  Legacy: new Volume planning writes `variantPackagingTargets`
+   *  instead and expands at PO-creation time. */
   productTargets?: Record<string, number>;
+  /** Per-variant-size target units. Map of `variantPackagingId → units`
+   *  (count of boxes / sized units). PO creation expands via
+   *  variantPackagingProducts.qty into per-product piece counts.
+   *  Migration 0093. */
+  variantPackagingTargets?: Record<string, number>;
   /** Product IDs belonging to this campaign. Stored as array so a
    *  single read pulls the full set. */
   productIds: string[];
