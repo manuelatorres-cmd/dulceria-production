@@ -42,6 +42,23 @@ interface ResolvedRow {
   missing: boolean;
 }
 
+/** Supabase / PostgREST errors are plain objects (not Error instances) so
+ *  `String(err)` produces "[object Object]". Pull the useful fields out. */
+function formatSupabaseError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object") {
+    const obj = e as Record<string, unknown>;
+    const msg = typeof obj.message === "string" ? obj.message : null;
+    const details = typeof obj.details === "string" ? obj.details : null;
+    const hint = typeof obj.hint === "string" ? obj.hint : null;
+    const code = typeof obj.code === "string" ? obj.code : null;
+    const parts = [msg, details, hint].filter(Boolean) as string[];
+    if (parts.length > 0) return code ? `${code}: ${parts.join(" — ")}` : parts.join(" — ");
+    try { return JSON.stringify(e); } catch { return "Unknown error"; }
+  }
+  return String(e);
+}
+
 function formatEuro(n: number): string {
   return new Intl.NumberFormat("de-AT", {
     style: "currency",
@@ -227,7 +244,7 @@ export function VolumePlanning({ campaign, products }: Props) {
       });
       setEditing(false);
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e));
+      setSaveError(formatSupabaseError(e));
     } finally {
       setSaving(false);
     }
@@ -294,7 +311,7 @@ export function VolumePlanning({ campaign, products }: Props) {
       }
       setPoJustCreated(poId);
     } catch (e) {
-      setPoError(e instanceof Error ? e.message : String(e));
+      setPoError(formatSupabaseError(e));
     } finally {
       setPoBusy(false);
     }
