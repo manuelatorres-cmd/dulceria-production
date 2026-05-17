@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual planner — sticky workflow mockup</title>
+<style>
+:root {
+  --bg: #f6f1e6;
+  --paper: #ffffff;
+  --sidebar: #1a3a32;
+  --sidebar-deep: #122a25;
+  --ink: #1a1a1a;
+  --ink-soft: #4a4a4a;
+  --muted: #8a8580;
+  --line: #e5dfd1;
+  --line-strong: #d3ccba;
+  --accent: #d97757;
+  --accent-soft: #f5e6dc;
+  --yellow-soft: #fdf3d1;
+  --yellow-mid: #f4e4b0;
+  --pink-soft: #fde9e4;
+  --pink-strong: #d97a6a;
+  --green-soft: #d8ebd9;
+  --green: #4a7d4a;
+  --teal-pill: #1a3a32;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+.app { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 220px;
+  background: var(--sidebar);
+  color: #c5d2cf;
+  padding: 18px 14px;
+  flex-shrink: 0;
+}
+.sidebar .brand {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 700; color: #fff; font-size: 18px;
+  padding: 4px 8px; margin-bottom: 24px;
+}
+.sidebar .brand .heart {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--accent); font-size: 16px;
+}
+.sidebar .nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #b8c5c2;
+  cursor: pointer;
+  margin: 1px 0;
+}
+.sidebar .nav-item.active { background: var(--sidebar-deep); color: #fff; }
+.sidebar .nav-item .badge {
+  margin-left: auto; background: var(--accent-soft); color: var(--accent);
+  font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 600;
+}
+.sidebar .nav-item .badge.green { background: var(--green-soft); color: var(--green); }
+.sidebar .nav-item .badge.yellow { background: var(--yellow-mid); color: #7a6510; }
+.sidebar .group {
+  font-size: 10px; letter-spacing: 1.3px;
+  color: #6e8581; margin: 18px 8px 6px;
+}
+
+/* MAIN */
+.main {
+  flex: 1; display: flex; flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.top-tabs {
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 36px;
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
+.top-tabs .tab {
+  padding: 6px 16px; border-radius: 999px;
+  font-size: 13px; color: var(--ink-soft); cursor: pointer;
+}
+.top-tabs .tab.active { background: var(--bg); color: var(--ink); font-weight: 500; }
+
+/* SCROLLING DEMAND AREA */
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 36px 24px;
+}
+.page-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 18px;
+}
+.page-head h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
+.page-head .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+.scroll-note {
+  background: var(--accent-soft); color: #8a4530;
+  border: 1px solid #e8c5b1; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 18px;
+  font-size: 12.5px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.scroll-note a { color: #8a4530; font-size: 11px; }
+
+.demand-card {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: 12px; padding: 22px;
+}
+.demand-card h2 { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+.demand-card .meta { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
+
+.filters {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;
+}
+.filter-pill {
+  padding: 5px 10px; border-radius: 6px;
+  font-size: 12px; background: #f3eee3; color: var(--ink-soft);
+  display: inline-flex; gap: 6px; align-items: center; cursor: pointer;
+}
+.filter-pill.active { background: var(--sidebar); color: #fff; }
+.filter-pill .count {
+  background: rgba(0,0,0,0.06); padding: 0 6px; border-radius: 4px;
+  font-size: 10.5px; font-weight: 600;
+}
+.filter-pill.active .count { background: rgba(255,255,255,0.18); color: #fff; }
+
+.search {
+  width: 100%; padding: 9px 12px;
+  border: 1px solid var(--line); border-radius: 6px;
+  font-family: inherit; font-size: 13px; margin-bottom: 14px;
+}
+
+.group-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 4px;
+  font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+.group-head .dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--yellow-mid);
+}
+.group-head .count-trail { margin-left: auto; opacity: 0.7; }
+
+.demand-row {
+  padding: 12px 14px; border-left: 3px solid transparent;
+  display: flex; align-items: flex-start; gap: 8px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.demand-row:hover { background: #fcfaf3; }
+.demand-row.editing { border-left-color: var(--yellow-mid); background: #fcf5dc; }
+.demand-row .caret { color: var(--muted); margin-top: 1px; }
+.demand-row .body { flex: 1; }
+.demand-row .title { font-weight: 600; font-size: 14px; }
+.demand-row .specs { color: var(--muted); font-size: 12px; margin-top: 1px; }
+.demand-row .tags { margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+.tag {
+  font-size: 11px; padding: 2px 7px; border-radius: 4px;
+  background: #f3eee3; color: var(--ink-soft);
+}
+.tag.warn { background: var(--pink-soft); color: var(--pink-strong); }
+.tag.yellow { background: var(--yellow-mid); color: #7a6510; font-weight: 600; }
+.tag.due { background: transparent; color: var(--pink-strong); padding-left: 0; }
+
+/* STICKY BOTTOM CLUSTER */
+.action-cluster {
+  background: var(--bg);
+  border-top: 1px solid var(--line-strong);
+  flex-shrink: 0;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.04);
+  position: relative;
+}
+.cluster-row {
+  padding: 12px 36px;
+  display: flex; gap: 12px; align-items: stretch;
+}
+.cluster-row.drafts-row {
+  padding-top: 10px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.cluster-row.week-nav {
+  padding: 8px 36px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 12px;
+  background: #fbf7eb;
+}
+.cluster-row.week-strip {
+  padding: 0 36px 14px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+/* Active draft card (left, prominent) */
+.active-draft {
+  flex: 0 0 360px;
+  background: var(--yellow-soft);
+  border: 1.5px solid var(--yellow-mid);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: grab;
+  position: relative;
+}
+.active-draft:active { cursor: grabbing; }
+.active-draft .head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 2px;
+}
+.active-draft .title { font-size: 14px; font-weight: 700; }
+.active-draft .meta { font-size: 11.5px; color: #8a7530; margin-bottom: 8px; }
+.active-draft .po-row {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.po-chip {
+  font-size: 11px; padding: 3px 8px; border-radius: 4px;
+  background: #fff; border: 1px solid var(--yellow-mid);
+  display: inline-flex; gap: 5px; align-items: center;
+}
+.po-chip .po-label { color: var(--muted); font-weight: 600; font-size: 9.5px; letter-spacing: 0.5px; }
+.active-draft .actions { display: flex; gap: 6px; justify-content: flex-end; }
+.active-draft .drag-hint {
+  font-size: 10.5px; color: #8a7530; font-style: italic;
+  position: absolute; top: 10px; right: 14px;
+}
+.btn {
+  padding: 5px 12px; border-radius: 5px;
+  font-size: 12px; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--line-strong); background: var(--paper);
+  color: var(--ink);
+}
+.btn.primary { background: var(--sidebar); color: #fff; border-color: var(--sidebar); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--ink-soft); }
+
+/* Other drafts queue (right) */
+.drafts-queue {
+  flex: 1;
+  display: flex; gap: 8px; align-items: stretch;
+  overflow-x: auto;
+}
+.drafts-queue .qh {
+  font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+  align-self: center; margin-right: 4px; white-space: nowrap;
+}
+.draft-card {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 12px;
+  min-width: 180px; cursor: pointer;
+}
+.draft-card .status {
+  font-size: 9.5px; letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+.draft-card .name { font-size: 13px; font-weight: 600; margin-top: 2px; }
+.draft-card .meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.draft-card .progress { font-size: 12px; font-weight: 600; margin-top: 4px; }
+.new-draft-btn {
+  border: 1px dashed var(--line-strong); background: transparent;
+  color: var(--muted); font-size: 12px; padding: 8px 12px; border-radius: 8px;
+  cursor: pointer; align-self: stretch; min-width: 110px;
+}
+
+/* Week nav */
+.week-nav-inner {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+}
+.week-nav-inner .label {
+  font-weight: 600; font-size: 13.5px;
+}
+.week-nav-inner .nav-btn {
+  background: var(--paper); border: 1px solid var(--line);
+  padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+  font-family: inherit;
+}
+.week-nav-inner .nav-btn.today { font-weight: 600; }
+.week-nav-inner .spacer { flex: 1; }
+.week-nav-inner .hint { font-size: 11px; color: var(--muted); font-style: italic; }
+
+/* Week strip - drop zones */
+.day {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px;
+  min-height: 76px;
+  display: flex; flex-direction: column;
+  transition: border-color 0.1s, background 0.1s;
+}
+.day .dow {
+  font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); font-weight: 600;
+}
+.day .date { font-size: 13.5px; font-weight: 600; margin-bottom: 4px; }
+.day .empty { font-size: 11px; color: var(--muted); font-style: italic; margin-top: auto; }
+.day.drop-target {
+  border-color: var(--accent); border-style: dashed; border-width: 1.5px;
+  background: var(--accent-soft);
+}
+.day.drop-target .empty { color: var(--accent); font-weight: 600; font-style: normal; }
+.day.today { background: #fbf7eb; }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="heart">♥</span>
+      <span>Dulceria</span>
+    </div>
+    <div class="nav-item">⌂ Dashboard</div>
+    <div class="group">SPACES</div>
+    <div class="nav-item active">▣ Workshop</div>
+    <div class="group">WORK QUEUE</div>
+    <div class="nav-item">🛒 Orders <span class="badge">2</span></div>
+    <div class="nav-item">☐ Picking <span class="badge green">1</span></div>
+    <div class="nav-item">⊟ Production orders</div>
+    <div class="group">SCHEDULE</div>
+    <div class="nav-item">📅 Calendar (month)</div>
+    <div class="nav-item">▦ Plan (week)</div>
+    <div class="nav-item">▤ Daily</div>
+    <div class="group">PLANNING TOOLS</div>
+    <div class="nav-item">▤ Planner (replen)</div>
+    <div class="nav-item active" style="background: var(--sidebar-deep); color: #fff;">✎ Manual planner</div>
+    <div class="nav-item">▤ Needed vs stock</div>
+    <div class="group">RESOURCES</div>
+    <div class="nav-item">📦 Stock <span class="badge yellow">19</span></div>
+    <div class="nav-item">⚙ Equipment</div>
+    <div class="nav-item">⚠ HACCP <span class="badge yellow">2</span></div>
+    <div class="group">CAMPAIGNS</div>
+    <div class="nav-item">📣 Campaigns</div>
+  </aside>
+
+  <main class="main">
+    <div class="top-tabs">
+      <span class="tab">Dashboard</span>
+      <span class="tab">Daily</span>
+      <span class="tab">Planner</span>
+      <span class="tab">Needed</span>
+      <span class="tab active">Manual</span>
+      <span class="tab">Equipment</span>
+      <span class="tab">HACCP</span>
+      <span class="tab" style="margin-left:auto;color:var(--muted);font-size:12px;">Disable preview</span>
+    </div>
+
+    <!-- SCROLLABLE AREA (only this scrolls) -->
+    <div class="scroll-area">
+      <div class="page-head">
+        <div>
+          <h1>Manual planner</h1>
+          <div class="sub">Select demand · build a draft batch · drop on a day · save as production order.</div>
+        </div>
+      </div>
+
+      <div class="scroll-note">
+        <span>⚠ Draft already has Pistachio Crunch Bar. Save or cancel it before accepting a suggestion for Nougat Crunch Bar.</span>
+        <a href="#">DISMISS</a>
+      </div>
+
+      <div class="demand-card">
+        <h2>Open demand</h2>
+        <div class="meta">26 products · 5 219 pcs needed</div>
+
+        <div class="filters">
+          <span class="filter-pill">All <span class="count">28</span></span>
+          <span class="filter-pill">Online <span class="count">1</span></span>
+          <span class="filter-pill">B2B <span class="count">0</span></span>
+          <span class="filter-pill">Event <span class="count">0</span></span>
+          <span class="filter-pill">Shop <span class="count">0</span></span>
+          <span class="filter-pill">Restock-PO <span class="count">19</span></span>
+          <span class="filter-pill active">Campaign-PO <span class="count">26</span></span>
+          <span class="filter-pill">Urgent <span class="count">0</span></span>
+          <span class="filter-pill">Already in draft <span class="count">28</span></span>
+        </div>
+
+        <input type="text" class="search" placeholder="Search product...">
+
+        <div class="group-head">
+          <span class="dot"></span>
+          <span>BAR FILLED · 3 PCS/RUN</span>
+          <span class="count-trail">· 4</span>
+        </div>
+
+        <div class="demand-row editing">
+          <span class="caret">▾</span>
+          <div class="body">
+            <div class="title">Pistachio Crunch Bar</div>
+            <div class="specs">45 pcs · 45 PO · 3-cav · 3 pcs/run</div>
+            <div class="tags">
+              <span class="tag due">⚠ due 12. Mai</span>
+              <span class="tag yellow">editing</span>
+              <span style="color: var(--muted); font-size: 12px;">45 of 46 left</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="demand-row">
+          <span class="caret">▸</span>
+          <div class="body">
+            <div class="title">Nougat Crunch Bar</div>
+            <div class="specs">43 pcs · 43 PO · 3-cav · 3 pcs/run</div>
+            <div class="tags">
+              <span class="tag due">⚠ due 14. Mai</span>
+              <span class="tag">in draft × 3</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="demand-row">
+          <span class="caret">▸</span>
+          <div class="body">
+            <div class="title">Peanut Crunch Bar</div>
+            <div class="specs">43 pcs · 43 PO · 3-cav · 3 pcs/run</div>
+            <div class="tags">
+              <span class="tag due">⚠ due 14. Mai</span>
+              <span class="tag">in draft × 3</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="demand-row">
+          <span class="caret">▸</span>
+          <div class="body">
+            <div class="title">Pistachio Crunch Bar (white)</div>
+            <div class="specs">33 pcs · 33 PO · 3-cav · 3 pcs/run</div>
+            <div class="tags">
+              <span class="tag due">⚠ due 14. Mai</span>
+              <span class="tag">in draft × 3</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="group-head" style="margin-top: 6px;">
+          <span class="dot"></span>
+          <span>BAR THIN · 3 PCS/RUN</span>
+          <span class="count-trail">· 4</span>
+        </div>
+
+        <div class="demand-row">
+          <span class="caret">▸</span>
+          <div class="body">
+            <div class="title">Caramel Chocolate</div>
+            <div class="specs">50 pcs · 50 PO · 3-cav · 3 pcs/run</div>
+            <div class="tags">
+              <span class="tag">in draft × 4</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="demand-row">
+          <span class="caret">▸</span>
+          <div class="body">
+            <div class="title">Lemon Chocolate</div>
+            <div class="specs">50 pcs · 50 PO · 3-cav · 3 pcs/run</div>
+            <div class="tags">
+              <span class="tag">in draft × 4</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="demand-row">
+          <span class="caret">▸</span>
+          <div class="body">
+            <div class="title">Pistachio Chocolate Bar</div>
+            <div class="specs">50 pcs · 50 PO · 3-cav · 3 pcs/run</div>
+            <div class="tags">
+              <span class="tag">in draft × 4</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; color: var(--muted); font-size: 12px; padding: 14px;">
+          (scroll continues with the rest of the demand…)
+        </div>
+      </div>
+    </div>
+
+    <!-- STICKY BOTTOM CLUSTER -->
+    <div class="action-cluster">
+      <!-- Row 1: Active draft (left) + Other drafts queue (right) -->
+      <div class="cluster-row drafts-row">
+        <div class="active-draft" draggable="true">
+          <span class="drag-hint">⋮⋮ drag onto a day ↓</span>
+          <div class="head">
+            <div class="title">Pistachio Crunch Bar batch</div>
+          </div>
+          <div class="meta">1 product · 42 pcs · 14 fills · ~59m active</div>
+          <div class="po-row">
+            <span class="po-chip"><span class="po-label">PO</span> Veganmania · 40 pcs · due 4. Juni ✕</span>
+          </div>
+          <div class="actions">
+            <button class="btn ghost">Cancel</button>
+            <button class="btn">Park as draft</button>
+          </div>
+        </div>
+
+        <div class="drafts-queue">
+          <span class="qh">Other drafts</span>
+          <div class="draft-card">
+            <div class="status">Unscheduled</div>
+            <div class="name">Pistachio Crunch Bar</div>
+            <div class="meta">1 line · Bar filled</div>
+            <div class="progress">1 / 3 <span style="font-weight: 400; color: var(--muted);">1 fills · +2 surplus</span></div>
+          </div>
+          <div class="draft-card">
+            <div class="status">Unscheduled</div>
+            <div class="name">Pistachio Raspberry Crunch</div>
+            <div class="meta">1 line · Heart XXL</div>
+            <div class="progress">1 / 2 <span style="font-weight: 400; color: var(--muted);">1 fills · +1 surplus</span></div>
+          </div>
+          <button class="new-draft-btn">+ new draft</button>
+        </div>
+      </div>
+
+      <!-- Row 2: Week nav (right where the days are) -->
+      <div class="cluster-row week-nav">
+        <div class="week-nav-inner">
+          <button class="nav-btn">← prev week</button>
+          <span class="label">May 18 — May 24, 2026</span>
+          <button class="nav-btn today">today</button>
+          <button class="nav-btn">next week →</button>
+          <span class="spacer"></span>
+          <span class="hint">drop active draft on a day → save & pin</span>
+        </div>
+      </div>
+
+      <!-- Row 3: Week strip -->
+      <div class="cluster-row week-strip">
+        <div class="day today">
+          <span class="dow">MON</span>
+          <span class="date">May 18</span>
+          <span class="empty">empty</span>
+        </div>
+        <div class="day">
+          <span class="dow">TUE</span>
+          <span class="date">May 19</span>
+          <span class="empty">empty</span>
+        </div>
+        <div class="day">
+          <span class="dow">WED</span>
+          <span class="date">May 20</span>
+          <span class="empty">empty</span>
+        </div>
+        <div class="day drop-target">
+          <span class="dow">THU</span>
+          <span class="date">May 21</span>
+          <span class="empty">↳ drop here</span>
+        </div>
+        <div class="day">
+          <span class="dow">FRI</span>
+          <span class="date">May 22</span>
+          <span class="empty">empty</span>
+        </div>
+        <div class="day">
+          <span class="dow">SAT</span>
+          <span class="date">May 23</span>
+          <span class="empty">empty</span>
+        </div>
+        <div class="day">
+          <span class="dow">SUN</span>
+          <span class="date">May 24</span>
+          <span class="empty">empty</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

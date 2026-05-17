@@ -749,31 +749,110 @@ export default function ManualPlannerPage() {
   const criticalPercent = capacityConfig?.criticalThresholdPercent ?? 90;
 
   // ─── Render ───────────────────────────────────────────────────────
+  // Three-zone column per CURSOR_PROMPT_MANUAL_PLANNER_WORKFLOW.md:
+  //   - mp-scroll-zone owns the only scroll on the page (header + warn-strip + demand card)
+  //   - mp-action-cluster is sticky-pinned to the bottom and has its own
+  //     three rows: drafts row, week-nav row, week strip.
+  const weekLabel = (() => {
+    const start = startOfWeekMonday(weekAnchor);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 6);
+    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const year = end.getUTCFullYear();
+    return `${fmt(start)} — ${fmt(end)}, ${year}`;
+  })();
+
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={handleDragEnd}>
-      <div className="ds manual-planner-v2 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
-        <div className="mb-2">
-          <BackButton />
-        </div>
+      <div className="ds manual-planner-v2 mp-page-root -mx-4 sm:-mx-6">
+        {/* ── Middle zone: only this scrolls. ──────────────────────── */}
+        <div className="mp-scroll-zone px-4 sm:px-6 pt-4 pb-3">
+          <div className="mb-2">
+            <BackButton />
+          </div>
 
-        <div className="flex items-start justify-between gap-3 mb-5 flex-wrap">
-          <div>
+          <div className="mb-4">
             <h1
-              className="text-3xl"
+              className="text-2xl"
               style={{
                 fontFamily: "var(--font-serif)",
-                fontWeight: 600,
-                letterSpacing: "-0.02em",
+                fontWeight: 700,
+                letterSpacing: "-0.01em",
                 color: "var(--mp-text-primary)",
               }}
             >
               Manual planner
             </h1>
-            <p className="text-[13px] italic mt-0.5" style={{ color: "var(--mp-text-muted)" }}>
+            <p className="text-[12px] mt-0.5" style={{ color: "var(--mp-text-muted)" }}>
               Select demand · build a draft batch · drop on a day · save as production order.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+
+          {saveErr ? (
+            <div
+              className="mb-3 px-3 py-1.5 text-[12px] flex items-start gap-2"
+              style={{
+                border: "1px solid #e8c5b1",
+                background: "var(--mp-blush)",
+                color: "#8a4530",
+                borderRadius: 6,
+              }}
+            >
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span className="flex-1">{saveErr}</span>
+              <button
+                type="button"
+                onClick={() => setSaveErr(null)}
+                className="text-[10px] uppercase font-semibold opacity-80 hover:opacity-100"
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+
+          <DemandPicker
+            products={productDemands}
+            draftProductId={draftProductId}
+            draftOrderItemIds={draftOrderItemIds}
+            draftPoItemIds={draftPoItemIds}
+            onPickOrderLine={handlePickOrderLine}
+            onPickPoLine={handlePickPoLine}
+            onAcceptSuggestion={handleAcceptSuggestion}
+          />
+        </div>
+
+        {/* ── Bottom zone: sticky cluster. Three rows. ─────────────── */}
+        <div className="mp-action-cluster">
+          {/* Row 1 — drafts row: active draft (left) + other-drafts queue (right).
+              If no active draft, queue takes the full row. */}
+          <div className="mp-cluster-row drafts" style={{ alignItems: "stretch" }}>
+            {draft ? (
+              <div style={{ flex: "0 0 360px" }}>
+                <DraftBar
+                  draft={draft}
+                  totalActiveMinutes={draftActiveMinutes}
+                  onRemoveAllocation={handleRemoveAllocation}
+                  onCancel={handleCancelDraft}
+                  onSave={handleSaveDraft}
+                  onPark={() => { void handleParkDraft(); }}
+                  onName={handleNameDraft}
+                  saving={saving}
+                  pinnedDateLabel={pinnedDateLabel}
+                />
+              </div>
+            ) : null}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <DraftsTray
+                cards={buildTrayCards(draftPlanCards, draft)}
+                onLoadCard={(c) => { void handleLoadTrayCard(c); }}
+                onDeleteCard={(c) => { void handleDeleteTrayCard(c); }}
+                onNewDraft={() => { void handleNewDraft(); }}
+              />
+            </div>
+          </div>
+
+          {/* Row 2 — week nav (prev / label / today / next + hint). */}
+          <div className="mp-cluster-row week-nav">
             <button
               type="button"
               onClick={() => {
@@ -781,25 +860,31 @@ export default function ManualPlannerPage() {
                 next.setDate(next.getDate() - 7);
                 setWeekAnchor(next);
               }}
-              className="px-3 py-1.5 text-[13px] hover:bg-[color:var(--mp-hover-bg)]"
               style={{
-                border: "0.5px solid var(--mp-border-warm)",
+                padding: "3px 9px",
+                borderRadius: 5,
+                fontSize: 11.5,
+                border: "1px solid var(--mp-border-warm)",
                 background: "var(--mp-card-bg)",
-                color: "var(--mp-text-primary)",
-                borderRadius: 4,
+                cursor: "pointer",
+                fontFamily: "inherit",
               }}
             >
               ← prev week
             </button>
+            <span style={{ fontWeight: 600, fontSize: 12.5 }}>{weekLabel}</span>
             <button
               type="button"
               onClick={() => setWeekAnchor(new Date())}
-              className="px-3 py-1.5 text-[13px] hover:bg-[color:var(--mp-hover-bg)]"
               style={{
-                border: "0.5px solid var(--mp-border-warm)",
+                padding: "3px 9px",
+                borderRadius: 5,
+                fontSize: 11.5,
+                fontWeight: 600,
+                border: "1px solid var(--mp-border-warm)",
                 background: "var(--mp-card-bg)",
-                color: "var(--mp-text-primary)",
-                borderRadius: 4,
+                cursor: "pointer",
+                fontFamily: "inherit",
               }}
             >
               today
@@ -811,108 +896,56 @@ export default function ManualPlannerPage() {
                 next.setDate(next.getDate() + 7);
                 setWeekAnchor(next);
               }}
-              className="px-3 py-1.5 text-[13px] hover:bg-[color:var(--mp-hover-bg)]"
               style={{
-                border: "0.5px solid var(--mp-border-warm)",
+                padding: "3px 9px",
+                borderRadius: 5,
+                fontSize: 11.5,
+                border: "1px solid var(--mp-border-warm)",
                 background: "var(--mp-card-bg)",
-                color: "var(--mp-text-primary)",
-                borderRadius: 4,
+                cursor: "pointer",
+                fontFamily: "inherit",
               }}
             >
               next week →
             </button>
-          </div>
-        </div>
-
-        {saveErr ? (
-          <div
-            className="mb-4 px-3 py-2 text-[12px] flex items-start gap-2"
-            style={{
-              border: "0.5px solid var(--mp-rose)",
-              background: "var(--mp-blush)",
-              color: "var(--mp-rose)",
-              borderRadius: 4,
-            }}
-          >
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span className="flex-1">{saveErr}</span>
-            <button
-              type="button"
-              onClick={() => setSaveErr(null)}
-              className="text-[10px] uppercase opacity-70 hover:opacity-100"
+            <span style={{ flex: 1 }} />
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--mp-text-muted)",
+                fontStyle: "italic",
+              }}
             >
-              Dismiss
-            </button>
-          </div>
-        ) : null}
-
-        {/* Spec §1: upper region is 2-col on ≥1024px (demand 1.55fr / draft 1fr).
-            DraftsTray + WeekStripPills sit full-width below. <1024px stacks.
-            Inline style is the source of truth — Tailwind arbitrary value
-            `lg:grid-cols-[1.55fr_1fr]` is kept only as a hint for class
-            scanners; the inline style + media query is what actually
-            renders so a JIT miscompile can't break the layout. */}
-        <div className="flex flex-col gap-6">
-          <div
-            className="manual-upper-grid"
-            style={{
-              display: "grid",
-              gap: "1.5rem",
-              alignItems: "start",
-            }}
-          >
-            <DemandPicker
-              products={productDemands}
-              draftProductId={draftProductId}
-              draftOrderItemIds={draftOrderItemIds}
-              draftPoItemIds={draftPoItemIds}
-              onPickOrderLine={handlePickOrderLine}
-              onPickPoLine={handlePickPoLine}
-              onAcceptSuggestion={handleAcceptSuggestion}
-            />
-            <DraftBar
-              draft={draft}
-              totalActiveMinutes={draftActiveMinutes}
-              onRemoveAllocation={handleRemoveAllocation}
-              onCancel={handleCancelDraft}
-              onSave={handleSaveDraft}
-              onPark={() => { void handleParkDraft(); }}
-              onName={handleNameDraft}
-              saving={saving}
-              pinnedDateLabel={pinnedDateLabel}
-            />
+              drop active draft on a day → save &amp; pin
+            </span>
           </div>
 
-          <DraftsTray
-            cards={buildTrayCards(draftPlanCards, draft)}
-            onLoadCard={(c) => { void handleLoadTrayCard(c); }}
-            onDeleteCard={(c) => { void handleDeleteTrayCard(c); }}
-            onNewDraft={() => { void handleNewDraft(); }}
-          />
-
-          <WeekStripPills
-            weekAnchor={weekAnchor}
-            productionDays={productionDays}
-            lineItems={dayLineItems}
-            plans={productionPlans}
-            planProducts={planProducts}
-            products={products}
-            moulds={moulds}
-            capacityConfig={capacityConfig}
-            people={people}
-            unavailability={personUnavailability}
-            blockedDays={eventCalendar}
-            draftPinnedDate={draft?.pinnedDate ?? null}
-            draftPreview={
-              draft
-                ? {
-                    name: draft.name,
-                    pieces: draft.totalPieces,
-                    mouldCount: draft.mouldCount,
-                  }
-                : null
-            }
-          />
+          {/* Row 3 — week strip pills. */}
+          <div className="mp-cluster-row week-strip">
+            <WeekStripPills
+              weekAnchor={weekAnchor}
+              productionDays={productionDays}
+              lineItems={dayLineItems}
+              plans={productionPlans}
+              planProducts={planProducts}
+              products={products}
+              moulds={moulds}
+              capacityConfig={capacityConfig}
+              people={people}
+              unavailability={personUnavailability}
+              blockedDays={eventCalendar}
+              draftPinnedDate={draft?.pinnedDate ?? null}
+              draftPreview={
+                draft
+                  ? {
+                      name: draft.name,
+                      pieces: draft.totalPieces,
+                      mouldCount: draft.mouldCount,
+                    }
+                  : null
+              }
+            />
+          </div>
         </div>
 
         {pendingFillMould && draft && (

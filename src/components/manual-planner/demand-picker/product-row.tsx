@@ -2,9 +2,19 @@
 
 import type { ProductDemand } from "@/lib/manual-planner/aggregate-demand";
 import type { SmartSuggestion } from "@/lib/manual-planner/smart-suggestions";
-import { IconChevronDown as ChevronDown, IconChevronRight as ChevronRight } from "@tabler/icons-react";
+import { IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import { OrdersExpanded } from "./orders-expanded";
 
+/**
+ * Compact single-line product row per the workflow redesign
+ * (CURSOR_PROMPT_MANUAL_PLANNER_WORKFLOW.md §3). Grid columns:
+ *   14px | 1fr | 70px | 110px | 100px | 100px | 24px
+ *   dot · name · qty · spec · due · state · expand
+ *
+ * Click the row body → expand inline to reveal source lines
+ * (OrdersExpanded). Expand chevron fades in on hover so the resting
+ * state stays scan-friendly across 26+ products.
+ */
 export function ProductRow({
   product,
   expanded,
@@ -26,154 +36,60 @@ export function ProductRow({
   onPickPoLine: (args: { poItemId: string; productId: string; qty: number; poName: string }) => void;
   onAcceptSuggestion: (productId: string, suggestion: SmartSuggestion) => void;
 }) {
-  // Determine left border color based on visual state.
-  let leftBorder = "transparent";
-  let bg = "var(--mp-card-bg)";
-  let opacity = 1;
-
-  if (inDraft) {
-    leftBorder = "var(--mp-draft-border)";
-    bg = "var(--mp-draft-tint)";
-  } else if (product.urgencyLevel === "overdue" || product.urgencyLevel === "urgent") {
-    leftBorder = "var(--mp-rose)";
-  } else if (product.alreadyPlannedInDrafts > 0 || product.alreadyPlannedInActive > 0) {
-    leftBorder = "var(--mp-blush)";
-  }
-  if (
-    product.totalDemand > 0 &&
-    product.currentStock + product.alreadyPlannedInActive >= product.totalDemand
-  ) {
-    opacity = 0.45;
-  }
-  if (expanded) {
-    bg = "var(--mp-hover-bg)";
-  }
+  const urgent =
+    product.urgencyLevel === "overdue" || product.urgencyLevel === "urgent";
 
   const dueLabel = product.earliestDeadline
-    ? product.earliestDeadline.toLocaleDateString("de-AT", { day: "numeric", month: "short" })
-    : null;
+    ? `${urgent ? "⚠ " : ""}${product.earliestDeadline.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+    : "—";
 
-  // Summary line: "67 pcs · 17 ord · 50 PO · 3-cav · 40 pcs/run"
-  const summaryParts: string[] = [];
-  if (product.totalDemand > 0) summaryParts.push(`${product.totalDemand} pcs`);
-  if (product.orderDemand > 0) summaryParts.push(`${product.orderDemand} ord`);
-  if (product.poDemand > 0) summaryParts.push(`${product.poDemand} PO`);
-  if (product.numberOfCavities > 0)
-    summaryParts.push(`${product.numberOfCavities}-cav`);
-  if (product.numberOfCavities > 0)
-    summaryParts.push(`${product.numberOfCavities} pcs/run`);
+  // Spec column: "{N} PO · {C}-cav" (drop pcs/run per spec §3).
+  const specParts: string[] = [];
+  if (product.poDemand > 0) specParts.push(`${product.poDemand} PO`);
+  if (product.orderDemand > 0) specParts.push(`${product.orderDemand} ord`);
+  if (product.numberOfCavities > 0) specParts.push(`${product.numberOfCavities}-cav`);
+
+  const rowClass = [
+    "mp-demand-row",
+    urgent ? "urgent" : "",
+    inDraft ? "editing" : "",
+  ].filter(Boolean).join(" ");
 
   return (
-    <div
-      style={{
-        borderBottom: "0.5px solid var(--mp-border-warm)",
-        borderLeft: `3px solid ${leftBorder}`,
-        background: bg,
-        opacity,
-        transition: "background 0.1s",
-      }}
-    >
-      <button
-        type="button"
+    <>
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onToggle}
-        className="w-full text-left px-4 py-2.5 flex items-start gap-2"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className={rowClass}
       >
-        {expanded ? (
-          <ChevronDown className="w-3.5 h-3.5 mt-1 shrink-0" style={{ color: "var(--mp-text-muted)" }} />
-        ) : (
-          <ChevronRight className="w-3.5 h-3.5 mt-1 shrink-0" style={{ color: "var(--mp-text-muted)" }} />
-        )}
-        <span className="flex-1 min-w-0">
-          <span className="flex items-baseline justify-between gap-2">
-            <span
-              className="text-[14px] truncate"
-              style={{ color: "var(--mp-text-primary)", fontWeight: 500 }}
-            >
-              {product.productName}
-            </span>
-            {product.currentStock > 0 && (
-              <span
-                className="text-[11px] italic shrink-0"
-                style={{ color: "var(--mp-text-muted)" }}
-              >
-                stock {product.currentStock}
-              </span>
-            )}
-          </span>
-          {summaryParts.length > 0 && (
-            <span
-              className="block text-[11.5px] mt-0.5"
-              style={{ color: "var(--mp-text-muted)" }}
-            >
-              {summaryParts.join(" · ")}
-            </span>
-          )}
-          <span className="block mt-1 flex flex-wrap gap-1.5">
-            {(product.urgencyLevel === "overdue" || product.urgencyLevel === "urgent") &&
-              dueLabel && (
-                <span
-                  className="text-[10.5px]"
-                  style={{
-                    color: "var(--mp-rose)",
-                    fontWeight: 500,
-                  }}
-                >
-                  ⚠ due {dueLabel}
-                </span>
-              )}
-            {product.alreadyPlannedInActive > 0 && (
-              <span
-                className="text-[10.5px]"
-                style={{
-                  color: "var(--mp-teal)",
-                  fontWeight: 500,
-                }}
-              >
-                {product.alreadyPlannedInActive} planned
-              </span>
-            )}
-            {inDraft && (
-              <span
-                className="text-[10.5px]"
-                style={{
-                  color: "var(--mp-text-primary)",
-                  background: "var(--mp-draft-border)",
-                  padding: "1px 6px",
-                  borderRadius: 2,
-                  fontWeight: 500,
-                }}
-              >
-                editing
-              </span>
-            )}
-            {!inDraft && product.draftCount > 0 && (
-              <span
-                className="text-[10.5px]"
-                style={{
-                  color: "var(--mp-teal, #1c5651)",
-                  background: "rgba(28,86,81,0.10)",
-                  padding: "1px 6px",
-                  borderRadius: 2,
-                  fontWeight: 500,
-                }}
-              >
-                in draft{product.draftCount > 1 ? ` × ${product.draftCount}` : ""}
-              </span>
-            )}
-            {product.inDraftQty > 0 && product.totalDemand > 0 && (
-              <span
-                className="text-[10.5px] tabular-nums"
-                style={{
-                  color: "var(--mp-text-muted)",
-                  fontWeight: 500,
-                }}
-              >
-                {product.totalDemand} of {product.totalDemand + product.inDraftQty} left
-              </span>
-            )}
-          </span>
+        <span className="status-dot" aria-hidden />
+        <span className="name">{product.productName}</span>
+        <span className="qty">
+          {product.totalDemand}
+          <span className="unit"> pcs</span>
         </span>
-      </button>
+        <span className="spec">{specParts.join(" · ") || "—"}</span>
+        <span className="due">{dueLabel}</span>
+        <span className="state">
+          {inDraft ? (
+            <span className="mp-state-tag editing">editing</span>
+          ) : product.draftCount > 0 ? (
+            <span className="mp-state-tag draft">
+              in draft{product.draftCount > 1 ? ` × ${product.draftCount}` : ""}
+            </span>
+          ) : null}
+        </span>
+        <span className="expand" aria-hidden>
+          <ChevronRight className="w-3 h-3" />
+        </span>
+      </div>
 
       {expanded && (
         <OrdersExpanded
@@ -185,6 +101,6 @@ export function ProductRow({
           onAcceptSuggestion={onAcceptSuggestion}
         />
       )}
-    </div>
+    </>
   );
 }

@@ -2,6 +2,23 @@
 
 import type { ReactNode } from "react";
 
+/**
+ * Slim group divider per workflow redesign §3 (≤26px tall).
+ * Colored dot · UPPERCASE mould-bucket name · "· N pcs/run" · count
+ * Color is hashed from the label so each mould bucket gets a stable
+ * dot tint without needing a per-mould-type registry.
+ */
+function colorForLabel(label: string): string {
+  // Tiny deterministic hash → hue.
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = (hash * 31 + label.charCodeAt(i)) & 0xffff;
+  }
+  const hue = hash % 360;
+  // Constrain saturation/lightness so dots read on cream bg without glare.
+  return `hsl(${hue}, 45%, 50%)`;
+}
+
 export function CategoryGroup({
   label,
   productCount,
@@ -13,55 +30,23 @@ export function CategoryGroup({
   meta?: string;
   children: ReactNode;
 }) {
+  const dotColor = colorForLabel(label);
+  // Split "Bar mould · 3 pcs/run" into name + spec for two-tone rendering.
+  const [primary, ...rest] = label.split(" · ");
+  const specSuffix = rest.length > 0 ? ` · ${rest.join(" · ")}` : "";
+
   return (
-    <div style={{ borderBottom: "0.5px solid var(--mp-border-warm)" }}>
-      <div
-        className="px-5 py-2.5 flex items-center justify-between"
-        style={{
-          background: "var(--mp-page-bg)",
-          fontSize: 11,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "var(--mp-text-muted)",
-          fontWeight: 600,
-        }}
-      >
-        <span className="inline-flex items-center gap-2">
-          <span
-            aria-hidden
-            style={{
-              display: "inline-block",
-              width: 6,
-              height: 6,
-              borderRadius: 999,
-              background: "var(--mp-caramel)",
-            }}
-          />
-          {label}
-          <span
-            style={{
-              textTransform: "none",
-              letterSpacing: 0,
-              fontWeight: 400,
-              fontStyle: "italic",
-              color: "var(--mp-text-muted)",
-            }}
-          >
-            · {productCount}
-          </span>
-        </span>
-        {meta ? (
-          <span
-            style={{
-              textTransform: "none",
-              letterSpacing: 0,
-              fontWeight: 400,
-              fontStyle: "italic",
-            }}
-          >
-            {meta}
-          </span>
+    <div>
+      <div className="mp-group-divider">
+        <span className="dot" style={{ background: dotColor }} aria-hidden />
+        <span>{primary}</span>
+        {specSuffix ? (
+          <span style={{ opacity: 0.6, fontWeight: 500 }}>{specSuffix}</span>
         ) : null}
+        <span className="count-trail">
+          {productCount} product{productCount === 1 ? "" : "s"}
+          {meta ? ` · ${meta}` : ""}
+        </span>
       </div>
       <div>{children}</div>
     </div>

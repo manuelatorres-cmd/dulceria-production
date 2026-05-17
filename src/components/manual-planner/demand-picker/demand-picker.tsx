@@ -102,95 +102,108 @@ export function DemandPicker({
   }
 
   return (
-    <div
-      className="flex flex-col"
-      style={{
-        background: "var(--mp-card-bg)",
-        border: "0.5px solid var(--mp-border-warm)",
-        borderRadius: 8,
-        overflow: "hidden",
-      }}
-    >
-      <div
-        className="px-5 pt-4 pb-3"
-        style={{ borderBottom: "0.5px solid var(--mp-border-warm)" }}
-      >
-        <h2
+    <div className="mp-demand-card">
+      {/* Sticky inner top: header + filters + search stay pinned as the
+          card's body scrolls past underneath. Workflow redesign §3. */}
+      <div className="mp-demand-sticky-top">
+        <div
           style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: 18,
-            fontWeight: 600,
-            color: "var(--mp-text-primary)",
-            marginBottom: 4,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            marginBottom: 8,
+            gap: 8,
+            flexWrap: "wrap",
           }}
         >
-          Open demand
-        </h2>
-        <p
-          className="text-[12px] italic"
-          style={{ color: "var(--mp-text-muted)" }}
-        >
-          {totalProducts} product{totalProducts === 1 ? "" : "s"} · {totalPieces} pcs needed
-        </p>
-      </div>
+          <div>
+            <span
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: 15,
+                fontWeight: 700,
+                color: "var(--mp-text-primary)",
+              }}
+            >
+              Open demand
+            </span>
+            <span
+              style={{
+                color: "var(--mp-text-muted)",
+                fontSize: 12,
+                marginLeft: 6,
+              }}
+            >
+              · {totalProducts} product{totalProducts === 1 ? "" : "s"} ·{" "}
+              {totalPieces.toLocaleString("en-US")} pcs needed
+            </span>
+          </div>
+          <span
+            style={{
+              fontSize: 12,
+              color: "var(--mp-text-muted)",
+              fontStyle: "italic",
+            }}
+          >
+            sorted by mould bucket
+          </span>
+        </div>
 
-      <div style={{ borderBottom: "0.5px solid var(--mp-border-warm)" }}>
         <SourceFilterChips
           products={products}
           selected={chips}
           onChange={setChips}
         />
-        <div className="px-5 py-2">
-          <input
-            type="search"
-            placeholder="Search product…"
-            value={search}
-            onChange={(e) => setSearchState(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "4px 8px",
-              fontSize: 12,
-              borderRadius: 4,
-              border: "0.5px solid var(--mp-border-warm)",
-              background: "var(--mp-page-bg, #fff)",
-            }}
-          />
-        </div>
+
+        <input
+          type="search"
+          placeholder="Search product…"
+          value={search}
+          onChange={(e) => setSearchState(e.target.value)}
+          style={{
+            width: "100%",
+            marginTop: 6,
+            padding: "6px 10px",
+            fontSize: 12.5,
+            borderRadius: 5,
+            border: "1px solid var(--mp-border-warm)",
+            background: "var(--mp-card-bg)",
+            fontFamily: "inherit",
+          }}
+        />
       </div>
 
-      <div className="flex-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 320px)" }}>
-        {grouped.length === 0 ? (
-          <p
-            className="px-5 py-6 text-[12.5px] italic text-center"
-            style={{ color: "var(--mp-text-muted)" }}
+      {grouped.length === 0 ? (
+        <p
+          className="text-[12.5px] italic text-center"
+          style={{ color: "var(--mp-text-muted)", padding: "16px" }}
+        >
+          No demand matches the current filter.
+        </p>
+      ) : (
+        grouped.map((group) => (
+          <CategoryGroup
+            key={group.label}
+            label={group.label}
+            productCount={group.products.length}
           >
-            No demand matches the current filter.
-          </p>
-        ) : (
-          grouped.map((group) => (
-            <CategoryGroup
-              key={group.label}
-              label={group.label}
-              productCount={group.products.length}
-            >
-              {group.products.map((product) => (
-                <ProductRow
-                  key={product.productId}
-                  product={product}
-                  expanded={expandedProductId === product.productId}
-                  onToggle={() => handleToggle(product.productId)}
-                  inDraft={draftProductId === product.productId}
-                  draftOrderItemIds={draftOrderItemIds}
-                  draftPoItemIds={draftPoItemIds}
-                  onPickOrderLine={onPickOrderLine}
-                  onPickPoLine={onPickPoLine}
-                  onAcceptSuggestion={onAcceptSuggestion}
-                />
-              ))}
-            </CategoryGroup>
-          ))
-        )}
-      </div>
+            {group.products.map((product) => (
+              <ProductRow
+                key={product.productId}
+                product={product}
+                expanded={expandedProductId === product.productId}
+                onToggle={() => handleToggle(product.productId)}
+                inDraft={draftProductId === product.productId}
+                draftOrderItemIds={draftOrderItemIds}
+                draftPoItemIds={draftPoItemIds}
+                onPickOrderLine={onPickOrderLine}
+                onPickPoLine={onPickPoLine}
+                onAcceptSuggestion={onAcceptSuggestion}
+              />
+            ))}
+          </CategoryGroup>
+        ))
+      )}
     </div>
   );
 }
