@@ -491,6 +491,11 @@ export interface ProductionPlan {
    *  Wrap up step. Kept distinct from `notes` (which doubles as a batch-
    *  level sticky note). Migration 0089. */
   issuesNotes?: string;
+  /** UUID shared by every plan originating from a split (mig 0096).
+   *  Cleared when only one plan in the group remains. Used by the
+   *  manual planner's BatchPeekPopover to surface "Merge with sibling"
+   *  + chain-link icon on a pinned pill. */
+  siblingGroupId?: string | null;
 }
 
 /**

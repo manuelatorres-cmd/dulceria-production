@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { useDraggable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type {
   Mould,
   PlanProduct,
@@ -135,7 +135,7 @@ export function ScheduleSection({
 
       {open ? (
         <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 12, padding: 12 }}>
-          <SchedulePool cards={poolCards} />
+          <PoolWithDropTarget cards={poolCards} />
           <div>
             <div
               style={{
@@ -194,6 +194,7 @@ export function ScheduleSection({
               blockedDays={blockedDays}
               draftPinnedDate={draftPinnedDate}
               draftPreview={draftPreview}
+              onPillClick={onPillClick}
             />
           </div>
         </div>
@@ -212,9 +213,16 @@ const miniBtnStyle: React.CSSProperties = {
   fontFamily: "inherit",
 };
 
-function SchedulePool({ cards }: { cards: DraftPlanCardShape[] }) {
+/**
+ * Schedule pool as a single droppable region. Drop target id `mp-pool`
+ * so page-level handleDragEnd can route pinned-pill→pool drops to
+ * unpinToPool().
+ */
+function PoolWithDropTarget({ cards }: { cards: DraftPlanCardShape[] }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "mp-pool" });
   return (
     <div
+      ref={setNodeRef}
       style={{
         background: "var(--mp-page-bg)",
         border: "1px solid var(--mp-border-warm)",
@@ -224,6 +232,8 @@ function SchedulePool({ cards }: { cards: DraftPlanCardShape[] }) {
         flexDirection: "column",
         gap: 6,
         minHeight: 200,
+        outline: isOver ? "1.5px dashed var(--mp-draft-border, #dab73f)" : "none",
+        outlineOffset: -2,
       }}
     >
       <header
@@ -240,7 +250,7 @@ function SchedulePool({ cards }: { cards: DraftPlanCardShape[] }) {
       </header>
       {cards.length === 0 ? (
         <p style={{ fontSize: 11.5, fontStyle: "italic", color: "var(--mp-text-muted)", padding: "8px 4px" }}>
-          No parked drafts. Add a draft from the workspace.
+          {isOver ? "drop here to unpin" : "No parked drafts. Add a draft from the workspace."}
         </p>
       ) : (
         cards.map((card) => <PoolCard key={card.planId} card={card} />)
@@ -309,16 +319,20 @@ export function BatchPeekPopover({
   planProducts,
   products,
   moulds,
-  onSendBackToPool,
   onClose,
+  onSplit,
+  onMergeSibling,
 }: {
   planId: string;
   plans: ProductionPlan[];
   planProducts: PlanProduct[];
   products: Product[];
   moulds: Mould[];
-  onSendBackToPool: () => void;
   onClose: () => void;
+  /** Caller opens the SplitBatchModal. */
+  onSplit: () => void;
+  /** Caller invokes mergeSiblingPlans(planId, siblingId). */
+  onMergeSibling: (siblingId: string) => void;
 }) {
   const plan = plans.find((p) => p.id === planId);
   const pp = planProducts.find((x) => x.planId === planId);
@@ -327,6 +341,13 @@ export function BatchPeekPopover({
   if (!plan) return null;
   const cavities = mould?.numberOfCavities ?? 0;
   const pieces = pp ? (pp.actualYield ?? pp.quantity * cavities) : 0;
+
+  // Siblings: plans sharing this plan's siblingGroupId, excluding self.
+  const siblings = plan.siblingGroupId
+    ? plans
+        .filter((p) => p.siblingGroupId === plan.siblingGroupId && p.id !== plan.id)
+        .filter((p) => p.status !== "done" && p.status !== "cancelled")
+    : [];
 
   return (
     <div
@@ -350,18 +371,26 @@ export function BatchPeekPopover({
           border: "1px solid var(--mp-border-warm)",
           borderRadius: 10,
           padding: 18,
-          minWidth: 320,
-          maxWidth: 420,
+          minWidth: 360,
+          maxWidth: 460,
           boxShadow: "0 8px 28px rgba(0,0,0,0.18)",
           display: "flex",
           flexDirection: "column",
-          gap: 8,
+          gap: 10,
           fontSize: 12.5,
         }}
       >
         <header style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>
             {product?.name ?? plan.name}
+            {plan.siblingGroupId ? (
+              <span
+                title="Sibling group"
+                style={{ marginLeft: 6, fontSize: 11, opacity: 0.6 }}
+              >
+                🔗
+              </span>
+            ) : null}
           </h2>
           <button
             type="button"
@@ -393,13 +422,71 @@ export function BatchPeekPopover({
           <dt style={{ color: "var(--mp-text-muted)" }}>Status</dt>
           <dd>{plan.status}</dd>
         </dl>
+
+        {siblings.length > 0 ? (
+          <div
+            style={{
+              padding: "8px 10px",
+              background: "var(--mp-page-bg)",
+              border: "1px solid var(--mp-border-warm)",
+              borderRadius: 6,
+              fontSize: 12,
+            }}
+          >
+            <strong>Siblings:</strong>
+            <ul style={{ margin: "4px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+              {siblings.map((s) => {
+                const sPp = planProducts.find((x) => x.planId === s.id);
+                const sLabel = s.pinnedDate
+                  ? new Date(s.pinnedDate + "T00:00:00").toLocaleDateString("en-GB", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                    })
+                  : "pool";
+                return (
+                  <li
+                    key={s.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 11.5,
+                    }}
+                  >
+                    <span style={{ flex: 1 }}>
+                      {sPp?.quantity ?? 0} fills · {sLabel}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onMergeSibling(s.id!)}
+                      style={{
+                        padding: "3px 9px",
+                        fontSize: 11,
+                        borderRadius: 4,
+                        border: "1px solid var(--mp-teal, #1c5651)",
+                        background: "var(--mp-teal, #1c5651)",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Merge
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+
         <a
-          href="/plan?view=weekly"
+          href={`/plan?view=weekly&focusPlanId=${plan.id}`}
           style={{
             fontSize: 12,
             color: "var(--mp-teal, #1c5651)",
             textDecoration: "underline",
-            marginTop: 4,
+            marginTop: 2,
           }}
         >
           Open on Plan(week) →
@@ -407,18 +494,21 @@ export function BatchPeekPopover({
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 6 }}>
           <button
             type="button"
-            onClick={onSendBackToPool}
+            onClick={onSplit}
+            disabled={(pp?.quantity ?? 0) <= 1}
+            title={(pp?.quantity ?? 0) <= 1 ? "Need at least 2 fills to split" : "Split into two batches"}
             style={{
               padding: "5px 12px",
               borderRadius: 5,
               border: "1px solid var(--mp-border-warm)",
               background: "transparent",
               fontSize: 12,
-              cursor: "pointer",
+              cursor: (pp?.quantity ?? 0) <= 1 ? "not-allowed" : "pointer",
+              opacity: (pp?.quantity ?? 0) <= 1 ? 0.5 : 1,
               fontFamily: "inherit",
             }}
           >
-            Send back to pool
+            Split…
           </button>
           <button
             type="button"

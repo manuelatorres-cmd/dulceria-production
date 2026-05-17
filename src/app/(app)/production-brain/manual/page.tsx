@@ -72,10 +72,16 @@ import {
 import {
   ScheduleSection,
   BatchPeekPopover,
-  sendBackToPool,
 } from "@/components/manual-planner/schedule-section";
 import { CombineHintCard } from "@/components/manual-planner/combine-hint-card";
+import { SplitBatchModal } from "@/components/manual-planner/split-batch-modal";
 import { pinPoolCardToDay } from "@/lib/manual-planner/pin-pool-card-to-day";
+import {
+  movePinnedToDay,
+  unpinToPool,
+  pinFromPool,
+} from "@/lib/manual-planner/plan-placement";
+import { mergeSiblingPlans } from "@/lib/manual-planner/merge-sibling-plans";
 import { useSchedulePool, useCampaigns } from "@/lib/hooks";
 import { BackButton } from "@/components/back-button";
 import { IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
@@ -113,6 +119,7 @@ export default function ManualPlannerPage() {
   const campaigns = useCampaigns();
   const [workspaceView, setWorkspaceView] = useWorkspaceView();
   const [peekPlanId, setPeekPlanId] = useState<string | null>(null);
+  const [splitModalForPlanId, setSplitModalForPlanId] = useState<string | null>(null);
   const [isolatedToast, setIsolatedToast] = useState<string | null>(null);
   const productLocations = useProductLocationTotals();
   const dayLineItems = useAllProductionDayLineItems();
@@ -729,25 +736,52 @@ export default function ManualPlannerPage() {
   async function handleDragEnd(e: DragEndEvent) {
     const id = String(e.active.id);
     const overId = e.over?.id ? String(e.over.id) : "";
+    const data = e.active.data.current as
+      | {
+          kind?: string;
+          trayCardId?: string;
+          trayCardKind?: string;
+          planId?: string;
+          sourceDate?: string;
+        }
+      | undefined;
+
+    // ── Pool drop target (mp-pool) — pinned pill → pool ──────────
+    if (overId === "mp-pool") {
+      if (data?.kind === "pinned-pill" && data.planId) {
+        try {
+          await unpinToPool(data.planId);
+        } catch (err) {
+          setSaveErr(`Unpin failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      return;
+    }
+
+    // ── Day cell drop targets ────────────────────────────────────
     // Drop target id formats accepted:
-    //   - `plan-day-<iso>`                ← legacy + WeekStripPills + Gantt fallback
-    //   - `plan-day-<iso>-<planId>`        ← Gantt row-specific drop target
+    //   - `plan-day-<iso>`                ← WeekStripPills day cell
+    //   - `plan-day-<iso>-<planId>`        ← Gantt row-specific (legacy)
     //   - `day-<iso>`                      ← legacy manual-planner WeekGrid
-    // Parse the iso date out of any of these forms.
     let date: string | null = null;
     if (overId.startsWith("plan-day-")) {
       const rest = overId.slice("plan-day-".length);
-      // The iso (yyyy-mm-dd) is exactly 10 chars and may be followed by
-      // `-<planId>` (uuid). Take the leading 10 chars when present.
       if (/^\d{4}-\d{2}-\d{2}/.test(rest)) date = rest.slice(0, 10);
     } else if (overId.startsWith("day-")) {
       date = overId.slice("day-".length);
     }
     if (!date) return;
 
-    const data = e.active.data.current as
-      | { kind?: string; trayCardId?: string; trayCardKind?: string }
-      | undefined;
+    // ── Pinned pill → day cell ──────────────────────────────────
+    if (data?.kind === "pinned-pill" && data.planId) {
+      if (data.sourceDate === date) return;
+      try {
+        await movePinnedToDay(data.planId, date);
+      } catch (err) {
+        setSaveErr(`Move failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return;
+    }
 
     if (id === "manual-draft-batch") {
       setDraft((cur) => (cur ? { ...cur, pinnedDate: date } : cur));
@@ -760,8 +794,10 @@ export default function ManualPlannerPage() {
         return;
       }
       // Parked pool/tray card dropped on a day:
-      // Spec §3.7 — direct persist (status='active' + pinnedDate),
-      // skipping the load-into-editor flow.
+      // Spec §3.7 (workspace) — direct persist (status='active' +
+      // pinnedDate), skipping the load-into-editor flow. Uses
+      // pinFromPool from plan-placement.ts for the field flip plus
+      // pinPoolCardToDay's productionDayLineItems seed.
       try {
         await pinPoolCardToDay(data.trayCardId, date);
       } catch (err) {
@@ -1040,17 +1076,48 @@ export default function ManualPlannerPage() {
             planProducts={planProducts}
             products={products}
             moulds={moulds}
-            onSendBackToPool={async () => {
+            onSplit={() => {
+              setSplitModalForPlanId(peekPlanId);
+              setPeekPlanId(null);
+            }}
+            onMergeSibling={async (siblingId) => {
               try {
-                await sendBackToPool(peekPlanId);
+                await mergeSiblingPlans(peekPlanId, siblingId);
                 setPeekPlanId(null);
               } catch (err) {
-                setSaveErr(`Unpin failed: ${err instanceof Error ? err.message : String(err)}`);
+                setSaveErr(
+                  `Merge failed: ${err instanceof Error ? err.message : String(err)}`,
+                );
               }
             }}
             onClose={() => setPeekPlanId(null)}
           />
         ) : null}
+
+        {splitModalForPlanId ? (() => {
+          const planForSplit = productionPlans.find((p) => p.id === splitModalForPlanId);
+          const ppForSplit = planProducts.find((x) => x.planId === splitModalForPlanId);
+          const productForSplit = ppForSplit
+            ? products.find((p) => p.id === ppForSplit.productId)
+            : null;
+          const mouldForSplit = ppForSplit
+            ? moulds.find((m) => m.id === ppForSplit.mouldId)
+            : null;
+          if (!planForSplit || !ppForSplit || (ppForSplit.quantity ?? 0) <= 1) {
+            return null;
+          }
+          return (
+            <SplitBatchModal
+              planId={splitModalForPlanId}
+              productName={productForSplit?.name ?? planForSplit.name}
+              totalFills={ppForSplit.quantity}
+              cavities={mouldForSplit?.numberOfCavities ?? 0}
+              weekAnchor={weekAnchor}
+              onDone={() => setSplitModalForPlanId(null)}
+              onClose={() => setSplitModalForPlanId(null)}
+            />
+          );
+        })() : null}
       </div>
     </DndContext>
   );

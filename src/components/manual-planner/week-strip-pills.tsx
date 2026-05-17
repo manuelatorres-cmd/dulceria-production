@@ -14,7 +14,7 @@
  */
 
 import { useMemo } from "react";
-import { useDroppable } from "@dnd-kit/core";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import type {
   CapacityConfig,
@@ -52,6 +52,12 @@ interface PillView {
   mouldCount: number;
   mouldName: string;
   isLocked: boolean;
+  /** True if this plan's siblingGroupId is set AND at least one
+   *  other plan shares it — drives the chain-link icon. */
+  hasSibling: boolean;
+  /** ISO date the pill currently sits on — used by the drag-end
+   *  handler to distinguish "same-day no-op" drops. */
+  sourceDate: string;
 }
 
 export function WeekStripPills({
@@ -68,6 +74,7 @@ export function WeekStripPills({
   blockedDays,
   draftPinnedDate,
   draftPreview,
+  onPillClick,
 }: {
   weekAnchor: Date;
   productionDays: ProductionDay[];
@@ -84,6 +91,8 @@ export function WeekStripPills({
   draftPinnedDate: string | null;
   /** Summary to overlay on the pinned day. */
   draftPreview: { name: string; pieces: number; mouldCount: number } | null;
+  /** Click pinned pill → caller opens BatchPeekPopover. Optional. */
+  onPillClick?: (planId: string) => void;
 }) {
   const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -101,6 +110,16 @@ export function WeekStripPills({
   const productById = useMemo(() => new Map(products.map((p) => [p.id!, p])), [products]);
   const mouldById = useMemo(() => new Map(moulds.map((m) => [m.id!, m])), [moulds]);
   const planById = useMemo(() => new Map(plans.map((p) => [p.id!, p])), [plans]);
+
+  // Sibling group sizes — drives the chain-link icon.
+  const siblingGroupSize = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of plans) {
+      if (!p.siblingGroupId) continue;
+      m.set(p.siblingGroupId, (m.get(p.siblingGroupId) ?? 0) + 1);
+    }
+    return m;
+  }, [plans]);
 
   // Pills per date: every active/draft plan whose pinnedDate falls in this
   // week. Also surface plans with line items on this day (for plans saved
@@ -122,6 +141,7 @@ export function WeekStripPills({
       const mould = mouldById.get(pp.mouldId);
       const cavities = mould?.numberOfCavities ?? 0;
       const arr = m.get(date) ?? [];
+      const groupSize = plan.siblingGroupId ? siblingGroupSize.get(plan.siblingGroupId) ?? 1 : 1;
       arr.push({
         planId,
         productName: product?.name ?? plan.name ?? "Batch",
@@ -129,6 +149,8 @@ export function WeekStripPills({
         mouldCount: pp.quantity,
         mouldName: mould?.name ?? "—",
         isLocked,
+        hasSibling: !!plan.siblingGroupId && groupSize >= 2,
+        sourceDate: date,
       });
       m.set(date, arr);
     }
@@ -150,7 +172,7 @@ export function WeekStripPills({
     }
 
     return m;
-  }, [plans, lineItems, dayDateById, planById, planProducts, productById, mouldById, weekDays]);
+  }, [plans, lineItems, dayDateById, planById, planProducts, productById, mouldById, weekDays, siblingGroupSize]);
 
   const capacityByDate = useMemo(() => {
     const m = new Map<string, { used: number; capacity: number }>();
@@ -200,6 +222,7 @@ export function WeekStripPills({
               capacityMinutes={cap.capacity}
               pills={pills}
               draftPreview={showDraftOverlay ? draftPreview : null}
+              onPillClick={onPillClick}
             />
           );
         })}
@@ -217,6 +240,7 @@ function DayCell({
   capacityMinutes,
   pills,
   draftPreview,
+  onPillClick,
 }: {
   iso: string;
   label: string;
@@ -226,6 +250,7 @@ function DayCell({
   capacityMinutes: number;
   pills: PillView[];
   draftPreview: { name: string; pieces: number; mouldCount: number } | null;
+  onPillClick?: (planId: string) => void;
 }) {
   // Match PlanWeekV2Body's droppable id convention so manual page's
   // handleDragEnd can parse both surfaces the same way.
@@ -347,7 +372,11 @@ function DayCell({
               </p>
             ) : null}
             {pills.map((pill) => (
-              <BatchPill key={pill.planId} pill={pill} />
+              <BatchPill
+                key={pill.planId}
+                pill={pill}
+                onClick={onPillClick ? () => onPillClick(pill.planId) : undefined}
+              />
             ))}
             {draftPreview ? <DraftPreviewPill preview={draftPreview} /> : null}
           </>
@@ -357,10 +386,26 @@ function DayCell({
   );
 }
 
-function BatchPill({ pill }: { pill: PillView }) {
+function BatchPill({ pill, onClick }: { pill: PillView; onClick?: () => void }) {
+  // Pinned pill is draggable so it can be moved between days OR sent
+  // back to the pool. Drop target id encodes the source day so the
+  // page-level handler can compute the delta.
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `pinned-pill-${pill.planId}-${pill.sourceDate}`,
+    data: {
+      kind: "pinned-pill",
+      planId: pill.planId,
+      sourceDate: pill.sourceDate,
+    },
+  });
   return (
-    <div
+    <button
+      ref={setNodeRef}
+      type="button"
+      onClick={onClick}
       title={`${pill.productName} · ${pill.pieces} pcs · ${pill.mouldCount} fills · ${pill.mouldName}`}
+      {...attributes}
+      {...listeners}
       style={{
         padding: "4px 6px",
         borderRadius: 4,
@@ -371,6 +416,11 @@ function BatchPill({ pill }: { pill: PillView }) {
         flexDirection: "column",
         gap: 1,
         overflow: "hidden",
+        cursor: "grab",
+        textAlign: "left",
+        fontFamily: "inherit",
+        opacity: isDragging ? 0.4 : 1,
+        width: "100%",
       }}
     >
       <span
@@ -380,8 +430,20 @@ function BatchPill({ pill }: { pill: PillView }) {
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
         }}
       >
+        {pill.hasSibling ? (
+          <span
+            aria-label="Has sibling batch"
+            title="Has a sibling from a split — open peek to merge"
+            style={{ fontSize: 10, opacity: 0.7 }}
+          >
+            🔗
+          </span>
+        ) : null}
         {pill.productName}
       </span>
       <span
@@ -391,9 +453,9 @@ function BatchPill({ pill }: { pill: PillView }) {
           color: "var(--ds-text-muted, #7a766f)",
         }}
       >
-        {pill.pieces} pcs · {pill.mouldCount} fills{pill.isLocked ? " · locked" : ""}
+        {pill.pieces} pcs · {pill.mouldCount} fills
       </span>
-    </div>
+    </button>
   );
 }
 
