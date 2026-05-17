@@ -8481,6 +8481,38 @@ async function seedCampaignDrivenPlans(): Promise<{ warnings: string[]; deadline
   ) as PlanProduct[];
   const planById = new Map(existingPlans.map((p) => [p.id!, p]));
 
+  // Pre-load (campaignId, productId) → productionOrderItem.id so each
+  // freshly-inserted plan also gets a poPlanLinks row (mig 0097 fixed
+  // the missing-link bug; this is the going-forward write).
+  const campaignIds = campaigns.map((c) => c.id!).filter(Boolean);
+  const campaignPos = campaignIds.length > 0
+    ? assertOk(
+        await supabase
+          .from("productionOrders")
+          .select("id, campaignId")
+          .in("campaignId", campaignIds),
+      ) as Array<{ id: string; campaignId: string }>
+    : [];
+  const poIdsForCampaigns = campaignPos.map((p) => p.id);
+  const poItemsForCampaigns = poIdsForCampaigns.length > 0
+    ? assertOk(
+        await supabase
+          .from("productionOrderItems")
+          .select("id, productionOrderId, productId")
+          .in("productionOrderId", poIdsForCampaigns),
+      ) as Array<{ id: string; productionOrderId: string; productId: string }>
+    : [];
+  const campaignByPoId = new Map(campaignPos.map((p) => [p.id, p.campaignId]));
+  const poItemByCampaignProduct = new Map<string, string>();
+  for (const item of poItemsForCampaigns) {
+    const cId = campaignByPoId.get(item.productionOrderId);
+    if (!cId) continue;
+    const key = `${cId}|${item.productId}`;
+    if (!poItemByCampaignProduct.has(key)) {
+      poItemByCampaignProduct.set(key, item.id);
+    }
+  }
+
   const now = new Date();
 
   for (const c of campaigns) {
@@ -8582,11 +8614,74 @@ async function seedCampaignDrivenPlans(): Promise<{ warnings: string[]; deadline
         if (campaignDeadlineMs != null) {
           deadlineByPlanId.set(planId, campaignDeadlineMs);
         }
+
+        // Going-forward poPlanLinks write per spec PO_PLAN_LINKS_BACKFILL_BATCH.md §2.1.
+        // chunkMoulds × cavities = this slice's expected output.
+        const poItemId = c.id ? poItemByCampaignProduct.get(`${c.id}|${productId}`) : null;
+        if (poItemId) {
+          await upsertPoPlanLinkSafe({
+            planId,
+            productionOrderItemId: poItemId,
+            allocatedQuantity: chunkMoulds * cavities,
+            warnings,
+          });
+        } else {
+          warnings.push(
+            `No productionOrderItem for "${product.name}" in campaign "${c.name}" — poPlanLink skipped.`,
+          );
+        }
       }
     }
   }
 
   return { warnings, deadlineByPlanId };
+}
+
+/**
+ * Idempotent poPlanLinks upsert used by the campaign + PO seeders
+ * (PO_PLAN_LINKS_BACKFILL_BATCH.md §2.3). Select first to dodge a
+ * unique-constraint race, then either UPDATE allocatedQuantity if the
+ * recomputed chunk size changed, or INSERT a fresh row. Defensive —
+ * any error appends to the warnings list and returns; the seeder loop
+ * keeps going.
+ */
+async function upsertPoPlanLinkSafe(args: {
+  planId: string;
+  productionOrderItemId: string;
+  allocatedQuantity: number;
+  warnings: string[];
+}): Promise<void> {
+  try {
+    const existing = assertOkMaybe(
+      await supabase
+        .from("poPlanLinks")
+        .select("id, allocatedQuantity")
+        .eq("planId", args.planId)
+        .eq("productionOrderItemId", args.productionOrderItemId)
+        .maybeSingle(),
+    ) as { id: string; allocatedQuantity: number } | null;
+    if (existing) {
+      if (existing.allocatedQuantity !== args.allocatedQuantity) {
+        const { error } = await supabase
+          .from("poPlanLinks")
+          .update({ allocatedQuantity: args.allocatedQuantity, updatedAt: new Date() })
+          .eq("id", existing.id);
+        if (error) args.warnings.push(`poPlanLink update failed: ${error.message}`);
+      }
+      return;
+    }
+    const { error } = await supabase.from("poPlanLinks").insert({
+      id: newId(),
+      planId: args.planId,
+      productionOrderItemId: args.productionOrderItemId,
+      allocatedQuantity: args.allocatedQuantity,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    if (error) args.warnings.push(`poPlanLink insert failed: ${error.message}`);
+  } catch (e) {
+    args.warnings.push(`poPlanLink upsert raised: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 /** Materialise low-stock-vs-minimum gaps into draft plans. Reads
@@ -8706,6 +8801,23 @@ async function seedProductionOrderDrivenPlans(): Promise<{ warnings: string[]; d
           createdAt: now, updatedAt: now,
         } as ProductionPlan);
         if (dueMs != null) deadlineByPlanId.set(planId, dueMs);
+
+        // Going-forward poPlanLinks write per spec PO_PLAN_LINKS_BACKFILL_BATCH.md §2.2.
+        // `it` is the productionOrderItems row we're materialising — link
+        // directly to its id with the chunk's expected output as the
+        // allocated quantity.
+        if (it.id) {
+          await upsertPoPlanLinkSafe({
+            planId,
+            productionOrderItemId: it.id,
+            allocatedQuantity: chunkMoulds * cavities,
+            warnings,
+          });
+        } else {
+          warnings.push(
+            `productionOrderItem for "${product.name}" has no id — poPlanLink skipped (unexpected DB state).`,
+          );
+        }
       }
     }
   }
