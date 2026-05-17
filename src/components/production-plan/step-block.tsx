@@ -2,6 +2,7 @@
 
 import {
   IconLock as Lock,
+  IconLockOpen as LockOpen,
   IconHourglass as Hourglass,
   IconAlertTriangle as AlertTriangle,
 } from "@tabler/icons-react";
@@ -33,6 +34,7 @@ export function StepBlock({
   entry,
   density,
   onClick,
+  onLockToggle,
   draggable,
   dragHandleProps,
   isDragging,
@@ -40,6 +42,10 @@ export function StepBlock({
   entry: StepBlockEntry;
   density: StepBlockDensity;
   onClick?: () => void;
+  /** Per-batch lock toggle. Receives the single planId + requested new
+   *  state so the caller can pin/unpin one batch without affecting its
+   *  siblings in the same step group. */
+  onLockToggle?: (planId: string, lock: boolean) => void;
   draggable?: boolean;
   /** Spread on the block — supplies dnd-kit listeners + attributes. */
   dragHandleProps?: Record<string, unknown>;
@@ -112,6 +118,36 @@ export function StepBlock({
     ? formatMinutes(minutes)
     : "—";
 
+  function handleLockClick(e: React.MouseEvent): void {
+    e.stopPropagation();
+    if (!onLockToggle) return;
+    onLockToggle(entry.planId, !entry.isLocked);
+  }
+
+  const lockButton = onLockToggle && !passive ? (
+    <button
+      type="button"
+      onClick={handleLockClick}
+      title={entry.isLocked ? "Unlock this batch" : "Lock this batch"}
+      style={{
+        background: "transparent",
+        border: "none",
+        padding: 2,
+        marginLeft: 2,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        color: entry.isLocked ? "var(--wp-teal)" : "var(--wp-text-muted)",
+      }}
+    >
+      {entry.isLocked ? (
+        <Lock className="w-3 h-3" />
+      ) : (
+        <LockOpen className="w-3 h-3" />
+      )}
+    </button>
+  ) : null;
+
   return (
     <div
       role={onClick ? "button" : undefined}
@@ -129,6 +165,7 @@ export function StepBlock({
           passive={passive}
           conflict={conflict}
           timeLabel={timeLabel}
+          trailing={lockButton}
         />
       ) : (
         <TwoLineRow
@@ -140,6 +177,7 @@ export function StepBlock({
           conflict={conflict}
           timeLabel={timeLabel}
           spanInfo={entry.spanInfo}
+          trailing={lockButton}
         />
       )}
     </div>
@@ -155,6 +193,7 @@ function TwoLineRow({
   conflict,
   timeLabel,
   spanInfo,
+  trailing,
 }: {
   stepName: string;
   productName: string;
@@ -164,6 +203,7 @@ function TwoLineRow({
   conflict: boolean;
   timeLabel: string;
   spanInfo?: { fromIso: string; toIso: string } | null;
+  trailing?: React.ReactNode;
 }) {
   // Explicit flex-col so the two rows always stack — protects against any
   // parent CSS that might collapse the fragment.
@@ -200,6 +240,7 @@ function TwoLineRow({
         >
           {timeLabel}
         </span>
+        {trailing}
       </div>
       <div
         style={{
@@ -242,6 +283,7 @@ function CompactRow({
   passive,
   conflict,
   timeLabel,
+  trailing,
 }: {
   stepName: string;
   productName: string;
@@ -249,6 +291,7 @@ function CompactRow({
   passive: boolean;
   conflict: boolean;
   timeLabel: string;
+  trailing?: React.ReactNode;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -291,6 +334,7 @@ function CompactRow({
       >
         {timeLabel}
       </span>
+      {trailing}
     </div>
   );
 }

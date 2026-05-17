@@ -25,3 +25,20 @@ export async function moveStep(input: MoveStepInput): Promise<void> {
   queryClient.invalidateQueries({ queryKey: ["productionDayLineItems"] });
   queryClient.invalidateQueries({ queryKey: ["production-plans"] });
 }
+
+/** Bulk variant — moves every (planId, stepId) pair to the same target
+ *  date in a single Supabase batch. Used by the group-level drag handle
+ *  on the weekly planner so an operator can shift a whole step (every
+ *  batch sharing that step name) onto another day in one drop. */
+export async function moveSteps(input: {
+  moves: Array<{ planId: string; stepId: string }>;
+  targetDate: string;
+}): Promise<void> {
+  if (input.moves.length === 0) return;
+  await moveProductionStepsToDate({
+    moves: input.moves,
+    targetDate: input.targetDate,
+  });
+  queryClient.invalidateQueries({ queryKey: ["productionDayLineItems"] });
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+}

@@ -1824,6 +1824,22 @@ export async function unpinProductionPlan(planId: string): Promise<void> {
   queryClient.invalidateQueries({ queryKey: ["production-plans"] });
 }
 
+/** Bulk-unpin multiple plans. Mirrors pinProductionPlans for group-level
+ *  unlock affordances in the weekly planner. */
+export async function unpinProductionPlans(planIds: string[]): Promise<void> {
+  if (planIds.length === 0) return;
+  const CHUNK = 100;
+  for (let i = 0; i < planIds.length; i += CHUNK) {
+    const slice = planIds.slice(i, i + CHUNK);
+    const { error } = await supabase
+      .from("productionPlans")
+      .update({ pinnedDate: null, updatedAt: new Date() })
+      .in("id", slice);
+    if (error) throw error;
+  }
+  queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+}
+
 /** Lock multiple plans onto an explicit date (or their currently
  *  scheduled day if `date` is omitted). The week view's lock buttons
  *  call this so an operator can fix a batch in place without dragging. */

@@ -12,6 +12,7 @@ import type {
 } from "@/types";
 import { effectiveDailyCapacityMinutes } from "@/lib/capacity";
 import { DayColumn, type DayStepEntry, type DayConflict } from "./day-column";
+import type { StepGroup } from "./group-block";
 
 function isoForOffset(start: Date, offset: number): string {
   const d = new Date(start);
@@ -49,6 +50,19 @@ export interface WeekGridInputs {
   onStepClick?: (entry: DayStepEntry) => void;
   /** Phase 4 wraps each block with useDraggable. */
   renderDraggable?: (entry: DayStepEntry, body: React.ReactNode) => React.ReactNode;
+  /** Wraps a group header so the GripVertical icon becomes a drag source
+   *  carrying every member plan+step in one drop. */
+  renderGroupDraggable?: (
+    group: StepGroup,
+    sourceDate: string,
+    renderHandle: (props: {
+      dragHandleProps: Record<string, unknown>;
+      isDragging: boolean;
+    }) => React.ReactNode,
+  ) => React.ReactNode;
+  /** Toggle pinnedDate on one or more plans. Used by group + per-batch
+   *  lock affordances. */
+  onLockToggle?: (planIds: string[], lock: boolean) => void;
   /** Phase 4 conflict detection result, keyed by ISO date. */
   conflictsByDate?: Map<string, DayConflict[]>;
 }
@@ -80,6 +94,8 @@ export function WeekGrid(props: WeekGridInputs) {
     onDayHeaderClick,
     onStepClick,
     renderDraggable,
+    renderGroupDraggable,
+    onLockToggle,
     conflictsByDate,
   } = props;
 
@@ -269,6 +285,8 @@ export function WeekGrid(props: WeekGridInputs) {
               onHeaderClick={onDayHeaderClick ? () => onDayHeaderClick(iso) : undefined}
               onStepClick={onStepClick}
               renderDraggable={renderDraggable}
+              renderGroupDraggable={renderGroupDraggable}
+              onLockToggle={onLockToggle}
             />
           );
         })}

@@ -4,8 +4,10 @@ import {
   IconChevronDown as ChevronDown,
   IconChevronRight as ChevronRight,
   IconLock as Lock,
+  IconLockOpen as LockOpen,
   IconHourglass as Hourglass,
   IconAlertTriangle as AlertTriangle,
+  IconGripVertical as GripVertical,
 } from "@tabler/icons-react";
 import type { StepBlockEntry } from "./step-block";
 import { formatMinutes } from "./format-minutes";
@@ -26,14 +28,26 @@ export function GroupBlock({
   group,
   expanded,
   onToggle,
+  onLockToggle,
   density,
+  draggable,
+  dragHandleProps,
+  isDragging,
   children,
 }: {
   group: StepGroup;
   expanded: boolean;
   onToggle: () => void;
+  /** Called when the user clicks the lock icon. Receives every member
+   *  planId and the requested new state so the caller can pin/unpin in
+   *  one round-trip. */
+  onLockToggle?: (planIds: string[], lock: boolean) => void;
   /** Density flows from DayColumn — controls font + padding parity with StepBlock. */
   density: "two-line" | "compact";
+  draggable?: boolean;
+  /** Spread on the drag handle — supplies dnd-kit listeners + attributes. */
+  dragHandleProps?: Record<string, unknown>;
+  isDragging?: boolean;
   /** Individual StepBlocks rendered inline when expanded. */
   children?: React.ReactNode;
 }) {
@@ -67,13 +81,18 @@ export function GroupBlock({
     textColor = "var(--wp-text-primary)";
   }
 
+  const memberPlanIds = group.members.map((m) => m.planId);
+  const memberCountLabel = group.members.length === 1 ? "1 batch" : `${group.members.length} batches`;
+
+  function handleLockClick(e: React.MouseEvent): void {
+    e.stopPropagation();
+    if (!onLockToggle) return;
+    onLockToggle(memberPlanIds, !group.isLocked);
+  }
+
   return (
     <div>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="w-full text-left hover:bg-[color:var(--wp-hover-bg)]"
+      <div
         style={{
           padding: density === "compact" ? "4px 8px" : "7px 9px",
           borderRadius: 3,
@@ -88,58 +107,117 @@ export function GroupBlock({
           borderLeft: `3px ${leftStyle} ${leftBorder}`,
           color: textColor,
           fontStyle: italic ? "italic" : "normal",
-          cursor: "pointer",
-          transition: "background 0.1s ease",
+          transition: "background 0.1s ease, transform 0.08s ease",
+          display: "flex",
+          flexDirection: "column",
+          gap: density === "compact" ? 1 : 2,
+          opacity: isDragging ? 0.4 : 1,
         }}
+        className="hover:bg-[color:var(--wp-hover-bg)]"
       >
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          {expanded ? (
-            <ChevronDown className="w-3 h-3 shrink-0" />
-          ) : (
-            <ChevronRight className="w-3 h-3 shrink-0" />
+          {draggable && !group.passive && (
+            <span
+              {...(dragHandleProps ?? {})}
+              title="Drag whole step"
+              style={{
+                cursor: "grab",
+                display: "inline-flex",
+                alignItems: "center",
+                opacity: 0.55,
+              }}
+            >
+              <GripVertical className="w-3 h-3" />
+            </span>
           )}
-          <span
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
             style={{
               flex: 1,
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
               gap: 4,
-              fontWeight: 500,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: "inherit",
+              font: "inherit",
+              textAlign: "left",
               minWidth: 0,
             }}
           >
-            {group.hasConflict && (
-              <AlertTriangle className="w-3 h-3 shrink-0" style={{ color: "var(--wp-rose)" }} />
-            )}
-            {group.isLocked && !group.passive && !group.hasConflict && (
-              <Lock className="w-3 h-3 shrink-0" style={{ color: "var(--wp-teal)" }} />
-            )}
-            {group.passive && (
-              <Hourglass className="w-3 h-3 shrink-0" style={{ color: "var(--wp-text-muted)" }} />
+            {expanded ? (
+              <ChevronDown className="w-3 h-3 shrink-0" />
+            ) : (
+              <ChevronRight className="w-3 h-3 shrink-0" />
             )}
             <span
               style={{
+                flex: 1,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontWeight: 500,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
+                minWidth: 0,
               }}
             >
-              {group.stepName}
+              {group.hasConflict && (
+                <AlertTriangle className="w-3 h-3 shrink-0" style={{ color: "var(--wp-rose)" }} />
+              )}
+              {group.isLocked && !group.passive && !group.hasConflict && (
+                <Lock className="w-3 h-3 shrink-0" style={{ color: "var(--wp-teal)" }} />
+              )}
+              {group.passive && (
+                <Hourglass className="w-3 h-3 shrink-0" style={{ color: "var(--wp-text-muted)" }} />
+              )}
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {group.stepName}
+              </span>
             </span>
-          </span>
-          <span
-            className="tabular-nums shrink-0"
-            style={{ color: "var(--wp-text-muted)", fontSize: 11 }}
-          >
-            {group.members.length} batches
-          </span>
+            <span
+              className="tabular-nums shrink-0"
+              style={{ color: "var(--wp-text-muted)", fontSize: 11 }}
+            >
+              {memberCountLabel}
+            </span>
+          </button>
+          {onLockToggle && !group.passive && (
+            <button
+              type="button"
+              onClick={handleLockClick}
+              title={group.isLocked ? "Unlock all batches in this step" : "Lock all batches in this step"}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: 2,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                color: group.isLocked ? "var(--wp-teal)" : "var(--wp-text-muted)",
+              }}
+            >
+              {group.isLocked ? (
+                <Lock className="w-3.5 h-3.5" />
+              ) : (
+                <LockOpen className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
         </div>
         <div
           style={{
-            marginTop: density === "compact" ? 1 : 2,
             fontSize: 11,
             color: "var(--wp-text-muted)",
             display: "flex",
@@ -154,7 +232,7 @@ export function GroupBlock({
             {group.passive ? `${formatMinutes(group.totalMinutes)} passive` : `${formatMinutes(group.totalMinutes)} total`}
           </span>
         </div>
-      </button>
+      </div>
       {expanded && children && (
         <div
           style={{
@@ -174,7 +252,11 @@ export function GroupBlock({
   );
 }
 
-const GROUP_THRESHOLD = 5;
+// 2026-05-17: was 5 — Manuela's spec is "every step is a group, even single
+// batches", so the group/solo distinction collapses to "always group".
+// Solos still come back as an empty array for callers that handle them
+// separately.
+const GROUP_THRESHOLD = 1;
 
 /** Build groups from a flat entry list. Entries that don't hit the
  *  threshold for their key remain ungrouped (returned as `solos`).

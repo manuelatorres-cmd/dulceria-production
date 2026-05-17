@@ -30,7 +30,9 @@ import type {
   PersonUnavailability,
 } from "@/types";
 import { detectConflicts } from "@/lib/production-plan/detect-conflicts";
-import { moveStep } from "@/lib/production-plan/move-step";
+import { moveStep, moveSteps } from "@/lib/production-plan/move-step";
+import { pinProductionPlans, unpinProductionPlans } from "@/lib/hooks";
+import type { StepGroup } from "./group-block";
 import { WeekGrid } from "./week-grid";
 import { SpanOverlay, type SpanEntry } from "./span-overlay";
 import type { DayStepEntry } from "./day-column";
@@ -223,11 +225,20 @@ export function PlanWeekV2({
     const overId = String(e.over.id);
     if (!overId.startsWith("plan-day-")) return;
     const targetDate = overId.slice("plan-day-".length);
-    const data = e.active.data.current as
+    const raw = e.active.data.current as
       | { planId: string; stepId: string; sourceDate: string }
+      | { moves: Array<{ planId: string; stepId: string }>; sourceDate: string }
       | undefined;
-    if (!data || !data.planId || !data.stepId) return;
-    if (data.sourceDate === targetDate) return;
+    if (!raw) return;
+
+    // Group-drag carries a `moves` array; single drag carries planId+stepId.
+    // Normalise into a `moves` list so the rest of the function can stay shared.
+    const isGroup = "moves" in raw;
+    const moves: Array<{ planId: string; stepId: string }> = isGroup
+      ? raw.moves
+      : [{ planId: raw.planId, stepId: raw.stepId }];
+    if (moves.length === 0) return;
+    if (raw.sourceDate === targetDate) return;
 
     const targetDay = new Date(targetDate + "T12:00:00");
     const capacityMinutes = effectiveDailyCapacityMinutes(
@@ -245,13 +256,25 @@ export function PlanWeekV2({
       (li) => dayDateById.get(li.productionDayId) === targetDate,
     );
     const usedMinutes = targetLineItems.reduce((s, li) => s + (li.plannedMinutes ?? 0), 0);
-    const step = stepById.get(data.stepId);
-    const movedMinutes = step?.activeMinutes ?? 0;
-    const movingPp = planProductByPlan.get(data.planId);
+
+    // Sum minutes across every move so the conflict detector sees the full
+    // capacity impact of a multi-batch group drop, not just one batch.
+    const movedMinutes = moves.reduce((sum, mv) => {
+      const step = stepById.get(mv.stepId);
+      return sum + (step?.activeMinutes ?? 0);
+    }, 0);
+
+    // Conflict detection uses the first plan in the group as a representative
+    // (its mould). Cross-plan mould diversity inside a group is rare since
+    // group key is step name + lock state — same step usually shares a mould
+    // class. Worst-case we miss a secondary conflict; the user still sees
+    // the primary one.
+    const repPlanId = moves[0].planId;
+    const movingPp = planProductByPlan.get(repPlanId);
     const conflicts = detectConflicts({
       targetDate,
       movedMinutes,
-      movingPlanId: data.planId,
+      movingPlanId: repPlanId,
       movingMouldId: movingPp?.mouldId ?? null,
       existingUsedMinutes: usedMinutes,
       capacityMinutes,
@@ -272,11 +295,26 @@ export function PlanWeekV2({
     setMoving(true);
     setMoveError(null);
     try {
-      await moveStep({ planId: data.planId, stepId: data.stepId, targetDate });
+      if (moves.length === 1) {
+        await moveStep({ planId: moves[0].planId, stepId: moves[0].stepId, targetDate });
+      } else {
+        await moveSteps({ moves, targetDate });
+      }
     } catch (err) {
       setMoveError(err instanceof Error ? err.message : String(err));
     } finally {
       setMoving(false);
+    }
+  }
+
+  async function handleLockToggle(planIds: string[], lock: boolean): Promise<void> {
+    if (planIds.length === 0) return;
+    setMoveError(null);
+    try {
+      if (lock) await pinProductionPlans(planIds);
+      else await unpinProductionPlans(planIds);
+    } catch (err) {
+      setMoveError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -293,6 +331,27 @@ export function PlanWeekV2({
       >
         {body}
       </DraggableStep>
+    );
+  }
+
+  function renderGroupDraggable(
+    group: StepGroup,
+    sourceDate: string,
+    renderHandle: (props: {
+      dragHandleProps: Record<string, unknown>;
+      isDragging: boolean;
+    }) => React.ReactNode,
+  ): React.ReactNode {
+    if (group.passive) {
+      return renderHandle({ dragHandleProps: {}, isDragging: false });
+    }
+    const moves = group.members
+      .filter((m) => m.step?.id)
+      .map((m) => ({ planId: m.planId, stepId: m.step!.id! }));
+    return (
+      <DraggableGroup groupKey={group.key} moves={moves} sourceDate={sourceDate}>
+        {renderHandle}
+      </DraggableGroup>
     );
   }
 
@@ -341,6 +400,8 @@ export function PlanWeekV2({
             warnPercent={warnPercent}
             criticalPercent={criticalPercent}
             renderDraggable={renderDraggable}
+            renderGroupDraggable={renderGroupDraggable}
+            onLockToggle={handleLockToggle}
             conflictsByDate={conflictsByDate}
             onDayHeaderClick={onDayHeaderClick}
             onStepClick={onStepClick}
@@ -380,6 +441,40 @@ function DraggableStep({
       style={{ opacity: isDragging ? 0.4 : 1 }}
     >
       {children}
+    </div>
+  );
+}
+
+/**
+ * Wraps a group block so its drag handle (the GripVertical icon) becomes
+ * a dnd-kit drag source. Listeners/attributes are not spread on the whole
+ * group — that would conflict with the click-to-expand button — but on
+ * just the handle the GroupBlock renders inside.
+ */
+function DraggableGroup({
+  groupKey,
+  moves,
+  sourceDate,
+  children,
+}: {
+  groupKey: string;
+  moves: Array<{ planId: string; stepId: string }>;
+  sourceDate: string;
+  children: (props: {
+    dragHandleProps: Record<string, unknown>;
+    isDragging: boolean;
+  }) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `group-${sourceDate}-${groupKey}`,
+    data: { moves, sourceDate },
+  });
+  // The setNodeRef has to wrap the container so dnd-kit can measure
+  // bounding-box, but the listeners go on the handle so clicks on
+  // the toggle button still register normally.
+  return (
+    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }}>
+      {children({ dragHandleProps: { ...attributes, ...listeners }, isDragging })}
     </div>
   );
 }

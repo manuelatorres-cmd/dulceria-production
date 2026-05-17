@@ -6,7 +6,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { DayHeader } from "./day-header";
 import { StepBlock, type StepBlockEntry } from "./step-block";
 import { ConflictWarning } from "./conflict-warning";
-import { GroupBlock, buildStepGroups } from "./group-block";
+import { GroupBlock, buildStepGroups, type StepGroup } from "./group-block";
 
 const COMPACT_THRESHOLD = 6;
 
@@ -33,6 +33,8 @@ export function DayColumn({
   onHeaderClick,
   onStepClick,
   renderDraggable,
+  renderGroupDraggable,
+  onLockToggle,
 }: {
   iso: string;
   isToday: boolean;
@@ -47,6 +49,15 @@ export function DayColumn({
   onHeaderClick?: () => void;
   onStepClick?: (entry: DayStepEntry) => void;
   renderDraggable?: (entry: DayStepEntry, body: React.ReactNode) => React.ReactNode;
+  renderGroupDraggable?: (
+    group: StepGroup,
+    sourceDate: string,
+    renderHandle: (props: {
+      dragHandleProps: Record<string, unknown>;
+      isDragging: boolean;
+    }) => React.ReactNode,
+  ) => React.ReactNode;
+  onLockToggle?: (planIds: string[], lock: boolean) => void;
 }) {
   const droppable = useDroppable({ id: `plan-day-${iso}`, disabled: isClosed });
   const density = steps.length >= COMPACT_THRESHOLD ? "compact" : "two-line";
@@ -135,31 +146,56 @@ export function DayColumn({
           slots.map((slot) => {
             if (slot.kind === "group") {
               const isExpanded = expandedGroups.has(slot.group.key);
-              return (
+              const childMembers = isExpanded
+                ? slot.group.members.map((entry) => {
+                    const block = (
+                      <StepBlock
+                        entry={entry}
+                        density={density}
+                        onClick={onStepClick ? () => onStepClick(entry) : undefined}
+                        onLockToggle={
+                          onLockToggle
+                            ? (planId, lock) => onLockToggle([planId], lock)
+                            : undefined
+                        }
+                        draggable={!!renderDraggable}
+                      />
+                    );
+                    return (
+                      <div key={entry.key}>
+                        {renderDraggable ? renderDraggable(entry, block) : block}
+                      </div>
+                    );
+                  })
+                : null;
+
+              const renderHandle = ({
+                dragHandleProps,
+                isDragging,
+              }: {
+                dragHandleProps: Record<string, unknown>;
+                isDragging: boolean;
+              }) => (
                 <GroupBlock
-                  key={slot.group.key}
                   group={slot.group}
                   expanded={isExpanded}
                   onToggle={() => toggleGroup(slot.group.key)}
+                  onLockToggle={onLockToggle}
                   density={density}
+                  draggable={!!renderGroupDraggable}
+                  dragHandleProps={dragHandleProps}
+                  isDragging={isDragging}
                 >
-                  {isExpanded &&
-                    slot.group.members.map((entry) => {
-                      const block = (
-                        <StepBlock
-                          entry={entry}
-                          density={density}
-                          onClick={onStepClick ? () => onStepClick(entry) : undefined}
-                          draggable={!!renderDraggable}
-                        />
-                      );
-                      return (
-                        <div key={entry.key}>
-                          {renderDraggable ? renderDraggable(entry, block) : block}
-                        </div>
-                      );
-                    })}
+                  {childMembers}
                 </GroupBlock>
+              );
+
+              return (
+                <div key={slot.group.key}>
+                  {renderGroupDraggable
+                    ? renderGroupDraggable(slot.group, iso, renderHandle)
+                    : renderHandle({ dragHandleProps: {}, isDragging: false })}
+                </div>
               );
             }
             const entry = slot.entry;
@@ -168,6 +204,11 @@ export function DayColumn({
                 entry={entry}
                 density={density}
                 onClick={onStepClick ? () => onStepClick(entry) : undefined}
+                onLockToggle={
+                  onLockToggle
+                    ? (planId, lock) => onLockToggle([planId], lock)
+                    : undefined
+                }
                 draggable={!!renderDraggable}
               />
             );
