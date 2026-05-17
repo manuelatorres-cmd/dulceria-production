@@ -20,6 +20,7 @@ import type {
   OrderItem,
   OrderPlanLink,
   PlanProduct,
+  PoPlanLink,
   Product,
   ProductionOrder,
   ProductionOrderItem,
@@ -35,11 +36,16 @@ export interface OrderDemandLine {
   customerName: string;
   channel: string;
   sourceRef?: string;
+  /** Optional `orders.priority` so chips can filter on "urgent". */
+  priority?: Order["priority"];
   remaining: number;
   /** Original order qty before subtracting active/done allocations. */
   originalQty: number;
   /** Already linked to active or done plans (informational). */
   alreadyAllocated: number;
+  /** Qty linked to status='draft' plans (parked OR active drafts).
+   *  Surfaces "X of Y left" pills without double-counting. */
+  inDraftQty: number;
   dueDate: Date | null;
   urgency: UrgencyLevel;
 }
@@ -51,6 +57,10 @@ export interface PoDemandLine {
   channel: string; // restock / campaign_run
   remaining: number;
   originalQty: number;
+  /** Qty linked to active+done plans via poPlanLinks (mig 0094). */
+  alreadyAllocated: number;
+  /** Qty linked to draft plans via poPlanLinks. */
+  inDraftQty: number;
   dueDate: Date | null;
   urgency: UrgencyLevel;
 }
@@ -72,6 +82,12 @@ export interface ProductDemand {
   currentStock: number;
   alreadyPlannedInDrafts: number;
   alreadyPlannedInActive: number;
+  /** Sum of (orderPlanLinks + poPlanLinks).allocatedQuantity where the
+   *  linked plan is status='draft'. Drives the "in draft" badge and
+   *  the "X of Y left" pill in the demand list. */
+  inDraftQty: number;
+  /** How many distinct draft plans touch this product (for "in draft × 2"). */
+  draftCount: number;
   urgencyLevel: UrgencyLevel;
   earliestDeadline: Date | null;
   orderItems: OrderDemandLine[];
@@ -88,6 +104,9 @@ export interface AggregateDemandInput {
   plans: ProductionPlan[];
   planProducts: PlanProduct[];
   links: OrderPlanLink[];
+  /** PO ↔ plan links — mig 0094. Used to subtract PO allocations from
+   *  open-PO remaining and to track per-line inDraftQty. */
+  poLinks?: PoPlanLink[];
   /** Loose-piece stock per product (sum of non-allocated locations). */
   stockByProduct: Map<string, number>;
   /** Today as ISO yyyy-mm-dd, used to compute urgency. Defaults to today. */
@@ -147,14 +166,46 @@ export function aggregateDemandByProduct(input: AggregateDemandInput): ProductDe
   const donePlanIds = new Set(
     input.plans.filter((p) => p.status === "done").map((p) => p.id!),
   );
+  const draftPlanIds = new Set(
+    input.plans.filter((p) => p.status === "draft").map((p) => p.id!),
+  );
   const fulfilledPlanIds = new Set([...activePlanIds, ...donePlanIds]);
   const allocByItem = new Map<string, number>();
+  const inDraftByItem = new Map<string, number>();
   for (const link of input.links) {
-    if (!fulfilledPlanIds.has(link.planId)) continue;
-    allocByItem.set(
-      link.orderItemId,
-      (allocByItem.get(link.orderItemId) ?? 0) + link.allocatedQuantity,
-    );
+    if (fulfilledPlanIds.has(link.planId)) {
+      allocByItem.set(
+        link.orderItemId,
+        (allocByItem.get(link.orderItemId) ?? 0) + link.allocatedQuantity,
+      );
+    } else if (draftPlanIds.has(link.planId)) {
+      inDraftByItem.set(
+        link.orderItemId,
+        (inDraftByItem.get(link.orderItemId) ?? 0) + link.allocatedQuantity,
+      );
+    }
+  }
+
+  // PO links: same allocation/inDraft split, keyed by productionOrderItemId.
+  const poLinks = input.poLinks ?? [];
+  const allocByPoItem = new Map<string, number>();
+  const inDraftByPoItem = new Map<string, number>();
+  // Per-product roll-up: how many draft plans touch this product +
+  // total in-draft qty across order + po lines.
+  const draftPlanIdsByProduct = new Map<string, Set<string>>();
+  const inDraftQtyByProduct = new Map<string, number>();
+  for (const link of poLinks) {
+    if (fulfilledPlanIds.has(link.planId)) {
+      allocByPoItem.set(
+        link.productionOrderItemId,
+        (allocByPoItem.get(link.productionOrderItemId) ?? 0) + link.allocatedQuantity,
+      );
+    } else if (draftPlanIds.has(link.planId)) {
+      inDraftByPoItem.set(
+        link.productionOrderItemId,
+        (inDraftByPoItem.get(link.productionOrderItemId) ?? 0) + link.allocatedQuantity,
+      );
+    }
   }
 
   // Already-planned tally per product, split by active vs draft.
@@ -171,6 +222,13 @@ export function aggregateDemandByProduct(input: AggregateDemandInput): ProductDe
     if (expected <= 0) continue;
     const target = plan.status === "active" ? plannedActiveByProduct : plannedDraftByProduct;
     target.set(pp.productId, (target.get(pp.productId) ?? 0) + expected);
+
+    // Track draft-plan presence per product for "in draft × N" badges.
+    if (plan.status === "draft" && plan.id) {
+      const set = draftPlanIdsByProduct.get(pp.productId) ?? new Set<string>();
+      set.add(plan.id);
+      draftPlanIdsByProduct.set(pp.productId, set);
+    }
   }
 
   // Per-product demand accumulation.
@@ -199,6 +257,8 @@ export function aggregateDemandByProduct(input: AggregateDemandInput): ProductDe
       currentStock: input.stockByProduct.get(productId) ?? 0,
       alreadyPlannedInDrafts: plannedDraftByProduct.get(productId) ?? 0,
       alreadyPlannedInActive: plannedActiveByProduct.get(productId) ?? 0,
+      inDraftQty: 0,
+      draftCount: draftPlanIdsByProduct.get(productId)?.size ?? 0,
       urgencyLevel: "none",
       earliestDeadline: null,
       earliestDeadlineMs: Number.POSITIVE_INFINITY,
@@ -217,8 +277,9 @@ export function aggregateDemandByProduct(input: AggregateDemandInput): ProductDe
     const order = orderById.get(item.orderId);
     if (!order) continue;
     const alreadyAllocated = allocByItem.get(item.id ?? "") ?? 0;
-    const remaining = Math.max(0, item.quantity - alreadyAllocated);
-    if (remaining <= 0) continue;
+    const inDraftQty = inDraftByItem.get(item.id ?? "") ?? 0;
+    const remaining = Math.max(0, item.quantity - alreadyAllocated - inDraftQty);
+    if (remaining <= 0 && inDraftQty === 0) continue;
 
     const due = order.deadline ? new Date(order.deadline) : null;
     const urgency = urgencyFor(due, todayMs);
@@ -229,14 +290,18 @@ export function aggregateDemandByProduct(input: AggregateDemandInput): ProductDe
       customerName: order.customerName ?? order.eventName ?? order.sourceRef ?? "Anonymous",
       channel: order.channel,
       sourceRef: order.sourceRef,
+      priority: order.priority,
       remaining,
       originalQty: item.quantity,
       alreadyAllocated,
+      inDraftQty,
       dueDate: due,
       urgency,
     });
     row.orderDemand += remaining;
     row.totalDemand += remaining;
+    row.inDraftQty += inDraftQty;
+    inDraftQtyByProduct.set(item.productId, (inDraftQtyByProduct.get(item.productId) ?? 0) + inDraftQty);
     row.urgencyLevel = maxUrgency(row.urgencyLevel, urgency);
     if (due) {
       const ms = due.getTime();
@@ -255,11 +320,12 @@ export function aggregateDemandByProduct(input: AggregateDemandInput): ProductDe
     if (!openPoIds.has(it.productionOrderId)) continue;
     const po = poById.get(it.productionOrderId);
     if (!po) continue;
-    // POs don't (yet) link to plans via OrderPlanLink, so the only
-    // already-fulfilled signal we have is alreadyPlannedInActive at the
-    // product level. Show originalQty as remaining for now.
-    const remaining = it.targetUnits;
-    if (remaining <= 0) continue;
+    // PO links land in poPlanLinks (mig 0094). Subtract both fulfilled
+    // and in-draft allocations so the picker shows true remaining.
+    const alreadyAllocated = allocByPoItem.get(it.id ?? "") ?? 0;
+    const inDraftQty = inDraftByPoItem.get(it.id ?? "") ?? 0;
+    const remaining = Math.max(0, it.targetUnits - alreadyAllocated - inDraftQty);
+    if (remaining <= 0 && inDraftQty === 0) continue;
     const due = po.dueDate ? new Date(po.dueDate) : null;
     const urgency = urgencyFor(due, todayMs);
     const row = ensureRow(it.productId);
@@ -270,11 +336,15 @@ export function aggregateDemandByProduct(input: AggregateDemandInput): ProductDe
       channel: po.channel,
       remaining,
       originalQty: it.targetUnits,
+      alreadyAllocated,
+      inDraftQty,
       dueDate: due,
       urgency,
     });
     row.poDemand += remaining;
     row.totalDemand += remaining;
+    row.inDraftQty += inDraftQty;
+    inDraftQtyByProduct.set(it.productId, (inDraftQtyByProduct.get(it.productId) ?? 0) + inDraftQty);
     row.urgencyLevel = maxUrgency(row.urgencyLevel, urgency);
     if (due) {
       const ms = due.getTime();
@@ -290,6 +360,8 @@ export function aggregateDemandByProduct(input: AggregateDemandInput): ProductDe
   for (const row of working.values()) {
     row.orderItems.sort((a, b) => sortByDue(a.dueDate, b.dueDate));
     row.poItems.sort((a, b) => sortByDue(a.dueDate, b.dueDate));
+    // Finalise per-product draftCount from the per-product set built above.
+    row.draftCount = draftPlanIdsByProduct.get(row.productId)?.size ?? 0;
     // Strip the working-only field.
     const { earliestDeadlineMs: _omit, ...rest } = row;
     out.push(rest);

@@ -143,7 +143,32 @@ export function ProductRow({
                   fontWeight: 500,
                 }}
               >
-                in draft batch
+                editing
+              </span>
+            )}
+            {!inDraft && product.draftCount > 0 && (
+              <span
+                className="text-[10.5px]"
+                style={{
+                  color: "var(--mp-teal, #1c5651)",
+                  background: "rgba(28,86,81,0.10)",
+                  padding: "1px 6px",
+                  borderRadius: 2,
+                  fontWeight: 500,
+                }}
+              >
+                in draft{product.draftCount > 1 ? ` × ${product.draftCount}` : ""}
+              </span>
+            )}
+            {product.inDraftQty > 0 && product.totalDemand > 0 && (
+              <span
+                className="text-[10.5px] tabular-nums"
+                style={{
+                  color: "var(--mp-text-muted)",
+                  fontWeight: 500,
+                }}
+              >
+                {product.totalDemand} of {product.totalDemand + product.inDraftQty} left
               </span>
             )}
           </span>

@@ -92,6 +92,18 @@ export function recomputeBatchTotals(d: DraftBatch): DraftBatch {
   return { ...d, mouldCount, totalPieces, totalDemand, surplus };
 }
 
+/**
+ * Mutate the active draft's pinnedDate in localStorage. No-op when no
+ * draft exists. Used by drag-to-day from the DraftsTray + the
+ * ActiveDraftPanel pin handle so the date can flow into the existing
+ * subscription/save pipeline without a parallel mutation channel.
+ */
+export function setActiveDraftPinnedDate(date: string | null): void {
+  const cur = loadDraft();
+  if (!cur) return;
+  saveDraft({ ...cur, pinnedDate: date });
+}
+
 export function newDraft(input: {
   productId: string;
   productName: string;

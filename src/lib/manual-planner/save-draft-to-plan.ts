@@ -1,50 +1,62 @@
 /**
- * Save a manual-planner DraftBatch to the DB as a real production plan.
+ * Save a manual-planner DraftBatch to the DB as a productionPlans row.
+ *
+ * Two save modes, controlled by `options.status`:
+ *   - 'draft'  → park for later. pinnedDate forced to null regardless
+ *                of input. Editor clears so the user can start a new
+ *                draft; the parked card appears in the DraftsTray.
+ *   - 'active' → commit + pin. pinnedDate is required (ISO yyyy-mm-dd)
+ *                and persists on the productionPlans row so the
+ *                scheduler treats it as locked.
  *
  * Writes:
- *   - one productionPlans row (status='active', pinnedDate set so the
- *     auto-planner respects the placement)
- *   - one planProducts row (productId + mouldId + quantity = mouldCount)
- *   - one orderPlanLinks row per order-source allocation
+ *   - productionPlans (status, pinnedDate, surplusDestination, name, notes)
+ *   - planProducts    (productId, mouldId, quantity = mouldCount)
+ *   - orderPlanLinks  (one per source='order' allocation)
+ *   - poPlanLinks     (one per source='po' allocation — mig 0094)
  *
- * PO-source allocations are NOT linked — there is no PO-plan link
- * table at the schema level (see investigation §9). They flow through
- * as informational notes on the plan. This is documented as an honest
- * deferred item in the v2 spec.
+ * No more PO-as-notes-text trail: every allocation has a typed FK row.
  */
 
-import { saveProductionPlan, savePlanProduct, saveOrderPlanLink } from "@/lib/hooks";
+import {
+  saveProductionPlan,
+  savePlanProduct,
+  saveOrderPlanLink,
+  savePoPlanLink,
+} from "@/lib/hooks";
 import type { DraftBatch } from "./draft-state";
+
+export interface SaveDraftOptions {
+  status: "draft" | "active";
+  /** Required when status === 'active'. Ignored (forced null) when 'draft'. */
+  pinnedDate?: string | null;
+}
 
 export interface SaveDraftResult {
   planId: string;
   warnings: string[];
 }
 
-export async function saveDraftToPlan(draft: DraftBatch): Promise<SaveDraftResult> {
-  if (!draft.pinnedDate) throw new Error("Cannot save: no pinned date.");
+export async function saveDraftToPlan(
+  draft: DraftBatch,
+  options: SaveDraftOptions,
+): Promise<SaveDraftResult> {
   if (draft.allocations.length === 0 && draft.surplusDestination == null) {
     throw new Error("Cannot save: no allocations and no surplus destination.");
   }
+  if (options.status === "active" && !options.pinnedDate) {
+    throw new Error("Cannot save & pin: no pinned date.");
+  }
 
   const now = new Date();
-  const poNotes: string[] = [];
-  for (const a of draft.allocations) {
-    if (a.source === "po") poNotes.push(`PO ${a.label}: ${a.qty} pcs`);
-  }
-  const notes =
-    [
-      draft.notes.trim(),
-      poNotes.length > 0 ? `PO allocations (informational): ${poNotes.join("; ")}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n") || undefined;
+  const pinnedDate = options.status === "draft" ? null : options.pinnedDate ?? null;
+  const notes = draft.notes.trim() ? draft.notes.trim() : undefined;
 
   const planId = await saveProductionPlan({
     name: draft.name,
-    status: "active",
+    status: options.status,
     notes,
-    pinnedDate: draft.pinnedDate,
+    pinnedDate,
     surplusDestination:
       draft.surplusDestination === "po-fill"
         ? "store"
@@ -63,16 +75,24 @@ export async function saveDraftToPlan(draft: DraftBatch): Promise<SaveDraftResul
 
   const warnings: string[] = [];
   for (const a of draft.allocations) {
-    if (a.source !== "order" || !a.parentId) continue;
+    if (!a.parentId) continue;
     try {
-      await saveOrderPlanLink({
-        orderItemId: a.parentId,
-        planId,
-        allocatedQuantity: a.qty,
-      });
+      if (a.source === "order") {
+        await saveOrderPlanLink({
+          orderItemId: a.parentId,
+          planId,
+          allocatedQuantity: a.qty,
+        });
+      } else {
+        await savePoPlanLink({
+          productionOrderItemId: a.parentId,
+          planId,
+          allocatedQuantity: a.qty,
+        });
+      }
     } catch (e) {
       warnings.push(
-        `OrderPlanLink for ${a.label}: ${e instanceof Error ? e.message : String(e)}`,
+        `${a.source === "order" ? "OrderPlanLink" : "PoPlanLink"} for ${a.label}: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
   }

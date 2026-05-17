@@ -23,6 +23,8 @@ import {
   useAllPlanProducts,
   useProductionPlans,
   useAllOrderPlanLinks,
+  useAllPoPlanLinks,
+  useDraftPlans,
   useProductLocationTotals,
   useAllProductionDayLineItems,
   useProductionDays,
@@ -47,6 +49,9 @@ import {
   recomputeBatchTotals,
 } from "@/lib/manual-planner/draft-state";
 import { saveDraftToPlan } from "@/lib/manual-planner/save-draft-to-plan";
+import { loadDraftFromPlan } from "@/lib/manual-planner/load-draft-from-plan";
+import { deleteParkedDraft } from "@/lib/manual-planner/delete-parked-draft";
+import { DraftsTray, buildTrayCards, type TrayCard } from "@/components/manual-planner/drafts-tray";
 
 import { DemandPicker } from "@/components/manual-planner/demand-picker/demand-picker";
 import { DraftBar } from "@/components/manual-planner/draft-bar/draft-bar";
@@ -87,6 +92,8 @@ export default function ManualPlannerPage() {
   const planProducts = useAllPlanProducts();
   const productionPlans = useProductionPlans();
   const orderPlanLinks = useAllOrderPlanLinks();
+  const poPlanLinks = useAllPoPlanLinks();
+  const draftPlanCards = useDraftPlans();
   const productLocations = useProductLocationTotals();
   const dayLineItems = useAllProductionDayLineItems();
   const productionDays = useProductionDays(120);
@@ -147,6 +154,7 @@ export default function ManualPlannerPage() {
         plans: productionPlans,
         planProducts,
         links: orderPlanLinks,
+        poLinks: poPlanLinks,
         stockByProduct,
       }),
     [
@@ -159,6 +167,7 @@ export default function ManualPlannerPage() {
       productionPlans,
       planProducts,
       orderPlanLinks,
+      poPlanLinks,
       stockByProduct,
     ],
   );
@@ -235,9 +244,22 @@ export default function ManualPlannerPage() {
         return recomputeBatchTotals(fresh);
       }
       if (cur.productId !== productId) {
-        setSaveErr(
-          `Draft already has ${cur.productName}. Save or cancel it before adding ${product?.name ?? "another product"}.`,
+        // AC10: cross-product line click → prompt, park current, init new.
+        const ok = window.confirm(
+          `Start new draft for ${product?.name ?? "this product"}? Current draft '${cur.productName}' will be parked.`,
         );
+        if (!ok) return cur;
+        void autoParkIfDirty().then(() => {
+          const fresh = newDraft({
+            productId,
+            productName: product?.name ?? productId.slice(0, 8),
+            mouldId,
+            mouldName: mould.name,
+            numberOfCavities: mould.numberOfCavities,
+          });
+          fresh.allocations.push(allocation);
+          setDraft(recomputeBatchTotals(fresh));
+        });
         return cur;
       }
       // Same product → upsert by parentId.
@@ -294,9 +316,21 @@ export default function ManualPlannerPage() {
         return recomputeBatchTotals(fresh);
       }
       if (cur.productId !== productId) {
-        setSaveErr(
-          `Draft already has ${cur.productName}. Save or cancel it before adding ${product?.name ?? "another product"}.`,
+        const ok = window.confirm(
+          `Start new draft for ${product?.name ?? "this product"}? Current draft '${cur.productName}' will be parked.`,
         );
+        if (!ok) return cur;
+        void autoParkIfDirty().then(() => {
+          const fresh = newDraft({
+            productId,
+            productName: product?.name ?? productId.slice(0, 8),
+            mouldId,
+            mouldName: mould.name,
+            numberOfCavities: mould.numberOfCavities,
+          });
+          fresh.allocations.push(allocation);
+          setDraft(recomputeBatchTotals(fresh));
+        });
         return cur;
       }
       const existingIdx = cur.allocations.findIndex(
@@ -392,18 +426,117 @@ export default function ManualPlannerPage() {
     setDraft((cur) => (cur ? { ...cur, name } : cur));
   }
 
+  function isDraftDirty(d: DraftBatch | null): boolean {
+    if (!d) return false;
+    return d.allocations.length > 0 || d.surplusDestination !== null;
+  }
+
+  /** Silently park the current draft if dirty. Used before switching drafts
+   *  (load parked, new draft, cross-product line click). No prompt — the
+   *  caller already obtained user consent. */
+  async function autoParkIfDirty(): Promise<void> {
+    if (!isDraftDirty(draft)) return;
+    if (!draft) return;
+    try {
+      await saveDraftToPlan(draft, { status: "draft" });
+      queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["plan-products"] });
+      queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
+      queryClient.invalidateQueries({ queryKey: ["po-plan-links"] });
+    } catch (e) {
+      setSaveErr(`Auto-park failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  async function handleParkDraft(): Promise<void> {
+    if (!draft) return;
+    if (draft.allocations.length === 0) {
+      setSaveErr("Nothing to park — add at least one allocation first.");
+      return;
+    }
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      const result = await saveDraftToPlan(draft, { status: "draft" });
+      if (result.warnings.length > 0) {
+        setSaveErr(`Parked with warnings: ${result.warnings.join("; ")}`);
+      }
+      setDraft(null);
+      queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["plan-products"] });
+      queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
+      queryClient.invalidateQueries({ queryKey: ["po-plan-links"] });
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleLoadTrayCard(card: TrayCard): Promise<void> {
+    if (card.kind === "active") return; // already loaded
+    if (isDraftDirty(draft) && draft?.id !== card.id) {
+      const ok = window.confirm(
+        `Switch to '${card.name}'? Your current draft will be parked.`,
+      );
+      if (!ok) return;
+      await autoParkIfDirty();
+    }
+    setSaveErr(null);
+    try {
+      const loaded = await loadDraftFromPlan(card.id);
+      setDraft(loaded);
+      // Loading from DB transfers ownership of the row to the editor —
+      // delete the parked plan so it doesn't double up in the tray.
+      // Re-save happens via Park or Save & pin.
+      await deleteParkedDraft(card.id);
+      queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+    } catch (e) {
+      setSaveErr(`Load failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  async function handleDeleteTrayCard(card: TrayCard): Promise<void> {
+    if (card.kind === "active") {
+      handleCancelDraft();
+      return;
+    }
+    const ok = window.confirm(`Delete parked draft '${card.name}'? This can't be undone.`);
+    if (!ok) return;
+    try {
+      await deleteParkedDraft(card.id);
+      queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+    } catch (e) {
+      setSaveErr(`Delete failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  async function handleNewDraft(): Promise<void> {
+    if (isDraftDirty(draft)) {
+      const ok = window.confirm("Park current draft and start a new one?");
+      if (!ok) return;
+      await autoParkIfDirty();
+    }
+    setDraft(null);
+    setSaveErr(null);
+  }
+
   async function commitDraftToDb(toSave: DraftBatch) {
     setSaving(true);
     setSaveErr(null);
     try {
-      const result = await saveDraftToPlan(toSave);
+      const result = await saveDraftToPlan(toSave, {
+        status: "active",
+        pinnedDate: toSave.pinnedDate,
+      });
       if (result.warnings.length > 0) {
         setSaveErr(`Saved with warnings: ${result.warnings.join("; ")}`);
       }
       setDraft(null);
       queryClient.invalidateQueries({ queryKey: ["production-plans"] });
       queryClient.invalidateQueries({ queryKey: ["plan-products"] });
-      queryClient.invalidateQueries({ queryKey: ["orderPlanLinks"] });
+      queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
+      queryClient.invalidateQueries({ queryKey: ["po-plan-links"] });
     } catch (e) {
       setSaveErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -640,13 +773,38 @@ export default function ManualPlannerPage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
-  function handleDragEnd(e: DragEndEvent) {
+  async function handleDragEnd(e: DragEndEvent) {
     const id = String(e.active.id);
     const overId = e.over?.id ? String(e.over.id) : "";
     if (!overId.startsWith("day-")) return;
     const date = overId.slice(4);
     if (id === "manual-draft-batch") {
       setDraft((cur) => (cur ? { ...cur, pinnedDate: date } : cur));
+      return;
+    }
+    if (id.startsWith("draft-card-")) {
+      const data = e.active.data.current as { trayCardId?: string; trayCardKind?: string } | undefined;
+      if (!data?.trayCardId) return;
+      if (data.trayCardKind === "active") {
+        setDraft((cur) => (cur ? { ...cur, pinnedDate: date } : cur));
+        return;
+      }
+      // Parked card dropped on a day: load → pin → caller must hit "Save & pin".
+      if (isDraftDirty(draft) && draft?.id !== data.trayCardId) {
+        const ok = window.confirm(
+          "Switch drafts? Current draft will be parked.",
+        );
+        if (!ok) return;
+        await autoParkIfDirty();
+      }
+      try {
+        const loaded = await loadDraftFromPlan(data.trayCardId);
+        await deleteParkedDraft(data.trayCardId);
+        setDraft({ ...loaded, pinnedDate: date });
+        queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+      } catch (err) {
+        setSaveErr(`Load failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 
@@ -765,12 +923,19 @@ export default function ManualPlannerPage() {
           </div>
 
           <div className="space-y-4 min-w-0">
+            <DraftsTray
+              cards={buildTrayCards(draftPlanCards, draft)}
+              onLoadCard={(c) => { void handleLoadTrayCard(c); }}
+              onDeleteCard={(c) => { void handleDeleteTrayCard(c); }}
+              onNewDraft={() => { void handleNewDraft(); }}
+            />
             <DraftBar
               draft={draft}
               totalActiveMinutes={draftActiveMinutes}
               onRemoveAllocation={handleRemoveAllocation}
               onCancel={handleCancelDraft}
               onSave={handleSaveDraft}
+              onPark={() => { void handleParkDraft(); }}
               onName={handleNameDraft}
               saving={saving}
               pinnedDateLabel={pinnedDateLabel}

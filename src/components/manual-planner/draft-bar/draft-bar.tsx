@@ -17,6 +17,7 @@ export function DraftBar({
   onRemoveAllocation,
   onCancel,
   onSave,
+  onPark,
   onName,
   saving,
   pinnedDateLabel,
@@ -26,6 +27,8 @@ export function DraftBar({
   onRemoveAllocation: (parentId: string, source: "order" | "po") => void;
   onCancel: () => void;
   onSave: () => void;
+  /** Park as draft — saves with status='draft', no pin required. */
+  onPark: () => void;
   onName: (name: string) => void;
   saving: boolean;
   pinnedDateLabel: string | null;
@@ -57,6 +60,7 @@ export function DraftBar({
     onRemoveAllocation={onRemoveAllocation}
     onCancel={onCancel}
     onSave={onSave}
+    onPark={onPark}
     onName={onName}
     saving={saving}
     pinnedDateLabel={pinnedDateLabel}
@@ -69,6 +73,7 @@ function ActiveDraftBar({
   onRemoveAllocation,
   onCancel,
   onSave,
+  onPark,
   onName,
   saving,
   pinnedDateLabel,
@@ -78,6 +83,7 @@ function ActiveDraftBar({
   onRemoveAllocation: (parentId: string, source: "order" | "po") => void;
   onCancel: () => void;
   onSave: () => void;
+  onPark: () => void;
   onName: (name: string) => void;
   saving: boolean;
   pinnedDateLabel: string | null;
@@ -182,32 +188,58 @@ function ActiveDraftBar({
             <>⏵ Drop on a day below to set production date.</>
           )}
         </span>
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={!draft.pinnedDate || draft.allocations.length === 0 || saving}
-          className="px-3 py-1.5 inline-flex items-center gap-1 text-[12px]"
-          style={{
-            background:
-              !draft.pinnedDate || draft.allocations.length === 0 || saving
-                ? "var(--mp-border-warm)"
-                : "var(--mp-teal)",
-            color:
-              !draft.pinnedDate || draft.allocations.length === 0 || saving
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            type="button"
+            onClick={onPark}
+            disabled={draft.allocations.length === 0 || saving}
+            className="px-3 py-1.5 inline-flex items-center gap-1 text-[12px]"
+            style={{
+              background: "transparent",
+              color: draft.allocations.length === 0 || saving
                 ? "var(--mp-text-muted)"
-                : "#ffffff",
-            border: "0.5px solid var(--mp-teal)",
-            borderRadius: 4,
-            opacity: !draft.pinnedDate || draft.allocations.length === 0 || saving ? 0.7 : 1,
-            cursor:
-              !draft.pinnedDate || draft.allocations.length === 0 || saving
-                ? "not-allowed"
-                : "pointer",
-          }}
-        >
-          <Save className="w-3.5 h-3.5" />
-          {saving ? "Saving…" : "Save as production order"}
-        </button>
+                : "var(--mp-text-primary)",
+              border: "0.5px solid var(--mp-border-warm)",
+              borderRadius: 4,
+              cursor:
+                draft.allocations.length === 0 || saving ? "not-allowed" : "pointer",
+              opacity: draft.allocations.length === 0 || saving ? 0.6 : 1,
+            }}
+            title="Save as draft — pin a day later"
+          >
+            Park as draft
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={!draft.pinnedDate || draft.allocations.length === 0 || saving}
+            className="px-3 py-1.5 inline-flex items-center gap-1 text-[12px]"
+            style={{
+              background:
+                !draft.pinnedDate || draft.allocations.length === 0 || saving
+                  ? "var(--mp-border-warm)"
+                  : "var(--mp-teal)",
+              color:
+                !draft.pinnedDate || draft.allocations.length === 0 || saving
+                  ? "var(--mp-text-muted)"
+                  : "#ffffff",
+              border: "0.5px solid var(--mp-teal)",
+              borderRadius: 4,
+              opacity: !draft.pinnedDate || draft.allocations.length === 0 || saving ? 0.7 : 1,
+              cursor:
+                !draft.pinnedDate || draft.allocations.length === 0 || saving
+                  ? "not-allowed"
+                  : "pointer",
+            }}
+          >
+            <Save className="w-3.5 h-3.5" />
+            {saving
+              ? "Saving…"
+              : pinnedDateLabel
+              ? `Save & pin to ${pinnedDateLabel}`
+              : "Save & pin"}
+          </button>
+        </div>
       </div>
     </div>
   );

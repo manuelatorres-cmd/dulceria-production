@@ -2475,6 +2475,21 @@ export interface ProductionOrderItem {
   updatedAt?: Date;
 }
 
+/**
+ * PO-line ↔ batch allocation. Mirrors OrderPlanLink for the
+ * productionOrders demand stream. Added with mig 0094 so parked drafts
+ * that allocate PO lines can be persisted/reloaded without the brittle
+ * notes-text parse path used in v1.
+ */
+export interface PoPlanLink {
+  id?: string;
+  productionOrderItemId: string;
+  planId: string;
+  allocatedQuantity: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface Campaign {
   id?: string;
   name: string;

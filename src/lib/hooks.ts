@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase, newId } from "@/lib/supabase";
 import { queryClient } from "@/lib/query-client";
 import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
-import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, VariantStockLocation, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun, ProductionDayNotes, Calibration } from "@/types";
+import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, VariantStockLocation, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, PoPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun, ProductionDayNotes, Calibration } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, CHANNEL_FULFILMENT_DEFAULTS, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, type FulfilmentMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
@@ -2522,6 +2522,189 @@ export async function replaceLinksForOrderItem(
 
 function invalidateOrderPlanLinkQueries(): void {
   queryClient.invalidateQueries({ queryKey: ["order-plan-links"] });
+}
+
+// ---------------------------------------------------------------------------
+// PO ↔ Plan links (many-to-many) — mig 0094
+//
+// Mirrors orderPlanLinks for production-order demand. Without this the
+// manual planner had to store PO allocations as free-text in
+// productionPlans.notes — brittle on reload, and the demand aggregator
+// could not subtract PO allocations from open-PO remaining.
+// ---------------------------------------------------------------------------
+
+export function useAllPoPlanLinks(): PoPlanLink[] {
+  const { data } = useQuery({
+    queryKey: ["po-plan-links", "all"],
+    queryFn: async () => assertOk(
+      await supabase.from("poPlanLinks").select("*"),
+    ) as PoPlanLink[],
+  });
+  return data ?? [];
+}
+
+export function usePoLinksForPlan(planId: string | undefined): PoPlanLink[] {
+  const { data } = useQuery({
+    queryKey: ["po-plan-links", "for-plan", planId],
+    enabled: !!planId,
+    queryFn: async () => assertOk(
+      await supabase.from("poPlanLinks").select("*").eq("planId", planId!),
+    ) as PoPlanLink[],
+  });
+  return data ?? [];
+}
+
+export async function savePoPlanLink(
+  link: Omit<PoPlanLink, "id" | "createdAt" | "updatedAt"> & { id?: string },
+): Promise<string> {
+  const now = new Date();
+  if (link.id) {
+    const { error } = await supabase
+      .from("poPlanLinks")
+      .update({
+        productionOrderItemId: link.productionOrderItemId,
+        planId: link.planId,
+        allocatedQuantity: link.allocatedQuantity,
+        updatedAt: now,
+      })
+      .eq("id", link.id);
+    if (error) throw error;
+    invalidatePoPlanLinkQueries();
+    return link.id;
+  }
+  const createdId = newId();
+  const { error } = await supabase.from("poPlanLinks").upsert({
+    id: createdId,
+    productionOrderItemId: link.productionOrderItemId,
+    planId: link.planId,
+    allocatedQuantity: link.allocatedQuantity,
+    createdAt: now,
+    updatedAt: now,
+  }, { onConflict: "productionOrderItemId,planId" });
+  if (error) throw error;
+  invalidatePoPlanLinkQueries();
+  return createdId;
+}
+
+export async function deletePoPlanLink(id: string): Promise<void> {
+  const { error } = await supabase.from("poPlanLinks").delete().eq("id", id);
+  if (error) throw error;
+  invalidatePoPlanLinkQueries();
+}
+
+function invalidatePoPlanLinkQueries(): void {
+  queryClient.invalidateQueries({ queryKey: ["po-plan-links"] });
+}
+
+// ---------------------------------------------------------------------------
+// Draft plans hook — drives the DraftsTray on the manual planner.
+//
+// Returns compact card shapes joined from productionPlans (status='draft')
+// + planProducts + products + moulds + orderPlanLinks + poPlanLinks.
+// Cheap in practice (draft count is tens, not thousands) so a plain JS
+// join is used rather than an RPC.
+// ---------------------------------------------------------------------------
+
+export interface DraftPlanCard {
+  planId: string;
+  name: string;
+  productId: string;
+  productName: string;
+  mouldName: string;
+  numberOfCavities: number;
+  mouldCount: number;
+  totalPieces: number;
+  totalDemand: number;
+  allocationCount: number;
+  surplus: number;
+  surplusDestination: string | null;
+  /** Always null for status='draft'; exposed so the UI can type-share
+   *  with active-plan card shapes. */
+  pinnedDate: string | null;
+}
+
+export function useDraftPlans(): DraftPlanCard[] {
+  const { data } = useQuery({
+    queryKey: ["production-plans", "draft", "cards"],
+    queryFn: async () => {
+      const plans = assertOk(
+        await supabase.from("productionPlans").select("*").eq("status", "draft"),
+      ) as ProductionPlan[];
+      if (plans.length === 0) return [] as DraftPlanCard[];
+      const planIds = plans.map((p) => p.id!).filter(Boolean);
+
+      const planProductsRes = assertOk(
+        await supabase.from("planProducts").select("*").in("planId", planIds),
+      ) as PlanProduct[];
+      const planProductByPlan = new Map<string, PlanProduct>();
+      for (const pp of planProductsRes) {
+        if (!planProductByPlan.has(pp.planId)) planProductByPlan.set(pp.planId, pp);
+      }
+
+      const productIds = [...new Set(planProductsRes.map((pp) => pp.productId))];
+      const mouldIds = [...new Set(planProductsRes.map((pp) => pp.mouldId))];
+
+      const products = productIds.length > 0
+        ? assertOk(await supabase.from("products").select("id, name").in("id", productIds)) as Array<{ id: string; name: string }>
+        : [];
+      const moulds = mouldIds.length > 0
+        ? assertOk(await supabase.from("moulds").select("id, name, numberOfCavities").in("id", mouldIds)) as Array<{ id: string; name: string; numberOfCavities: number }>
+        : [];
+      const productMap = new Map(products.map((p) => [p.id, p]));
+      const mouldMap = new Map(moulds.map((m) => [m.id, m]));
+
+      const opl = assertOk(
+        await supabase.from("orderPlanLinks").select("*").in("planId", planIds),
+      ) as OrderPlanLink[];
+      const ppl = assertOk(
+        await supabase.from("poPlanLinks").select("*").in("planId", planIds),
+      ) as PoPlanLink[];
+
+      const allocSumByPlan = new Map<string, { count: number; qty: number }>();
+      for (const link of opl) {
+        const cur = allocSumByPlan.get(link.planId) ?? { count: 0, qty: 0 };
+        cur.count += 1;
+        cur.qty += link.allocatedQuantity;
+        allocSumByPlan.set(link.planId, cur);
+      }
+      for (const link of ppl) {
+        const cur = allocSumByPlan.get(link.planId) ?? { count: 0, qty: 0 };
+        cur.count += 1;
+        cur.qty += link.allocatedQuantity;
+        allocSumByPlan.set(link.planId, cur);
+      }
+
+      const cards: DraftPlanCard[] = [];
+      for (const plan of plans) {
+        const pp = planProductByPlan.get(plan.id!);
+        if (!pp) continue;
+        const product = productMap.get(pp.productId);
+        const mould = mouldMap.get(pp.mouldId);
+        const cav = mould?.numberOfCavities ?? 0;
+        const mouldCount = pp.quantity;
+        const totalPieces = mouldCount * cav;
+        const allocSum = allocSumByPlan.get(plan.id!) ?? { count: 0, qty: 0 };
+        cards.push({
+          planId: plan.id!,
+          name: plan.name,
+          productId: pp.productId,
+          productName: product?.name ?? pp.productId.slice(0, 8),
+          mouldName: mould?.name ?? "—",
+          numberOfCavities: cav,
+          mouldCount,
+          totalPieces,
+          totalDemand: allocSum.qty,
+          allocationCount: allocSum.count,
+          surplus: Math.max(0, totalPieces - allocSum.qty),
+          surplusDestination: plan.surplusDestination ?? null,
+          pinnedDate: null,
+        });
+      }
+      cards.sort((a, b) => a.productName.localeCompare(b.productName));
+      return cards;
+    },
+  });
+  return data ?? [];
 }
 
 /** Returns a map of productId → { lastProducedAt, inStock } for all products that have been in a completed plan. */

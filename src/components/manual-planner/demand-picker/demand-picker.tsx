@@ -5,14 +5,35 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ProductDemand } from "@/lib/manual-planner/aggregate-demand";
 import type { SmartSuggestion } from "@/lib/manual-planner/smart-suggestions";
 import { CategoryGroup } from "./category-group";
-import { FilterRow, type DemandFilter } from "./filter-row";
 import { ProductRow } from "./product-row";
+import {
+  SourceFilterChips,
+  applyChipFilter,
+  type ChipKey,
+} from "../source-filter-chips";
 
-const VALID_FILTERS: DemandFilter[] = ["all", "online", "po", "urgent", "lowstock"];
+const VALID_CHIPS: ChipKey[] = [
+  "all",
+  "online",
+  "b2b",
+  "event",
+  "shop",
+  "restock-po",
+  "campaign-po",
+  "urgent",
+  "in-draft",
+];
 
-function asFilter(raw: string | null): DemandFilter {
-  if (raw && (VALID_FILTERS as string[]).includes(raw)) return raw as DemandFilter;
-  return "all";
+function parseChips(raw: string | null): Set<ChipKey> {
+  if (!raw) return new Set<ChipKey>();
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean) as ChipKey[];
+  const set = new Set<ChipKey>();
+  for (const p of parts) if (VALID_CHIPS.includes(p)) set.add(p);
+  return set;
+}
+
+function serialiseChips(set: Set<ChipKey>): string {
+  return [...set].join(",");
 }
 
 export function DemandPicker({
@@ -36,43 +57,30 @@ export function DemandPicker({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [filter, setFilterState] = useState<DemandFilter>(asFilter(searchParams.get("filter")));
+  const [chips, setChips] = useState<Set<ChipKey>>(parseChips(searchParams.get("chips")));
   const [search, setSearchState] = useState<string>(searchParams.get("q") ?? "");
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
 
-  // Sync URL when filter or search changes — replaceState avoids history spam.
+  // Sync URL when chips or search change.
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
-    if (filter === "all") params.delete("filter");
-    else params.set("filter", filter);
+    const chipParam = serialiseChips(chips);
+    if (!chipParam || chipParam === "all") params.delete("chips");
+    else params.set("chips", chipParam);
     if (!search) params.delete("q");
     else params.set("q", search);
     const next = params.toString();
     const url = next ? `${pathname}?${next}` : pathname;
     router.replace(url, { scroll: false });
-    // intentionally only depend on filter+search; searchParams reference changes per-nav
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, search, pathname, router]);
+  }, [chips, search, pathname, router]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return products.filter((p) => {
-      if (q && !p.productName.toLowerCase().includes(q)) return false;
-      switch (filter) {
-        case "online":
-          return p.orderDemand > 0;
-        case "po":
-          return p.poDemand > 0;
-        case "urgent":
-          return p.urgencyLevel === "urgent" || p.urgencyLevel === "overdue";
-        case "lowstock":
-          return p.currentStock < p.totalDemand;
-        case "all":
-        default:
-          return true;
-      }
-    });
-  }, [products, filter, search]);
+    const chipFiltered = applyChipFilter(products, chips);
+    if (!q) return chipFiltered;
+    return chipFiltered.filter((p) => p.productName.toLowerCase().includes(q));
+  }, [products, chips, search]);
 
   const grouped = useMemo(() => {
     const m = new Map<string, { sort: number; products: ProductDemand[] }>();
@@ -126,13 +134,28 @@ export function DemandPicker({
         </p>
       </div>
 
-      <div className="px-5 py-3" style={{ borderBottom: "0.5px solid var(--mp-border-warm)" }}>
-        <FilterRow
-          filter={filter}
-          onFilterChange={setFilterState}
-          search={search}
-          onSearchChange={setSearchState}
+      <div style={{ borderBottom: "0.5px solid var(--mp-border-warm)" }}>
+        <SourceFilterChips
+          products={products}
+          selected={chips}
+          onChange={setChips}
         />
+        <div className="px-5 py-2">
+          <input
+            type="search"
+            placeholder="Search product…"
+            value={search}
+            onChange={(e) => setSearchState(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "4px 8px",
+              fontSize: 12,
+              borderRadius: 4,
+              border: "0.5px solid var(--mp-border-warm)",
+              background: "var(--mp-page-bg, #fff)",
+            }}
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 320px)" }}>
