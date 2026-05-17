@@ -6,6 +6,7 @@ import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
 import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, VariantStockLocation, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, PoPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun, ProductionDayNotes, Calibration } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, CHANNEL_FULFILMENT_DEFAULTS, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, type FulfilmentMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
+import { isCompositionDraft } from "@/lib/manual-planner/is-composition-draft";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
 
 // --- Ingredients ---
@@ -2655,6 +2656,10 @@ export interface DraftPlanCard {
   /** Always null for status='draft'; exposed so the UI can type-share
    *  with active-plan card shapes. */
   pinnedDate: string | null;
+  /** epoch-ms of productionPlans.updatedAt (falls back to createdAt).
+   *  Used by CombineHintCard to pick the freshest same-mould match
+   *  when multiple candidates exist (hotfix §4 step 3). */
+  updatedAt: number;
 }
 
 /**
@@ -2709,8 +2714,16 @@ export function useDraftPlans(): DraftPlanCard[] {
         await supabase.from("poPlanLinks").select("*").in("planId", planIds),
       ) as PoPlanLink[];
 
+      // Track order-link presence separately from PO links — the
+      // composition-draft heuristic uses orderPlanLinks specifically
+      // as the positive signal (only saveDraftToPlan writes them).
+      const orderLinkCountByPlan = new Map<string, number>();
       const allocSumByPlan = new Map<string, { count: number; qty: number }>();
       for (const link of opl) {
+        orderLinkCountByPlan.set(
+          link.planId,
+          (orderLinkCountByPlan.get(link.planId) ?? 0) + 1,
+        );
         const cur = allocSumByPlan.get(link.planId) ?? { count: 0, qty: 0 };
         cur.count += 1;
         cur.qty += link.allocatedQuantity;
@@ -2728,15 +2741,15 @@ export function useDraftPlans(): DraftPlanCard[] {
         const pp = planProductByPlan.get(plan.id!);
         if (!pp) continue;
         const allocSum = allocSumByPlan.get(plan.id!) ?? { count: 0, qty: 0 };
-        // Only manual-planner drafts belong in the tray. System-seeded
-        // status='draft' rows (replen seeder names "PO: Replen · …",
-        // campaign generator names "Campaign: …", PO splitter names
-        // "PO: <campaign> — …") have no orderPlanLinks/poPlanLinks
-        // entries because those seeders write planProducts directly.
-        // Filtering by allocationCount > 0 keeps the tray scoped to
-        // user-composed drafts without deleting the seeded rows that
-        // other surfaces (campaign view, replen panel) may still read.
         if (allocSum.count === 0) continue;
+        // Composition-draft heuristic (HOTFIX 2026-05-18). Filters out
+        // regenerate-seeded drafts (Campaign:/PO:/× N/— consolidated/
+        // — packing) so the manual planner's tray + pool stay scoped
+        // to user-composed drafts only. See is-composition-draft.ts
+        // for the full decision tree; planType column lands in the
+        // next batch.
+        const hasOrderPlanLinks = (orderLinkCountByPlan.get(plan.id!) ?? 0) > 0;
+        if (!isCompositionDraft({ name: plan.name, hasOrderPlanLinks })) continue;
         const product = productMap.get(pp.productId);
         const mould = mouldMap.get(pp.mouldId);
         const cav = mould?.numberOfCavities ?? 0;
@@ -2756,6 +2769,11 @@ export function useDraftPlans(): DraftPlanCard[] {
           surplus: Math.max(0, totalPieces - allocSum.qty),
           surplusDestination: plan.surplusDestination ?? null,
           pinnedDate: null,
+          updatedAt: plan.updatedAt
+            ? new Date(plan.updatedAt).getTime()
+            : plan.createdAt
+              ? new Date(plan.createdAt).getTime()
+              : 0,
         });
       }
       cards.sort((a, b) => a.productName.localeCompare(b.productName));

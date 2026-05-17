@@ -27,15 +27,23 @@ export function CombineHintCard({
   const [err, setErr] = useState<string | null>(null);
 
   if (!activeDraft) return null;
-  // Find every parked draft that shares the same mould but is a
-  // different plan from the active one.
-  const candidates = otherDrafts.filter(
-    (d) =>
-      d.numberOfCavities === activeDraft.numberOfCavities &&
-      d.mouldName === activeDraft.mouldName &&
-      d.planId !== activeDraft.id,
-  );
+  // Find every parked composition draft that shares the same mould
+  // but is a different plan from the active one. Source list is
+  // already filtered by isCompositionDraft in useDraftPlans (hotfix
+  // 2026-05-18), so regenerate-seeded "PO: ..." / "Campaign: ..."
+  // rows can't pollute candidates here.
+  const candidates = otherDrafts
+    .filter(
+      (d) =>
+        d.numberOfCavities === activeDraft.numberOfCavities &&
+        d.mouldName === activeDraft.mouldName &&
+        d.planId !== activeDraft.id,
+    )
+    .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   if (candidates.length === 0) return null;
+  // Spec §4 step 3: show ONE card pointing to the most-recently-updated
+  // match. Drop the rest to avoid the "stack of hint cards" bug.
+  const top = candidates[0];
 
   async function handleMerge(planId: string): Promise<void> {
     if (!activeDraft) return;
@@ -66,43 +74,45 @@ export function CombineHintCard({
       }}
     >
       <span style={{ fontWeight: 600 }}>💡 Combine?</span>
-      {candidates.map((c) => (
-        <div
-          key={c.planId}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "2px 0",
+        }}
+      >
+        <span style={{ flex: 1 }}>
+          <strong>{top.productName}</strong>{" "}
+          <span style={{ color: "var(--mp-text-muted)" }}>
+            ({top.numberOfCavities}-cav · {top.totalDemand} pcs)
+          </span>{" "}
+          could be combined with this batch.
+          {candidates.length > 1 ? (
+            <span style={{ color: "var(--mp-text-muted)", marginLeft: 4 }}>
+              (+{candidates.length - 1} more in pool)
+            </span>
+          ) : null}
+        </span>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => { void handleMerge(top.planId); }}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "2px 0",
+            padding: "3px 10px",
+            borderRadius: 4,
+            border: "1px solid var(--mp-teal, #1c5651)",
+            background: "var(--mp-teal, #1c5651)",
+            color: "#fff",
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: busy ? "wait" : "pointer",
+            fontFamily: "inherit",
           }}
         >
-          <span style={{ flex: 1 }}>
-            <strong>{c.productName}</strong>{" "}
-            <span style={{ color: "var(--mp-text-muted)" }}>
-              ({c.numberOfCavities}-cav · {c.totalDemand} pcs)
-            </span>{" "}
-            could be combined with this batch.
-          </span>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => { void handleMerge(c.planId); }}
-            style={{
-              padding: "3px 10px",
-              borderRadius: 4,
-              border: "1px solid var(--mp-teal, #1c5651)",
-              background: "var(--mp-teal, #1c5651)",
-              color: "#fff",
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: busy ? "wait" : "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            {busy ? "Merging…" : "Merge?"}
-          </button>
-        </div>
-      ))}
+          {busy ? "Merging…" : "Merge?"}
+        </button>
+      </div>
       {err ? (
         <span style={{ color: "var(--mp-rose, #993556)", fontSize: 11 }}>{err}</span>
       ) : null}
