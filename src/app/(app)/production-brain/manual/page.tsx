@@ -60,8 +60,23 @@ import {
   type FillMouldChoice,
   type PoFillOption,
 } from "@/components/manual-planner/draft-bar/fill-mould-modal";
-import { ManualWeekGantt } from "@/components/manual-planner/manual-week-gantt";
-import { moveStageDay } from "@/lib/manual-planner/move-stage-day";
+import {
+  DemandViewSwitcher,
+  ProductView,
+  CampaignView,
+  MouldView,
+  CustomerView,
+  useWorkspaceView,
+  type WorkspaceView,
+} from "@/components/manual-planner/workspace-views";
+import {
+  ScheduleSection,
+  BatchPeekPopover,
+  sendBackToPool,
+} from "@/components/manual-planner/schedule-section";
+import { CombineHintCard } from "@/components/manual-planner/combine-hint-card";
+import { pinPoolCardToDay } from "@/lib/manual-planner/pin-pool-card-to-day";
+import { useSchedulePool, useCampaigns } from "@/lib/hooks";
 import { BackButton } from "@/components/back-button";
 import { IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 
@@ -94,6 +109,11 @@ export default function ManualPlannerPage() {
   const orderPlanLinks = useAllOrderPlanLinks();
   const poPlanLinks = useAllPoPlanLinks();
   const draftPlanCards = useDraftPlans();
+  const schedulePoolCards = useSchedulePool();
+  const campaigns = useCampaigns();
+  const [workspaceView, setWorkspaceView] = useWorkspaceView();
+  const [peekPlanId, setPeekPlanId] = useState<string | null>(null);
+  const [isolatedToast, setIsolatedToast] = useState<string | null>(null);
   const productLocations = useProductLocationTotals();
   const dayLineItems = useAllProductionDayLineItems();
   const productionDays = useProductionDays(120);
@@ -726,25 +746,8 @@ export default function ManualPlannerPage() {
     if (!date) return;
 
     const data = e.active.data.current as
-      | { kind?: string; planId?: string; stepId?: string; sourceDate?: string;
-          trayCardId?: string; trayCardKind?: string }
+      | { kind?: string; trayCardId?: string; trayCardKind?: string }
       | undefined;
-
-    // ── Stage chip drop (Gantt) ────────────────────────────────────
-    if (data?.kind === "stage" && data.planId && data.stepId) {
-      if (data.sourceDate === date) return; // same day no-op
-      const today = new Date().toISOString().slice(0, 10);
-      if (date < today) {
-        setSaveErr("Cannot move a stage to a past day.");
-        return;
-      }
-      try {
-        await moveStageDay({ planId: data.planId, stepId: data.stepId, targetDate: date });
-      } catch (err) {
-        setSaveErr(`Move failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-      return;
-    }
 
     if (id === "manual-draft-batch") {
       setDraft((cur) => (cur ? { ...cur, pinnedDate: date } : cur));
@@ -756,21 +759,13 @@ export default function ManualPlannerPage() {
         setDraft((cur) => (cur ? { ...cur, pinnedDate: date } : cur));
         return;
       }
-      // Parked card dropped on a day: load → pin → caller must hit "Save & pin".
-      if (isDraftDirty(draft) && draft?.id !== data.trayCardId) {
-        const ok = window.confirm(
-          "Switch drafts? Current draft will be parked.",
-        );
-        if (!ok) return;
-        await autoParkIfDirty();
-      }
+      // Parked pool/tray card dropped on a day:
+      // Spec §3.7 — direct persist (status='active' + pinnedDate),
+      // skipping the load-into-editor flow.
       try {
-        const loaded = await loadDraftFromPlan(data.trayCardId);
-        await deleteParkedDraft(data.trayCardId);
-        setDraft({ ...loaded, pinnedDate: date });
-        queryClient.invalidateQueries({ queryKey: ["production-plans"] });
+        await pinPoolCardToDay(data.trayCardId, date);
       } catch (err) {
-        setSaveErr(`Load failed: ${err instanceof Error ? err.message : String(err)}`);
+        setSaveErr(`Pin failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
@@ -792,16 +787,95 @@ export default function ManualPlannerPage() {
     return `${fmt(start)} — ${fmt(end)}, ${year}`;
   })();
 
+  // Count of plans pinned in the visible week — used by the Schedule
+  // section header subtitle "X batches in pool · Y on the week".
+  const pinnedThisWeekCount = useMemo(() => {
+    const start = startOfWeekMonday(weekAnchor);
+    const isoSet = new Set<string>();
+    for (let i = 0; i < 7; i++) isoSet.add(isoForOffset(start, i));
+    let n = 0;
+    for (const p of productionPlans) {
+      if (!p.pinnedDate) continue;
+      if (p.status === "done" || p.status === "cancelled") continue;
+      if (isoSet.has(p.pinnedDate.slice(0, 10))) n++;
+    }
+    return n;
+  }, [weekAnchor, productionPlans]);
+
+  const tabCounts: Record<WorkspaceView, number> = {
+    product: productDemands.length,
+    campaign: campaigns.length,
+    mould: new Set(productDemands.map((p) => p.numberOfCavities)).size,
+    customer: new Set(
+      orders
+        .filter((o) =>
+          new Set(["pending", "in_production", "ready_to_pack"]).has(o.status),
+        )
+        .map((o) => o.customerName || o.eventName || o.sourceRef || "Anonymous"),
+    ).size,
+  };
+
+  function renderActiveView(): React.ReactNode {
+    if (workspaceView === "campaign") {
+      return (
+        <CampaignView
+          campaigns={campaigns}
+          productionOrders={productionOrders}
+          productionOrderItems={productionOrderItems}
+          products={products}
+          productDemands={productDemands}
+        />
+      );
+    }
+    if (workspaceView === "mould") {
+      return (
+        <MouldView
+          productDemands={productDemands}
+          moulds={moulds}
+          onPickOrderLine={handlePickOrderLine}
+          onPickPoLine={handlePickPoLine}
+          draftProductId={draftProductId}
+        />
+      );
+    }
+    if (workspaceView === "customer") {
+      return (
+        <CustomerView
+          orders={orders}
+          orderItems={orderItems}
+          products={products}
+          productDemands={productDemands}
+          onPickOrderLine={handlePickOrderLine}
+          onIsolatedClick={(label) =>
+            setIsolatedToast(
+              `Heads up: ${label} is marked isolated — don't combine with other allocations.`,
+            )
+          }
+        />
+      );
+    }
+    return (
+      <ProductView
+        products={productDemands}
+        draftProductId={draftProductId}
+        draftOrderItemIds={draftOrderItemIds}
+        draftPoItemIds={draftPoItemIds}
+        onPickOrderLine={handlePickOrderLine}
+        onPickPoLine={handlePickPoLine}
+        onAcceptSuggestion={handleAcceptSuggestion}
+      />
+    );
+  }
+
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={handleDragEnd}>
-      <div className="ds manual-planner-v2 mp-page-root -mx-4 sm:-mx-6">
-        {/* ── Middle zone: only this scrolls. ──────────────────────── */}
-        <div className="mp-scroll-zone px-4 sm:px-6 pt-4 pb-3">
-          <div className="mb-2">
-            <BackButton />
-          </div>
+      <div className="ds manual-planner-v2 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4" style={{ minHeight: "100vh", background: "var(--ds-page-bg)" }}>
+        <div className="mb-2">
+          <BackButton />
+        </div>
 
-          <div className="mb-4">
+        <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+          <div>
             <h1
               className="text-2xl"
               style={{
@@ -814,176 +888,139 @@ export default function ManualPlannerPage() {
               Manual planner
             </h1>
             <p className="text-[12px] mt-0.5" style={{ color: "var(--mp-text-muted)" }}>
-              Select demand · build a draft batch · drop on a day · save as production order.
+              Workspace · build drafts · pin to days in the schedule pool.
             </p>
           </div>
+        </div>
 
-          {saveErr ? (
-            <div
-              className="mb-3 px-3 py-1.5 text-[12px] flex items-start gap-2"
-              style={{
-                border: "1px solid #e8c5b1",
-                background: "var(--mp-blush)",
-                color: "#8a4530",
-                borderRadius: 6,
-              }}
+        {saveErr ? (
+          <div
+            className="mb-3 px-3 py-1.5 text-[12px] flex items-start gap-2"
+            style={{
+              border: "1px solid #e8c5b1",
+              background: "var(--mp-blush)",
+              color: "#8a4530",
+              borderRadius: 6,
+            }}
+          >
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span className="flex-1">{saveErr}</span>
+            <button
+              type="button"
+              onClick={() => setSaveErr(null)}
+              className="text-[10px] uppercase font-semibold opacity-80 hover:opacity-100"
             >
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span className="flex-1">{saveErr}</span>
-              <button
-                type="button"
-                onClick={() => setSaveErr(null)}
-                className="text-[10px] uppercase font-semibold opacity-80 hover:opacity-100"
-              >
-                Dismiss
-              </button>
-            </div>
-          ) : null}
+              Dismiss
+            </button>
+          </div>
+        ) : null}
 
-          <DemandPicker
-            products={productDemands}
-            draftProductId={draftProductId}
-            draftOrderItemIds={draftOrderItemIds}
-            draftPoItemIds={draftPoItemIds}
-            onPickOrderLine={handlePickOrderLine}
-            onPickPoLine={handlePickPoLine}
-            onAcceptSuggestion={handleAcceptSuggestion}
+        {isolatedToast ? (
+          <div
+            className="mb-3 px-3 py-1.5 text-[12px]"
+            style={{
+              border: "1px solid var(--mp-rose, #993556)",
+              background: "var(--mp-blush)",
+              color: "var(--mp-rose, #993556)",
+              borderRadius: 6,
+              display: "flex",
+              gap: 6,
+              alignItems: "center",
+            }}
+          >
+            <span style={{ flex: 1 }}>{isolatedToast}</span>
+            <button
+              type="button"
+              onClick={() => setIsolatedToast(null)}
+              className="text-[10px] uppercase font-semibold opacity-80 hover:opacity-100"
+              style={{ background: "transparent", border: "none", cursor: "pointer" }}
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+
+        {/* TOP — 60/40 grid: demand workspace left, active draft right.
+            Inline grid-template-columns to dodge Tailwind comma-arbitrary
+            bug (see globals.css note). */}
+        <div className="manual-upper-grid" style={{ display: "grid", gap: "1.25rem", alignItems: "start" }}>
+          <div
+            style={{
+              background: "var(--mp-card-bg)",
+              border: "1px solid var(--mp-border-warm)",
+              borderRadius: 10,
+              overflow: "hidden",
+              minWidth: 0,
+            }}
+          >
+            <DemandViewSwitcher
+              active={workspaceView}
+              onChange={setWorkspaceView}
+              counts={tabCounts}
+            />
+            {renderActiveView()}
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <CombineHintCard
+              activeDraft={draft}
+              otherDrafts={draftPlanCards}
+              onMerged={(merged) => setDraft(merged)}
+            />
+            <DraftBar
+              draft={draft}
+              totalActiveMinutes={draftActiveMinutes}
+              onRemoveAllocation={handleRemoveAllocation}
+              onCancel={handleCancelDraft}
+              onSave={handleSaveDraft}
+              onPark={() => { void handleParkDraft(); }}
+              onName={handleNameDraft}
+              saving={saving}
+              pinnedDateLabel={pinnedDateLabel}
+            />
+          </div>
+        </div>
+
+        {/* MIDDLE — drafts tray (full-width band). */}
+        <div style={{ marginTop: 16 }}>
+          <DraftsTray
+            cards={buildTrayCards(draftPlanCards, draft)}
+            onLoadCard={(c) => { void handleLoadTrayCard(c); }}
+            onDeleteCard={(c) => { void handleDeleteTrayCard(c); }}
+            onNewDraft={() => { void handleNewDraft(); }}
           />
         </div>
 
-        {/* ── Bottom zone: sticky cluster. Three rows. ─────────────── */}
-        <div className="mp-action-cluster">
-          {/* Row 1 — drafts row: active draft (left) + other-drafts queue (right).
-              If no active draft, queue takes the full row. */}
-          <div className="mp-cluster-row drafts" style={{ alignItems: "stretch" }}>
-            {draft ? (
-              <div style={{ flex: "0 0 360px" }}>
-                <DraftBar
-                  draft={draft}
-                  totalActiveMinutes={draftActiveMinutes}
-                  onRemoveAllocation={handleRemoveAllocation}
-                  onCancel={handleCancelDraft}
-                  onSave={handleSaveDraft}
-                  onPark={() => { void handleParkDraft(); }}
-                  onName={handleNameDraft}
-                  saving={saving}
-                  pinnedDateLabel={pinnedDateLabel}
-                />
-              </div>
-            ) : null}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <DraftsTray
-                cards={buildTrayCards(draftPlanCards, draft)}
-                onLoadCard={(c) => { void handleLoadTrayCard(c); }}
-                onDeleteCard={(c) => { void handleDeleteTrayCard(c); }}
-                onNewDraft={() => { void handleNewDraft(); }}
-              />
-            </div>
-          </div>
-
-          {/* Row 2 — week nav (prev / label / today / next + hint). */}
-          <div className="mp-cluster-row week-nav">
-            <button
-              type="button"
-              onClick={() => {
-                const next = new Date(weekAnchor);
-                next.setDate(next.getDate() - 7);
-                setWeekAnchor(next);
-              }}
-              style={{
-                padding: "3px 9px",
-                borderRadius: 5,
-                fontSize: 11.5,
-                border: "1px solid var(--mp-border-warm)",
-                background: "var(--mp-card-bg)",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              ← prev week
-            </button>
-            <span style={{ fontWeight: 600, fontSize: 12.5 }}>{weekLabel}</span>
-            <button
-              type="button"
-              onClick={() => setWeekAnchor(new Date())}
-              style={{
-                padding: "3px 9px",
-                borderRadius: 5,
-                fontSize: 11.5,
-                fontWeight: 600,
-                border: "1px solid var(--mp-border-warm)",
-                background: "var(--mp-card-bg)",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              today
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const next = new Date(weekAnchor);
-                next.setDate(next.getDate() + 7);
-                setWeekAnchor(next);
-              }}
-              style={{
-                padding: "3px 9px",
-                borderRadius: 5,
-                fontSize: 11.5,
-                border: "1px solid var(--mp-border-warm)",
-                background: "var(--mp-card-bg)",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              next week →
-            </button>
-            <span style={{ flex: 1 }} />
-            <span
-              style={{
-                fontSize: 11,
-                color: "var(--mp-text-muted)",
-                fontStyle: "italic",
-              }}
-            >
-              drop active draft on a day → save &amp; pin
-            </span>
-          </div>
-
-          {/* Row 3 — week view: Gantt grid per
-              MANUAL_PLANNER_WEEK_VIEW_GANTT.md. Rows=batches, cols=days,
-              cells=StageChips. Drag a chip to another day → moveStageDay
-              rewrites the stepIds[] across productionDayLineItems rows. */}
-          <div className="mp-cluster-row week-strip">
-            <ManualWeekGantt
-              weekAnchor={weekAnchor}
-              productionDays={productionDays}
-              lineItems={dayLineItems}
-              plans={productionPlans}
-              planProducts={planProducts}
-              productionSteps={productionSteps}
-              productCategories={productCategories}
-              products={products}
-              moulds={moulds}
-              dailyActiveCapacityMinutes={effectiveDailyCapacityMinutes(
-                new Date(),
-                capacityConfig,
-                people,
-                personUnavailability,
-                eventCalendar,
-              ) || null}
-              draftPinnedDate={draft?.pinnedDate ?? null}
-              draftPreview={
-                draft
-                  ? {
-                      name: draft.name,
-                      pieces: draft.totalPieces,
-                      mouldCount: draft.mouldCount,
-                    }
-                  : null
-              }
-            />
-          </div>
+        {/* BOTTOM — collapsible Schedule section. Drag a pool card on
+            the right week strip → pinPoolCardToDay. */}
+        <div style={{ marginTop: 12 }}>
+          <ScheduleSection
+            poolCards={schedulePoolCards}
+            weekAnchor={weekAnchor}
+            setWeekAnchor={setWeekAnchor}
+            productionDays={productionDays}
+            lineItems={dayLineItems}
+            plans={productionPlans}
+            planProducts={planProducts}
+            products={products}
+            moulds={moulds}
+            capacityConfig={capacityConfig}
+            people={people}
+            unavailability={personUnavailability}
+            blockedDays={eventCalendar}
+            pinnedThisWeekCount={pinnedThisWeekCount}
+            draftPinnedDate={draft?.pinnedDate ?? null}
+            draftPreview={
+              draft
+                ? {
+                    name: draft.name,
+                    pieces: draft.totalPieces,
+                    mouldCount: draft.mouldCount,
+                  }
+                : null
+            }
+            onPillClick={(planId) => setPeekPlanId(planId)}
+          />
         </div>
 
         {pendingFillMould && draft && (
@@ -995,6 +1032,25 @@ export default function ManualPlannerPage() {
             onConfirm={handleFillMouldChoice}
           />
         )}
+
+        {peekPlanId ? (
+          <BatchPeekPopover
+            planId={peekPlanId}
+            plans={productionPlans}
+            planProducts={planProducts}
+            products={products}
+            moulds={moulds}
+            onSendBackToPool={async () => {
+              try {
+                await sendBackToPool(peekPlanId);
+                setPeekPlanId(null);
+              } catch (err) {
+                setSaveErr(`Unpin failed: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            }}
+            onClose={() => setPeekPlanId(null)}
+          />
+        ) : null}
       </div>
     </DndContext>
   );

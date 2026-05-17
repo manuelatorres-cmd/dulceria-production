@@ -205,9 +205,9 @@ function ActiveDraftBar({
                 draft.allocations.length === 0 || saving ? "not-allowed" : "pointer",
               opacity: draft.allocations.length === 0 || saving ? 0.6 : 1,
             }}
-            title="Save as draft — pin a day later"
+            title="Save as parked draft — pin a day later from the Schedule pool"
           >
-            Park as draft
+            Add to schedule pool
           </button>
           <button
             type="button"

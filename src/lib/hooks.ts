@@ -2657,6 +2657,21 @@ export interface DraftPlanCard {
   pinnedDate: string | null;
 }
 
+/**
+ * Schedule-pool feed for the manual planner (workspace batch §4.4).
+ *
+ * Returns parked drafts whose pinnedDate is null AND that have at
+ * least one allocation. Identical to `useDraftPlans()` today — the
+ * underlying query already enforces those constraints — so we just
+ * re-export it under a name that matches the workspace spec.
+ *
+ * Kept as a separate named hook so future divergence (pool-specific
+ * sort, capacity hints) lands here without polluting useDraftPlans.
+ */
+export function useSchedulePool(): DraftPlanCard[] {
+  return useDraftPlans();
+}
+
 export function useDraftPlans(): DraftPlanCard[] {
   const { data } = useQuery({
     queryKey: ["production-plans", "draft", "cards"],
