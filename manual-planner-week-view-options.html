@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Manual Planner — Week View Options</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #ece7df; color: #2a2a2a; font-size: 13px; line-height: 1.4; padding: 24px;
+  }
+
+  /* ---- Page intro ---- */
+  .intro {
+    background: #1c3937; color: #f5efe5; padding: 18px 22px;
+    border-radius: 10px; margin-bottom: 20px;
+  }
+  .intro h1 { font-size: 18px; margin-bottom: 6px; }
+  .intro p { font-size: 12px; color: #d4ccc0; line-height: 1.55; }
+  .intro p strong { color: #e6c97a; }
+
+  /* ---- Section header ---- */
+  .sectionHead {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 10px; padding: 0 4px;
+  }
+  .sectionHead h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .sectionHead .label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: #7a766f; font-weight: 600;
+  }
+  .sectionHead .desc { font-size: 12px; color: #555; margin-top: 3px; max-width: 760px; }
+  .pickPill {
+    display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 10px;
+    background: #e6c97a; color: #1c3937; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+
+  .panel {
+    background: #fff; border: 1px solid #d8d2c7; border-radius: 10px;
+    margin-bottom: 32px; overflow: hidden;
+  }
+
+  /* ---- Stage palette (consistent across all options) ---- */
+  .stage {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 7px; border-radius: 4px; font-size: 10px;
+    font-weight: 600; cursor: grab; user-select: none;
+  }
+  .stage .name { letter-spacing: 0.03em; }
+  .stage .time { font-weight: 400; opacity: 0.7; font-size: 9px; }
+  .stage .grip {
+    font-size: 8px; opacity: 0.4; letter-spacing: -1px;
+  }
+  .stage.pol { background: #d6e6e2; color: #1c4a44; }
+  .stage.she { background: #f0e7cf; color: #6b5418; }
+  .stage.fil { background: #f5d9c4; color: #7a3f1c; }
+  .stage.cap { background: #f5d9d3; color: #8a3a2c; }
+  .stage.unm { background: #e0d5e5; color: #4d2e5a; }
+  .stage.sea { background: #d5e5dc; color: #2c5340; }
+
+  /* ============================================ */
+  /* OPTION A: Gantt by batch                     */
+  /* ============================================ */
+  .ganttHead {
+    display: grid;
+    grid-template-columns: 200px repeat(7, 1fr);
+    background: #faf6ef; border-bottom: 1px solid #d8d2c7;
+    padding: 10px 0; font-size: 11px;
+  }
+  .ganttHead .label, .ganttHead .day {
+    padding: 0 12px; color: #7a766f; font-weight: 600; letter-spacing: 0.04em;
+  }
+  .ganttHead .day { text-align: center; border-left: 1px solid #ece8e0; }
+  .ganttHead .day strong { display: block; color: #2a2a2a; font-size: 14px;
+                            font-weight: 700; margin-top: 2px; }
+  .ganttHead .day.today strong { color: #1c3937; }
+
+  .ganttRow {
+    display: grid;
+    grid-template-columns: 200px repeat(7, 1fr);
+    align-items: stretch;
+    border-bottom: 1px solid #ece8e0;
+    min-height: 56px;
+  }
+  .ganttRow:last-child { border-bottom: 0; }
+  .ganttRow .batchLabel {
+    padding: 10px 12px;
+    background: #faf6ef;
+    border-right: 1px solid #d8d2c7;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .ganttRow .batchLabel .nm { font-weight: 600; font-size: 12px; }
+  .ganttRow .batchLabel .meta { font-size: 10px; color: #7a766f; margin-top: 2px; }
+  .ganttRow .cell {
+    padding: 8px 6px;
+    border-left: 1px solid #ece8e0;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .ganttRow .cell.empty::after {
+    content: "·"; color: #d0c8b8; font-size: 14px;
+  }
+  .ganttRow .cell.today { background: #fdfaf2; }
+  .ganttRow .cell.dropTarget {
+    background: #fff8e6; border-left-color: #e6c97a;
+    box-shadow: inset 0 0 0 1.5px #e6c97a;
+  }
+  .totalRow {
+    display: grid;
+    grid-template-columns: 200px repeat(7, 1fr);
+    background: #f5efe5; border-top: 1px solid #d8d2c7;
+    padding: 8px 0; font-size: 11px;
+  }
+  .totalRow .lab { padding: 0 12px; color: #7a766f; font-weight: 600;
+                   font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+                   display: flex; align-items: center; }
+  .totalRow .v { padding: 0 12px; text-align: center; border-left: 1px solid #ece8e0;
+                 font-variant-numeric: tabular-nums; }
+  .totalRow .v strong { font-size: 12px; }
+  .totalRow .v .sub { font-size: 9px; color: #7a766f; display: block; }
+  .totalRow .v.over { color: #d96a52; }
+
+  /* ============================================ */
+  /* OPTION B: Stage swimlanes                    */
+  /* ============================================ */
+  .swimHead {
+    display: grid;
+    grid-template-columns: 140px repeat(7, 1fr);
+    background: #faf6ef; border-bottom: 1px solid #d8d2c7;
+    padding: 10px 0; font-size: 11px;
+  }
+  .swimHead .label, .swimHead .day {
+    padding: 0 12px; color: #7a766f; font-weight: 600; letter-spacing: 0.04em;
+  }
+  .swimHead .day { text-align: center; border-left: 1px solid #ece8e0; }
+  .swimHead .day strong { display: block; color: #2a2a2a; font-size: 14px;
+                           font-weight: 700; margin-top: 2px; }
+  .swimHead .day.today strong { color: #1c3937; }
+  .swimRow {
+    display: grid;
+    grid-template-columns: 140px repeat(7, 1fr);
+    align-items: stretch; border-bottom: 1px solid #ece8e0;
+    min-height: 64px;
+  }
+  .swimRow:last-child { border-bottom: 0; }
+  .swimRow .stageLabel {
+    padding: 10px 12px;
+    border-right: 1px solid #d8d2c7;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .swimRow .stageLabel .dot {
+    width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+  }
+  .swimRow .stageLabel .nm { font-weight: 600; font-size: 12px; }
+  .swimRow .stageLabel .sub { font-size: 9px; color: #7a766f; }
+  .swimRow .cell {
+    padding: 8px 8px;
+    border-left: 1px solid #ece8e0;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .swimRow .cell.today { background: #fdfaf2; }
+  .swimRow .cell.empty::after { content: ""; }
+  .swimItem {
+    padding: 4px 7px; border-radius: 4px;
+    font-size: 10px; background: #f5efe5; border: 1px solid #ece8e0;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: grab;
+  }
+  .swimItem .nm { font-weight: 600; }
+  .swimItem .t { font-size: 9px; color: #7a766f; }
+  .swimRow.pol .stageLabel .dot { background: #d6e6e2; }
+  .swimRow.she .stageLabel .dot { background: #f0e7cf; }
+  .swimRow.fil .stageLabel .dot { background: #f5d9c4; }
+  .swimRow.cap .stageLabel .dot { background: #f5d9d3; }
+  .swimRow.unm .stageLabel .dot { background: #e0d5e5; }
+  .swimRow.sea .stageLabel .dot { background: #d5e5dc; }
+  .swimRow.pol .swimItem { background: #e8f0ed; border-color: #c5dad4; }
+  .swimRow.she .swimItem { background: #faf3df; border-color: #e6d9b3; }
+  .swimRow.fil .swimItem { background: #fbe6d4; border-color: #ebc4a1; }
+  .swimRow.cap .swimItem { background: #fbe6e0; border-color: #ebc0b4; }
+  .swimRow.unm .swimItem { background: #ebe1ee; border-color: #cbb9d2; }
+  .swimRow.sea .swimItem { background: #e3eee7; border-color: #b9cebf; }
+
+  /* ============================================ */
+  /* OPTION C: Day cards with stages-per-batch    */
+  /* ============================================ */
+  .dayCardsGrid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 0;
+  }
+  .dayCard {
+    padding: 12px; border-right: 1px solid #ece8e0;
+    min-height: 320px; display: flex; flex-direction: column;
+  }
+  .dayCard:last-child { border-right: 0; }
+  .dayCard.today { background: #fdfaf2; }
+  .dayCard .head { display: flex; justify-content: space-between;
+                   align-items: baseline; margin-bottom: 8px;
+                   padding-bottom: 8px; border-bottom: 1px solid #ece8e0; }
+  .dayCard .head .dow { font-size: 10px; color: #7a766f; font-weight: 600;
+                        letter-spacing: 0.08em; text-transform: uppercase; }
+  .dayCard .head .date { font-size: 16px; font-weight: 700;
+                         font-variant-numeric: tabular-nums; }
+  .dayCard.today .head .date { color: #1c3937; }
+  .batchBlock {
+    background: #faf6ef; border: 1px solid #ece8e0;
+    border-left: 3px solid #1c3937; border-radius: 5px;
+    padding: 7px 9px; margin-bottom: 6px; cursor: grab;
+  }
+  .batchBlock .bn { font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+  .batchBlock .stageInside {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 10px; padding: 2px 5px; border-radius: 3px;
+  }
+  .batchBlock .stageInside.pol { background: #d6e6e2; color: #1c4a44; }
+  .batchBlock .stageInside.she { background: #f0e7cf; color: #6b5418; }
+  .batchBlock .stageInside.fil { background: #f5d9c4; color: #7a3f1c; }
+  .batchBlock .stageInside.cap { background: #f5d9d3; color: #8a3a2c; }
+  .batchBlock .stageInside.unm { background: #e0d5e5; color: #4d2e5a; }
+  .batchBlock .stageInside.sea { background: #d5e5dc; color: #2c5340; }
+  .batchBlock .t { font-size: 9px; color: #7a766f; margin-left: 6px;
+                   font-variant-numeric: tabular-nums; }
+  .batchBlock.pisCol { border-left-color: #1c4a44; }
+  .batchBlock.strCol { border-left-color: #8a3a2c; }
+  .batchBlock.espCol { border-left-color: #6b5418; }
+  .batchBlock.hazCol { border-left-color: #4d2e5a; }
+  .dayCard .footer {
+    margin-top: auto; padding-top: 8px;
+    border-top: 1px solid #ece8e0;
+    font-size: 10px; color: #7a766f; display: flex; justify-content: space-between;
+  }
+  .dayCard .footer .active { font-weight: 600; color: #2a2a2a; }
+  .dayCard.empty .content { color: #b8b0a3; font-size: 11px; padding: 10px;
+                            text-align: center; font-style: italic; }
+  .dayCard.empty { background: #faf6ef; }
+
+  /* Verdict box */
+  .verdict {
+    margin-top: 18px; padding: 14px 16px;
+    background: #fff8e6; border: 1px solid #e6d49a; border-radius: 8px;
+    font-size: 11px; line-height: 1.6;
+  }
+  .verdict strong { color: #1c3937; }
+  .verdict .ttl { color: #1c3937; font-weight: 700; font-size: 12px;
+                  margin-bottom: 4px; display: block; }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Manual Planner — week view, three structural options</h1>
+  <p>
+    The top of the page (active draft + drafts tray) stays as designed. <strong>Only the week view below is being decided here.</strong>
+    Same 4 batches shown across all three so the differences are direct: Pistachio Crunch Bar (6 stages),
+    Strawberry Cheesecake (5 stages), Espresso Shot (4 stages), Hazelnut Crunch (2 stages). Real data
+    comes from <strong>productionDayLineItems.stepIds[]</strong> — the schema already supports per-day stage assignment.
+  </p>
+</div>
+
+<!-- ============================================ -->
+<!-- OPTION A: Gantt by batch                    -->
+<!-- ============================================ -->
+<div class="sectionHead">
+  <div>
+    <h2>A · Gantt by batch <span class="pickPill">my pick</span></h2>
+    <p class="desc">Rows = batches. Columns = days. Each cell = the stage running that day. Drag a stage chip to reschedule one piece of the work without moving the whole batch.</p>
+  </div>
+  <span class="label">Best for · planning forward</span>
+</div>
+<div class="panel">
+  <div class="ganttHead">
+    <span class="label">Batch</span>
+    <span class="day">MON <strong>11</strong></span>
+    <span class="day">TUE <strong>12</strong></span>
+    <span class="day">WED <strong>13</strong></span>
+    <span class="day">THU <strong>14</strong></span>
+    <span class="day">FRI <strong>15</strong></span>
+    <span class="day">SAT <strong>16</strong></span>
+    <span class="day today">SUN <strong>17</strong></span>
+  </div>
+
+  <div class="ganttRow">
+    <div class="batchLabel">
+      <span class="nm">Pistachio Crunch Bar</span>
+      <span class="meta">3 fills · 1 mould · 45 pcs</span>
+    </div>
+    <div class="cell"><span class="stage pol"><span class="grip">⋮⋮</span><span class="name">POL</span><span class="time">35m</span></span></div>
+    <div class="cell"><span class="stage she"><span class="grip">⋮⋮</span><span class="name">SHE</span><span class="time">20m</span></span></div>
+    <div class="cell"><span class="stage fil"><span class="grip">⋮⋮</span><span class="name">FIL</span><span class="time">1h</span></span></div>
+    <div class="cell"><span class="stage cap"><span class="grip">⋮⋮</span><span class="name">CAP</span><span class="time">25m</span></span></div>
+    <div class="cell"><span class="stage unm"><span class="grip">⋮⋮</span><span class="name">UNM</span><span class="time">30m</span></span></div>
+    <div class="cell"><span class="stage sea"><span class="grip">⋮⋮</span><span class="name">SEAL</span><span class="time">30m</span></span></div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="ganttRow">
+    <div class="batchLabel">
+      <span class="nm">Strawberry Cheesecake</span>
+      <span class="meta">1 fill · 24-cav · 24 pcs</span>
+    </div>
+    <div class="cell empty"></div>
+    <div class="cell"><span class="stage pol"><span class="grip">⋮⋮</span><span class="name">POL</span><span class="time">25m</span></span></div>
+    <div class="cell"><span class="stage she"><span class="grip">⋮⋮</span><span class="name">SHE</span><span class="time">20m</span></span></div>
+    <div class="cell"><span class="stage fil"><span class="grip">⋮⋮</span><span class="name">FIL</span><span class="time">45m</span></span></div>
+    <div class="cell"><span class="stage cap"><span class="grip">⋮⋮</span><span class="name">CAP</span><span class="time">20m</span></span></div>
+    <div class="cell"><span class="stage unm"><span class="grip">⋮⋮</span><span class="name">UNM</span><span class="time">25m</span></span></div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="ganttRow">
+    <div class="batchLabel">
+      <span class="nm">Espresso Shot</span>
+      <span class="meta">2 fills · 40-cav · 80 pcs</span>
+    </div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell"><span class="stage pol"><span class="grip">⋮⋮</span><span class="name">POL</span><span class="time">45m</span></span></div>
+    <div class="cell"><span class="stage she"><span class="grip">⋮⋮</span><span class="name">SHE</span><span class="time">35m</span></span></div>
+    <div class="cell"><span class="stage fil"><span class="grip">⋮⋮</span><span class="name">FIL</span><span class="time">1h 20m</span></span></div>
+    <div class="cell"><span class="stage cap"><span class="grip">⋮⋮</span><span class="name">CAP</span><span class="time">30m</span></span></div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="ganttRow">
+    <div class="batchLabel">
+      <span class="nm">Hazelnut Crunch</span>
+      <span class="meta">1 fill · 40-cav · 40 pcs · finishing</span>
+    </div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell"><span class="stage unm"><span class="grip">⋮⋮</span><span class="name">UNM</span><span class="time">30m</span></span></div>
+    <div class="cell dropTarget"><span class="stage sea"><span class="grip">⋮⋮</span><span class="name">SEAL</span><span class="time">25m</span></span></div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="totalRow">
+    <span class="lab">Day load</span>
+    <span class="v"><strong>35m</strong><span class="sub">1 stage</span></span>
+    <span class="v"><strong>45m</strong><span class="sub">2 stages</span></span>
+    <span class="v"><strong>2h 05m</strong><span class="sub">3 stages</span></span>
+    <span class="v"><strong>2h 40m</strong><span class="sub">4 stages</span></span>
+    <span class="v over"><strong>3h 25m</strong><span class="sub">4 stages</span></span>
+    <span class="v"><strong>1h 50m</strong><span class="sub">3 stages</span></span>
+    <span class="v"><strong>0m</strong><span class="sub">rest day</span></span>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- OPTION B: Stage swimlanes                   -->
+<!-- ============================================ -->
+<div class="sectionHead">
+  <div>
+    <h2>B · Stage swimlanes</h2>
+    <p class="desc">Rows = stage types (Polishing, Shelling, Filling, Cap, Unmould, Sealing). Columns = days. Cells list which batches need that stage that day.</p>
+  </div>
+  <span class="label">Best for · workshop floor</span>
+</div>
+<div class="panel">
+  <div class="swimHead">
+    <span class="label">Stage</span>
+    <span class="day">MON <strong>11</strong></span>
+    <span class="day">TUE <strong>12</strong></span>
+    <span class="day">WED <strong>13</strong></span>
+    <span class="day">THU <strong>14</strong></span>
+    <span class="day">FRI <strong>15</strong></span>
+    <span class="day">SAT <strong>16</strong></span>
+    <span class="day today">SUN <strong>17</strong></span>
+  </div>
+
+  <div class="swimRow pol">
+    <div class="stageLabel"><span class="dot"></span><div><div class="nm">Polishing</div><div class="sub">active 35m avg</div></div></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Pistachio Bar</span><span class="t">35m</span></div></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Strawberry CC</span><span class="t">25m</span></div></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Espresso</span><span class="t">45m</span></div></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="swimRow she">
+    <div class="stageLabel"><span class="dot"></span><div><div class="nm">Shelling</div><div class="sub">active 25m avg</div></div></div>
+    <div class="cell empty"></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Pistachio Bar</span><span class="t">20m</span></div></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Strawberry CC</span><span class="t">20m</span></div></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Espresso</span><span class="t">35m</span></div></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="swimRow fil">
+    <div class="stageLabel"><span class="dot"></span><div><div class="nm">Filling</div><div class="sub">active 1h avg</div></div></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Pistachio Bar</span><span class="t">1h</span></div></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Strawberry CC</span><span class="t">45m</span></div></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Espresso</span><span class="t">1h 20m</span></div></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="swimRow cap">
+    <div class="stageLabel"><span class="dot"></span><div><div class="nm">Capping</div><div class="sub">active 25m avg</div></div></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Pistachio Bar</span><span class="t">25m</span></div></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Strawberry CC</span><span class="t">20m</span></div></div>
+    <div class="cell"><div class="swimItem"><span class="nm">Espresso</span><span class="t">30m</span></div></div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="swimRow unm">
+    <div class="stageLabel"><span class="dot"></span><div><div class="nm">Unmoulding</div><div class="sub">active 30m avg</div></div></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell">
+      <div class="swimItem"><span class="nm">Pistachio Bar</span><span class="t">30m</span></div>
+      <div class="swimItem"><span class="nm">Hazelnut</span><span class="t">30m</span></div>
+    </div>
+    <div class="cell"><div class="swimItem"><span class="nm">Strawberry CC</span><span class="t">25m</span></div></div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="swimRow sea">
+    <div class="stageLabel"><span class="dot"></span><div><div class="nm">Sealing</div><div class="sub">finishing</div></div></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell empty"></div>
+    <div class="cell">
+      <div class="swimItem"><span class="nm">Pistachio Bar</span><span class="t">30m</span></div>
+      <div class="swimItem"><span class="nm">Hazelnut</span><span class="t">25m</span></div>
+    </div>
+    <div class="cell empty"></div>
+  </div>
+
+  <div class="totalRow">
+    <span class="lab">Day load</span>
+    <span class="v"><strong>35m</strong><span class="sub">1 stage</span></span>
+    <span class="v"><strong>45m</strong><span class="sub">2 stages</span></span>
+    <span class="v"><strong>2h 05m</strong><span class="sub">3 stages</span></span>
+    <span class="v"><strong>2h 40m</strong><span class="sub">4 stages</span></span>
+    <span class="v over"><strong>3h 25m</strong><span class="sub">4 stages</span></span>
+    <span class="v"><strong>1h 50m</strong><span class="sub">3 stages</span></span>
+    <span class="v"><strong>0m</strong><span class="sub">rest day</span></span>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- OPTION C: Day cards with stages-per-batch   -->
+<!-- ============================================ -->
+<div class="sectionHead">
+  <div>
+    <h2>C · Day cards with stages-per-batch</h2>
+    <p class="desc">Keeps the day-column layout you have now. Inside each day, batches are sub-cards showing which stage runs that day. Like the current page, just organized by batch instead of stages being loose.</p>
+  </div>
+  <span class="label">Best for · day-at-a-glance</span>
+</div>
+<div class="panel">
+  <div class="dayCardsGrid">
+
+    <div class="dayCard">
+      <div class="head"><span class="dow">Mon</span><span class="date">11</span></div>
+      <div class="content">
+        <div class="batchBlock pisCol">
+          <div class="bn">Pistachio Crunch Bar</div>
+          <span class="stageInside pol">POL</span><span class="t">35m</span>
+        </div>
+      </div>
+      <div class="footer"><span>1 stage</span><span class="active">35m</span></div>
+    </div>
+
+    <div class="dayCard">
+      <div class="head"><span class="dow">Tue</span><span class="date">12</span></div>
+      <div class="content">
+        <div class="batchBlock pisCol">
+          <div class="bn">Pistachio Crunch Bar</div>
+          <span class="stageInside she">SHE</span><span class="t">20m</span>
+        </div>
+        <div class="batchBlock strCol">
+          <div class="bn">Strawberry Cheesecake</div>
+          <span class="stageInside pol">POL</span><span class="t">25m</span>
+        </div>
+      </div>
+      <div class="footer"><span>2 stages</span><span class="active">45m</span></div>
+    </div>
+
+    <div class="dayCard">
+      <div class="head"><span class="dow">Wed</span><span class="date">13</span></div>
+      <div class="content">
+        <div class="batchBlock pisCol">
+          <div class="bn">Pistachio Crunch Bar</div>
+          <span class="stageInside fil">FIL</span><span class="t">1h</span>
+        </div>
+        <div class="batchBlock strCol">
+          <div class="bn">Strawberry Cheesecake</div>
+          <span class="stageInside she">SHE</span><span class="t">20m</span>
+        </div>
+        <div class="batchBlock espCol">
+          <div class="bn">Espresso Shot</div>
+          <span class="stageInside pol">POL</span><span class="t">45m</span>
+        </div>
+      </div>
+      <div class="footer"><span>3 stages</span><span class="active">2h 05m</span></div>
+    </div>
+
+    <div class="dayCard">
+      <div class="head"><span class="dow">Thu</span><span class="date">14</span></div>
+      <div class="content">
+        <div class="batchBlock pisCol">
+          <div class="bn">Pistachio Crunch Bar</div>
+          <span class="stageInside cap">CAP</span><span class="t">25m</span>
+        </div>
+        <div class="batchBlock strCol">
+          <div class="bn">Strawberry Cheesecake</div>
+          <span class="stageInside fil">FIL</span><span class="t">45m</span>
+        </div>
+        <div class="batchBlock espCol">
+          <div class="bn">Espresso Shot</div>
+          <span class="stageInside she">SHE</span><span class="t">35m</span>
+        </div>
+      </div>
+      <div class="footer"><span>3 stages</span><span class="active">2h 40m</span></div>
+    </div>
+
+    <div class="dayCard">
+      <div class="head"><span class="dow">Fri</span><span class="date">15</span></div>
+      <div class="content">
+        <div class="batchBlock pisCol">
+          <div class="bn">Pistachio Crunch Bar</div>
+          <span class="stageInside unm">UNM</span><span class="t">30m</span>
+        </div>
+        <div class="batchBlock strCol">
+          <div class="bn">Strawberry Cheesecake</div>
+          <span class="stageInside cap">CAP</span><span class="t">20m</span>
+        </div>
+        <div class="batchBlock espCol">
+          <div class="bn">Espresso Shot</div>
+          <span class="stageInside fil">FIL</span><span class="t">1h 20m</span>
+        </div>
+        <div class="batchBlock hazCol">
+          <div class="bn">Hazelnut Crunch</div>
+          <span class="stageInside unm">UNM</span><span class="t">30m</span>
+        </div>
+      </div>
+      <div class="footer"><span>4 stages</span><span class="active" style="color:#d96a52">3h 25m</span></div>
+    </div>
+
+    <div class="dayCard">
+      <div class="head"><span class="dow">Sat</span><span class="date">16</span></div>
+      <div class="content">
+        <div class="batchBlock pisCol">
+          <div class="bn">Pistachio Crunch Bar</div>
+          <span class="stageInside sea">SEAL</span><span class="t">30m</span>
+        </div>
+        <div class="batchBlock strCol">
+          <div class="bn">Strawberry Cheesecake</div>
+          <span class="stageInside unm">UNM</span><span class="t">25m</span>
+        </div>
+        <div class="batchBlock espCol">
+          <div class="bn">Espresso Shot</div>
+          <span class="stageInside cap">CAP</span><span class="t">30m</span>
+        </div>
+        <div class="batchBlock hazCol">
+          <div class="bn">Hazelnut Crunch</div>
+          <span class="stageInside sea">SEAL</span><span class="t">25m</span>
+        </div>
+      </div>
+      <div class="footer"><span>4 stages</span><span class="active">1h 50m</span></div>
+    </div>
+
+    <div class="dayCard empty today">
+      <div class="head"><span class="dow">Sun · today</span><span class="date">17</span></div>
+      <div class="content"><div style="text-align:center;color:#b8b0a3;font-style:italic;font-size:11px;padding:20px 0">rest day</div></div>
+      <div class="footer"><span>—</span><span class="active">0m</span></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="verdict">
+  <span class="ttl">Why Gantt (A)</span>
+  Stages flow visually left-to-right like real production time. When you sequence Pistachio's polishing on Monday, you can see the rest of the row cascade right and verify nothing collides with another batch's mould or your active hours. Drag a single stage chip → reschedule one piece without moving the whole batch. The day-load row at the bottom tells you if any day is overpacked (Fri shows 3h 25m in red).
+  <br><br>
+  <span class="ttl">When B wins</span>
+  If you stand in the workshop in the morning thinking "what am I polishing today?" — swimlanes answer that in one glance. But that question is what <strong>/daily</strong> should answer. This page is planning, not execution.
+  <br><br>
+  <span class="ttl">When C wins</span>
+  Closest to the current page mental model — least retraining. But it loses the time-flow you get from horizontal rows. Pistachio's 6 stages over 6 days look like 6 unrelated cards, not a sequence.
+</div>
+
+</body>
+</html>

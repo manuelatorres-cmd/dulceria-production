@@ -60,7 +60,8 @@ import {
   type FillMouldChoice,
   type PoFillOption,
 } from "@/components/manual-planner/draft-bar/fill-mould-modal";
-import { WeekStripPills } from "@/components/manual-planner/week-strip-pills";
+import { ManualWeekGantt } from "@/components/manual-planner/manual-week-gantt";
+import { moveStageDay } from "@/lib/manual-planner/move-stage-day";
 import { BackButton } from "@/components/back-button";
 import { IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 
@@ -708,19 +709,48 @@ export default function ManualPlannerPage() {
   async function handleDragEnd(e: DragEndEvent) {
     const id = String(e.active.id);
     const overId = e.over?.id ? String(e.over.id) : "";
-    // PlanWeekV2Body uses `plan-day-<iso>` for its day-column drop targets;
-    // the legacy manual-planner WeekGrid used `day-<iso>`. Accept both so
-    // existing draft-bar drag continues to work.
-    let date: string;
-    if (overId.startsWith("plan-day-")) date = overId.slice("plan-day-".length);
-    else if (overId.startsWith("day-")) date = overId.slice("day-".length);
-    else return;
+    // Drop target id formats accepted:
+    //   - `plan-day-<iso>`                ← legacy + WeekStripPills + Gantt fallback
+    //   - `plan-day-<iso>-<planId>`        ← Gantt row-specific drop target
+    //   - `day-<iso>`                      ← legacy manual-planner WeekGrid
+    // Parse the iso date out of any of these forms.
+    let date: string | null = null;
+    if (overId.startsWith("plan-day-")) {
+      const rest = overId.slice("plan-day-".length);
+      // The iso (yyyy-mm-dd) is exactly 10 chars and may be followed by
+      // `-<planId>` (uuid). Take the leading 10 chars when present.
+      if (/^\d{4}-\d{2}-\d{2}/.test(rest)) date = rest.slice(0, 10);
+    } else if (overId.startsWith("day-")) {
+      date = overId.slice("day-".length);
+    }
+    if (!date) return;
+
+    const data = e.active.data.current as
+      | { kind?: string; planId?: string; stepId?: string; sourceDate?: string;
+          trayCardId?: string; trayCardKind?: string }
+      | undefined;
+
+    // ── Stage chip drop (Gantt) ────────────────────────────────────
+    if (data?.kind === "stage" && data.planId && data.stepId) {
+      if (data.sourceDate === date) return; // same day no-op
+      const today = new Date().toISOString().slice(0, 10);
+      if (date < today) {
+        setSaveErr("Cannot move a stage to a past day.");
+        return;
+      }
+      try {
+        await moveStageDay({ planId: data.planId, stepId: data.stepId, targetDate: date });
+      } catch (err) {
+        setSaveErr(`Move failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return;
+    }
+
     if (id === "manual-draft-batch") {
       setDraft((cur) => (cur ? { ...cur, pinnedDate: date } : cur));
       return;
     }
     if (id.startsWith("draft-card-")) {
-      const data = e.active.data.current as { trayCardId?: string; trayCardKind?: string } | undefined;
       if (!data?.trayCardId) return;
       if (data.trayCardKind === "active") {
         setDraft((cur) => (cur ? { ...cur, pinnedDate: date } : cur));
@@ -920,20 +950,28 @@ export default function ManualPlannerPage() {
             </span>
           </div>
 
-          {/* Row 3 — week strip pills. */}
+          {/* Row 3 — week view: Gantt grid per
+              MANUAL_PLANNER_WEEK_VIEW_GANTT.md. Rows=batches, cols=days,
+              cells=StageChips. Drag a chip to another day → moveStageDay
+              rewrites the stepIds[] across productionDayLineItems rows. */}
           <div className="mp-cluster-row week-strip">
-            <WeekStripPills
+            <ManualWeekGantt
               weekAnchor={weekAnchor}
               productionDays={productionDays}
               lineItems={dayLineItems}
               plans={productionPlans}
               planProducts={planProducts}
+              productionSteps={productionSteps}
+              productCategories={productCategories}
               products={products}
               moulds={moulds}
-              capacityConfig={capacityConfig}
-              people={people}
-              unavailability={personUnavailability}
-              blockedDays={eventCalendar}
+              dailyActiveCapacityMinutes={effectiveDailyCapacityMinutes(
+                new Date(),
+                capacityConfig,
+                people,
+                personUnavailability,
+                eventCalendar,
+              ) || null}
               draftPinnedDate={draft?.pinnedDate ?? null}
               draftPreview={
                 draft

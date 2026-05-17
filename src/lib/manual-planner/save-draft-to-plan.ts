@@ -24,6 +24,10 @@ import {
   saveOrderPlanLink,
   savePoPlanLink,
 } from "@/lib/hooks";
+import { supabase, newId } from "@/lib/supabase";
+import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
+import { queryClient } from "@/lib/query-client";
+import type { ProductCategory, Product, ProductionStep } from "@/types";
 import type { DraftBatch } from "./draft-state";
 
 export interface SaveDraftOptions {
@@ -101,5 +105,126 @@ export async function saveDraftToPlan(
     }
   }
 
+  // Seed productionDayLineItems for the pinned day. Per
+  // MANUAL_PLANNER_WEEK_VIEW_GANTT.md §4.4 v1, every step for the
+  // product's category lands on `pinnedDate` itself. The user then drags
+  // chips in the Gantt to spread the workload across days.
+  if (options.status === "active" && pinnedDate) {
+    try {
+      await seedLineItemsForPinnedDay({ planId, productId: draft.productId, pinnedDate });
+      queryClient.invalidateQueries({ queryKey: ["productionDayLineItems"] });
+      queryClient.invalidateQueries({ queryKey: ["production-day-line-items"] });
+      queryClient.invalidateQueries({ queryKey: ["productionDays"] });
+    } catch (e) {
+      warnings.push(
+        `Seed line items for ${pinnedDate}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
   return { planId, warnings };
+}
+
+/**
+ * Insert (or merge into) the productionDayLineItems row for the pinned
+ * day. All productionSteps matching the product's category are placed
+ * on this single day. Creates the productionDays row if missing.
+ */
+async function seedLineItemsForPinnedDay({
+  planId,
+  productId,
+  pinnedDate,
+}: {
+  planId: string;
+  productId: string;
+  pinnedDate: string;
+}): Promise<void> {
+  // 1. Resolve product → category name → step list.
+  const product = assertOkMaybe(
+    await supabase
+      .from("products")
+      .select("id, productCategoryId")
+      .eq("id", productId)
+      .maybeSingle(),
+  ) as Pick<Product, "id" | "productCategoryId"> | null;
+  if (!product?.productCategoryId) return; // no category → no steps to seed
+
+  const category = assertOkMaybe(
+    await supabase
+      .from("productCategories")
+      .select("id, name")
+      .eq("id", product.productCategoryId)
+      .maybeSingle(),
+  ) as Pick<ProductCategory, "id" | "name"> | null;
+  if (!category) return;
+
+  const steps = assertOk(
+    await supabase
+      .from("productionSteps")
+      .select("id, name, activeMinutes, sortOrder")
+      .eq("productType", category.name),
+  ) as Array<Pick<ProductionStep, "id" | "name" | "activeMinutes" | "sortOrder">>;
+  if (steps.length === 0) return;
+
+  const stepIds = steps
+    .slice()
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    .map((s) => s.id!)
+    .filter(Boolean);
+  const plannedMinutes = steps.reduce(
+    (sum, s) => sum + Number(s.activeMinutes ?? 0),
+    0,
+  );
+
+  // 2. Ensure productionDays row.
+  const existingDay = assertOkMaybe(
+    await supabase
+      .from("productionDays")
+      .select("id")
+      .eq("date", pinnedDate)
+      .maybeSingle(),
+  ) as { id: string } | null;
+  let productionDayId: string;
+  if (existingDay) {
+    productionDayId = existingDay.id;
+  } else {
+    productionDayId = newId();
+    const { error } = await supabase.from("productionDays").insert({
+      id: productionDayId,
+      date: pinnedDate,
+      status: "draft",
+    });
+    if (error) throw error;
+  }
+
+  // 3. Merge into productionDayLineItems for (plan, day). UNIQUE
+  //    constraint on (productionDayId, planId) means we must either
+  //    update an existing row or insert a fresh one.
+  const existingLi = assertOkMaybe(
+    await supabase
+      .from("productionDayLineItems")
+      .select("id, stepIds")
+      .eq("planId", planId)
+      .eq("productionDayId", productionDayId)
+      .maybeSingle(),
+  ) as { id: string; stepIds: string[] | null } | null;
+
+  if (existingLi) {
+    const merged = [...new Set([...(existingLi.stepIds ?? []), ...stepIds])];
+    const { error } = await supabase
+      .from("productionDayLineItems")
+      .update({ stepIds: merged, plannedMinutes, updatedAt: new Date() })
+      .eq("id", existingLi.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("productionDayLineItems").insert({
+      id: newId(),
+      productionDayId,
+      planId,
+      stepIds,
+      plannedMinutes,
+      sortOrder: 0,
+    });
+    if (error) throw error;
+  }
 }
