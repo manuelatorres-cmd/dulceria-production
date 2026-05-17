@@ -1824,6 +1824,40 @@ export async function unpinProductionPlan(planId: string): Promise<void> {
   queryClient.invalidateQueries({ queryKey: ["production-plans"] });
 }
 
+/**
+ * Per-line-item lock toggle. Updates productionDayLineItems.locked for
+ * every (planId, date) target in one batch. Mig 0095. Used by the
+ * weekly + manual planner's per-batch and group-level lock affordances
+ * so the lock granularity matches what the user sees on screen — one
+ * StepBlock = one line item = one lock state.
+ */
+export async function setLineItemsLocked(
+  targets: Array<{ planId: string; date: string }>,
+  locked: boolean,
+): Promise<void> {
+  if (targets.length === 0) return;
+  const dates = [...new Set(targets.map((t) => t.date))];
+  const days = assertOk(
+    await supabase.from("productionDays").select("id, date").in("date", dates),
+  ) as Array<{ id: string; date: string }>;
+  const dayIdByDate = new Map(days.map((d) => [d.date.slice(0, 10), d.id]));
+  const resolved = targets
+    .map((t) => ({ planId: t.planId, productionDayId: dayIdByDate.get(t.date) }))
+    .filter((u): u is { planId: string; productionDayId: string } => !!u.productionDayId);
+  if (resolved.length === 0) return;
+  // No composite-key IN in postgrest; iterate with pair-eq updates. Counts
+  // stay tiny (≤ batches-per-day × group-members), so a loop is fine.
+  for (const u of resolved) {
+    const { error } = await supabase
+      .from("productionDayLineItems")
+      .update({ locked, updatedAt: new Date() })
+      .eq("planId", u.planId)
+      .eq("productionDayId", u.productionDayId);
+    if (error) throw error;
+  }
+  queryClient.invalidateQueries({ queryKey: ["productionDayLineItems"] });
+}
+
 /** Bulk-unpin multiple plans. Mirrors pinProductionPlans for group-level
  *  unlock affordances in the weekly planner. */
 export async function unpinProductionPlans(planIds: string[]): Promise<void> {

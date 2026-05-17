@@ -2020,6 +2020,11 @@ export interface ProductionDayLineItem {
    *  the day-detail drawer's "Mark as worked" action so the auto-planner
    *  treats it as historical. Migration 0087. */
   actuallyWorked?: boolean;
+  /** Per-line-item lock. When true, this batch's appearance on this
+   *  specific day is frozen — other days for the same plan stay
+   *  freely draggable. Replaces the old plan-level lock that used
+   *  productionPlans.pinnedDate as a coarse signal. Migration 0095. */
+  locked?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }

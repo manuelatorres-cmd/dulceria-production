@@ -32,7 +32,7 @@ import type {
 } from "@/types";
 import { detectConflicts } from "@/lib/production-plan/detect-conflicts";
 import { moveStep, moveSteps } from "@/lib/production-plan/move-step";
-import { pinProductionPlans, unpinProductionPlans } from "@/lib/hooks";
+import { setLineItemsLocked } from "@/lib/hooks";
 import type { StepGroup } from "./group-block";
 import { WeekGrid } from "./week-grid";
 import { SpanOverlay, type SpanEntry } from "./span-overlay";
@@ -335,12 +335,17 @@ export function PlanWeekV2Body({
     }
   }
 
-  async function handleLockToggle(planIds: string[], lock: boolean): Promise<void> {
-    if (planIds.length === 0) return;
+  async function handleLockToggle(
+    targets: Array<{ planId: string; sourceDate: string }>,
+    lock: boolean,
+  ): Promise<void> {
+    if (targets.length === 0) return;
     setMoveError(null);
     try {
-      if (lock) await pinProductionPlans(planIds);
-      else await unpinProductionPlans(planIds);
+      await setLineItemsLocked(
+        targets.map((t) => ({ planId: t.planId, date: t.sourceDate })),
+        lock,
+      );
     } catch (err) {
       setMoveError(err instanceof Error ? err.message : String(err));
     }

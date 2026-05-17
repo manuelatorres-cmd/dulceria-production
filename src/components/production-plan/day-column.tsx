@@ -57,7 +57,12 @@ export function DayColumn({
       isDragging: boolean;
     }) => React.ReactNode,
   ) => React.ReactNode;
-  onLockToggle?: (planIds: string[], lock: boolean) => void;
+  /**
+   * Per-line-item lock toggle. Targets are (planId, sourceDate) pairs so
+   * one StepBlock = one line item = one row to flip. Group lock passes
+   * every member's pair. Mig 0095.
+   */
+  onLockToggle?: (targets: Array<{ planId: string; sourceDate: string }>, lock: boolean) => void;
 }) {
   const droppable = useDroppable({ id: `plan-day-${iso}`, disabled: isClosed });
   const density = steps.length >= COMPACT_THRESHOLD ? "compact" : "two-line";
@@ -155,7 +160,8 @@ export function DayColumn({
                         onClick={onStepClick ? () => onStepClick(entry) : undefined}
                         onLockToggle={
                           onLockToggle
-                            ? (planId, lock) => onLockToggle([planId], lock)
+                            ? (planId, lock) =>
+                                onLockToggle([{ planId, sourceDate: iso }], lock)
                             : undefined
                         }
                         draggable={!!renderDraggable}
@@ -180,7 +186,15 @@ export function DayColumn({
                   group={slot.group}
                   expanded={isExpanded}
                   onToggle={() => toggleGroup(slot.group.key)}
-                  onLockToggle={onLockToggle}
+                  onLockToggle={
+                    onLockToggle
+                      ? (planIds, lock) =>
+                          onLockToggle(
+                            planIds.map((planId) => ({ planId, sourceDate: iso })),
+                            lock,
+                          )
+                      : undefined
+                  }
                   density={density}
                   draggable={!!renderGroupDraggable}
                   dragHandleProps={dragHandleProps}
@@ -206,7 +220,8 @@ export function DayColumn({
                 onClick={onStepClick ? () => onStepClick(entry) : undefined}
                 onLockToggle={
                   onLockToggle
-                    ? (planId, lock) => onLockToggle([planId], lock)
+                    ? (planId, lock) =>
+                        onLockToggle([{ planId, sourceDate: iso }], lock)
                     : undefined
                 }
                 draggable={!!renderDraggable}

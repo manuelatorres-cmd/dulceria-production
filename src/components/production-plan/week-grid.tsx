@@ -60,9 +60,10 @@ export interface WeekGridInputs {
       isDragging: boolean;
     }) => React.ReactNode,
   ) => React.ReactNode;
-  /** Toggle pinnedDate on one or more plans. Used by group + per-batch
-   *  lock affordances. */
-  onLockToggle?: (planIds: string[], lock: boolean) => void;
+  /** Per-line-item lock toggle (mig 0095). Targets are (planId, sourceDate)
+   *  pairs so locking one StepBlock affects only that batch's appearance
+   *  on that day. */
+  onLockToggle?: (targets: Array<{ planId: string; sourceDate: string }>, lock: boolean) => void;
   /** Phase 4 conflict detection result, keyed by ISO date. */
   conflictsByDate?: Map<string, DayConflict[]>;
 }
@@ -194,7 +195,11 @@ export function WeekGrid(props: WeekGridInputs) {
       const mould = pp ? mouldById.get(pp.mouldId) : undefined;
       const cavities = mould?.numberOfCavities ?? 0;
       const pieces = pp ? (pp.actualYield ?? pp.quantity * cavities) : 0;
-      const isLocked = !!plan.pinnedDate;
+      // 2026-05-17: lock is now per-line-item (mig 0095). The legacy
+      // plan.pinnedDate signal still ORs in so any plans still carrying
+      // the old global pin show as locked across every day until the
+      // user explicitly unlocks per-day.
+      const isLocked = !!li.locked || !!plan.pinnedDate;
 
       const planDates = datesByPlan.get(li.planId) ?? [date];
       const dateIdx = planDates.indexOf(date);
