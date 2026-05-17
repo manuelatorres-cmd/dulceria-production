@@ -6,7 +6,6 @@ import { assertOk, assertOkMaybe } from "@/lib/supabase-query";
 import type { Ingredient, Product, ProductCategory, Filling, FillingCategory, ProductFilling, FillingIngredient, Mould, ProductionPlan, PlanProduct, PlanStepStatus, UserPreferences, ProductFillingHistory, IngredientPriceHistory, ProductCostSnapshot, Experiment, ExperimentIngredient, Packaging, PackagingOrder, PackagingConsumption, ShoppingItem, Variant, VariantProduct, VariantPackaging, VariantPackagingComponent, VariantPackagingProduct, VariantStockLocation, ProductionOrder, ProductionOrderItem, OrderVariantLine, VariantPricingSnapshot, DecorationMaterial, DecorationCategory, ShellDesign, FillingStock, IngredientCategory, IngredientStock, IngredientStockMovement, CapacityConfig, EventCalendarEntry, Person, PersonUnavailability, Equipment, ProductionStep, Order, OrderChannel, OrderStatus, OrderItem, OrderPlanLink, PoPlanLink, StockLocation, StockLocationRow, StockMovement, StockLocationMinimum, StockMovementReason, WasteLogEntry, Customer, CustomerContact, CustomerFollowup, Quote, OrderBox, ProductionDay, ProductionDayLineItem, HaccpTemperatureLog, StockAdjustment, StockAdjustmentItemType, StockAdjustmentReason, OrderPackagingLine, ShopOpeningHours, ShopClosure, CustomerProductPrice, ReplenishmentProposal, ReplenishmentStatus, DailySellEstimate, Campaign, CampaignStatus, MouldPoolInstance, EquipmentInstance, MachineLoad, ColdStorageUnit, MouldUsageLog, StaffShift, PersonAvailabilityException, ProductStock, StockTransfer, StockTransferEntityType, TemperatureReading, HaccpIncident, CsvImport, ExternalSkuMapping, LocationStockMinimum, LocationMinimumEntityType, Notification, NotificationStatus, NotificationUrgency, NotificationType, PriceList, PriceListItem, SubscriptionTemplate, SubscriptionRun, ProductionDayNotes, Calibration } from "@/types";
 import { DEFAULT_PRODUCT_CATEGORIES, DEFAULT_INGREDIENT_CATEGORIES, DEFAULT_COATINGS, SHELF_STABLE_CATEGORIES, CHANNEL_FULFILMENT_DEFAULTS, costPerGram as deriveIngredientCostPerGram, hasPricingData, type MarketRegion, type CurrencyCode, type FillMode, type FulfilmentMode, getCurrencySymbol } from "@/types";
 import { validateCategoryRange } from "@/lib/productCategories";
-import { isCompositionDraft } from "@/lib/manual-planner/is-composition-draft";
 import { calculateProductCost, buildIngredientCostMap, serializeBreakdown, deriveShellPercentageFromGrams } from "@/lib/costCalculation";
 
 // --- Ingredients ---
@@ -2742,14 +2741,12 @@ export function useDraftPlans(): DraftPlanCard[] {
         if (!pp) continue;
         const allocSum = allocSumByPlan.get(plan.id!) ?? { count: 0, qty: 0 };
         if (allocSum.count === 0) continue;
-        // Composition-draft heuristic (HOTFIX 2026-05-18). Filters out
-        // regenerate-seeded drafts (Campaign:/PO:/× N/— consolidated/
-        // — packing) so the manual planner's tray + pool stay scoped
-        // to user-composed drafts only. See is-composition-draft.ts
-        // for the full decision tree; planType column lands in the
-        // next batch.
+        // (SOURCE_FIRST 2026-05-18) The composition-draft filter is
+        // no longer needed — this hook is kept around only as a
+        // safety net for any leftover consumer. Manual planner now
+        // reads useSchedulableSources / useScheduledSources.
         const hasOrderPlanLinks = (orderLinkCountByPlan.get(plan.id!) ?? 0) > 0;
-        if (!isCompositionDraft({ name: plan.name, hasOrderPlanLinks })) continue;
+        void hasOrderPlanLinks;
         const product = productMap.get(pp.productId);
         const mould = mouldMap.get(pp.mouldId);
         const cav = mould?.numberOfCavities ?? 0;
