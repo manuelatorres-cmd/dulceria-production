@@ -60,9 +60,7 @@ import {
   type FillMouldChoice,
   type PoFillOption,
 } from "@/components/manual-planner/draft-bar/fill-mould-modal";
-import { WeekGrid } from "@/components/manual-planner/week-grid/week-grid";
-import type { DayLineItemView } from "@/components/manual-planner/week-grid/day-column";
-import { PlanWeekV2Body } from "@/components/production-plan/plan-week-v2";
+import { WeekStripPills } from "@/components/manual-planner/week-strip-pills";
 import { BackButton } from "@/components/back-button";
 import { IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 
@@ -428,8 +426,11 @@ export default function ManualPlannerPage() {
   }
 
   function isDraftDirty(d: DraftBatch | null): boolean {
+    // Dirty == has at least one allocation. Surplus destination on its own
+    // does NOT count — that path spawned empty parked drafts before the
+    // 2026-05-17 fix.
     if (!d) return false;
-    return d.allocations.length > 0 || d.surplusDestination !== null;
+    return d.allocations.length > 0;
   }
 
   /** Silently park the current draft if dirty. Used before switching drafts
@@ -672,79 +673,9 @@ export default function ManualPlannerPage() {
     productionDayDateById,
   ]);
 
-  const itemsByDate = useMemo(() => {
-    const m = new Map<string, DayLineItemView[]>();
-    for (const li of dayLineItems) {
-      const date = productionDayDateById.get(li.productionDayId);
-      if (!date || !weekIsoSet.has(date)) continue;
-      const plan = planById.get(li.planId);
-      if (!plan) continue;
-      if (plan.status === "done" || plan.status === "cancelled") continue;
-      const pps = planProductsByPlan.get(li.planId) ?? [];
-      const pp = pps[0];
-      const product = pp ? productById.get(pp.productId) : undefined;
-      const mould = pp ? mouldById.get(pp.mouldId) : undefined;
-      const cavities = mould?.numberOfCavities ?? 0;
-      const pieces = pp ? (pp.actualYield ?? pp.quantity * cavities) : 0;
-      const steps = li.stepIds
-        .map((id) => stepById.get(id))
-        .filter((s): s is NonNullable<typeof s> => Boolean(s));
-      const view: DayLineItemView = {
-        id: li.id ?? `${li.productionDayId}:${li.planId}:${li.sortOrder}`,
-        planId: li.planId,
-        planName: plan.name ?? "Batch",
-        productName: product?.name ?? "—",
-        pieces,
-        steps,
-        isLocked: !!plan.pinnedDate,
-      };
-      const arr = m.get(date) ?? [];
-      arr.push(view);
-      m.set(date, arr);
-    }
-    // Also surface manually-pinned plans that have no lineItems yet (just-saved batches).
-    for (const plan of productionPlans) {
-      if (!plan.pinnedDate) continue;
-      if (plan.status === "done" || plan.status === "cancelled") continue;
-      const date = plan.pinnedDate.slice(0, 10);
-      if (!weekIsoSet.has(date)) continue;
-      const planHasLineItems = dayLineItems.some(
-        (li) =>
-          li.planId === plan.id &&
-          productionDayDateById.get(li.productionDayId) === date,
-      );
-      if (planHasLineItems) continue;
-      const pps = planProductsByPlan.get(plan.id ?? "") ?? [];
-      const pp = pps[0];
-      const product = pp ? productById.get(pp.productId) : undefined;
-      const mould = pp ? mouldById.get(pp.mouldId) : undefined;
-      const cavities = mould?.numberOfCavities ?? 0;
-      const pieces = pp ? (pp.actualYield ?? pp.quantity * cavities) : 0;
-      const view: DayLineItemView = {
-        id: `pin:${plan.id}`,
-        planId: plan.id ?? "",
-        planName: plan.name ?? "Batch",
-        productName: product?.name ?? "—",
-        pieces,
-        steps: [],
-        isLocked: true,
-      };
-      const arr = m.get(date) ?? [];
-      arr.push(view);
-      m.set(date, arr);
-    }
-    return m;
-  }, [
-    dayLineItems,
-    productionDayDateById,
-    weekIsoSet,
-    planById,
-    planProductsByPlan,
-    productById,
-    mouldById,
-    stepById,
-    productionPlans,
-  ]);
+  // (Legacy itemsByDate memo removed 2026-05-17. WeekStripPills builds its
+  //  own pill list internally so the redundant DayLineItemView shape is
+  //  no longer needed on this page.)
 
   // ─── Active-minutes for the draft (informational on the bar) ─────
   const draftActiveMinutes = useMemo(() => {
@@ -915,8 +846,16 @@ export default function ManualPlannerPage() {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[380px,1fr] gap-6">
-          <div>
+        {/* Spec §1: upper region is 2-col on ≥1024px (demand 62% / draft 38%).
+            DraftsTray + WeekStripPills sit full-width below. <1024px stacks. */}
+        <div
+          className="grid gap-6"
+          style={{ gridTemplateColumns: "minmax(0, 1fr)" }}
+        >
+          <div
+            className="grid grid-cols-1 lg:grid-cols-[62fr,38fr] gap-6"
+            style={{ alignItems: "start" }}
+          >
             <DemandPicker
               products={productDemands}
               draftProductId={draftProductId}
@@ -925,15 +864,6 @@ export default function ManualPlannerPage() {
               onPickOrderLine={handlePickOrderLine}
               onPickPoLine={handlePickPoLine}
               onAcceptSuggestion={handleAcceptSuggestion}
-            />
-          </div>
-
-          <div className="space-y-4 min-w-0">
-            <DraftsTray
-              cards={buildTrayCards(draftPlanCards, draft)}
-              onLoadCard={(c) => { void handleLoadTrayCard(c); }}
-              onDeleteCard={(c) => { void handleDeleteTrayCard(c); }}
-              onNewDraft={() => { void handleNewDraft(); }}
             />
             <DraftBar
               draft={draft}
@@ -946,23 +876,38 @@ export default function ManualPlannerPage() {
               saving={saving}
               pinnedDateLabel={pinnedDateLabel}
             />
-
-            <PlanWeekV2Body
-              weekAnchor={weekAnchor}
-              setWeekAnchor={setWeekAnchor}
-              productionDays={productionDays}
-              lineItems={dayLineItems}
-              plans={productionPlans}
-              planProducts={planProducts}
-              productionSteps={productionSteps}
-              products={products}
-              moulds={moulds}
-              capacityConfig={capacityConfig}
-              people={people}
-              unavailability={personUnavailability}
-              blockedDays={eventCalendar}
-            />
           </div>
+
+          <DraftsTray
+            cards={buildTrayCards(draftPlanCards, draft)}
+            onLoadCard={(c) => { void handleLoadTrayCard(c); }}
+            onDeleteCard={(c) => { void handleDeleteTrayCard(c); }}
+            onNewDraft={() => { void handleNewDraft(); }}
+          />
+
+          <WeekStripPills
+            weekAnchor={weekAnchor}
+            productionDays={productionDays}
+            lineItems={dayLineItems}
+            plans={productionPlans}
+            planProducts={planProducts}
+            products={products}
+            moulds={moulds}
+            capacityConfig={capacityConfig}
+            people={people}
+            unavailability={personUnavailability}
+            blockedDays={eventCalendar}
+            draftPinnedDate={draft?.pinnedDate ?? null}
+            draftPreview={
+              draft
+                ? {
+                    name: draft.name,
+                    pieces: draft.totalPieces,
+                    mouldCount: draft.mouldCount,
+                  }
+                : null
+            }
+          />
         </div>
 
         {pendingFillMould && draft && (

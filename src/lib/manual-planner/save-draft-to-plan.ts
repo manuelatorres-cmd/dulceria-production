@@ -41,8 +41,12 @@ export async function saveDraftToPlan(
   draft: DraftBatch,
   options: SaveDraftOptions,
 ): Promise<SaveDraftResult> {
-  if (draft.allocations.length === 0 && draft.surplusDestination == null) {
-    throw new Error("Cannot save: no allocations and no surplus destination.");
+  // Hard rule (2026-05-17): no zero-allocation drafts. Earlier path
+  // allowed parking when surplusDestination was set with no allocations,
+  // which spawned "0 lines · +200 surplus" orphans visible in the tray.
+  // Save must carry real demand or it shouldn't exist.
+  if (draft.allocations.length === 0) {
+    throw new Error("Cannot save empty draft — add at least one allocation first.");
   }
   if (options.status === "active" && !options.pinnedDate) {
     throw new Error("Cannot save & pin: no pinned date.");
