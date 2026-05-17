@@ -2712,12 +2712,21 @@ export function useDraftPlans(): DraftPlanCard[] {
       for (const plan of plans) {
         const pp = planProductByPlan.get(plan.id!);
         if (!pp) continue;
+        const allocSum = allocSumByPlan.get(plan.id!) ?? { count: 0, qty: 0 };
+        // Only manual-planner drafts belong in the tray. System-seeded
+        // status='draft' rows (replen seeder names "PO: Replen · …",
+        // campaign generator names "Campaign: …", PO splitter names
+        // "PO: <campaign> — …") have no orderPlanLinks/poPlanLinks
+        // entries because those seeders write planProducts directly.
+        // Filtering by allocationCount > 0 keeps the tray scoped to
+        // user-composed drafts without deleting the seeded rows that
+        // other surfaces (campaign view, replen panel) may still read.
+        if (allocSum.count === 0) continue;
         const product = productMap.get(pp.productId);
         const mould = mouldMap.get(pp.mouldId);
         const cav = mould?.numberOfCavities ?? 0;
         const mouldCount = pp.quantity;
         const totalPieces = mouldCount * cav;
-        const allocSum = allocSumByPlan.get(plan.id!) ?? { count: 0, qty: 0 };
         cards.push({
           planId: plan.id!,
           name: plan.name,
