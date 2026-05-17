@@ -846,15 +846,20 @@ export default function ManualPlannerPage() {
           </div>
         ) : null}
 
-        {/* Spec §1: upper region is 2-col on ≥1024px (demand 62% / draft 38%).
-            DraftsTray + WeekStripPills sit full-width below. <1024px stacks. */}
-        <div
-          className="grid gap-6"
-          style={{ gridTemplateColumns: "minmax(0, 1fr)" }}
-        >
+        {/* Spec §1: upper region is 2-col on ≥1024px (demand 1.55fr / draft 1fr).
+            DraftsTray + WeekStripPills sit full-width below. <1024px stacks.
+            Inline style is the source of truth — Tailwind arbitrary value
+            `lg:grid-cols-[1.55fr_1fr]` is kept only as a hint for class
+            scanners; the inline style + media query is what actually
+            renders so a JIT miscompile can't break the layout. */}
+        <div className="flex flex-col gap-6">
           <div
-            className="grid grid-cols-1 lg:grid-cols-[62fr,38fr] gap-6"
-            style={{ alignItems: "start" }}
+            className="manual-upper-grid"
+            style={{
+              display: "grid",
+              gap: "1.5rem",
+              alignItems: "start",
+            }}
           >
             <DemandPicker
               products={productDemands}

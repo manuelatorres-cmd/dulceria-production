@@ -310,6 +310,19 @@
   color: var(--mp-text-primary);
 }
 
+/* Manual planner upper region: demand picker (~62%) + active draft (~38%)
+   side-by-side on ≥1024px, stacked below. Spec §1. Hand-rolled in CSS
+   because Tailwind arbitrary values with commas (e.g. lg:grid-cols-[62fr,38fr])
+   silently no-op — JIT treats the comma as invalid arbitrary syntax. */
+.manual-upper-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1024px) {
+  .manual-upper-grid {
+    grid-template-columns: 1.55fr 1fr;
+  }
+}
+
 @layer utilities {
   /* Standardised form input — use on <input>, <select>, <textarea>. */
   .input {
