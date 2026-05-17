@@ -62,6 +62,7 @@ import {
 } from "@/components/manual-planner/draft-bar/fill-mould-modal";
 import { WeekGrid } from "@/components/manual-planner/week-grid/week-grid";
 import type { DayLineItemView } from "@/components/manual-planner/week-grid/day-column";
+import { PlanWeekV2Body } from "@/components/production-plan/plan-week-v2";
 import { BackButton } from "@/components/back-button";
 import { IconAlertTriangle as AlertTriangle } from "@tabler/icons-react";
 
@@ -776,8 +777,13 @@ export default function ManualPlannerPage() {
   async function handleDragEnd(e: DragEndEvent) {
     const id = String(e.active.id);
     const overId = e.over?.id ? String(e.over.id) : "";
-    if (!overId.startsWith("day-")) return;
-    const date = overId.slice(4);
+    // PlanWeekV2Body uses `plan-day-<iso>` for its day-column drop targets;
+    // the legacy manual-planner WeekGrid used `day-<iso>`. Accept both so
+    // existing draft-bar drag continues to work.
+    let date: string;
+    if (overId.startsWith("plan-day-")) date = overId.slice("plan-day-".length);
+    else if (overId.startsWith("day-")) date = overId.slice("day-".length);
+    else return;
     if (id === "manual-draft-batch") {
       setDraft((cur) => (cur ? { ...cur, pinnedDate: date } : cur));
       return;
@@ -941,22 +947,20 @@ export default function ManualPlannerPage() {
               pinnedDateLabel={pinnedDateLabel}
             />
 
-            <WeekGrid
-              anchor={weekAnchor}
-              capacityByDate={capacityByDate}
-              itemsByDate={itemsByDate}
-              warnPercent={warnPercent}
-              criticalPercent={criticalPercent}
-              draftPinnedDate={draft?.pinnedDate ?? null}
-              draftPreview={
-                draft
-                  ? {
-                      name: draft.name,
-                      pieces: draft.totalPieces,
-                      mouldCount: draft.mouldCount,
-                    }
-                  : null
-              }
+            <PlanWeekV2Body
+              weekAnchor={weekAnchor}
+              setWeekAnchor={setWeekAnchor}
+              productionDays={productionDays}
+              lineItems={dayLineItems}
+              plans={productionPlans}
+              planProducts={planProducts}
+              productionSteps={productionSteps}
+              products={products}
+              moulds={moulds}
+              capacityConfig={capacityConfig}
+              people={people}
+              unavailability={personUnavailability}
+              blockedDays={eventCalendar}
             />
           </div>
         </div>

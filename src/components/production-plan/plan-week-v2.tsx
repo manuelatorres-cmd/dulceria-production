@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
   useDraggable,
+  useDndMonitor,
   pointerWithin,
   type DragEndEvent,
 } from "@dnd-kit/core";
@@ -37,25 +38,7 @@ import { WeekGrid } from "./week-grid";
 import { SpanOverlay, type SpanEntry } from "./span-overlay";
 import type { DayStepEntry } from "./day-column";
 
-export function PlanWeekV2({
-  weekAnchor,
-  setWeekAnchor,
-  productionDays,
-  lineItems,
-  plans,
-  planProducts,
-  productionSteps,
-  products,
-  moulds,
-  capacityConfig,
-  people,
-  unavailability,
-  blockedDays,
-  onDayHeaderClick,
-  onStepClick,
-  /** Optional slot rendered above the grid (e.g. WeekNav). */
-  weekNav,
-}: {
+export interface PlanWeekV2Props {
   weekAnchor: Date;
   setWeekAnchor: (d: Date) => void;
   productionDays: ProductionDay[];
@@ -71,8 +54,17 @@ export function PlanWeekV2({
   blockedDays: EventCalendarEntry[];
   onDayHeaderClick?: (iso: string) => void;
   onStepClick?: (entry: DayStepEntry) => void;
+  /** Optional slot rendered above the grid (e.g. WeekNav). */
   weekNav?: React.ReactNode;
-}) {
+}
+
+/**
+ * Top-level mount: wraps PlanWeekV2Body in its own DndContext for callers
+ * (like /plan?view=weekly) that don't already provide one. Callers that
+ * own an outer DndContext — e.g. the manual planner, which has its own
+ * draft-card draggables — should mount PlanWeekV2Body directly instead.
+ */
+export function PlanWeekV2(props: PlanWeekV2Props) {
   // PointerSensor alone misses some touch devices; mirror the planner's
   // sensor stack so touch + mouse + keyboard all work on iPad.
   const sensors = useSensors(
@@ -81,6 +73,37 @@ export function PlanWeekV2({
     useSensor(KeyboardSensor),
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
+  return (
+    <DndContext sensors={sensors} collisionDetection={pointerWithin}>
+      <PlanWeekV2Body {...props} />
+    </DndContext>
+  );
+}
+
+/**
+ * The week-grid + group/lock/drag handlers, without an internal
+ * DndContext. Subscribes to the parent context via `useDndMonitor` so
+ * its plan-step move/lock logic coexists with the parent's other
+ * drag handlers (e.g. the manual planner's draft-pin drops).
+ */
+export function PlanWeekV2Body({
+  weekAnchor,
+  setWeekAnchor: _setWeekAnchor,
+  productionDays,
+  lineItems,
+  plans,
+  planProducts,
+  productionSteps,
+  products,
+  moulds,
+  capacityConfig,
+  people,
+  unavailability,
+  blockedDays,
+  onDayHeaderClick,
+  onStepClick,
+  weekNav,
+}: PlanWeekV2Props) {
   const [moveError, setMoveError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const warnPercent = capacityConfig?.warnThresholdPercent ?? 75;
@@ -236,8 +259,13 @@ export function PlanWeekV2({
     const isGroup = "moves" in raw;
     const moves: Array<{ planId: string; stepId: string }> = isGroup
       ? raw.moves
-      : [{ planId: raw.planId, stepId: raw.stepId }];
+      : raw.planId && raw.stepId
+        ? [{ planId: raw.planId, stepId: raw.stepId }]
+        : [];
+    // Foreign drag (e.g. manual planner's draft-card or draft-bar) — has no
+    // plan/step payload. Let the parent DndContext's other handlers process it.
     if (moves.length === 0) return;
+    if (moves.some((m) => !m.planId || !m.stepId)) return;
     if (raw.sourceDate === targetDate) return;
 
     const targetDay = new Date(targetDate + "T12:00:00");
@@ -355,13 +383,13 @@ export function PlanWeekV2({
     );
   }
 
+  // Subscribe to the parent DndContext so this body can be mounted
+  // alongside other draggables (e.g. the manual planner's draft cards)
+  // without owning its own DndContext.
+  useDndMonitor({ onDragEnd: handleDragEnd });
+
   return (
-    <DndContext
-      sensors={sensors}
-      onDragEnd={handleDragEnd}
-      collisionDetection={pointerWithin}
-    >
-      <div className="weekly-plan-v2">
+    <div className="weekly-plan-v2">
         {weekNav}
         {moveError && (
           <div
@@ -413,8 +441,7 @@ export function PlanWeekV2({
             Saving move…
           </p>
         )}
-      </div>
-    </DndContext>
+    </div>
   );
 }
 
